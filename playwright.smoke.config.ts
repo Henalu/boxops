@@ -1,0 +1,32 @@
+import { defineConfig } from "@playwright/test";
+
+const port = Number(process.env.E2E_PORT ?? 3000);
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
+const shouldStartLocalServer = process.env.E2E_START_SERVER === "1";
+
+export default defineConfig({
+  testDir: "./tests/smoke",
+  fullyParallel: false,
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 1 : 0,
+  timeout: 60_000,
+  expect: {
+    timeout: 10_000,
+  },
+  reporter: [["list"], ["html", { open: "never" }]],
+  use: {
+    baseURL,
+    headless: true,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
+  },
+  webServer: shouldStartLocalServer
+    ? {
+        command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+        url: baseURL,
+      }
+    : undefined,
+});

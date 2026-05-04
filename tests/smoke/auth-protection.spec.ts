@@ -1,0 +1,37 @@
+import { expect, test } from "@playwright/test";
+
+const protectedRoutes = [
+  "/app",
+  "/app/centers",
+  "/app/coaches",
+  "/app/class-types",
+  "/app/coverage?week=2026-05-04",
+  "/app/more",
+  "/app/schedule?week=2026-05-04&risks_only=1",
+  "/app/templates?week=2026-05-04",
+];
+
+test("login page renders the public auth surface", async ({ request }) => {
+  const response = await request.get("/login");
+
+  expect(response.ok()).toBeTruthy();
+
+  const html = await response.text();
+  expect(html).toContain("Accede a la operativa de tu box.");
+  expect(html).toContain("Iniciar sesion");
+});
+
+for (const route of protectedRoutes) {
+  test(`anonymous users are redirected from ${route}`, async ({ request, baseURL }) => {
+    const response = await request.get(route, { maxRedirects: 0 });
+
+    expect([302, 303, 307, 308]).toContain(response.status());
+
+    const location = response.headers().location;
+    expect(location).toBeTruthy();
+
+    const redirectUrl = new URL(location!, baseURL);
+    expect(redirectUrl.pathname).toBe("/login");
+    expect(redirectUrl.searchParams.get("redirectTo")).toBe(route);
+  });
+}
