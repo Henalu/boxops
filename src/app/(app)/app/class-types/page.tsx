@@ -1,27 +1,27 @@
 import { redirect } from "next/navigation";
-import {
-  CircleOff,
-  Dumbbell,
-  Plus,
-  Save,
-} from "lucide-react";
+import { CircleOff, Plus, Save } from "lucide-react";
 
 import {
   createClassType,
   setClassTypeStatus,
   updateClassType,
 } from "./actions";
+import {
+  CollapsibleActionPanel,
+  InlineEditDetails,
+  MetaGrid,
+  MetaItem,
+} from "@/components/features/management-ui";
+import {
+  EmptyState,
+  PageHeader,
+  SectionHeader,
+} from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
@@ -43,22 +43,22 @@ export const dynamic = "force-dynamic";
 
 type ClassTypesPageProps = {
   searchParams: Promise<{
+    error?: string | string[];
     organizationId?: string | string[];
     status?: string | string[];
-    error?: string | string[];
   }>;
 };
 
 type ClassTypeRow = Pick<
   Tables<"class_types">,
+  | "category"
+  | "color"
   | "id"
   | "name"
-  | "slug"
-  | "category"
   | "required_coaches"
   | "requires_certification"
+  | "slug"
   | "status"
-  | "color"
   | "updated_at"
 >;
 
@@ -80,11 +80,11 @@ const errorMessages: Record<string, string> = {
   "invalid-slug": "Usa un slug en minusculas, numeros y guiones.",
   "invalid-status": "El estado seleccionado no es valido.",
   "missing-fields": "Completa nombre y slug.",
-  "save-failed": "No se han podido guardar los cambios.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organizacion solicitada no esta disponible.",
   organization_required:
     "Elige una organizacion antes de gestionar tipos de actividad.",
+  "save-failed": "No se han podido guardar los cambios.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -227,65 +227,52 @@ function ColorField({ defaultValue }: { defaultValue?: string | null }) {
 
 function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Plus aria-hidden="true" className="size-4" />
-          Crear tipo de actividad
-        </CardTitle>
-        <CardDescription>
-          Define una clase o actividad para usarla en horarios y plantillas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={createClassType} className="grid gap-4 lg:grid-cols-6">
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <input name="status" type="hidden" value="active" />
+    <form action={createClassType} className="grid gap-4 lg:grid-cols-6">
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="status" type="hidden" value="active" />
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Nombre</span>
-            <Input name="name" placeholder="Open Box" required />
-          </label>
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Nombre</span>
+        <Input name="name" placeholder="Open Box" required />
+      </label>
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Slug</span>
-            <Input name="slug" placeholder="open-box" />
-          </label>
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Slug interno</span>
+        <Input name="slug" placeholder="open-box" />
+      </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Categoria</span>
-            <ClassTypeCategorySelect />
-          </label>
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Categoria</span>
+        <ClassTypeCategorySelect />
+      </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coaches</span>
-            <Input
-              defaultValue="1"
-              max="20"
-              min="0"
-              name="requiredCoaches"
-              required
-              type="number"
-            />
-          </label>
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Coaches</span>
+        <Input
+          defaultValue="1"
+          max="20"
+          min="0"
+          name="requiredCoaches"
+          required
+          type="number"
+        />
+      </label>
 
-          <div className="lg:col-span-2">
-            <ColorField />
-          </div>
+      <div className="lg:col-span-2">
+        <ColorField />
+      </div>
 
-          <div className="flex items-end lg:col-span-2">
-            <CertificationCheckbox />
-          </div>
+      <div className="flex items-end lg:col-span-2">
+        <CertificationCheckbox />
+      </div>
 
-          <div className="flex items-end lg:col-span-2">
-            <Button className="w-full sm:w-auto" type="submit">
-              <Plus aria-hidden="true" />
-              Crear tipo
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <div className="flex items-end lg:col-span-2">
+        <Button className="w-full sm:w-auto" type="submit">
+          <Plus aria-hidden="true" />
+          Crear tipo
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -297,46 +284,32 @@ function ClassTypeReadOnlyCard({
   timezone: string;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2">
-              <ColorSwatch color={classType.color} />
-              <span className="truncate">{classType.name}</span>
-            </CardTitle>
-            <CardDescription className="truncate">
-              {classType.slug}
-            </CardDescription>
-          </div>
+    <Card size="sm">
+      <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.2fr)_auto] lg:items-start">
+        <div className="min-w-0">
+          <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight">
+            <ColorSwatch color={classType.color} />
+            <span className="truncate">{classType.name}</span>
+          </h3>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            {classType.slug}
+          </p>
+        </div>
+        <MetaGrid className="lg:grid-cols-4">
+          <MetaItem label="Categoria">
+            {getClassTypeCategoryLabel(classType.category)}
+          </MetaItem>
+          <MetaItem label="Coaches">{classType.required_coaches}</MetaItem>
+          <MetaItem label="Certificacion">
+            {classType.requires_certification ? "Si" : "No"}
+          </MetaItem>
+          <MetaItem label="Actualizado">
+            {formatUpdatedAt(classType.updated_at, timezone)}
+          </MetaItem>
+        </MetaGrid>
+        <div className="flex justify-start lg:justify-end">
           <ClassTypeStatusBadge status={classType.status} />
         </div>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid gap-3 text-sm sm:grid-cols-4">
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Categoria</dt>
-            <dd className="mt-1 truncate font-medium">
-              {getClassTypeCategoryLabel(classType.category)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Coaches</dt>
-            <dd className="mt-1 font-medium">{classType.required_coaches}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Certificacion</dt>
-            <dd className="mt-1 font-medium">
-              {classType.requires_certification ? "Si" : "No"}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Ultima actualizacion</dt>
-            <dd className="mt-1 truncate">
-              {formatUpdatedAt(classType.updated_at, timezone)}
-            </dd>
-          </div>
-        </dl>
       </CardContent>
     </Card>
   );
@@ -355,88 +328,118 @@ function ClassTypeAdminCard({
     classType.status === "active" ? "inactive" : "active";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+    <Card size="sm">
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.2fr)_auto] lg:items-start">
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2">
+            <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight">
               <ColorSwatch color={classType.color} />
               <span className="truncate">{classType.name}</span>
-            </CardTitle>
-            <CardDescription className="truncate">
-              Actualizado {formatUpdatedAt(classType.updated_at, timezone)}
-            </CardDescription>
+            </h3>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {classType.slug}
+            </p>
           </div>
-          <ClassTypeStatusBadge status={classType.status} />
+          <MetaGrid className="lg:grid-cols-4">
+            <MetaItem label="Categoria">
+              {getClassTypeCategoryLabel(classType.category)}
+            </MetaItem>
+            <MetaItem label="Coaches">{classType.required_coaches}</MetaItem>
+            <MetaItem label="Certificacion">
+              {classType.requires_certification ? "Si" : "No"}
+            </MetaItem>
+            <MetaItem label="Actualizado">
+              {formatUpdatedAt(classType.updated_at, timezone)}
+            </MetaItem>
+          </MetaGrid>
+          <div className="flex justify-start lg:justify-end">
+            <ClassTypeStatusBadge status={classType.status} />
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <form action={updateClassType} className="grid gap-4 lg:grid-cols-6">
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <input name="classTypeId" type="hidden" value={classType.id} />
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Nombre</span>
-            <Input name="name" required defaultValue={classType.name} />
-          </label>
+        <InlineEditDetails label="Gestionar">
+          <div className="space-y-4">
+            <form
+              action={updateClassType}
+              className="grid gap-4 lg:grid-cols-6"
+            >
+              <input
+                name="organizationId"
+                type="hidden"
+                value={organizationId}
+              />
+              <input name="classTypeId" type="hidden" value={classType.id} />
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Slug</span>
-            <Input name="slug" required defaultValue={classType.slug} />
-          </label>
+              <label className="grid gap-2 lg:col-span-2">
+                <span className="text-sm font-medium">Nombre</span>
+                <Input name="name" required defaultValue={classType.name} />
+              </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Categoria</span>
-            <ClassTypeCategorySelect defaultValue={classType.category} />
-          </label>
+              <label className="grid gap-2 lg:col-span-2">
+                <span className="text-sm font-medium">Slug interno</span>
+                <Input name="slug" required defaultValue={classType.slug} />
+              </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coaches</span>
-            <Input
-              defaultValue={classType.required_coaches}
-              max="20"
-              min="0"
-              name="requiredCoaches"
-              required
-              type="number"
-            />
-          </label>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium">Categoria</span>
+                <ClassTypeCategorySelect defaultValue={classType.category} />
+              </label>
 
-          <div className="lg:col-span-2">
-            <ColorField defaultValue={classType.color} />
+              <label className="grid gap-2">
+                <span className="text-sm font-medium">Coaches</span>
+                <Input
+                  defaultValue={classType.required_coaches}
+                  max="20"
+                  min="0"
+                  name="requiredCoaches"
+                  required
+                  type="number"
+                />
+              </label>
+
+              <div className="lg:col-span-2">
+                <ColorField defaultValue={classType.color} />
+              </div>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-medium">Estado</span>
+                <ClassTypeStatusSelect defaultValue={classType.status} />
+              </label>
+
+              <div className="flex items-end lg:col-span-2">
+                <CertificationCheckbox
+                  defaultChecked={classType.requires_certification}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 lg:col-span-6">
+                <Button type="submit">
+                  <Save aria-hidden="true" />
+                  Guardar cambios
+                </Button>
+              </div>
+            </form>
+
+            <form action={setClassTypeStatus}>
+              <input
+                name="organizationId"
+                type="hidden"
+                value={organizationId}
+              />
+              <input name="classTypeId" type="hidden" value={classType.id} />
+              <input name="nextStatus" type="hidden" value={nextStatus} />
+              <Button
+                type="submit"
+                variant={nextStatus === "inactive" ? "destructive" : "outline"}
+              >
+                <CircleOff aria-hidden="true" />
+                {nextStatus === "inactive"
+                  ? "Desactivar tipo"
+                  : "Activar tipo"}
+              </Button>
+            </form>
           </div>
-
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Estado</span>
-            <ClassTypeStatusSelect defaultValue={classType.status} />
-          </label>
-
-          <div className="flex items-end lg:col-span-2">
-            <CertificationCheckbox
-              defaultChecked={classType.requires_certification}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2 lg:col-span-6">
-            <Button type="submit">
-              <Save aria-hidden="true" />
-              Guardar cambios
-            </Button>
-          </div>
-        </form>
-
-        <form action={setClassTypeStatus}>
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <input name="classTypeId" type="hidden" value={classType.id} />
-          <input name="nextStatus" type="hidden" value={nextStatus} />
-          <Button
-            type="submit"
-            variant={nextStatus === "inactive" ? "destructive" : "outline"}
-          >
-            <CircleOff aria-hidden="true" />
-            {nextStatus === "inactive" ? "Desactivar tipo" : "Activar tipo"}
-          </Button>
-        </form>
+        </InlineEditDetails>
       </CardContent>
     </Card>
   );
@@ -461,7 +464,11 @@ export default async function ClassTypesPage({
   if (!resolution.ok) {
     return (
       <div className="space-y-6">
-        <PageHeader />
+        <PageHeader
+          badge="Tipos de actividad"
+          title="Tipos de actividad"
+          description="Define las clases y actividades que se usaran en horarios y plantillas."
+        />
         <OrganizationResolutionState
           basePath="/app/class-types"
           resolution={resolution}
@@ -476,8 +483,15 @@ export default async function ClassTypesPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        organizationName={resolution.organization.name}
-        role={resolution.membership.role}
+        badge="Tipos de actividad"
+        description="Mantiene el catalogo operativo que alimenta horarios, plantillas y cobertura."
+        meta={
+          <>
+            <Badge variant="secondary">{resolution.organization.name}</Badge>
+            <Badge variant="outline">Rol {resolution.membership.role}</Badge>
+          </>
+        }
+        title="Tipos de actividad"
       />
 
       {status && successMessages[status] ? (
@@ -497,7 +511,14 @@ export default async function ClassTypesPage({
       ) : null}
 
       {canManageClassTypes ? (
-        <ClassTypeCreateForm organizationId={resolution.organization.id} />
+        <CollapsibleActionPanel
+          actionLabel="Crear"
+          description="Anade clases, recepcion u otras actividades que luego se programan como bloques."
+          icon={Plus}
+          title="Crear tipo de actividad"
+        >
+          <ClassTypeCreateForm organizationId={resolution.organization.id} />
+        </CollapsibleActionPanel>
       ) : (
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
@@ -509,31 +530,23 @@ export default async function ClassTypesPage({
       )}
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              Catalogo
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Nombre, categoria, coaches necesarios, certificacion y color.
-            </p>
-          </div>
-          <Badge variant="outline">{classTypes.length} tipos</Badge>
-        </div>
+        <SectionHeader
+          action={<Badge variant="outline">{classTypes.length} tipos</Badge>}
+          description="Nombre, categoria, coaches necesarios, certificacion y color."
+          title="Catalogo"
+        />
 
         {classTypes.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No hay tipos de actividad todavia</CardTitle>
-              <CardDescription>
-                {canManageClassTypes
-                  ? "Crea el primer tipo para preparar horarios y plantillas."
-                  : "Un admin debe crear el catalogo antes de que aparezca aqui."}
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <EmptyState
+            description={
+              canManageClassTypes
+                ? "Crea el primer tipo para preparar horarios y plantillas."
+                : "Un admin debe crear el catalogo antes de que aparezca aqui."
+            }
+            title="No hay tipos de actividad todavia"
+          />
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {classTypes.map((classType) =>
               canManageClassTypes ? (
                 <ClassTypeAdminCard
@@ -563,35 +576,5 @@ export default async function ClassTypesPage({
         </AlertDescription>
       </Alert>
     </div>
-  );
-}
-
-function PageHeader({
-  organizationName,
-  role,
-}: {
-  organizationName?: string;
-  role?: string;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">Tipos de actividad</Badge>
-        {organizationName ? (
-          <Badge variant="secondary">{organizationName}</Badge>
-        ) : null}
-        {role ? <Badge variant="outline">Rol {role}</Badge> : null}
-      </div>
-      <div className="max-w-3xl space-y-2">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-          <Dumbbell aria-hidden="true" className="size-6" />
-          Tipos de actividad
-        </h1>
-        <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-          Define las clases y actividades que se usaran en horarios y
-          plantillas.
-        </p>
-      </div>
-    </section>
   );
 }

@@ -19,6 +19,16 @@ import {
   updateScheduleTemplate,
   updateScheduleTemplateBlock,
 } from "./actions";
+import {
+  CollapsibleActionPanel,
+  InlineEditDetails,
+  MetaGrid,
+  MetaItem,
+} from "@/components/features/management-ui";
+import {
+  EmptyState,
+  SectionHeader,
+} from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -672,63 +682,49 @@ function TemplateCreateForm({
   weekStart: string;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Plus aria-hidden="true" className="size-4" />
-          Crear plantilla semanal
-        </CardTitle>
-        <CardDescription>
-          Define un patron reutilizable. Los bloques de cada dia se crean
-          despues dentro de la plantilla.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          action={createScheduleTemplate}
-          className="grid gap-4 lg:grid-cols-6"
-        >
-          <TemplateHiddenInputs
-            organizationId={organizationId}
-            weekStart={weekStart}
-          />
+    <form
+      action={createScheduleTemplate}
+      className="grid gap-4 lg:grid-cols-6"
+    >
+      <TemplateHiddenInputs
+        organizationId={organizationId}
+        weekStart={weekStart}
+      />
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Nombre</span>
-            <Input
-              maxLength={120}
-              name="name"
-              placeholder="Semana base"
-              required
-            />
-          </label>
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Nombre</span>
+        <Input
+          maxLength={120}
+          name="name"
+          placeholder="Semana base"
+          required
+        />
+      </label>
 
-          <label className="grid gap-2 lg:col-span-2">
-            <span className="text-sm font-medium">Alcance de centro</span>
-            <OptionalCenterSelect centers={activeCenters} />
-          </label>
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Alcance de centro</span>
+        <OptionalCenterSelect centers={activeCenters} />
+      </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Valida desde</span>
-            <Input name="validFrom" type="date" />
-          </label>
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Valida desde</span>
+        <Input name="validFrom" type="date" />
+      </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Valida hasta</span>
-            <Input name="validUntil" type="date" />
-          </label>
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Valida hasta</span>
+        <Input name="validUntil" type="date" />
+      </label>
 
-          <input name="status" type="hidden" value="draft" />
+      <input name="status" type="hidden" value="draft" />
 
-          <div className="flex items-end lg:col-span-6">
-            <Button type="submit">
-              <Plus aria-hidden="true" />
-              Crear plantilla
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <div className="flex items-end lg:col-span-6">
+        <Button type="submit">
+          <Plus aria-hidden="true" />
+          Crear plantilla
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -911,14 +907,10 @@ function TemplateBlockCreateForm({
   const canCreate = activeCenters.length > 0 && activeClassTypes.length > 0;
 
   return (
-    <div className="rounded-lg border border-border p-4">
-      <h4 className="flex items-center gap-2 text-sm font-medium">
-        <Plus aria-hidden="true" className="size-4" />
-        Anadir bloque a la plantilla
-      </h4>
+    <InlineEditDetails label="Anadir bloque">
       <form
         action={createScheduleTemplateBlock}
-        className="mt-4 grid gap-4 lg:grid-cols-6"
+        className="grid gap-4 lg:grid-cols-6"
       >
         <TemplateHiddenInputs
           organizationId={organizationId}
@@ -945,7 +937,7 @@ function TemplateBlockCreateForm({
           antes de crear bloques de plantilla.
         </p>
       ) : null}
-    </div>
+    </InlineEditDetails>
   );
 }
 
@@ -971,6 +963,10 @@ function TemplateBlockAdminRow({
   const defaultCoach = block.default_coach_profile_id
     ? coachDisplaysById.get(block.default_coach_profile_id)
     : null;
+  const center = centers.find((candidate) => candidate.id === block.center_id);
+  const classType = classTypes.find(
+    (candidate) => candidate.id === block.class_type_id,
+  );
 
   if (templateArchived) {
     return (
@@ -984,42 +980,68 @@ function TemplateBlockAdminRow({
   }
 
   return (
-    <div className="rounded-lg border border-border p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Clock aria-hidden="true" className="size-4 shrink-0" />
-          <h4 className="truncate text-sm font-medium">
-            {getScheduleTemplateDayLabel(block.day_of_week)} /{" "}
-            {formatTime(block.start_time)} - {formatTime(block.end_time)}
+    <div className="space-y-4 rounded-lg border border-border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h4 className="flex items-center gap-2 text-sm font-medium">
+            <Clock aria-hidden="true" className="size-4 shrink-0" />
+            <span>
+              {getScheduleTemplateDayLabel(block.day_of_week)} /{" "}
+              {formatTime(block.start_time)} - {formatTime(block.end_time)}
+            </span>
           </h4>
+          <p className="text-sm text-muted-foreground">
+            {block.required_coaches} coach
+            {block.required_coaches === 1 ? "" : "es"} necesario
+            {block.required_coaches === 1 ? "" : "s"}
+          </p>
         </div>
         <Badge variant={block.default_coach_profile_id ? "secondary" : "outline"}>
-          {block.default_coach_profile_id ? "Con coach" : "Vacante"}
+          {defaultCoach?.label ?? "Vacante"}
         </Badge>
       </div>
-      <form
-        action={updateScheduleTemplateBlock}
-        className="grid gap-4 lg:grid-cols-6"
-      >
-        <TemplateHiddenInputs
-          organizationId={organizationId}
-          templateId={block.template_id}
-          weekStart={weekStart}
-        />
-        <input name="templateBlockId" type="hidden" value={block.id} />
-        <TemplateBlockFields
-          assignableCoaches={assignableCoaches}
-          block={block}
-          centers={centers}
-          classTypes={classTypes}
-        />
-        <div className="flex items-end lg:col-span-6">
-          <Button type="submit">
-            <Save aria-hidden="true" />
-            Guardar bloque
-          </Button>
-        </div>
-      </form>
+      <MetaGrid className="lg:grid-cols-4">
+        <MetaItem label="Centro">
+          {center?.name ?? "Centro no disponible"}
+        </MetaItem>
+        <MetaItem label="Actividad">
+          <span className="flex min-w-0 items-center gap-2">
+            <ColorSwatch color={classType?.color ?? null} />
+            <span className="truncate">
+              {classType?.name ?? "Tipo no disponible"}
+            </span>
+          </span>
+        </MetaItem>
+        <MetaItem label="Coach por defecto">
+          {defaultCoach?.label ?? "Vacante"}
+        </MetaItem>
+        <MetaItem label="Notas">{block.notes || "Sin notas"}</MetaItem>
+      </MetaGrid>
+      <InlineEditDetails label="Editar bloque">
+        <form
+          action={updateScheduleTemplateBlock}
+          className="grid gap-4 lg:grid-cols-6"
+        >
+          <TemplateHiddenInputs
+            organizationId={organizationId}
+            templateId={block.template_id}
+            weekStart={weekStart}
+          />
+          <input name="templateBlockId" type="hidden" value={block.id} />
+          <TemplateBlockFields
+            assignableCoaches={assignableCoaches}
+            block={block}
+            centers={centers}
+            classTypes={classTypes}
+          />
+          <div className="flex items-end lg:col-span-6">
+            <Button type="submit">
+              <Save aria-hidden="true" />
+              Guardar bloque
+            </Button>
+          </div>
+        </form>
+      </InlineEditDetails>
     </div>
   );
 }
@@ -1110,7 +1132,7 @@ function ApplyTemplateForm({
   return (
     <form
       action={applyScheduleTemplateToWeek}
-      className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-[minmax(180px,240px)_auto]"
+      className="grid gap-3 sm:grid-cols-[minmax(180px,240px)_auto]"
     >
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="templateId" type="hidden" value={template.id} />
@@ -1197,42 +1219,37 @@ function TemplateCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Valida desde</dt>
-            <dd className="mt-1 truncate font-medium">
-              {formatDate(template.valid_from)}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Valida hasta</dt>
-            <dd className="mt-1 truncate font-medium">
-              {formatDate(template.valid_until)}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Aplicacion</dt>
-            <dd className="mt-1 truncate font-medium">
-              Crea bloques reales y asignaciones por defecto.
-            </dd>
-          </div>
-        </dl>
+        <MetaGrid className="lg:grid-cols-3">
+          <MetaItem label="Valida desde">
+            {formatDate(template.valid_from)}
+          </MetaItem>
+          <MetaItem label="Valida hasta">
+            {formatDate(template.valid_until)}
+          </MetaItem>
+          <MetaItem label="Aplicacion">
+            Crea bloques reales y asignaciones por defecto.
+          </MetaItem>
+        </MetaGrid>
 
         {canManageTemplates ? (
-          <>
-            <TemplateMetaForm
-              centers={centers}
-              organizationId={organizationId}
-              template={template}
-              weekStart={weekStart}
-            />
-            <ApplyTemplateForm
-              blockCount={blocks.length}
-              organizationId={organizationId}
-              template={template}
-              weekStart={weekStart}
-            />
-          </>
+          <div className="grid gap-3">
+            <InlineEditDetails label="Editar plantilla">
+              <TemplateMetaForm
+                centers={centers}
+                organizationId={organizationId}
+                template={template}
+                weekStart={weekStart}
+              />
+            </InlineEditDetails>
+            <InlineEditDetails label="Aplicar a semana">
+              <ApplyTemplateForm
+                blockCount={blocks.length}
+                organizationId={organizationId}
+                template={template}
+                weekStart={weekStart}
+              />
+            </InlineEditDetails>
+          </div>
         ) : null}
 
         <section className="space-y-3">
@@ -1394,11 +1411,18 @@ export default async function TemplatesPage({
       ) : null}
 
       {canManageTemplates ? (
-        <TemplateCreateForm
-          activeCenters={activeCenters}
-          organizationId={resolution.organization.id}
-          weekStart={week.weekStart}
-        />
+        <CollapsibleActionPanel
+          actionLabel="Crear"
+          description="Define un patron semanal reutilizable. Los bloques se anaden dentro de cada plantilla."
+          icon={Plus}
+          title="Crear plantilla semanal"
+        >
+          <TemplateCreateForm
+            activeCenters={activeCenters}
+            organizationId={resolution.organization.id}
+            weekStart={week.weekStart}
+          />
+        </CollapsibleActionPanel>
       ) : (
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
@@ -1410,32 +1434,25 @@ export default async function TemplatesPage({
       )}
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              Plantillas semanales
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Patrones semanales reutilizables con bloques vacantes o coach por
-              defecto.
-            </p>
-          </div>
-          <Badge variant="outline">{templates.length} plantillas</Badge>
-        </div>
+        <SectionHeader
+          action={
+            <Badge variant="outline">{templates.length} plantillas</Badge>
+          }
+          description="Patrones semanales reutilizables con bloques vacantes o coach por defecto."
+          title="Plantillas semanales"
+        />
 
         {templates.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No hay plantillas todavia</CardTitle>
-              <CardDescription>
-                {canManageTemplates
-                  ? "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
-                  : "Un admin debe crear plantillas antes de que aparezcan aqui."}
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <EmptyState
+            description={
+              canManageTemplates
+                ? "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
+                : "Un admin debe crear plantillas antes de que aparezcan aqui."
+            }
+            title="No hay plantillas todavia"
+          />
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {templates.map((template) => (
               <TemplateCard
                 activeCenters={activeCenters}
