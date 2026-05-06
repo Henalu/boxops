@@ -304,9 +304,11 @@ Debe separar al menos tres areas de visibilidad:
 - Documentos de gestion/admin: documentos internos o sensibles visibles solo para `admin` en el primer corte.
 - Documentos particulares de miembro: documentos asociados a una persona concreta, visibles para esa persona y roles autorizados.
 
-Al subir un documento, el rol autorizado debe poder marcarlo como documento que requiere firma y seleccionar que miembros/personas deben firmarlo. La firma debe apoyarse en una firma dibujada por el usuario desde su perfil, similar al flujo de ShiftSwap: una vez creada, el usuario puede pulsar firmar y la app aplica una copia/snapshot de esa firma al documento o genera una version firmada.
+Al subir un documento, el rol autorizado debe poder marcarlo como documento que requiere firma y seleccionar que miembros/personas deben firmarlo. La firma debe apoyarse en "Mi firma": una firma dibujada reutilizable creada por el usuario desde "Mi perfil" o "Mi cuenta", similar al flujo de ShiftSwap.
 
-Cada firma debe guardar estado por firmante y auditoria minima: documento/version, firmante, usuario autenticado, fecha y resultado. La firma se modela como confirmacion trazable de producto; cualquier uso con validez laboral/legal fuerte requiere revision legal previa.
+Crear o actualizar "Mi firma" es una accion personal separada de firmar un documento. Una vez creada, el usuario puede pulsar "Firmar" en documentos, nominas, politicas internas, confirmaciones u otras secciones futuras, y la app reutiliza la firma guardada del usuario autenticado. Si no existe firma guardada, el flujo debe pedir crearla antes de continuar o permitir crearla inline segun decision de UX.
+
+Cada firma aplicada debe guardar estado por firmante y auditoria minima: organizacion, documento/version o entidad firmada, usuario autenticado, persona firmante, fecha/hora, snapshot de firma usado, IP/user agent si se decide y resultado. No basta con apuntar a la firma actual del perfil, porque el usuario puede actualizarla despues. La firma se modela como confirmacion trazable de producto; cualquier uso con validez laboral/legal fuerte requiere revision legal previa.
 
 MVP futuro: repositorio, subida, consulta, solicitud de firma y firma basica. No generacion automatica de nominas.
 
@@ -355,6 +357,8 @@ El panel admin debe priorizar alertas operativas:
 ## Roadmap MVP
 
 La definicion operativa vive en `docs/product/mvp.md`.
+
+Nota 2026-05-06: tras Task 017, MVP 1 visual/operativo esta avanzado. El orden ejecutable actualizado vive en `docs/product/roadmap.md` y `TASKS.md`: Fase A cierre MVP 1 real, Fase B configuracion/branding/roles, Fase C auth/security, Fase D area personal/RRHH, Fase E documentos, Fase F fichaje manual, Fase G geolocalizacion asistida, Fase H PWA/app movil y Fase I cambios/ausencias/eventos/horas/IA.
 
 Resumen:
 
@@ -409,6 +413,7 @@ Datos conocidos:
 ## Documentos Relacionados
 
 - `docs/product/mvp.md`
+- `docs/product/roadmap.md`
 - `docs/product/design-direction.md`
 - `docs/product/ux-principles.md`
 - `docs/product/screen-map.md`

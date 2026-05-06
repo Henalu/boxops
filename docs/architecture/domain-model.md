@@ -190,6 +190,14 @@ Campos candidatos:
 - `requires_certification`
 - `status`
 
+Nota futura de Configuracion:
+
+- La implementacion actual usa categorias base fijas para `class_types.category`.
+- Cuando exista el modulo de Configuracion, las categorias visibles en Tipos de actividad deben ser editables por admin dentro de la organizacion activa: añadir, renombrar/editar etiqueta, desactivar y eliminar solo si no hay uso historico.
+- Si una categoria ya esta referenciada por tipos, bloques o plantillas, la operativa segura debe ser desactivar/archivar en lugar de borrado destructivo.
+- La fase futura debe decidir si se migra a una tabla tenant-scoped tipo `activity_categories` o a un catalogo de configuracion equivalente, y revisar el `CHECK` actual de `class_types.category`.
+- No se implementa en MVP 1; queda anotado para la fase de Configuracion.
+
 ### `schedule_templates`
 
 Plantilla semanal/mensual reutilizable.
@@ -454,7 +462,9 @@ Campos candidatos:
 
 ### `profile_signatures`
 
-Firma dibujada por el usuario desde su perfil. Debe guardarse como artefacto privado/versionado, preferiblemente en Storage con metadata y hash, no como dato global reutilizable entre tenants.
+Firma dibujada reutilizable por el usuario desde "Mi perfil" o "Mi cuenta". Debe guardarse como artefacto privado/versionado, preferiblemente en Storage con metadata y hash.
+
+Decision recomendada para el primer corte: firma tenant-scoped mediante `organization_id` + `person_profile_id`, porque encaja mejor con RLS, perfiles laborales y documentos por organizacion. Una firma global por usuario queda como decision abierta si mas adelante se necesita reutilizacion entre tenants.
 
 Campos candidatos:
 
@@ -464,6 +474,7 @@ Campos candidatos:
 - `user_id`
 - `storage_path`
 - `signature_hash`
+- `signature_version`
 - `status`
 - `created_at`
 - `updated_at`
@@ -472,8 +483,12 @@ Reglas candidatas:
 
 - Cada firma pertenece a una persona del tenant.
 - El usuario autenticado solo puede crear/actualizar su propia firma vinculada.
+- Todos los roles pueden crear/actualizar su propia firma como capacidad personal.
+- Un admin/manager no puede firmar en nombre de otra persona usando su firma guardada.
 - La firma no se expone como imagen publica.
+- Crear o actualizar la firma no firma ningun documento por si solo.
 - Al firmar un documento se debe guardar un snapshot/version de la firma usada, no depender solo del perfil editable actual.
+- Cambiar la firma del perfil no modifica documentos ni evidencias ya firmadas.
 
 ### `document_signature_requests`
 
@@ -489,9 +504,13 @@ Campos candidatos:
 - `requested_by_user_id`
 - `signature_status`
 - `signed_at`
+- `signed_by_user_id`
 - `signature_snapshot_path`
+- `signature_snapshot_hash`
 - `signed_document_path`
 - `document_version_hash`
+- `ip_address`
+- `user_agent`
 - `metadata`
 - `created_at`
 - `updated_at`
@@ -510,6 +529,8 @@ Reglas candidatas:
 - Solo perfiles activos y no internos deben ser firmantes normales.
 - Si el firmante todavia no tiene Auth, la solicitud queda preparada contra `person_profile_id`, pero no puede firmarse hasta vincular usuario.
 - Firmar genera evidencia/version firmada; no basta con cambiar un booleano.
+- El usuario autenticado que firma debe corresponder a la persona firmante dentro del tenant.
+- Si el usuario no tiene firma guardada, el flujo debe pedir crear "Mi firma" antes de continuar o permitir creacion inline segun decision UX.
 - Una nueva version del documento debe invalidar o recrear las solicitudes de firma pendientes segun regla de producto.
 
 ### `coach_certifications`
@@ -609,7 +630,7 @@ Documentos de programacion asociados a fecha, tipo de clase o bloque.
 | Dashboard en inicio protegido | `/app` deja de ser solo inicio tecnico y muestra el dashboard admin basico de cobertura. |
 | Sin persistencia de incidencias | No se crea `coverage_issues`; la cola usa el calculo al vuelo de MVP 1. |
 | Cola accionable | Los riesgos se ordenan por `uncovered`, `conflict` e `insufficient`. |
-| Enlace al bloque real | Cada riesgo enlaza a `/app/schedule#block-{id}` dentro de la semana y tenant activos. |
+| Enlace al bloque real | Cada riesgo enlaza a `/app/schedule?...&block_id={id}` dentro de la semana y tenant activos. |
 | Vistas de apoyo por centro | El dashboard crea atajos filtrados a `/app/schedule` conservando `organizationId` y `week`. |
 | Roles MVP | `admin` ve dashboard; `coach` conserva lectura segura y accesos a Mi horario/plantillas. |
 | Permisos sin ampliar | `manager` sigue pendiente de tarea explicita de permisos app/RLS. |

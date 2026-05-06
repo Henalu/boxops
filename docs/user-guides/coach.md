@@ -225,7 +225,7 @@ Cuando exista, esta seccion debera explicar:
 
 - ver bloques sin cubrir
 - ofrecerse para cubrir
-- recibir solicitudes de admin o companeros
+- recibir solicitudes de admin o compañeros
 
 ## Futuro: ausencias
 

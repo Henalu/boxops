@@ -260,7 +260,7 @@ Flujo actual:
 1. Entrar en `/login`.
 2. Iniciar sesion con un usuario de Supabase Auth que tenga una fila activa en `organization_memberships`.
 3. Abrir `/app`.
-4. Si el usuario tiene varias memberships activas, elegir una organizacion para anadir `organizationId` a la URL.
+4. Si el usuario tiene varias memberships activas, elegir una organizacion para añadir `organizationId` a la URL.
 5. Abrir `/app/schedule`, `/app/coverage`, `/app/coaches`, `/app/more`, `/app/centers`, `/app/class-types` o `/app/templates`.
 
 En `/app/centers`:
@@ -307,7 +307,7 @@ Ruta:
 /app/coaches
 ```
 
-Task 005 usa el schema inicial y Task 009 anade el modelo de persona visible:
+Task 005 usa el schema inicial y Task 009 añade el modelo de persona visible:
 
 - `organization_memberships` crea la relacion usuario-organizacion con rol y estado.
 - `coach_profiles` expresa capacidad operativa de coach dentro del tenant.

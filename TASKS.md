@@ -1,5 +1,371 @@
 # Tasks - BoxOps
 
+## Plan Canonico Actualizado - 2026-05-06
+
+Estado base: Task 017 dejo implementado MVP 1 visual/operativo con auth, multi-tenant, centros, equipo/coaches, tipos de actividad, horario semanal, asignaciones, cobertura, plantillas, dashboard, `/app/coverage`, `/app/more`, navegacion mobile-first y onboarding local.
+
+Este bloque manda para los siguientes cortes. Las secciones historicas de Task 001-017 se conservan como registro de ejecucion.
+
+Reglas para las fases nuevas:
+
+- [ ] No tocar codigo de app, migraciones ni seeds hasta abrir una task tecnica concreta.
+- [ ] No hardcodear STL; STL sigue siendo tenant piloto, no producto.
+- [ ] Mantener `Organization/Tenant -> Centers -> Users/Coaches -> Schedules -> Classes/Blocks -> Events`.
+- [ ] Separar permisos de configuracion global, gestion diaria y funciones personales.
+- [ ] Revisar privacidad/legal antes de documentos sensibles, nominas, fichaje, geolocalizacion o firmas.
+
+La vista resumida de producto vive en `docs/product/roadmap.md`.
+
+### Fase A - Cierre MVP 1 Real Con Datos Validados Y Deuda Pequena
+
+Objetivo: cerrar la base operativa ya construida contra datos reales, sin abrir modulos nuevos.
+
+Estado 2026-05-06: semana de prueba L-V recibida y cargada en local mediante `supabase/snippets/stl-test-week-2026-05-04.sql`. La UI se valido con 165 bloques y smoke E2E local admin/coach del tenant STL; `/app/templates` quedo ajustada para alternar todas las plantillas entre vista Semana y Agenda, y abrir la edicion de bloque en cliente sin recargar, con panel lateral en escritorio e inline en movil. La fase avanza, pero no se cierra del todo hasta confirmar centro por bloque, coaches reales o huecos intencionados y credenciales/flujo E2E reales del tenant piloto. No abrir Fase B hasta resolver esos bloqueos.
+
+Alcance:
+
+- validar semana real por centro, coach, tipo, bloque, asignacion y estado;
+- validar plantillas, excepciones, duplicados y cola de cobertura;
+- ajustar documentacion y deuda pequena de UX/copy si bloquea uso diario.
+
+No incluye:
+
+- roles avanzados, documentos, fichaje, RRHH, cambios, ausencias o branding real.
+
+Dependencias:
+
+- semana real del primer tenant;
+- credenciales o flujo E2E para admin y coach;
+- decision sobre fixture privado, anonimizado o seed local del piloto.
+
+Criterio de salida:
+
+- [x] Una semana real se puede cargar, revisar y corregir con la UI actual.
+- [x] Dashboard y `/app/coverage` muestran riesgos utiles con datos reales.
+- [ ] Plantillas funcionan con coaches por defecto y huecos vacantes reales.
+- [x] Deuda tactil movil priorizada o descartada explicitamente.
+- [x] `rg -n "STL" src` sigue sin referencias hardcodeadas.
+- [x] `docs/tenants/stl/README.md` queda actualizado solo con datos validados.
+
+Nota 2026-05-06: huecos vacantes reales quedan validados con la semana local; coaches por defecto reales siguen pendientes porque no se han recibido asignaciones por bloque.
+
+Nota UX 2026-05-06: la edicion de plantillas grandes queda priorizada dentro de Fase A con vista global Semana/Agenda. Semana agrupa bloques por dia para reducir scroll, sin cabecera duplicada en escritorio y con un unico dia visible en movil; Agenda conserva la lista vertical existente. Abrir un bloque para editar no cambia la URL ni mueve el scroll; escritorio usa panel lateral y movil expande el formulario bajo la tarjeta seleccionada.
+
+### Fase B - Configuracion De Tenant, Branding Y Roles Avanzados
+
+Objetivo: abrir configuracion real de organizacion y evolucionar permisos sin romper `admin`/`coach`.
+
+Alcance:
+
+- logo del box;
+- colores corporativos;
+- colores por centro;
+- configuracion visual controlada;
+- mantener identidad BoxOps con marca ligera del cliente;
+- usar `organizations.theme_config jsonb` como primera opcion si sigue encajando;
+- validar contraste y fallbacks;
+- separar permisos de configuracion global y gestion diaria.
+
+No incluye:
+
+- permitir sobrescritura de estados criticos (`uncovered`, `conflict`, `error`, foco);
+- billing completo;
+- documentos/RRHH/fichaje;
+- temas libres o rebranding total de BoxOps.
+
+Dependencias:
+
+- migracion futura para `organizations.theme_config`;
+- modelo de logo/asset privado o referencia interna;
+- matriz de roles avanzada;
+- tests con tenant sin tema, tenant con tema valido y tenant con valores invalidos.
+
+Criterio de salida:
+
+- [ ] Configuracion real aparece en `/app/more` o ruta equivalente de configuracion.
+- [ ] Un rol alto (`owner` o `superadmin`) controla configuracion global, branding y billing futuro.
+- [ ] Un rol operativo (`manager` o `admin`) gestiona horario/equipo sin controlar todo el tenant.
+- [ ] `coach` mantiene uso operativo y funciones personales.
+- [ ] Todos los usuarios, incluidos admins, tienen "Mi cuenta"/funciones personales.
+- [ ] Los colores configurables no rompen contraste ni estados criticos.
+- [ ] Se documenta compatibilidad/migracion desde `admin` y `coach` actuales.
+
+Decision recomendada:
+
+- [ ] Mantener `admin` actual como rol compatible y evolucionar hacia `owner` + `manager/admin` + `coach`.
+- [ ] Preferir `organizations.theme_config` al inicio; migrar a tabla dedicada solo si hay permisos, borradores, versionado o auditoria granular de tema.
+
+### Fase C - Auth/Security Polish
+
+Objetivo: completar flujos basicos de seguridad de cuenta sin filtrar existencia de emails.
+
+Alcance:
+
+- "He olvidado mi contrasena" en login;
+- reset con Supabase Auth;
+- pagina para nueva contrasena;
+- contrasena minimo 8 caracteres, al menos una letra y un numero;
+- regla configurada en Supabase Auth y repetida en app para feedback visual;
+- estudio de bloqueo por intentos fallidos.
+
+No incluye:
+
+- SSO, MFA obligatorio o consola avanzada de seguridad.
+
+Dependencias:
+
+- configuracion Supabase Auth;
+- decision sobre rate limits, Password Verification Hook y tabla propia;
+- copy anti-enumeracion.
+
+Criterio de salida:
+
+- [ ] Reset de contrasena funciona de extremo a extremo.
+- [ ] La UI siempre responde de forma generica ante emails no existentes.
+- [ ] La regla de contrasena vive en Supabase Auth y en validacion visual de app.
+- [ ] Queda decidido si hay 3 intentos con avisos restantes y cooldown, y con que mecanismo.
+- [ ] No se expone si un email existe por login, reset o bloqueo.
+
+Decision pendiente tecnica:
+
+- [ ] Determinar si Supabase Auth rate limits bastan o si se necesita Password Verification Hook + tabla propia de intentos.
+
+### Fase D - Area Personal Y Modelo RRHH
+
+Objetivo: crear "Mi perfil"/"Mi cuenta" como base personal y RRHH con permisos por campo.
+
+Alcance:
+
+- datos personales visibles/editables segun permisos;
+- seccion "Mi firma" disponible para todos los usuarios;
+- crear firma personal dibujandola en canvas/touch area;
+- borrar y volver a dibujar antes de guardar;
+- guardar y actualizar firma reutilizable;
+- advertir que actualizar la firma no modifica documentos ya firmados;
+- puesto, antiguedad, datos laborales, contrato/jornada cuando proceda;
+- salario, dinero o retribucion solo para personal autorizado;
+- separacion entre datos editables por usuario y datos editables por roles autorizados.
+
+No incluye:
+
+- nominas generadas, documentos completos, fichaje o payroll.
+
+Dependencias:
+
+- matriz de permisos por campo;
+- revision privacidad para salario/retribucion;
+- decision entre ampliar `person_profiles` o crear tablas RRHH separadas.
+- Supabase Storage privado o mecanismo equivalente para la firma dibujada.
+- decision tenant-scoped vs global: recomendado primer corte tenant-scoped con `organization_id` + `person_profile_id`.
+
+Criterio de salida:
+
+- [ ] Cada usuario tiene area personal accesible.
+- [ ] Admins que tambien son coaches pueden usar funciones personales.
+- [ ] Todos los roles (`owner`/`admin`/`manager`/`coach`) pueden crear y actualizar su propia firma.
+- [ ] La firma guardada nunca se sirve como asset publico.
+- [ ] Solo el usuario propietario y roles explicitamente autorizados pueden ver metadata o evidencia de firma.
+- [ ] Un admin no puede crear, actualizar ni usar la firma de otra persona para firmar en su nombre.
+- [ ] Datos laborales sensibles no aparecen en pantallas generales de equipo.
+- [ ] Salario/retribucion requiere permiso explicito.
+- [ ] Queda documentado que datos edita el usuario y que datos edita personal autorizado.
+
+Decision recomendada:
+
+- [ ] No meter salario/contrato/documentos dentro de `person_profiles` si se vuelve sensible; separar datos operativos de datos RRHH.
+- [ ] Crear "Mi firma" antes de cualquier boton "Firmar" en documentos, nominas, politicas internas u otras secciones.
+- [ ] Guardar metadata tenant-scoped de la firma en Postgres y el artefacto en Storage privado.
+
+### Fase E - Documentos, Permisos, Nominas, Firmas Y Certificaciones
+
+Objetivo: centralizar documentos con permisos estrictos y trazabilidad.
+
+Alcance:
+
+- documentos de empresa;
+- "Mis documentos";
+- permisos por rol;
+- permisos por persona concreta, estilo compartir en Drive;
+- empleados suben titulaciones/certificaciones;
+- admins/gestores autorizados suben nominas u otros documentos privados al espacio del empleado;
+- documentos, nominas, politicas internas u otras entidades pueden pedir firma en fases futuras;
+- boton "Firmar" reutiliza la firma guardada del usuario autenticado;
+- si el usuario no tiene firma guardada, el flujo debe pedir crearla antes de continuar o permitir crearla inline segun decision de UX;
+- separar claramente "crear/actualizar mi firma" de "firmar un documento";
+- al firmar se guarda snapshot/version de la firma usada, no solo referencia a la firma actual del perfil;
+- buckets privados, RLS, URLs firmadas y auditoria de acceso si procede.
+
+No incluye:
+
+- gestor documental pesado;
+- generacion de nominas;
+- firma electronica avanzada/cualificada sin validacion legal;
+- integracion Drive API salvo decision posterior.
+
+Dependencias:
+
+- Fase D: "Mi firma" creada en perfil/cuenta.
+- Supabase Storage privado;
+- modelo de documentos, versiones, grants y auditoria;
+- politica de retencion/borrado;
+- revision legal de documentos sensibles, nominas y firmas.
+
+Criterio de salida:
+
+- [ ] Un empleado ve sus documentos propios.
+- [ ] Un rol autorizado sube documentos privados a una persona concreta.
+- [ ] Documentos de empresa respetan visibilidad por rol/persona.
+- [ ] Certificaciones tienen archivo, fecha de obtencion/caducidad y estado.
+- [ ] Accesos privados usan URL firmada o mecanismo equivalente.
+- [ ] Un boton "Firmar" nunca obliga a dibujar de nuevo si existe firma guardada valida.
+- [ ] Si no hay firma guardada, el flujo dirige a crearla o abre creacion inline segun decision documentada.
+- [ ] Cada firma aplicada registra organizacion, documento/version o entidad firmada, usuario autenticado, persona firmante, fecha/hora, snapshot usado, estado e IP/user agent si se decide.
+- [ ] Cambiar "Mi firma" despues de firmar no altera evidencias anteriores.
+- [ ] La app no presenta firmas como avanzadas/cualificadas sin validacion legal.
+
+Decision recomendada:
+
+- [ ] Modelar permisos por scope + rol + grants por persona concreta; no asumir que cualquier admin ve todo documento sensible.
+- [ ] No permitir que un rol autorizado firme por otra persona usando su firma guardada.
+
+### Fase F - Fichaje Manual Legal/Auditable
+
+Objetivo: registrar jornada de forma manual, exportable y auditable antes de geolocalizacion.
+
+Alcance:
+
+- fichaje manual de inicio/fin;
+- correcciones posteriores con motivo;
+- aprobacion semanal por gestor/admin de personal;
+- exportable y auditable;
+- acceso del trabajador a sus registros.
+
+No incluye:
+
+- geofencing, app nativa, payroll o cumplimiento legal prometido sin revision.
+
+Dependencias:
+
+- revision legal y privacidad;
+- modelo de registros/correcciones/aprobaciones/exportes;
+- permisos de trabajador, gestor, owner y representantes si aplica.
+
+Criterio de salida:
+
+- [ ] Se registra inicio y fin de jornada.
+- [ ] Correcciones guardan motivo, autor, fecha y estado.
+- [ ] Aprobacion semanal queda trazada.
+- [ ] Exporte revisable disponible.
+- [ ] Se documenta conservacion de registros durante 4 anos en Espana.
+- [ ] Se documenta acceso para trabajador, representantes e Inspeccion.
+- [ ] La documentacion avisa que legal debe revisar antes de prometer cumplimiento.
+
+Decision pendiente legal:
+
+- [ ] Validar retencion, formato de exporte, acceso de representantes y textos de consentimiento antes de usar datos reales.
+
+### Fase G - Fichaje Geolocalizado Asistido
+
+Objetivo: usar ubicacion puntual como ayuda de fichaje, no como tracking.
+
+Alcance:
+
+- activacion opcional por admin;
+- ubicacion del centro configurable en mapa por rol con maximos permisos;
+- radio inicial sugerido: 100m configurable;
+- fichar entrada si usuario entra en radio y coincide con horario;
+- si llega antes, revisar al llegar la hora si sigue dentro;
+- salida automatica a la hora prevista si hay entrada activa;
+- no fichar si esta en el box fuera de horario;
+- consentimiento/permiso claro de ubicacion.
+
+No incluye:
+
+- tracking continuo;
+- historial de movimientos;
+- fichaje automatico fiable con app cerrada desde navegador/PWA.
+
+Dependencias:
+
+- Fase F cerrada;
+- centros con ubicacion confiable;
+- pruebas de precision real;
+- revision legal/privacidad.
+
+Criterio de salida:
+
+- [ ] La ubicacion se pide solo cuando aporta al fichaje.
+- [ ] Solo se guardan eventos necesarios, no trayectos.
+- [ ] Hay fallback/correccion manual.
+- [ ] El usuario entiende permiso, finalidad y limitacion.
+- [ ] Queda documentado que navegador/PWA no garantiza geofencing con app cerrada.
+
+Decision pendiente tecnica/legal:
+
+- [ ] Si el fichaje automatico cerrado es requisito comercial innegociable, adelantar Fase H nativa o wrapper movil.
+
+### Fase H - PWA/App Movil Y Geofencing Nativo
+
+Objetivo: preparar estrategia movil sin priorizar nativo antes de validar web/MVP operativo.
+
+Alcance:
+
+- navegador/PWA responsive inicial;
+- arquitectura preparada para App Store y Google Play;
+- evaluacion posterior de Capacitor/Ionic, React Native/Expo u otra estrategia;
+- licencias developer Apple/Google como dependencia futura;
+- geofencing nativo solo si el caso comercial lo exige.
+
+No incluye:
+
+- publicacion nativa temprana;
+- prometer automatismos de app cerrada desde web/PWA;
+- reescritura movil completa sin decision de producto.
+
+Dependencias:
+
+- validacion comercial de fichaje automatico;
+- decision tecnica de wrapper/nativo;
+- politica de privacidad compatible con ubicacion;
+- cuentas Apple Developer y Google Play.
+
+Criterio de salida:
+
+- [ ] Estrategia movil elegida y documentada.
+- [ ] PWA cubre uso diario basico.
+- [ ] Costes/licencias/store review documentados.
+- [ ] Geofencing nativo tiene motivo comercial claro.
+
+### Fase I - Cambios, Ausencias, Eventos, Horas Extra E IA
+
+Objetivo: reordenar modulos ya previstos tras la base operativa, seguridad, RRHH, documentos y fichaje inicial.
+
+Alcance:
+
+- cambios de turno/clase y cobertura entre coaches;
+- ausencias, vacaciones y permisos;
+- eventos, festivos y competiciones;
+- horas extra detectadas/validadas/cerradas;
+- IA sobre programacion solo cuando documentos y horarios esten modelados.
+
+No incluye:
+
+- IA temprana, payroll completo, CRM de alumnos o marketplace de coaches.
+
+Dependencias:
+
+- permisos avanzados;
+- horarios/fichaje si impactan horas;
+- documentos/certificaciones si condicionan asignaciones;
+- validacion comercial de prioridades.
+
+Criterio de salida:
+
+- [ ] Cada submodulo tiene task propia y criterio de auditoria.
+- [ ] Cambios y ausencias actualizan cobertura de forma trazable.
+- [ ] Horas extra no se presentan como nomina ni calculo fiscal.
+- [ ] IA queda subordinada a documentos/programacion utiles.
+
 ## Fase 0 - Documentacion Y Contexto
 
 - [x] Revisar referencias DEV antes de crear el proyecto.
@@ -84,7 +450,7 @@ Alcance:
   - `src/lib/supabase/client.ts`
   - `src/lib/supabase/server.ts`
 - [x] Usar tipos generados en `src/types/supabase.ts`.
-- [x] Anadir scripts:
+- [x] Añadir scripts:
   - `dev`
   - `build`
   - `lint`
@@ -227,7 +593,7 @@ Alcance:
 - [x] Crear ruta protegida `/app/coaches`.
 - [x] Mantener `organizationId` en query string.
 - [x] Resolver usuario, memberships y organizacion activa igual que `/app/centers`.
-- [x] Anadir navegacion hacia `/app/coaches`.
+- [x] Añadir navegacion hacia `/app/coaches`.
 - [x] Admin puede listar memberships visibles del tenant.
 - [x] Admin puede ver rol, estado y organizacion.
 - [x] Admin puede crear una membership minima si existe un `user_id` de Supabase Auth.
@@ -278,7 +644,7 @@ Alcance:
 - [x] Crear ruta protegida `/app/class-types`.
 - [x] Mantener `organizationId` en query string.
 - [x] Resolver usuario, memberships y organizacion activa igual que `/app/centers` y `/app/coaches`.
-- [x] Anadir navegacion hacia `/app/class-types`.
+- [x] Añadir navegacion hacia `/app/class-types`.
 - [x] Admin puede listar tipos del tenant.
 - [x] Admin puede crear un tipo minimo.
 - [x] Admin puede editar:
@@ -332,7 +698,7 @@ Alcance:
 - [x] Mantener `organizationId` en query string.
 - [x] Mantener semana por query string con `week=YYYY-MM-DD`; la app normaliza la fecha recibida al lunes de esa semana.
 - [x] Resolver usuario, memberships y organizacion activa igual que `/app/centers`, `/app/coaches` y `/app/class-types`.
-- [x] Anadir navegacion hacia `/app/schedule`.
+- [x] Añadir navegacion hacia `/app/schedule`.
 - [x] Admin puede listar bloques del tenant en la semana activa.
 - [x] Admin puede crear bloques minimos con centro, tipo de actividad, fecha, horas, coaches necesarios, estado y notas.
 - [x] Admin puede editar esos mismos campos.
@@ -552,19 +918,19 @@ Validacion STL recibida el 2026-04-30:
 
 Validacion STL adicional recibida:
 
-- Los bloques del horario recibido corresponden inicialmente a STL TremaÃ±es.
+- Los bloques del horario recibido corresponden inicialmente a STL Tremañes.
 - STL City debe usar las mismas franjas horarias iniciales, pero solo con actividades CrossFit y Wellness.
 - Las asignaciones iniciales pueden generarse aleatoriamente por centro como dato editable.
 - La asignacion aleatoria debe evitar solapar al mismo coach cuando sea posible.
 - Los coaches deberian registrarse o aceptar invitacion con el correo que prefieran; no conviene crear cuentas reales por ellos con emails inventados.
 - Se puede crear un usuario tecnico interno para Henalu Paes de Barros con `henalupaesdebarros@gmail.com`, rol admin tecnico y visibilidad oculta para el equipo operativo.
 - Perfiles operativos iniciales STL pendientes de Auth:
-  - Roberto: `admin`, alias Rober, STL TremaÃ±es, 20 horas.
+  - Roberto: `admin`, alias Rober, STL Tremañes, 20 horas.
   - Juanma: `admin`, STL City, 20 horas.
-  - Nuria: `manager`, STL TremaÃ±es, 20 horas.
-  - Pedro: `manager`, alias Pedrin, STL TremaÃ±es, 20 horas.
-  - Valentina Oxley: `coach`, STL TremaÃ±es, 20 horas.
-  - Noah: `coach`, STL TremaÃ±es, 20 horas.
+  - Nuria: `manager`, STL Tremañes, 20 horas.
+  - Pedro: `manager`, alias Pedrin, STL Tremañes, 20 horas.
+  - Valentina Oxley: `coach`, STL Tremañes, 20 horas.
+  - Noah: `coach`, STL Tremañes, 20 horas.
   - Lucas: `coach`, STL City, 20 horas.
   - Valentina: `coach`, STL City, 20 horas.
   - Lucia: `coach`, STL City, 20 horas.
@@ -638,7 +1004,7 @@ Alcance ejecutado:
 - [x] Mantener `organization_memberships` como fuente de acceso y rol.
 - [x] Permitir `person_profiles` pendientes de Auth con `user_id = null`.
 - [x] Permitir vincular opcionalmente `person_profiles.user_id` a una membership existente del mismo tenant cuando exista `auth.users`.
-- [x] Anadir `coach_profiles.person_profile_id`.
+- [x] Añadir `coach_profiles.person_profile_id`.
 - [x] Hacer `coach_profiles.user_id` nullable para permitir capacidad operativa de coach pendiente de Auth.
 - [x] Mantener compatibilidad con el modelo actual basado en `coach_profiles.user_id`.
 - [x] Exigir que cada `coach_profile` tenga al menos `user_id` o `person_profile_id`.
@@ -757,7 +1123,7 @@ Verificacion:
 
 Estado: completada y validada tecnicamente.
 
-Objetivo: anadir filtros compartibles a `/app/schedule` para desbloquear la operativa semanal de MVP 1 sin crear dashboard ni plantillas.
+Objetivo: añadir filtros compartibles a `/app/schedule` para desbloquear la operativa semanal de MVP 1 sin crear dashboard ni plantillas.
 
 Alcance ejecutado:
 
@@ -770,7 +1136,7 @@ Alcance ejecutado:
 - [x] Mantener `organizationId` y `week` en la URL junto a los filtros.
 - [x] Combinar filtros entre si como interseccion.
 - [x] Mantener empty state especifico cuando una combinacion de filtros no devuelve resultados.
-- [x] Anadir enlace para limpiar filtros conservando `organizationId` y `week`.
+- [x] Añadir enlace para limpiar filtros conservando `organizationId` y `week`.
 - [x] Conservar filtros saneados al cambiar semana y tras mutaciones admin.
 - [x] Mantener `schedule_block_assignments` como fuente canonica para el filtro de coach asignado.
 - [x] Mantener nombres visibles desde `person_profiles.display_name` y fallback tecnico claro cuando falta perfil visible.
@@ -803,7 +1169,7 @@ Verificacion:
 
 Estado: completada y validada tecnicamente.
 
-Objetivo: anadir a `/app/schedule` un filtro compartible para que un coach vea sus bloques asignados, sin crear dashboard, plantillas ni flujos de cambios.
+Objetivo: añadir a `/app/schedule` un filtro compartible para que un coach vea sus bloques asignados, sin crear dashboard, plantillas ni flujos de cambios.
 
 Alcance ejecutado:
 
@@ -865,7 +1231,7 @@ Alcance ejecutado:
   - `schedule_block_assignments.source = 'template'`.
 - [x] Crear helper `src/lib/schedule-templates.ts` con estados, labels y validaciones.
 - [x] Crear ruta protegida `/app/templates`.
-- [x] Anadir navegacion hacia `/app/templates` conservando `organizationId` y `week`.
+- [x] Añadir navegacion hacia `/app/templates` conservando `organizationId` y `week`.
 - [x] Mantener Next.js App Router con Server Components por defecto.
 - [x] Mantener `organization_memberships` como fuente de rol y tenant.
 - [x] Admin puede listar plantillas semanales del tenant activo.
@@ -932,9 +1298,9 @@ Alcance ejecutado:
 - [x] Mostrar resumen semanal de riesgos activos, bloques sin cubrir, conflictos y bloques activos.
 - [x] Ordenar la cola por `uncovered`, `conflict` e `insufficient`.
 - [x] Enlazar cada riesgo al bloque real en `/app/schedule` mediante anchors `block-{id}`.
-- [x] Anadir vistas de apoyo por centro con atajos filtrados al horario semanal.
-- [x] Anadir empty state cuando no hay bloques y cuando no hay riesgos activos.
-- [x] Anadir `loading.tsx` y `error.tsx` en el segmento `/app`.
+- [x] Añadir vistas de apoyo por centro con atajos filtrados al horario semanal.
+- [x] Añadir empty state cuando no hay bloques y cuando no hay riesgos activos.
+- [x] Añadir `loading.tsx` y `error.tsx` en el segmento `/app`.
 - [x] No crear migraciones, tablas persistidas de `coverage_issues` ni tipos Supabase nuevos.
 - [x] No crear cambios, invitaciones, ausencias, fichaje, payroll, mobile nativo, IA ni geolocalizacion.
 - [x] No hardcodear STL en rutas, componentes, permisos ni defaults.
@@ -967,7 +1333,7 @@ Objetivo: cerrar la primera deuda tecnica verificable posterior al dashboard adm
 Alcance ejecutado:
 
 - [x] Detectar que la siguiente tarea accionable real era deuda tecnica de smoke tests, no cambios, ausencias, fichaje ni dashboard visual final.
-- [x] Anadir Playwright como dev dependency del proyecto.
+- [x] Añadir Playwright como dev dependency del proyecto.
 - [x] Crear `npm run test:smoke`.
 - [x] Crear `playwright.smoke.config.ts`.
 - [x] Configurar el smoke para usar por defecto `http://127.0.0.1:3000` o `E2E_BASE_URL`.
@@ -1035,7 +1401,7 @@ Alcance ejecutado:
   - `/app/class-types?organizationId=00000000-0000-0000-0000-000000100001`
 - [x] Generar evidencia local en `test-results/frontend-audit-2026-05-04/` con screenshots y `audit-results.json`.
 - [x] Confirmar que no hubo errores de consola, error overlay de Next.js, labels accesibles ausentes ni overflow horizontal de pagina en las rutas auditadas.
-- [x] Implementar fix pequeno y directo en `/app/coaches`: la tabla de memberships queda dentro de un contenedor `overflow-x-auto` para no quedar recortada por la card en 375px.
+- [x] Implementar fix pequeño y directo en `/app/coaches`: la tabla de memberships queda dentro de un contenedor `overflow-x-auto` para no quedar recortada por la card en 375px.
 - [x] Repetir verificacion focal de `/app/coaches` en 375px tras el fix.
 - [x] Documentar alcance, evidencias, hallazgos, decisiones y limitaciones en `docs/product/frontend-validation-scenarios.md`.
 - [x] No tocar schema, migraciones, seeds ni tipos Supabase.
@@ -1048,7 +1414,7 @@ Hallazgos:
 - No se detecto overflow horizontal de pagina ni errores de consola en login, dashboard, horario, plantillas, centros, coaches o tipos para los viewports auditados.
 - Los formularios auditados mantienen labels accesibles y headings principales unicos por ruta.
 - `/app/coaches` tenia una tabla admin mas ancha que 375px recortada por el `overflow-hidden` de `Card`; se corrigio con scroll horizontal acotado al contenido de la card.
-- La UI protegida conserva muchos controles compactos (`Button size="sm"`, inputs/selects de 32-36px) que quedan por debajo del objetivo tactil de 44px en movil. Se documenta como deuda responsive, pero no se cambio globalmente para no redisenar densidad ni alterar todas las superficies en esta tarea.
+- La UI protegida conserva muchos controles compactos (`Button size="sm"`, inputs/selects de 32-36px) que quedan por debajo del objetivo tactil de 44px en movil. Se documenta como deuda responsive, pero no se cambio globalmente para no rediseñar densidad ni alterar todas las superficies en esta tarea.
 - El script de contraste marco el boton negro de login como falso positivo por normalizacion `lab(...)`; la inspeccion visual y los tokens usados no indican un problema real de contraste en ese boton.
 
 Limitaciones:
@@ -1062,7 +1428,7 @@ Decisiones tecnicas:
 
 - Mantener Playwright como herramienta de audit puntual y no crear un nuevo script npm hasta que este audit se repita de forma recurrente.
 - Mantener la densidad compacta de shadcn/ui en desktop/tablet; la mejora de targets tactiles debe abordarse como tarea dedicada si se decide adaptar controles por pointer/viewport.
-- No convertir la tabla de memberships en cards moviles en esta tarea; el scroll horizontal es el fix minimo para evitar contenido inaccesible sin abrir una fase de redisenio.
+- No convertir la tabla de memberships en cards moviles en esta tarea; el scroll horizontal es el fix minimo para evitar contenido inaccesible sin abrir una fase de rediseño.
 
 Verificacion:
 
@@ -1089,12 +1455,12 @@ Alcance ejecutado:
 - [x] Implementar bottom navigation en mobile y sidebar en desktop/tablet.
 - [x] Crear `/app/coverage` como cola accionable de riesgos semanales.
 - [x] Crear `/app/more` para gestion, ayuda, guia y configuracion futura no implementada.
-- [x] Redisenar `/app` como dashboard operativo con saludo, cobertura, resumen, pendientes y accesos rapidos.
+- [x] Rediseñar `/app` como dashboard operativo con saludo, cobertura, resumen, pendientes y accesos rapidos.
 - [x] Ajustar `/app/schedule` hacia una vista de Horario con selector de semana y tabs Semana / Mi semana / Sin cubrir.
 - [x] Reetiquetar `/app/coaches` como Equipo y limpiar copy visible de membership/Auth/tenant en texto principal.
 - [x] Limpiar copy visible en Centros, Tipos de actividad, Plantillas y Login.
 - [x] Crear onboarding inicial con `localStorage` key `boxops_onboarding_seen_v1`.
-- [x] Anadir "Reiniciar guia" desde `/app/more`.
+- [x] Añadir "Reiniciar guia" desde `/app/more`.
 - [x] Crear componentes reutilizables en `src/components/features/operations-ui.tsx`.
 - [x] Mantener Server Components por defecto; solo onboarding usa Client Component.
 - [x] No tocar schema, migraciones, seeds ni tipos Supabase.
@@ -1138,7 +1504,7 @@ Verificacion:
 
 ## Fase 1 - Validacion Operativa Con STL
 
-Estado: pendiente. Esta fase es de descubrimiento validado, no de implementacion generica ni de personalizacion hardcodeada.
+Estado: parcialmente documentada, cargada y comprobada el 2026-05-06. Existe una semana de prueba L-V para STL cargada localmente como fixture no automatico y validada con smoke E2E local admin/coach. Sigue sin cerrarse del todo porque faltan centro por bloque, asignaciones reales o huecos confirmados y credenciales/flujo E2E reales del tenant.
 
 Bloquea:
 
@@ -1172,32 +1538,37 @@ Notas de validacion recibidas el 2026-04-30:
 - Visibilidad coach: horario completo del equipo, clases asignadas, nombre y foto.
 - Dashboard: cola de riesgos priorizada por bloques sin cubrir, conflictos graves, cobertura insuficiente, riesgos de la semana y vistas de apoyo.
 - Cambios de turno/centro: requieren aprobacion de `admin` o `manager`.
+- Semana de prueba recibida el 2026-05-06: lunes a viernes, 33 bloques diarios, clases simultaneas normales, cada bloque requiere 1 coach y `CrossFit Teens` dura 90 minutos.
+- Fixture local creado en `supabase/snippets/stl-test-week-2026-05-04.sql`: 1 plantilla activa, 165 bloques de plantilla, 165 bloques reales y 0 asignaciones.
+- Smoke E2E local con tenant STL y semana `2026-05-04`: 13 passed; `/app/templates` se ajusto para no renderizar formularios cerrados por cada bloque.
 
-- [ ] Recoger una semana real de horarios de STL Tremañes y STL City.
-- [ ] Separar bloques que son clases de bloques que son recepcion, evento, competicion, open box u otra actividad.
+- [x] Recoger una semana real de horarios de STL Tremañes y STL City.
+- [x] Separar bloques que son clases de bloques que son recepcion, evento, competicion, open box u otra actividad.
 - [ ] Confirmar para cada bloque real: centro, fecha, hora inicio, hora fin, tipo, coaches necesarios, coach asignado si existe, notas operativas y estado.
-- [ ] Listar coaches activos, roles operativos y responsabilidades.
+- [x] Listar coaches activos, roles operativos y responsabilidades.
 - [ ] Documentar coaches que trabajan en ambos centros.
-- [ ] Confirmar si todos los coaches necesitan `coach_profile` o si hay personas no-coach que tambien tendran membership.
-- [ ] Identificar tipos de clase actuales: WOD, CrossFit For Fun, Wellness, Open Box, Fundamentals, recepcion, eventos y otros.
-- [ ] Confirmar nombres exactos usados por STL y longitudes habituales para evitar copy truncado en UI futura.
-- [ ] Documentar clases/bloques sin cubrir o problemas frecuentes de cobertura.
-- [ ] Documentar ejemplos de cobertura insuficiente con mas de un coach requerido, si existen.
-- [ ] Documentar solapamientos reales o situaciones multi-centro que el producto debe detectar.
-- [ ] Confirmar reglas de plantillas: semanal, mensual o ambas.
-- [ ] Confirmar si la primera plantilla debe tener coach por defecto, solo bloque vacante o ambas opciones.
-- [ ] Documentar si hay certificaciones necesarias por tipo de clase.
-- [ ] Confirmar si coaches deben ver horario completo del equipo, solo su contexto o una vista mixta.
-- [ ] Validar si el primer dashboard debe priorizar centro, coach, clases sin cubrir o cola de riesgos.
+- [x] Confirmar si todos los coaches necesitan `coach_profile` o si hay personas no-coach que tambien tendran membership.
+- [x] Identificar tipos de clase actuales: WOD, CrossFit For Fun, Wellness, Open Box, Fundamentals, recepcion, eventos y otros.
+- [x] Confirmar nombres exactos usados por STL y longitudes habituales para evitar copy truncado en UI futura.
+- [x] Documentar clases/bloques sin cubrir o problemas frecuentes de cobertura.
+- [x] Documentar ejemplos de cobertura insuficiente con mas de un coach requerido, si existen.
+- [x] Documentar solapamientos reales o situaciones multi-centro que el producto debe detectar.
+- [x] Confirmar reglas de plantillas: semanal, mensual o ambas.
+- [x] Confirmar si la primera plantilla debe tener coach por defecto, solo bloque vacante o ambas opciones.
+- [x] Documentar si hay certificaciones necesarias por tipo de clase.
+- [x] Confirmar si coaches deben ver horario completo del equipo, solo su contexto o una vista mixta.
+- [x] Validar si el primer dashboard debe priorizar centro, coach, clases sin cubrir o cola de riesgos.
 - [ ] Confirmar si eventos/festivos deben modelarse como bloques, dias completos o ambas cosas.
-- [ ] Confirmar si los datos reales pueden convertirse en fixture anonimizado para pruebas.
+- [x] Confirmar si los datos reales pueden convertirse en fixture anonimizado para pruebas.
 
 Criterio de salida:
 
-- [ ] `docs/tenants/stl/README.md` actualizado solo con datos validados, sin inventar informacion.
-- [ ] `docs/product/open-questions.md` actualizado con respuestas o nuevas dudas concretas.
-- [ ] Semana real de ejemplo lista para guiar asignaciones, plantillas y cobertura.
-- [ ] Decisiones que afecten al producto generico documentadas sin contaminar `src/` con STL.
+- [x] `docs/tenants/stl/README.md` actualizado solo con datos validados, sin inventar informacion.
+- [x] `docs/product/open-questions.md` actualizado con respuestas o nuevas dudas concretas.
+- [x] Semana real de ejemplo lista para guiar asignaciones, plantillas y cobertura.
+- [x] Decisiones que afecten al producto generico documentadas sin contaminar `src/` con STL.
+
+Nota 2026-05-06: ver `docs/operations/mvp1-fase-a-validation.md`. La semana de ejemplo queda lista para guiar validacion, pero no debe convertirse en seed automatico hasta confirmar centro por bloque y asignaciones/huecos reales.
 
 ## Fase Diseño/UI - Preparacion Frontend
 
@@ -1378,9 +1749,11 @@ Dependencias de schema/migraciones futuras:
 - [ ] Permitir que un documento subido se marque como `requires_signature`.
 - [ ] Permitir elegir que miembros/personas deben firmar cada documento requerido.
 - [ ] Guardar estado de firma por firmante: pendiente, firmado, rechazado/anulado si aplica.
-- [ ] Crear firma dibujada desde el perfil del usuario, inspirada en el flujo de ShiftSwap.
-- [ ] Permitir firmar con una accion simple que inserte una copia/snapshot de la firma en el documento o genere una version firmada.
-- [ ] Mantener auditoria minima de firma: documento/version, firmante, fecha, usuario autenticado y estado.
+- [ ] Depender de "Mi firma" creada previamente en Fase D; no mezclar creacion de firma personal con firma de documento salvo flujo inline decidido.
+- [ ] Permitir firmar con una accion simple que use la firma guardada del usuario autenticado.
+- [ ] Guardar una copia/snapshot de la firma usada en el documento, entidad firmada o version firmada.
+- [ ] Mantener auditoria minima de firma: organizacion, documento/version o entidad firmada, usuario autenticado, persona firmante, fecha/hora, snapshot usado, estado e IP/user agent si se decide.
+- [ ] Impedir que admins/managers firmen en nombre de otra persona usando su firma guardada.
 - [ ] Cursos/certificaciones de coaches.
 - [ ] Fechas de obtencion/caducidad.
 - [ ] Adjuntos de certificados.
@@ -1400,6 +1773,7 @@ Dependencias de schema/migraciones futuras:
 - [ ] Billing por organizacion/centro/coach.
 - [ ] Onboarding de nuevo box.
 - [ ] Permisos avanzados por centro.
+- [ ] Configuracion de categorias de tipos de actividad por tenant: el admin debe poder añadir, editar, desactivar y eliminar categorias visibles en `/app/class-types` cuando exista el modulo de Configuracion. La fase futura debe revisar la lista fija actual y el `CHECK` de `class_types.category`; si una categoria ya esta en uso, priorizar archivar/desactivar antes que borrado destructivo para preservar historial de bloques.
 - [ ] Exportes CSV/PDF.
 - [ ] Integraciones con reservas/alumnos.
 - [ ] App movil nativa.

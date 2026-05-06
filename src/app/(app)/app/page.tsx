@@ -157,23 +157,24 @@ function shortId(value: string) {
   return value.slice(0, 8);
 }
 
-function getBlockAnchor(blockId: string) {
-  return `block-${blockId}`;
-}
-
 function getBlockHref({
   blockId,
   organizationId,
+  serviceDate,
   weekStart,
 }: {
   blockId: string;
   organizationId: string;
+  serviceDate: string;
   weekStart: string;
 }) {
-  return `${getSchedulePath({
+  return getSchedulePath({
+    blockId,
+    day: serviceDate,
     organizationId,
+    view: "week",
     week: weekStart,
-  })}#${getBlockAnchor(blockId)}`;
+  });
 }
 
 async function getScheduleBlocks({
@@ -507,8 +508,8 @@ function PageHeader({
           <ShieldCheck aria-hidden="true" className="size-6 shrink-0" />
           Hola, {roleLabel ?? "equipo"}
         </h1>
-        <p className="text-sm leading-6 text-muted-foreground sm:text-base">
-          Revisa que esta semana este bajo control y salta rapido a lo que
+        <p className="hidden text-sm leading-6 text-muted-foreground md:block md:text-base">
+          Revisa que esta semana esté bajo control y salta rápido a lo que
           tienes que resolver.
         </p>
       </div>
@@ -532,46 +533,89 @@ function WeekControls({
   weekStart: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button asChild size="sm" variant="outline">
-        <Link
-          href={getAppPathForDashboard({
-            organizationId,
-            week: getAdjacentWeekStart(weekStart, -1),
-          })}
-        >
-          <ArrowLeft aria-hidden="true" />
-          Semana anterior
-        </Link>
-      </Button>
-      <Button asChild size="sm" variant="outline">
-        <Link
-          href={getAppPathForDashboard({
-            organizationId,
-            week: currentWeekStart,
-          })}
-        >
-          Hoy
-        </Link>
-      </Button>
-      <Button asChild size="sm" variant="outline">
-        <Link
-          href={getAppPathForDashboard({
-            organizationId,
-            week: getAdjacentWeekStart(weekStart, 1),
-          })}
-        >
-          Semana siguiente
-          <ArrowRight aria-hidden="true" />
-        </Link>
-      </Button>
-      <Button asChild size="sm" variant="secondary">
-        <Link href={getSchedulePath({ organizationId, week: weekStart })}>
-          <CalendarDays aria-hidden="true" />
-          Abrir horario
-        </Link>
-      </Button>
-    </div>
+    <>
+      <div className="grid grid-cols-3 gap-2 md:hidden">
+        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: getAdjacentWeekStart(weekStart, -1),
+            })}
+          >
+            <ArrowLeft aria-hidden="true" />
+            Anterior
+          </Link>
+        </Button>
+        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: currentWeekStart,
+            })}
+          >
+            Hoy
+          </Link>
+        </Button>
+        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: getAdjacentWeekStart(weekStart, 1),
+            })}
+          >
+            Siguiente
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+        <Button asChild className="col-span-3 min-h-11 md:min-h-10" variant="secondary">
+          <Link href={getSchedulePath({ organizationId, week: weekStart })}>
+            <CalendarDays aria-hidden="true" />
+            Abrir horario
+          </Link>
+        </Button>
+      </div>
+
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
+        <Button asChild size="sm" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: getAdjacentWeekStart(weekStart, -1),
+            })}
+          >
+            <ArrowLeft aria-hidden="true" />
+            Semana anterior
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: currentWeekStart,
+            })}
+          >
+            Hoy
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link
+            href={getAppPathForDashboard({
+              organizationId,
+              week: getAdjacentWeekStart(weekStart, 1),
+            })}
+          >
+            Semana siguiente
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="secondary">
+          <Link href={getSchedulePath({ organizationId, week: weekStart })}>
+            <CalendarDays aria-hidden="true" />
+            Abrir horario
+          </Link>
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -620,7 +664,7 @@ function SummaryCards({
     {
       label: "Tipos de actividad",
       value: activeClassTypeCount,
-      description: "Catalogo listo para horarios.",
+      description: "Catálogo listo para horarios.",
       icon: Dumbbell,
     },
     {
@@ -633,7 +677,7 @@ function SummaryCards({
 
   return (
     <div
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
       data-tour="dashboard-summary"
     >
       {cards.map((card) => {
@@ -649,7 +693,7 @@ function SummaryCards({
             </CardHeader>
             <CardContent>
               <p className="font-mono text-3xl font-semibold">{card.value}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 hidden text-sm text-muted-foreground md:block">
                 {card.description}
               </p>
             </CardContent>
@@ -703,12 +747,12 @@ function CoverageHero({
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {riskItems.length > 0
-                ? "Hay clases o bloques que necesitan una decision."
+                ? "Hay clases o bloques que necesitan una decisión."
                 : "No hay riesgos activos con la cobertura actual."}
             </p>
           </div>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full lg:w-auto">
           <Link href={getCoveragePath({ organizationId, week: weekStart })}>
             Resolver cobertura
             <ArrowRight aria-hidden="true" />
@@ -787,7 +831,7 @@ function RiskQueue({
                     <div className="flex flex-wrap items-center gap-2">
                       <CoverageBadge state={item.coverage.state} />
                       {item.block.is_template_exception ? (
-                        <Badge variant="outline">Excepcion</Badge>
+                        <Badge variant="outline">Excepción</Badge>
                       ) : null}
                       <Badge variant="outline">
                         {item.coverage.validAssignmentCount}/
@@ -812,7 +856,7 @@ function RiskQueue({
                       </p>
                     ) : item.coverage.state === "uncovered" ? (
                       <p className="text-sm text-muted-foreground">
-                        No hay ningun coach asignado.
+                        No hay ningún coach asignado.
                       </p>
                     ) : (
                       <p className="text-sm text-muted-foreground">
@@ -821,11 +865,12 @@ function RiskQueue({
                     )}
                   </div>
                   <div className="flex items-start lg:justify-end">
-                    <Button asChild size="sm" variant="outline">
+                    <Button asChild className="w-full lg:w-auto" size="sm" variant="outline">
                       <Link
                         href={getBlockHref({
                           blockId: item.block.id,
                           organizationId,
+                          serviceDate: item.block.service_date,
                           weekStart,
                         })}
                       >
@@ -864,7 +909,7 @@ function SupportViews({
       <CardContent>
         {centerSummaries.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Todavia no hay bloques por centro en esta semana.
+            Todavía no hay bloques por centro en esta semana.
           </p>
         ) : (
           <div className="grid gap-3">
@@ -1019,7 +1064,7 @@ function ReadOnlyHome({
             Tu box
           </CardTitle>
           <CardDescription>
-            Contexto con el que estas trabajando ahora.
+            Contexto con el que estás trabajando ahora.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1048,7 +1093,7 @@ function ReadOnlyHome({
         <CardHeader>
           <CardTitle>Accesos de lectura</CardTitle>
           <CardDescription>
-            Puedes consultar la semana, plantillas y datos de gestion.
+            Puedes consultar la semana, plantillas y datos de gestión.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -1086,43 +1131,43 @@ function SurfaceLinks({
   return (
     <Card data-tour="quick-actions">
       <CardHeader>
-        <CardTitle>Acciones rapidas</CardTitle>
+        <CardTitle>Acciones rápidas</CardTitle>
         <CardDescription>
           Entra directo a las pantallas que se usan para preparar la semana.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        <Button asChild>
+      <CardContent className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+        <Button asChild className="w-full md:w-auto">
           <Link href={getCoveragePath({ organizationId, week: weekStart })}>
             <AlertTriangle aria-hidden="true" />
             Resolver cobertura
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full md:w-auto" variant="outline">
           <Link href={getSchedulePath({ organizationId, week: weekStart })}>
             <CalendarDays aria-hidden="true" />
             Abrir horario
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full md:w-auto" variant="outline">
           <Link href={getCentersPath({ organizationId })}>
             <MapPin aria-hidden="true" />
             Centros
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full md:w-auto" variant="outline">
           <Link href={getCoachesPath({ organizationId })}>
             <UsersRound aria-hidden="true" />
             Equipo
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full md:w-auto" variant="outline">
           <Link href={getClassTypesPath({ organizationId })}>
             <Dumbbell aria-hidden="true" />
             Tipos
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full md:w-auto" variant="outline">
           <Link href={getScheduleTemplatesPath({ organizationId, week: weekStart })}>
             <CalendarRange aria-hidden="true" />
             Plantillas
@@ -1185,7 +1230,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
         <Alert>
           <AlertTitle>Semana ajustada</AlertTitle>
           <AlertDescription>
-            La fecha recibida no era valida. Se muestra la semana actual.
+            La fecha recibida no era válida. Se muestra la semana actual.
           </AlertDescription>
         </Alert>
       ) : null}

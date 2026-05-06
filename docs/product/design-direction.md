@@ -177,7 +177,7 @@ El diseño base pertenece a BoxOps. Cada tenant puede configurar una capa visual
 - logo;
 - nombre visible de organizacion;
 - colores secundarios de centros si se validan;
-- pequenos ajustes de marca en areas permitidas.
+- pequeños ajustes de marca en areas permitidas.
 
 No deben ser configurables:
 

@@ -355,6 +355,14 @@ Estado tras Task 009:
 - Henalu queda como perfil tecnico interno, no asignable como coach.
 - No se cargan cuentas Auth reales, templates, horarios reales ni asignaciones reales desde este seed.
 
+Decision Fase A 2026-05-06:
+
+- Mantener el horario real, plantillas reales y asignaciones reales fuera del seed automatico hasta confirmar la semana completa de ambos centros.
+- Usar base privada de piloto o snippet local nombrado para validar una semana real, nunca `src` ni condiciones especiales en producto.
+- Crear fixture anonimizado solo despues de cerrar la distribucion exacta de STL City, los huecos reales y los casos de cobertura que se quieran conservar para pruebas.
+- Antes del fixture, la comprobacion local de Fase A encontro STL con 2 centros, 10 perfiles de persona, 9 coaches, 8 tipos, 0 plantillas y 0 bloques.
+- Tras aplicar `supabase/snippets/stl-test-week-2026-05-04.sql`, STL queda en local con 1 plantilla activa, 165 bloques de plantilla, 165 bloques reales y 0 asignaciones.
+
 ### Visibilidad Entre Coaches
 
 Para STL, los coaches deben poder ver:
@@ -393,7 +401,7 @@ Horario real recibido con `dia`, `hora_inicio`, `hora_fin` y `actividad`.
 
 Decision de datos iniciales recibida despues:
 
-- Los bloques del horario recibido corresponden inicialmente a STL TremaÃ±es.
+- Los bloques del horario recibido corresponden inicialmente a STL Tremañes.
 - STL City debe tener los mismos dias y franjas horarias iniciales, pero solo con actividades CrossFit y Wellness.
 - Las asignaciones iniciales de coaches a bloques pueden generarse aleatoriamente por centro como dato de arranque editable.
 - La asignacion aleatoria debe evitar asignar el mismo coach a bloques solapados cuando sea posible.
@@ -401,107 +409,62 @@ Decision de datos iniciales recibida despues:
 
 Pendiente para implementacion: definir si la distribucion de STL City entre CrossFit y Wellness sera alterna, aleatoria deterministica o configurada manualmente antes del seed.
 
-```csv
-dia,hora_inicio,hora_fin,actividad
-Lunes,07:00,08:00,Wellness
-Lunes,08:00,09:00,CF4Fun
-Lunes,08:15,09:15,Wellness
-Lunes,09:30,10:30,Wellness
-Lunes,10:00,11:00,Haltero Mix
-Lunes,11:00,12:00,Wellness
-Lunes,11:15,12:15,CrossFit
-Lunes,14:00,15:00,CF4Fun
-Lunes,16:30,17:30,CF4Fun
-Lunes,16:30,17:30,Wellness
-Lunes,17:35,18:35,CrossFit
-Lunes,17:35,18:35,Wellness
-Lunes,17:35,18:35,Halterofilia Mix
-Lunes,18:40,19:40,CrossFit
-Lunes,18:40,19:40,Wellness
-Lunes,18:40,19:40,Halterofilia Mix
-Lunes,19:50,20:50,Wellness
-Lunes,19:50,20:50,Halterofilia Mix
-Lunes,21:00,22:00,CrossFit
-Lunes,21:00,22:00,Wellness
-Martes,07:00,08:00,Wellness
-Martes,08:00,09:00,CF4Fun
-Martes,08:15,09:15,Wellness
-Martes,09:30,10:30,Wellness
-Martes,10:00,11:00,Fit+50
-Martes,10:00,11:00,Gimnásticos Fundamentos
-Martes,11:00,12:00,Wellness
-Martes,11:15,12:15,CrossFit
-Martes,14:00,15:00,CF4Fun
-Martes,16:30,17:30,Wellness
-Martes,17:35,18:35,CrossFit
-Martes,17:35,18:35,Wellness
-Martes,18:40,19:40,Gimnásticos Avanzados
-Martes,18:40,19:40,Wellness
-Martes,18:40,19:40,Halterofilia
-Martes,19:50,20:50,CrossFit
-Martes,19:50,20:50,Wellness
-Martes,19:50,20:50,Gimnásticos Fundamentos
-Martes,21:00,22:00,CrossFit
-Martes,21:00,22:00,Wellness
-Miércoles,07:00,08:00,Wellness
-Miércoles,08:00,09:00,CF4Fun
-Miércoles,08:15,09:15,Wellness
-Miércoles,09:30,10:30,Wellness
-Miércoles,10:00,11:00,Haltero Mix
-Miércoles,11:00,12:00,Wellness
-Miércoles,11:15,12:15,CrossFit
-Miércoles,14:00,15:00,CF4Fun
-Miércoles,16:30,17:30,CF4Fun
-Miércoles,16:30,17:30,Wellness
-Miércoles,17:35,18:35,CrossFit
-Miércoles,17:35,18:35,Wellness
-Miércoles,17:35,18:35,Halterofilia Mix
-Miércoles,18:40,19:40,CrossFit
-Miércoles,18:40,19:40,Wellness
-Miércoles,19:50,20:50,Wellness
-Miércoles,19:50,20:50,Halterofilia Mix
-Miércoles,21:00,22:00,CrossFit
-Miércoles,21:00,22:00,Wellness
-Jueves,07:00,08:00,Engine Community
-Jueves,08:00,09:00,Engine Community
-Jueves,10:00,11:00,Fit+50
-Jueves,10:00,11:00,Engine Community
-Jueves,11:15,12:15,Engine Community
-Jueves,14:00,15:00,Engine Community
-Jueves,16:30,17:30,Engine Community
-Jueves,17:35,18:35,Engine Community
-Jueves,18:40,19:40,Halterofilia
-Jueves,18:40,19:40,Engine Community
-Jueves,19:50,20:50,Gimnasticos Avanzados
-Jueves,19:50,20:50,Engine Community
-Jueves,21:00,22:00,Engine Community
-Viernes,07:00,08:00,Wellness
-Viernes,08:00,09:00,CF4Fun
-Viernes,08:15,09:15,Wellness
-Viernes,09:30,10:30,Wellness
-Viernes,10:00,11:00,CrossFit
-Viernes,11:00,12:00,Wellness
-Viernes,14:00,15:00,CF4Fun
-Viernes,16:30,17:30,CF4Fun
-Viernes,16:30,17:30,Wellness
-Viernes,17:35,18:35,Gimnásticos Fundamentos
-Viernes,17:35,18:35,Wellness
-Viernes,18:40,19:40,CrossFit
-Viernes,18:40,19:40,Wellness
-Viernes,19:50,20:50,CF4Fun
-Viernes,21:00,22:00,Wellness
-Sábado,08:30,09:30,STL SAT
-Sábado,10:00,11:00,Wellness
-Sábado,10:40,11:40,Mobility
-Sábado,11:15,12:15,CrossFit
-Domingo,10:00,11:00,Engine Community
-Domingo,11:15,12:15,Engine Community
-```
+Estado Fase A 2026-05-06:
+
+- El horario recibido sirve como semana real base para STL Tremañes.
+- STL City sigue parcial: estan validadas las mismas franjas y el limite a CrossFit/Wellness, pero falta la actividad exacta por franja.
+- No hay coach asignado validado por bloque real.
+- La UI y smoke E2E local admin/coach pasan contra la semana `2026-05-04`.
+- No se debe presentar esta semana como cerrada para piloto hasta cargar o confirmar asignaciones reales, huecos vacantes y estado operativo por bloque.
+
+### Semana De Prueba L-V Recibida - 2026-05-06
+
+El usuario facilito una semana completa de prueba para validar MVP 1 en STL:
+
+- aplica de lunes a viernes;
+- cubre franjas desde las 07:00 hasta las 21:00;
+- cada bloque requiere 1 coach;
+- la duracion normal de clase es 1 hora;
+- `CrossFit Teens` dura 1 hora y media;
+- puede haber varias clases a la misma hora y eso es normal;
+- no hay coach asignado por bloque todavia;
+- no se dio centro por bloque, asi que el fixture local se cargo temporalmente en STL Tremañes para poder validar la UI.
+
+Bloques diarios de la semana de prueba:
+
+| Hora | Actividades |
+|---|---|
+| 07:00-08:00 | Wellness, Open Box |
+| 08:00-09:00 | CrossFit 4Fun, Open Box, Wellness |
+| 09:30-10:30 | Wellness, Open Box |
+| 10:00-11:00 | Open Box, Halterofilia Mix |
+| 11:00-12:00 | Wellness |
+| 11:15-12:15 | CrossFit, Open Box |
+| 12:30-13:30 | Open Box |
+| 14:00-15:00 | Open Box, CrossFit 4Fun |
+| 15:00-16:00 | Open Box |
+| 15:15-16:15 | Wellness |
+| 16:00-17:30 | CrossFit Teens |
+| 16:30-17:30 | Wellness, CrossFit 4Fun, Open Box |
+| 17:35-18:35 | Halterofilia Avanzados, Wellness, CrossFit 4Fun |
+| 18:40-19:40 | CrossFit, Wellness, Halterofilia Mix |
+| 19:50-20:50 | CrossFit, Halterofilia Mix, Wellness |
+| 21:00-22:00 | CrossFit, Wellness, Open Box |
+
+Fixture local:
+
+- Archivo: `supabase/snippets/stl-test-week-2026-05-04.sql`.
+- Semana cargada: 2026-05-04 a 2026-05-08.
+- Resultado esperado: 1 plantilla activa, 165 bloques de plantilla, 165 bloques reales y 0 asignaciones.
+- Todos los bloques quedan vacantes para que `/app/coverage` muestre riesgos sin inventar coaches.
+
+La tabla anterior es la fuente vigente de la semana de prueba. El detalle historico anterior con sabado/domingo queda fuera de este fixture.
 
 ## Informacion Pendiente
 
-- Definir patron inicial para repartir actividades CrossFit/Wellness en STL City usando las mismas franjas.
-- Confirmar si se quiere que la asignacion aleatoria deje algun hueco sin cubrir para validar dashboard o si todos los bloques iniciales deben quedar cubiertos.
+- Confirmar si la semana de prueba L-V pertenece a STL Tremañes, a STL City o debe repartirse entre centros por bloque.
+- Confirmar coach asignado por bloque, o si todos/parte de los bloques deben quedar vacantes como huecos reales.
+- Confirmar si se quieren asignaciones de prueba para validar estados cubiertos/conflicto, o si la primera validacion debe centrarse en bloques sin cubrir.
 - Email de Nuria y confirmacion de si los emails recibidos se usaran para invitacion Auth o podran cambiarse antes de activar cuenta.
 - Reglas exactas de aprobacion para cambios de turno.
 - Politica de vacaciones y ausencias.

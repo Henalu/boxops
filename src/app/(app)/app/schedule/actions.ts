@@ -29,9 +29,15 @@ type ScheduleRedirectFilters = {
   classTypeId?: string | null;
   coachProfileId?: string | null;
   coverageState?: string | null;
+  day?: string | null;
   mineOnly?: boolean | null;
   risksOnly?: boolean | null;
+  view?: string | null;
 };
+
+const DATE_PARAM_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const SCHEDULE_ACTION_VIEWS = ["week", "agenda", "month"] as const;
+const ACTION_RETURN_PATHS = ["/app/coverage", "/app/schedule"] as const;
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -39,18 +45,65 @@ function getRequiredFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getErrorPath(
-  organizationId: string | null,
-  week: string | null,
-  error: string,
-  filters: ScheduleRedirectFilters = {},
-) {
+function getFallbackReturnPath({
+  filters,
+  organizationId,
+  week,
+}: {
+  filters: ScheduleRedirectFilters;
+  organizationId: string | null;
+  week: string | null;
+}) {
   return getSchedulePath({
-    error,
     organizationId,
     week,
     ...filters,
   });
+}
+
+function getSafeReturnPath(formData: FormData, fallbackPath: string) {
+  const rawReturnPath = getRequiredFormString(formData, "returnPath");
+
+  if (!rawReturnPath) {
+    return fallbackPath;
+  }
+
+  try {
+    const url = new URL(rawReturnPath, "http://boxops.local");
+
+    if (
+      url.origin !== "http://boxops.local" ||
+      !ACTION_RETURN_PATHS.some((path) => url.pathname === path)
+    ) {
+      return fallbackPath;
+    }
+
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return fallbackPath;
+  }
+}
+
+function getActionResultPath({
+  key,
+  returnPath,
+  value,
+}: {
+  key: "error" | "status";
+  returnPath: string;
+  value: string;
+}) {
+  const url = new URL(returnPath, "http://boxops.local");
+
+  if (key === "error") {
+    url.searchParams.delete("status");
+  } else {
+    url.searchParams.delete("error");
+  }
+
+  url.searchParams.set(key, value);
+
+  return `${url.pathname}${url.search}`;
 }
 
 function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters {
@@ -61,6 +114,8 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
   const coverageState = getRequiredFormString(formData, "coverage_state");
   const mineOnly = getRequiredFormString(formData, "mine");
   const risksOnly = getRequiredFormString(formData, "risks_only");
+  const view = getRequiredFormString(formData, "view");
+  const day = getRequiredFormString(formData, "day");
 
   return {
     blockStatus: isScheduleBlockStatus(blockStatus) ? blockStatus : null,
@@ -72,6 +127,12 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
       : null,
     mineOnly: mineOnly === "1" || mineOnly === "true",
     risksOnly: risksOnly === "1" || risksOnly === "true",
+    view: SCHEDULE_ACTION_VIEWS.includes(
+      view as (typeof SCHEDULE_ACTION_VIEWS)[number],
+    )
+      ? view
+      : null,
+    day: DATE_PARAM_PATTERN.test(day) ? day : null,
   };
 }
 
@@ -79,15 +140,16 @@ async function getAdminActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
   const filters = getScheduleRedirectFilters(formData);
-  const redirectPath = getSchedulePath({
+  const fallbackReturnPath = getFallbackReturnPath({
+    filters,
     organizationId,
     week: rawWeekStart || null,
-    ...filters,
   });
+  const returnPath = getSafeReturnPath(formData, fallbackReturnPath);
   const user = await getAuthenticatedUser();
 
   if (!user) {
-    redirect(getLoginPath(redirectPath));
+    redirect(getLoginPath(returnPath));
   }
 
   const memberships = await getActiveMemberships(user.id);
@@ -95,23 +157,21 @@ async function getAdminActionContext(formData: FormData) {
 
   if (!resolution.ok) {
     redirect(
-      getErrorPath(
-        organizationId,
-        rawWeekStart || null,
-        resolution.reason,
-        filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath,
+        value: resolution.reason,
+      }),
     );
   }
 
   if (resolution.membership.role !== "admin") {
     redirect(
-      getErrorPath(
-        resolution.organization.id,
-        rawWeekStart || null,
-        "forbidden",
-        filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath,
+        value: "forbidden",
+      }),
     );
   }
 
@@ -120,6 +180,7 @@ async function getAdminActionContext(formData: FormData) {
   return {
     filters,
     organization: resolution.organization,
+    returnPath,
     weekStart: week.weekStart,
   };
 }
@@ -322,12 +383,11 @@ export async function createScheduleBlock(formData: FormData) {
 
   if (!validation.ok) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        validation.error,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
     );
   }
 
@@ -339,12 +399,11 @@ export async function createScheduleBlock(formData: FormData) {
 
   if (referenceError) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        referenceError,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: referenceError,
+      }),
     );
   }
 
@@ -363,21 +422,19 @@ export async function createScheduleBlock(formData: FormData) {
 
   if (error) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        getMutationError(error.code),
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getMutationError(error.code),
+      }),
     );
   }
 
   redirect(
-    getSchedulePath({
-      organizationId: context.organization.id,
-      status: "created",
-      week: context.weekStart,
-      ...context.filters,
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "created",
     }),
   );
 }
@@ -388,12 +445,11 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
   if (!validation.ok) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        validation.error,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
     );
   }
 
@@ -406,12 +462,11 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
   if (blockError) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        blockError,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: blockError,
+      }),
     );
   }
 
@@ -423,12 +478,11 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
   if (coachError) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        coachError,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: coachError,
+      }),
     );
   }
 
@@ -442,24 +496,22 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
   if (existingError) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "save-failed",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "save-failed",
+      }),
     );
   }
 
   if (existingAssignment) {
     if (existingAssignment.assignment_status !== "removed") {
       redirect(
-        getErrorPath(
-          context.organization.id,
-          context.weekStart,
-          "duplicate-assignment",
-          context.filters,
-        ),
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: "duplicate-assignment",
+        }),
       );
     }
 
@@ -476,12 +528,11 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
     if (error) {
       redirect(
-        getErrorPath(
-          context.organization.id,
-          context.weekStart,
-          getAssignmentMutationError(error.code),
-          context.filters,
-        ),
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: getAssignmentMutationError(error.code),
+        }),
       );
     }
   } else {
@@ -495,22 +546,20 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 
     if (error) {
       redirect(
-        getErrorPath(
-          context.organization.id,
-          context.weekStart,
-          getAssignmentMutationError(error.code),
-          context.filters,
-        ),
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: getAssignmentMutationError(error.code),
+        }),
       );
     }
   }
 
   redirect(
-    getSchedulePath({
-      organizationId: context.organization.id,
-      status: "assigned",
-      week: context.weekStart,
-      ...context.filters,
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "assigned",
     }),
   );
 }
@@ -521,12 +570,11 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
 
   if (!validation.ok) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        validation.error,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
     );
   }
 
@@ -540,12 +588,11 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
 
   if (assignmentError || !assignment) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "assignment-required",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "assignment-required",
+      }),
     );
   }
 
@@ -566,12 +613,11 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
 
   if (blockResult.error || coachResult.error || !blockResult.data || !coachResult.data) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "invalid-assignment-reference",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "invalid-assignment-reference",
+      }),
     );
   }
 
@@ -585,21 +631,19 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
 
   if (error) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        getAssignmentMutationError(error.code),
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getAssignmentMutationError(error.code),
+      }),
     );
   }
 
   redirect(
-    getSchedulePath({
-      organizationId: context.organization.id,
-      status: "assignment-removed",
-      week: context.weekStart,
-      ...context.filters,
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "assignment-removed",
     }),
   );
 }
@@ -611,23 +655,21 @@ export async function updateScheduleBlock(formData: FormData) {
 
   if (!scheduleBlockId) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "block-required",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "block-required",
+      }),
     );
   }
 
   if (!validation.ok) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        validation.error,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
     );
   }
 
@@ -639,12 +681,11 @@ export async function updateScheduleBlock(formData: FormData) {
 
   if (referenceError) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        referenceError,
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: referenceError,
+      }),
     );
   }
 
@@ -660,12 +701,11 @@ export async function updateScheduleBlock(formData: FormData) {
 
   if (existingBlockError || !existingBlock) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "block-required",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "block-required",
+      }),
     );
   }
 
@@ -697,21 +737,19 @@ export async function updateScheduleBlock(formData: FormData) {
 
   if (error) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        getMutationError(error.code),
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getMutationError(error.code),
+      }),
     );
   }
 
   redirect(
-    getSchedulePath({
-      organizationId: context.organization.id,
-      status: "updated",
-      week: context.weekStart,
-      ...context.filters,
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "updated",
     }),
   );
 }
@@ -722,12 +760,11 @@ export async function cancelScheduleBlock(formData: FormData) {
 
   if (!scheduleBlockId) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "block-required",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "block-required",
+      }),
     );
   }
 
@@ -741,12 +778,11 @@ export async function cancelScheduleBlock(formData: FormData) {
 
   if (blockError || !block) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        "block-required",
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "block-required",
+      }),
     );
   }
 
@@ -764,21 +800,19 @@ export async function cancelScheduleBlock(formData: FormData) {
 
   if (error) {
     redirect(
-      getErrorPath(
-        context.organization.id,
-        context.weekStart,
-        getMutationError(error.code),
-        context.filters,
-      ),
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getMutationError(error.code),
+      }),
     );
   }
 
   redirect(
-    getSchedulePath({
-      organizationId: context.organization.id,
-      status: "cancelled",
-      week: context.weekStart,
-      ...context.filters,
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "cancelled",
     }),
   );
 }

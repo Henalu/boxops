@@ -37,7 +37,7 @@ export function CollapsibleActionPanel({
         <span
           className={cn(
             buttonVariants({ size: "sm" }),
-            "shrink-0 group-open:bg-secondary group-open:text-secondary-foreground",
+            "min-h-11 shrink-0 px-3 md:min-h-0 md:px-2.5 group-open:bg-secondary group-open:text-secondary-foreground",
           )}
         >
           {actionLabel}
@@ -65,7 +65,7 @@ export function InlineEditDetails({
         <span
           className={cn(
             buttonVariants({ size: "sm", variant: "outline" }),
-            "group-open:bg-muted",
+            "min-h-11 px-3 md:min-h-0 md:px-2.5 group-open:bg-muted",
           )}
         >
           <Pencil aria-hidden="true" className="size-3.5" />

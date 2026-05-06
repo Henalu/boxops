@@ -10,7 +10,7 @@ export default function Home() {
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-7 text-slate-700">
           Horarios, equipo, plantillas y cobertura en una experiencia pensada
-          para trabajar cada dia con menos ruido.
+          para trabajar cada día con menos ruido.
         </p>
         <a
           className="mt-8 inline-flex items-center justify-center rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"

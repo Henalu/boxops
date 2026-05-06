@@ -49,7 +49,9 @@ Cobertura opcional con credenciales:
   - usuarios/coaches
   - tipos de actividad
   - horario semanal
+  - cobertura
   - plantillas semanales
+  - mas/gestion
 - `coach` puede entrar en las mismas superficies en lectura.
 
 Variables opcionales:
@@ -62,6 +64,8 @@ Variables opcionales:
 - `E2E_WEEK` para fijar la semana en `/app/schedule` y `/app/templates`.
 - `E2E_BASE_URL` para staging, preview o un puerto distinto.
 - `E2E_START_SERVER=1` solo si se quiere que Playwright lance `npm run dev`.
+
+Nota Fase A 2026-05-06: el smoke marca el onboarding local como visto para validar navegacion de rutas sin bloquearse en el tour. La semana de prueba local de STL se valida con `E2E_ORGANIZATION_ID=00000000-0000-0000-0000-000000200001` y `E2E_WEEK=2026-05-04`; para cerrar validacion real haran falta credenciales o flujo E2E reales del piloto y asignaciones/huecos confirmados.
 
 ## Smoke manual pendiente
 

@@ -11,7 +11,7 @@ build/
 .turbo/
 .vercel/
 
-coverage/
+/coverage/
 test-results/
 playwright-report/
 

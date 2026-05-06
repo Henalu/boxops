@@ -83,7 +83,7 @@ Estado actual tras Task 015:
 - `coach` consulta centros, coaches y tipos en modo lectura.
 - `coach` consulta bloques operativos, cobertura, "Mi horario" y plantillas en modo lectura.
 
-Esto ya no es solo scaffold. Es el primer corte real protegido. Pequeno, pero con las tuberias importantes en su sitio.
+Esto ya no es solo scaffold. Es el primer corte real protegido. Pequeño, pero con las tuberias importantes en su sitio.
 
 ## Que no existe todavia
 

@@ -17,9 +17,9 @@ type LoginPageProps = {
 };
 
 const errorMessages: Record<string, string> = {
-  "missing-credentials": "Introduce email y contrasena para iniciar sesion.",
-  "invalid-credentials": "No se ha podido iniciar sesion con esos datos.",
-  callback: "No se ha podido completar el inicio de sesion.",
+  "missing-credentials": "Introduce email y contraseña para iniciar sesión.",
+  "invalid-credentials": "No se ha podido iniciar sesión con esos datos.",
+  callback: "No se ha podido completar el inicio de sesión.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -44,7 +44,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Accede a la operativa de tu box.
           </h1>
           <p className="mt-5 text-base leading-7 text-slate-700">
-            Revisa horarios, equipo, plantillas y cobertura desde un unico
+            Revisa horarios, equipo, plantillas y cobertura desde un único
             espacio de trabajo.
           </p>
         </div>
@@ -53,7 +53,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {user ? (
             <div className="space-y-5">
               <div>
-                <h2 className="text-xl font-semibold">Sesion iniciada</h2>
+                <h2 className="text-xl font-semibold">Sesión iniciada</h2>
                 <p className="mt-2 break-words text-sm leading-6 text-slate-600">
                   {user.email ?? user.id}
                 </p>
@@ -68,8 +68,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 </Link>
               ) : (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-                  Tu usuario existe, pero todavia no tiene acceso activo a
-                  ningun box.
+                  Tu usuario existe, pero todavía no tiene acceso activo a
+                  ningún box.
                 </p>
               )}
 
@@ -78,16 +78,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
                   type="submit"
                 >
-                  Cerrar sesion
+                  Cerrar sesión
                 </button>
               </form>
             </div>
           ) : (
             <form action={signInWithPassword} className="space-y-5">
               <div>
-                <h2 className="text-xl font-semibold">Iniciar sesion</h2>
+                <h2 className="text-xl font-semibold">Iniciar sesión</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Usa tu email y contrasena para continuar.
+                  Usa tu email y contraseña para continuar.
                 </p>
               </div>
 
@@ -114,7 +114,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">
-                  Contrasena
+                  Contraseña
                 </span>
                 <input
                   autoComplete="current-password"

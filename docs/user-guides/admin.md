@@ -37,6 +37,7 @@ Un admin puede:
 - ver cobertura basica calculada: cubierto, sin cubrir, insuficiente y conflicto
 - entrar en `/app/templates`
 - crear y editar plantillas semanales
+- alternar todas las plantillas entre vista Semana y vista Agenda
 - crear y editar bloques de plantilla
 - definir bloques de plantilla con coach por defecto o vacantes
 - aplicar una plantilla activa a una semana
@@ -314,6 +315,13 @@ Ruta:
 ```
 
 Aqui el admin gestiona patrones semanales reutilizables.
+
+La pantalla tiene dos modos de lectura:
+
+- Semana: agrupa los bloques por dia para editar plantillas grandes con menos scroll; en movil muestra solo el dia seleccionado.
+- Agenda: conserva la lista vertical ordenada por dia y hora.
+
+El modo elegido se conserva al guardar cambios. Abrir o cerrar la edicion de un bloque no recarga la pantalla: en escritorio aparece un panel lateral y en movil se despliega el formulario bajo el bloque seleccionado.
 
 ## Crear o editar plantilla
 

@@ -81,7 +81,7 @@ Prioridad de render futuro:
 
 ### Colores De Centro Y Tipo
 
-Los centros y tipos de actividad pueden tener color, pero solo como senal secundaria:
+Los centros y tipos de actividad pueden tener color, pero solo como señal secundaria:
 
 - punto, rail lateral fino, avatar, chip o borde sutil;
 - nunca como sustituto del estado operativo;
@@ -131,7 +131,7 @@ El spacing debe crear ritmo, no una cuadricula monotona.
 | `space.1` | 4px | Icono-texto, metadata pegada |
 | `space.2` | 8px | Elementos muy relacionados |
 | `space.3` | 12px | Filas, grupos compactos |
-| `space.4` | 16px | Padding movil, cards pequenas |
+| `space.4` | 16px | Padding movil, cards pequeñas |
 | `space.5` | 20px | Separacion media |
 | `space.6` | 24px | Padding desktop compacto |
 | `space.8` | 32px | Separacion entre grupos |
@@ -160,8 +160,8 @@ BoxOps debe sentirse moderno sin parecer blando ni decorativo.
 | Token | Valor | Uso |
 |---|---:|---|
 | `radius.none` | 0px | Divisores, tablas |
-| `radius.xs` | 4px | Badges pequenos, rails |
-| `radius.sm` | 6px | Inputs compactos, botones pequenos |
+| `radius.xs` | 4px | Badges pequeños, rails |
+| `radius.sm` | 6px | Inputs compactos, botones pequeños |
 | `radius.md` | 8px | Cards, bloques de horario, controles |
 | `radius.lg` | 10-12px | Sheets, popovers, dialogos |
 | `radius.full` | 9999px | Pills, avatars, chips |
@@ -216,7 +216,7 @@ Reglas:
 - Movil: agenda por dia con filtros rapidos y bloques compactos.
 - Desktop: semana densa por dias, con hoy visible y navegacion temporal clara.
 - `uncovered`, `insufficient` y `conflict` dominan sobre colores de tipo o centro.
-- Colores de tipo/centro deben ser rails, puntos o chips pequenos.
+- Colores de tipo/centro deben ser rails, puntos o chips pequeños.
 - Los filtros usan `layout.filter.gap` y estado activo obvio.
 
 ### Team Schedule By Center

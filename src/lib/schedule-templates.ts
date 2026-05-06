@@ -95,16 +95,16 @@ export function getScheduleTemplateDayLabel(day: number) {
   const labels: Record<ScheduleTemplateDay, string> = {
     1: "Lunes",
     2: "Martes",
-    3: "Miercoles",
+    3: "Miércoles",
     4: "Jueves",
     5: "Viernes",
-    6: "Sabado",
+    6: "Sábado",
     7: "Domingo",
   };
 
   return SCHEDULE_TEMPLATE_DAYS.includes(day as ScheduleTemplateDay)
     ? labels[day as ScheduleTemplateDay]
-    : `Dia ${day}`;
+    : `Día ${day}`;
 }
 
 function getFormString(formData: FormData, key: string) {

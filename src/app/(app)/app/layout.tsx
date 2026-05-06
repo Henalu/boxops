@@ -41,7 +41,7 @@ export default async function ProtectedAppLayout({
                   BoxOps
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  Operacion semanal
+                  Operación semanal
                 </span>
               </span>
             </Link>
@@ -50,7 +50,7 @@ export default async function ProtectedAppLayout({
           <div className="min-h-0 flex-1">
             <Suspense
               fallback={
-                <nav aria-label="Navegacion principal" className="h-40" />
+                <nav aria-label="Navegación principal" className="h-40" />
               }
             >
               <AppNavigation placement="sidebar" />
@@ -64,7 +64,7 @@ export default async function ProtectedAppLayout({
             </p>
             <form action="/auth/sign-out" method="post">
               <Button className="w-full" type="submit" variant="outline">
-                Cerrar sesion
+                Cerrar sesión
               </Button>
             </form>
           </div>
@@ -72,9 +72,9 @@ export default async function ProtectedAppLayout({
 
         <div className="min-w-0">
           <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-            <div className="flex min-h-14 items-center justify-between gap-3 px-4">
+            <div className="flex min-h-[3.25rem] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]">
               <Link
-                className="flex min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 href="/app"
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
@@ -84,25 +84,18 @@ export default async function ProtectedAppLayout({
                   BoxOps
                 </span>
               </Link>
-              <div className="flex items-center gap-2">
-                <OnboardingLaunchButton label="Guia" />
-                <form action="/auth/sign-out" method="post">
-                  <Button size="sm" type="submit" variant="ghost">
-                    Salir
-                  </Button>
-                </form>
-              </div>
+              <OnboardingLaunchButton label="Guía" />
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 md:pb-8 md:pt-8 lg:px-8">
+          <main className="mx-auto w-full max-w-6xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-8 lg:px-8">
             {children}
           </main>
         </div>
       </div>
 
       <Suspense
-        fallback={<nav aria-label="Navegacion principal" className="h-16" />}
+        fallback={<nav aria-label="Navegación principal" className="h-16" />}
       >
         <AppNavigation placement="bottom" />
       </Suspense>

@@ -2,6 +2,8 @@
 
 Este documento define como deberia funcionar el theming por tenant en BoxOps. Es una especificacion de producto/arquitectura visual, no una implementacion.
 
+Estado 2026-05-06: theming sigue sin implementacion real. La primera fase candidata es Fase B del roadmap, usando `organizations.theme_config jsonb` como opcion preferente si no aparecen necesidades de permisos, versionado o auditoria mas complejas.
+
 ## Principio
 
 BoxOps tiene una identidad base propia. El tenant puede aportar contexto visual, pero no debe cambiar la semantica operativa del producto.
@@ -38,6 +40,7 @@ Configurable de forma controlada:
 - color de acento principal;
 - color suave derivado del acento;
 - colores por centro;
+- colores corporativos secundarios solo si no compiten con estados;
 - preferencia de densidad inicial si se valida;
 - preferencia de vista inicial por rol si se valida.
 
@@ -60,6 +63,7 @@ Estos datos pueden tener colores propios, pero siempre subordinados a la semanti
 No permitir que un tenant cambie:
 
 - colores de `uncovered`, `conflict`, `error` o foco;
+- colores de warning/success/destructive cuando indiquen estado operativo;
 - contraste minimo;
 - significado visual de estados;
 - orden de prioridad de riesgos;
@@ -79,8 +83,10 @@ Forma conceptual:
 
 ```json
 {
+  "version": 1,
   "logoAssetId": "asset-id",
   "accentColor": "#334155",
+  "secondaryAccentColor": "#0f766e",
   "logoMode": "mark-and-name",
   "centerColors": {
     "center-uuid-1": "#2563eb",
@@ -93,6 +99,7 @@ Forma conceptual:
 Notas:
 
 - los IDs reales deben ser UUIDs o referencias internas, no nombres de centro;
+- `logoAssetId` debe apuntar a un asset controlado, idealmente privado o servido mediante ruta segura;
 - `accentColor` debe validarse y derivar variantes seguras;
 - `densityDefault` no puede ocultar informacion ni reducir targets moviles bajo minimos;
 - el tema se resuelve para la organizacion activa, no por usuario global.
@@ -152,6 +159,14 @@ El logo del tenant puede aparecer:
 
 No debe convertir la app en una experiencia distinta por tenant. La estructura, patrones y lenguaje siguen siendo BoxOps.
 
+Antes de subir logos reales hay que decidir:
+
+- formatos permitidos;
+- tamano maximo;
+- si se guarda original, variantes o ambas;
+- quien puede reemplazarlo;
+- si el logo puede aparecer en exports/documentos con datos laborales.
+
 ## Centros Y Colores
 
 Los colores de centro ayudan en vistas multi-centro, pero deben ser discretos:
@@ -204,5 +219,6 @@ La fase frontend puede empezar a implementar theming cuando:
 - se definan fallbacks seguros de BoxOps;
 - se haya validado contraste de tokens base;
 - se pruebe con al menos dos configuraciones de tenant;
+- exista matriz de permisos para quien cambia logo/colores;
 - `rg -n "STL" src` no encuentre referencias hardcodeadas;
 - la UI siga siendo usable sin logo ni color configurado.

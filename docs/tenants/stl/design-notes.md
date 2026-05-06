@@ -37,7 +37,7 @@ Cuando exista theming por tenant, STL puede configurar:
 - logo del tenant;
 - color de acento propio;
 - nombres visibles de centros;
-- pequenos detalles de marca permitidos;
+- pequeños detalles de marca permitidos;
 - preferencia inicial de centro o vista si se define como configuracion.
 
 Debe seguir siendo comun:

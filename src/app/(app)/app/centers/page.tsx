@@ -57,14 +57,14 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "center-required": "No se ha recibido el centro a actualizar.",
-  "duplicate-slug": "Ya existe un centro con ese slug en esta organizacion.",
+  "duplicate-slug": "Ya existe un centro con ese slug en esta organización.",
   forbidden: "Tu rol no permite gestionar centros.",
-  "invalid-slug": "Usa un slug en minusculas, numeros y guiones.",
-  "invalid-status": "El estado del centro no es valido.",
+  "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
+  "invalid-status": "El estado del centro no es válido.",
   "missing-fields": "Completa nombre, slug y zona horaria.",
   no_active_memberships: "No hay accesos activos para este usuario.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
-  organization_required: "Elige una organizacion antes de gestionar centros.",
+  organization_not_found: "La organización solicitada no está disponible.",
+  organization_required: "Elige una organización antes de gestionar centros.",
   "save-failed": "No se han podido guardar los cambios.",
 };
 
@@ -103,7 +103,7 @@ function formatUpdatedAt(value: string, timezone: string) {
 function StatusSelect({ defaultValue }: { defaultValue: string }) {
   return (
     <select
-      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-8"
       defaultValue={defaultValue}
       name="status"
     >
@@ -352,7 +352,7 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
       {canManageCenters ? (
         <CollapsibleActionPanel
           actionLabel="Crear"
-          description="Anade una sede cuando el box tenga un nuevo espacio operativo."
+          description="Añade una sede cuando el box tenga un nuevo espacio operativo."
           icon={Plus}
           title="Crear centro"
         >
@@ -382,9 +382,9 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
             description={
               canManageCenters
                 ? "Crea el primer centro para que el box tenga una sede operativa."
-                : "Un admin debe crear los centros antes de que aparezcan aqui."
+                : "Un admin debe crear los centros antes de que aparezcan aquí."
             }
-            title="No hay centros todavia"
+            title="No hay centros todavía"
           />
         ) : (
           <div className="grid gap-3">

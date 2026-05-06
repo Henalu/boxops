@@ -1,19 +1,43 @@
 # Legal And Privacy Notes - BoxOps
 
-Notas iniciales para evitar decisiones tecnicas peligrosas. No son asesoramiento legal.
+Notas iniciales para evitar decisiones tecnicas peligrosas. No son asesoramiento legal. Antes de usar datos reales sensibles, revisar con asesor legal/laboral y actualizar estas notas.
 
-## Fichaje
+## Principios
 
-El fichaje puede tener implicaciones laborales. No debe diseñarse como "la app decide todo" sin validacion legal/operativa.
+- BoxOps no debe prometer cumplimiento legal definitivo sin validacion externa.
+- Datos laborales, fichajes, nominas, ubicacion, firmas y documentos privados requieren permisos estrictos y minimizacion.
+- Toda tabla o documento de tenant debe mantener frontera de organizacion.
+- No hardcodear STL ni reglas de un tenant como comportamiento del producto.
+- Fichaje y documentos deben ser exportables/revisables, no cajas negras.
+
+## Fichaje Manual
+
+El fichaje puede tener implicaciones laborales. El primer corte debe ser manual, auditable y corregible antes de automatizar ubicacion.
 
 Principios:
 
-- Fichaje manual primero.
-- Correcciones posibles.
+- Registrar inicio y fin de jornada.
+- Permitir correcciones posteriores.
 - Motivo obligatorio en correcciones.
-- Aprobacion/rechazo admin.
+- Guardar autor, fecha, valor anterior, valor nuevo y estado de correccion.
+- Aprobacion semanal por gestor/admin de personal cuando se active el cierre.
 - Historial auditable.
-- Exportable/revisable, no opaco.
+- Exportable/revisable por rango, trabajador y organizacion.
+- Acceso del trabajador a sus propios registros.
+
+Notas Espana a validar:
+
+- La normativa espanola exige registro diario de jornada con inicio y fin.
+- Los registros deben conservarse durante 4 anos.
+- Los registros deben estar disponibles para trabajador, representantes legales e Inspeccion de Trabajo.
+- Validar formato, detalle, accesos y retencion con asesor legal antes de prometer cumplimiento.
+
+No presentar BoxOps como:
+
+- solucion legal cerrada de control horario sin revision;
+- sistema de payroll;
+- calculadora laboral/fiscal definitiva;
+- prueba unica sin posibilidad de correccion o auditoria.
 
 ## Geolocalizacion
 
@@ -21,18 +45,43 @@ La geolocalizacion solo debe usarse como comprobacion puntual vinculada a un tur
 
 No permitido:
 
-- Seguimiento continuo.
-- Historial de movimientos.
-- Fichar solo por entrar al box.
-- Geofence permanente en segundo plano sin necesidad clara.
+- seguimiento continuo;
+- historial de movimientos;
+- fichar solo por entrar al box;
+- geofence permanente en segundo plano sin necesidad clara y base legal revisada;
+- guardar trayectos o posiciones fuera del contexto de fichaje.
 
 Condiciones minimas para sugerir o iniciar fichaje asistido:
 
-- Usuario con turno/bloque asignado.
-- Centro correcto.
-- Ventana cercana al inicio o fin.
-- Sin fichaje activo duplicado.
-- Consentimiento y explicacion clara al usuario.
+- usuario con turno/bloque asignado;
+- centro correcto;
+- ventana cercana al inicio o fin;
+- sin fichaje activo duplicado;
+- consentimiento y explicacion clara al usuario;
+- opcion de correccion manual si falla ubicacion.
+
+Reglas operativas candidatas:
+
+- Geolocalizacion opcional activable por admin.
+- Ubicacion del centro configurable en mapa solo por roles con maximos permisos.
+- Radio inicial sugerido: 100m configurable.
+- Si el usuario entra en radio y coincide con horario, se puede fichar entrada segun el modo decidido.
+- Si llega antes, no fichar todavia; al llegar la hora, revisar si sigue dentro.
+- Si hay entrada activa, se puede proponer o aplicar salida automatica a la hora prevista segun decision legal/producto.
+- No fichar si esta en el box fuera de horario, porque puede estar entrenando.
+
+Limitacion tecnica:
+
+- En navegador/PWA no se debe asumir geolocalizacion fiable con app cerrada.
+- Para fichaje automatico en segundo plano hara falta evaluar fase nativa o wrapper movil, permisos iOS/Android, politicas de stores y privacidad.
+
+Preguntas legales/privacidad antes de datos reales:
+
+- Que base legal se invoca para ubicacion puntual?
+- Como se informa finalidad, minimizacion y retencion?
+- Que dato exacto se guarda: coordenada, precision, centro detectado, dentro/fuera o solo evento de fichaje?
+- Cuanto tiempo se conserva evidencia de ubicacion?
+- Como se gestiona denegacion de permiso sin discriminar al trabajador?
 
 ## Horas Extra
 
@@ -40,9 +89,9 @@ BoxOps debe tratar las horas extra como tracking interno pendiente de validacion
 
 No debe presentarse como:
 
-- Generador de nominas.
-- Calculadora fiscal.
-- Sistema legal definitivo de payroll.
+- generador de nominas;
+- calculadora fiscal;
+- sistema legal definitivo de payroll.
 
 Estados recomendados:
 
@@ -54,45 +103,106 @@ Estados recomendados:
 - `rejected`
 - `closed`
 
+Reglas:
+
+- Separar horas planificadas, fichadas, corregidas y validadas.
+- Guardar auditoria de validaciones y rechazos.
+- Permitir exporte y revision humana.
+- Validar con asesor laboral como se comunican o usan horas extra reales.
+
 ## Nominas Y Documentos Laborales
 
-Para MVP, documentos laborales son repositorio/subida/consulta.
+Para MVP, documentos laborales son repositorio/subida/consulta con permisos estrictos. BoxOps no genera nominas.
 
 Reglas:
 
-- Control de permisos estricto.
-- No mezclar visibilidad de documentos sensibles con documentos generales del box.
-- Registrar quien sube y quien puede ver.
+- Control de permisos estricto por organizacion.
+- Separar documentos de empresa, documentos privados de empleado, documentos de gestion y certificaciones.
+- Permitir permisos por rol y por persona concreta cuando el caso lo requiera.
+- Registrar quien sube, quien puede ver y, si procede, quien accede.
 - Valorar confirmacion de lectura para documentos importantes.
 - Definir retencion y borrado antes de datos reales sensibles.
+- No asumir que `admin` puede ver toda nomina o contrato si se decide separar permisos.
+
+Documentos sensibles candidatos:
+
+- nominas;
+- contratos;
+- anexos;
+- justificantes;
+- bajas/permisos;
+- certificados;
+- titulaciones;
+- documentos firmados;
+- resumenes de horas/fichaje.
+
+Implicaciones tecnicas:
+
+- Buckets privados de Supabase Storage o mecanismo equivalente.
+- RLS desde la primera migracion.
+- URLs firmadas para acceso temporal.
+- Metadata en Postgres con `organization_id`, propietario/persona afectada, uploader y visibilidad.
+- Auditoria de acceso para documentos sensibles si procede.
+- Versionado si un documento puede reemplazarse.
 
 ## Firmas De Documentos
 
 La firma dibujada en perfil puede servir como firma/confirmacion interna de producto, pero no debe presentarse como firma electronica avanzada o cualificada sin validacion legal previa.
 
+BoxOps debe separar dos capacidades:
+
+- "Mi firma": el usuario crea, guarda y actualiza su firma personal dibujada desde "Mi perfil"/"Mi cuenta".
+- "Firmar": una accion posterior en documentos, nominas, politicas internas, confirmaciones u otras secciones que reutiliza la firma guardada del usuario autenticado y genera evidencia propia.
+
 Reglas minimas antes de implementarla:
 
 - Consentimiento claro del usuario al crear su firma dibujada.
 - La firma debe guardarse en Storage privado o mecanismo equivalente, nunca como imagen publica.
-- Firmar un documento debe crear evidencia auditada: documento/version, firmante, usuario autenticado, fecha y estado.
+- Guardar metadata en Postgres con frontera de tenant.
+- Para el primer corte se recomienda firma tenant-scoped con `organization_id` + `person_profile_id`, si encaja con RLS y documentos laborales.
+- La opcion global por usuario requiere decision explicita porque puede complicar permisos, revocacion y separacion entre organizaciones.
+- Solo el usuario propietario debe poder crear/actualizar su firma.
+- Roles explicitamente autorizados podran ver evidencias o metadata si se decide, pero no usar la firma para firmar en nombre de otra persona.
+- No permitir que un admin firme en nombre de otra persona usando su firma guardada.
+- Firmar un documento o entidad debe crear evidencia auditada: organizacion, documento/version o entidad firmada, usuario autenticado, persona firmante, fecha/hora, snapshot usado, IP/user agent si se decide y estado.
 - Debe conservarse un snapshot de la firma usada en esa firma concreta, porque la firma del perfil puede cambiar despues.
+- La evidencia no debe depender solo del artefacto editable de "Mi firma".
+- Si el usuario actualiza "Mi firma", los documentos ya firmados deben conservar la firma original usada.
 - Si se modifica el documento, las firmas anteriores no deben parecer aplicadas automaticamente a la nueva version.
 - Los documentos firmados deben tener retencion, acceso y borrado definidos antes de usar datos laborales reales.
 - Revisar si se necesita proveedor especializado para contratos, anexos u otros documentos con exigencia legal fuerte.
+
+Flujo de producto recomendado:
+
+- Si un usuario pulsa "Firmar" y ya tiene firma guardada valida, la app reutiliza esa firma sin pedir que dibuje otra vez.
+- Si no tiene firma guardada, la app debe pedir crearla antes de continuar o permitir crearla inline, segun decision de UX.
+- Crear/actualizar "Mi firma" no debe equivaler automaticamente a firmar ningun documento.
+
+No usar copy tipo:
+
+- "firma electronica avanzada";
+- "firma cualificada";
+- "validez legal garantizada";
+- "contrato legalmente firmado";
+
+salvo que exista validacion legal y, si procede, proveedor especializado.
 
 ## Datos Sensibles
 
 Datos potencialmente sensibles:
 
-- Documentos laborales.
-- Nominas.
-- Contratos.
-- Bajas/permisos.
-- Fichajes.
-- Correcciones de fichaje.
-- Ubicacion puntual.
-- Certificaciones con archivos personales.
-- Firmas dibujadas y documentos firmados.
+- documentos laborales;
+- nominas;
+- contratos;
+- salario/retribucion;
+- jornada/contrato;
+- bajas/permisos;
+- fichajes;
+- correcciones de fichaje;
+- ubicacion puntual;
+- certificaciones con archivos personales;
+- firmas dibujadas y documentos firmados;
+- datos bancarios o fiscales si se incorporan.
 
 Implicaciones tecnicas:
 
@@ -101,13 +211,30 @@ Implicaciones tecnicas:
 - URLs firmadas para documentos privados.
 - Auditoria de accesos cuando sea necesario.
 - Separar documentos laborales de programacion/clases.
+- Permisos de lectura/escritura por campo o modulo, no solo por rol general.
+- Minimizar datos guardados y evitar campos sensibles en pantallas de equipo.
+
+## App Movil Y Stores
+
+La fase inicial debe ser navegador/PWA responsive. Antes de app nativa:
+
+- validar que web/PWA cubre horario, cobertura, documentos y fichaje manual;
+- documentar costes y licencias Apple Developer y Google Play;
+- revisar politicas de privacidad de iOS/Android si se pide ubicacion;
+- decidir si la app sera marca BoxOps o marca por tenant;
+- evaluar Capacitor/Ionic, React Native/Expo u otra estrategia solo cuando haya requisito claro.
+
+Si fichaje automatico con app cerrada es requisito comercial innegociable, elevar la prioridad de app nativa/wrapper y revisar legal/privacidad antes de venderlo.
 
 ## Riesgos A Revisar Antes De Implementar
 
 - Retencion de datos de fichaje y documentos.
-- Consentimiento para geolocalizacion.
+- Acceso de trabajadores, representantes e Inspeccion a registros de jornada.
+- Consentimiento/base legal para geolocalizacion.
 - Exactitud de geolocalizacion en centros cercanos o interiores.
 - Responsabilidad si el sistema calcula mal horas extra.
 - Permisos de managers por centro.
+- Acceso a salario/retribucion, nominas y contratos.
 - Validez legal y retencion de firmas documentales.
-- Acceso de coaches a horarios de otros compañeros.
+- Auditoria de acceso a documentos sensibles.
+- Acceso de coaches a horarios de otros companeros.

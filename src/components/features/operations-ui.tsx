@@ -49,18 +49,18 @@ export function PageHeader({
   title: string;
 }) {
   return (
-    <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {badge ? <Badge variant="secondary">{badge}</Badge> : null}
           {meta}
         </div>
         <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight md:text-3xl">
             {title}
           </h1>
           {description ? (
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="hidden max-w-2xl text-sm leading-6 text-muted-foreground md:block md:text-base">
               {description}
             </p>
           ) : null}
@@ -68,7 +68,7 @@ export function PageHeader({
         {children}
       </div>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 md:w-auto">
           {actions}
         </div>
       ) : null}
@@ -146,11 +146,13 @@ export function StatCard({
             </span>
           ) : null}
         </div>
-        <p className="font-mono text-3xl font-semibold tracking-tight">
+        <p className="font-mono text-2xl font-semibold tracking-tight md:text-3xl">
           {value}
         </p>
         {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="hidden text-sm text-muted-foreground md:block">
+            {description}
+          </p>
         ) : null}
       </CardContent>
     </Card>
@@ -221,17 +223,21 @@ export function EmptyState({
 }
 
 export function CoverageRiskCard({
+  actionLabel = "Asignar",
   center,
   href,
   meta,
+  scroll,
   status,
   time,
   title,
   tone,
 }: {
+  actionLabel?: string;
   center: string;
   href: string;
   meta: string;
+  scroll?: boolean;
   status: string;
   time: string;
   title: string;
@@ -239,7 +245,7 @@ export function CoverageRiskCard({
 }) {
   return (
     <Card className={cn("ring-1", toneClasses[tone])} size="sm">
-      <CardContent className="grid gap-4 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-start">
+      <CardContent className="grid gap-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
         <p className="font-mono text-sm font-semibold">{time}</p>
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -255,9 +261,13 @@ export function CoverageRiskCard({
             </p>
           </div>
         </div>
-        <Button asChild variant={tone === "critical" ? "destructive" : "outline"}>
-          <Link href={href}>
-            Asignar
+        <Button
+          asChild
+          className="w-full sm:w-auto"
+          variant={tone === "critical" ? "destructive" : "outline"}
+        >
+          <Link href={href} scroll={scroll}>
+            {actionLabel}
             <ArrowRight aria-hidden="true" />
           </Link>
         </Button>

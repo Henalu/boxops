@@ -22,17 +22,17 @@ const resolutionCopy = {
   no_active_memberships: {
     title: "No hay organizaciones activas",
     description:
-      "Tu usuario existe, pero aun no tiene acceso activo a ningun box.",
+      "Tu usuario existe, pero aún no tiene acceso activo a ningún box.",
   },
   organization_required: {
-    title: "Elige una organizacion",
+    title: "Elige una organización",
     description:
-      "Este usuario pertenece a mas de una organizacion. Selecciona una de forma explicita para continuar.",
+      "Este usuario pertenece a más de una organización. Selecciona una de forma explícita para continuar.",
   },
   organization_not_found: {
-    title: "Organizacion no disponible",
+    title: "Organización no disponible",
     description:
-      "La organizacion solicitada no existe para este usuario o no esta activa.",
+      "La organización solicitada no existe para este usuario o no está activa.",
   },
 };
 
@@ -78,7 +78,7 @@ export function OrganizationResolutionState({
           <Alert>
             <AlertTitle>Acceso pendiente</AlertTitle>
             <AlertDescription>
-              Pide a un admin que revise tu acceso antes de entrar en el area
+              Pide a un admin que revise tu acceso antes de entrar en el área
               protegida.
             </AlertDescription>
           </Alert>

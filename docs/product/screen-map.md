@@ -468,6 +468,10 @@ Notas de diseño:
 - Separar documentos sensibles de programacion de clases.
 - Separar visualmente documentos de equipo, documentos de gestion/admin y documentos particulares del miembro.
 - El gesto de firmar debe ser simple, pero debe mostrar claramente que se aplicara la firma dibujada del perfil al documento/version actual.
+- Crear/actualizar "Mi firma" y firmar un documento son acciones distintas.
+- Si el usuario ya tiene firma guardada, no debe dibujarla de nuevo en cada documento.
+- Si no tiene firma guardada, el flujo debe llevarlo a crearla antes de firmar o abrir una creacion inline segun decision UX.
+- Firmar debe guardar snapshot/version de la firma usada; actualizar "Mi firma" no cambia evidencias anteriores.
 - Usar permisos estrictos y feedback claro.
 
 ## Dependencias De Implementacion

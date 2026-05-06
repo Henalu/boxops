@@ -73,7 +73,7 @@ Ahora mismo solo hay:
 - Horario
 - Plantillas
 
-La navegacion conserva `organizationId` en query string. En `/app/schedule` y `/app/templates` tambien conserva `week` cuando existe para no sacar al usuario de la semana abierta o destino. Si anades una ruta bajo `/app`, haz que el link mantenga el tenant activo. Perder `organizationId` cuando hay varias memberships es una forma muy discreta de romper la experiencia.
+La navegacion conserva `organizationId` en query string. En `/app/schedule` y `/app/templates` tambien conserva `week` cuando existe para no sacar al usuario de la semana abierta o destino. Si añades una ruta bajo `/app`, haz que el link mantenga el tenant activo. Perder `organizationId` cuando hay varias memberships es una forma muy discreta de romper la experiencia.
 
 ## Si quiero tocar dashboard admin
 
@@ -85,7 +85,7 @@ Mira:
 - `src/lib/schedule-blocks.ts`
 - `src/lib/navigation/app-paths.ts`
 
-El dashboard de `/app` es basico y admin-only. Calcula cobertura al vuelo con `calculateScheduleCoverageByBlock`, ordena riesgos por `uncovered`, `conflict` e `insufficient`, y enlaza cada riesgo al bloque real en `/app/schedule#block-{id}`.
+El dashboard de `/app` es basico y admin-only. Calcula cobertura al vuelo con `calculateScheduleCoverageByBlock`, ordena riesgos por `uncovered`, `conflict` e `insufficient`, y enlaza cada riesgo al bloque real en `/app/schedule?...&block_id={id}`.
 
 No metas aqui solicitudes, aprobaciones, ausencias, fichaje, payroll ni permisos de `manager`. Tampoco persistas `coverage_issues` sin tarea de schema explicita.
 
@@ -329,7 +329,7 @@ Si cambia schema:
 3. `npm run supabase:types`
 4. revisar que RLS sigue cerrando por organizacion
 
-## Como anadir una pantalla nueva bajo `/app`
+## Como añadir una pantalla nueva bajo `/app`
 
 Ejemplo mental futuro: `/app/reports`.
 
@@ -346,7 +346,7 @@ Pasos:
 9. Hacer queries filtrando por `organization_id`.
 10. Si hay mutaciones, ponerlas en `actions.ts`.
 11. En cada action, volver a resolver usuario, membership, tenant y rol.
-12. Anadir link en `app-navigation.tsx` conservando `organizationId`.
+12. Añadir link en `app-navigation.tsx` conservando `organizationId`.
 
 Atajo mental:
 

@@ -1,16 +1,20 @@
 const DEFAULT_APP_PATH = "/app";
 
 type AppPathOptions = {
+  blockId?: string | null;
   blockStatus?: string | null;
   centerId?: string | null;
   classTypeId?: string | null;
   coachProfileId?: string | null;
   coverageState?: string | null;
+  day?: string | null;
   organizationId?: string | null;
   error?: string | null;
+  editTemplateBlockId?: string | null;
   mineOnly?: boolean | null;
   risksOnly?: boolean | null;
   status?: string | null;
+  view?: string | null;
   week?: string | null;
 };
 
@@ -25,12 +29,28 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
     params.set("status", options.status);
   }
 
+  if (options.blockId) {
+    params.set("block_id", options.blockId);
+  }
+
   if (options.error) {
     params.set("error", options.error);
   }
 
+  if (options.editTemplateBlockId) {
+    params.set("edit_block_id", options.editTemplateBlockId);
+  }
+
   if (options.week) {
     params.set("week", options.week);
+  }
+
+  if (options.day) {
+    params.set("day", options.day);
+  }
+
+  if (options.view) {
+    params.set("view", options.view);
   }
 
   if (options.centerId) {

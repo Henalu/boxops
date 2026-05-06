@@ -6,8 +6,10 @@ const protectedRoutes = [
   "/app/coaches",
   "/app/class-types",
   "/app/coverage?week=2026-05-04",
+  "/app/coverage?week=2026-05-04&block_id=00000000-0000-0000-0000-000000100412",
   "/app/more",
   "/app/schedule?week=2026-05-04&risks_only=1",
+  "/app/schedule?week=2026-05-04&view=agenda&block_id=00000000-0000-0000-0000-000000100400",
   "/app/templates?week=2026-05-04",
 ];
 
@@ -18,7 +20,7 @@ test("login page renders the public auth surface", async ({ request }) => {
 
   const html = await response.text();
   expect(html).toContain("Accede a la operativa de tu box.");
-  expect(html).toContain("Iniciar sesion");
+  expect(html).toContain("Iniciar sesión");
 });
 
 for (const route of protectedRoutes) {

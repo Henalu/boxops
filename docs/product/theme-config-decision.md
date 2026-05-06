@@ -2,6 +2,8 @@
 
 Este documento decide la persistencia recomendada para la configuracion visual futura de tenant. No crea migraciones ni codigo.
 
+Estado 2026-05-06: la decision sigue vigente para Fase B. `organizations.theme_config jsonb` es la primera opcion porque el branding previsto es controlado: logo, colores corporativos, colores por centro y preferencias visuales ligeras. Si aparecen permisos, borradores, versionado o auditoria propia de tema, reabrir esta decision antes de migrar.
+
 ## Decision Recomendada
 
 Para la primera implementacion de theming, usar una columna explicita:
@@ -20,6 +22,7 @@ El theming inicial de BoxOps es ligero:
 
 - logo o asset de marca;
 - acento de tenant;
+- color corporativo secundario si se valida;
 - modo de logo;
 - colores discretos por centro;
 - densidad inicial controlada;
@@ -72,6 +75,7 @@ La configuracion debe versionarse y validarse:
   "logoAssetId": "uuid-or-storage-asset-id",
   "logoMode": "mark-and-name",
   "accentColor": "#334155",
+  "secondaryAccentColor": "#0f766e",
   "densityDefault": "standard",
   "centerColors": {
     "center-uuid-1": "#2563eb",
@@ -83,11 +87,13 @@ La configuracion debe versionarse y validarse:
 Reglas:
 
 - Los IDs deben ser referencias internas o UUIDs, no nombres de centro.
+- `logoAssetId` debe apuntar a un asset controlado por BoxOps/tenant, no a una URL arbitraria sin validar.
 - Los colores configurables deben normalizarse y validar contraste.
 - El sistema deriva variantes seguras (`subtle`, `foreground`, `border`) desde el acento.
 - Si un valor falla, se usa fallback de BoxOps.
 - No se guardan tokens computados como fuente de verdad.
 - No se permite sobreescribir `uncovered`, `conflict`, `error`, foco ni estados criticos.
+- Si un color falla contraste, la UI debe usar fallback seguro aunque se decida guardar el valor para correccion posterior.
 
 ## Criterios Para Migrar A Tabla Dedicada
 

@@ -8,6 +8,7 @@ Schema inicial de MVP 1.
 - `migrations/00002_person_profiles.sql`: perfiles visibles/personas operativas pendientes de Auth y enlace opcional desde `coach_profiles`.
 - `seeds/01_demo_data.sql`: tenant generico de demo.
 - `seeds/02_stl_tenant.sql`: tenant STL con centros, tipos de clase conocidos, `person_profiles` y `coach_profiles` pendientes de Auth.
+- `snippets/stl-test-week-2026-05-04.sql`: fixture local no automatico para cargar la semana de prueba L-V de STL en Fase A.
 - `config.toml`: configuracion local base para Supabase CLI.
 
 ## Orden De Ejecucion
@@ -35,6 +36,7 @@ npx supabase db push
 ## Notas
 
 - Los seeds no crean usuarios de Supabase Auth.
+- Los snippets no se ejecutan en `supabase db reset`; se aplican manualmente cuando haga falta validar un escenario local concreto.
 - Para dar acceso a un usuario real, primero debe existir en `auth.users`.
 - STL vive solo en `02_stl_tenant.sql`; la migracion base no contiene reglas especiales para STL.
 - Todas las tablas operativas incluyen `organization_id`.
@@ -50,6 +52,23 @@ npx supabase db push
 - Task 010 expone asignaciones y cobertura basica en `/app/schedule` sin migracion nueva: `schedule_block_assignments` ya tenia `organization_id`, FK por tenant, estados, `source` y unicidad por bloque+coach.
 - Retirar una asignacion no borra filas; cambia `assignment_status` a `removed`. Reasignar el mismo coach al mismo bloque reactiva esa fila como `assigned`.
 - `coverage_issues` sigue sin tabla: durante MVP 1 se calcula al vuelo desde bloques, asignaciones, coaches, personas y memberships.
+
+## Fixture Local Semana STL Fase A
+
+Para cargar la semana de prueba L-V recibida el 2026-05-06:
+
+```bash
+Get-Content -Raw supabase/snippets/stl-test-week-2026-05-04.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1
+```
+
+Resultado esperado:
+
+- 1 plantilla semanal activa para STL.
+- 165 bloques de plantilla.
+- 165 bloques reales en la semana de 2026-05-04.
+- 0 asignaciones de coaches, para no inventar cobertura.
+
+El fixture carga los bloques temporalmente en el centro STL Tremanes porque no se ha confirmado centro por bloque. No moverlo a seed automatico hasta cerrar centro y asignaciones/huecos reales.
 
 ## Promocionar Un Usuario A Admin Demo
 

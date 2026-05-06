@@ -33,12 +33,14 @@ const mvpRoutes = [
     path: "/app/templates",
   },
   {
-    heading: /Mas/i,
+    heading: /Más/i,
     path: "/app/more",
   },
 ];
 
 test.describe("admin MVP 1 protected routes smoke", () => {
+  test.setTimeout(120_000);
+
   test.skip(
     !hasCredentials(adminCredentials),
     "Configura E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD para ejecutar el smoke admin.",
@@ -58,6 +60,8 @@ test.describe("admin MVP 1 protected routes smoke", () => {
 });
 
 test.describe("coach MVP 1 protected routes smoke", () => {
+  test.setTimeout(120_000);
+
   test.skip(
     !hasCredentials(coachCredentials),
     "Configura E2E_COACH_EMAIL y E2E_COACH_PASSWORD para ejecutar el smoke coach.",

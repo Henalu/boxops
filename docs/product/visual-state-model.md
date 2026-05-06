@@ -15,7 +15,7 @@ Permitir que coaches y admins reconozcan en segundos:
 - que solicitudes requieren accion;
 - que eventos, festivos o cambios son contexto operativo.
 
-Ningun estado debe comunicarse solo por color. Cada estado combina al menos dos senales: texto, icono, posicion, rail, borde, badge, patron o accion cercana.
+Ningun estado debe comunicarse solo por color. Cada estado combina al menos dos señales: texto, icono, posicion, rail, borde, badge, patron o accion cercana.
 
 ## Familias De Estado
 
@@ -80,7 +80,7 @@ Visual:
 
 - Badge "Cubierto".
 - Verde sobrio como fondo suave o texto.
-- Check pequeno.
+- Check pequeño.
 - No usar fondos grandes verdes en vistas densas.
 
 Copy recomendado:
@@ -379,7 +379,7 @@ Copy recomendado:
 
 ## Reglas De Accesibilidad
 
-- No usar color como unica senal.
+- No usar color como unica señal.
 - Mantener contraste AA para texto.
 - Badges deben incluir label textual.
 - Iconos decorativos deben tener `aria-hidden` futuro; iconos que comunican estado necesitan texto cercano.

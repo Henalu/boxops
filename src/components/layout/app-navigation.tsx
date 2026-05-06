@@ -58,7 +58,7 @@ const mainItems = [
   {
     href: "/app/more",
     icon: LayoutGrid,
-    label: "Mas",
+    label: "Más",
     tour: "nav-management",
   },
 ] as const;
@@ -81,8 +81,21 @@ const managementItems = [
   },
 ] as const;
 
+const mobileMorePaths = ["/app/centers", "/app/class-types", "/app/templates"];
+
 function isActivePath(pathname: string, href: string) {
   return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+}
+
+function isBottomActivePath(pathname: string, href: string) {
+  if (href === "/app/more") {
+    return (
+      isActivePath(pathname, href) ||
+      mobileMorePaths.some((path) => pathname.startsWith(path))
+    );
+  }
+
+  return isActivePath(pathname, href);
 }
 
 export function AppNavigation({ placement }: AppNavigationProps) {
@@ -125,38 +138,59 @@ export function AppNavigation({ placement }: AppNavigationProps) {
 
   if (placement === "bottom") {
     return (
-      <nav
-        aria-label="Navegacion principal"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur md:hidden"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          {mainItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActivePath(pathname, item.href);
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:hidden">
+        <div className="h-6 bg-gradient-to-t from-background to-transparent" />
+        <nav
+          aria-label="Navegación principal"
+          className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-border/70 bg-background/90 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-lg backdrop-blur-xl"
+        >
+          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+            {mainItems.map((item) => {
+              const Icon = item.icon;
+              const active = isBottomActivePath(pathname, item.href);
 
-            return (
-              <Link
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium text-muted-foreground transition-colors",
-                  active && "bg-primary text-primary-foreground",
-                )}
-                data-tour={item.tour}
-                href={resolveHref(item.href)}
-                key={item.href}
-              >
-                <Icon aria-hidden="true" className="size-4" />
-                <span className="max-w-full truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "relative flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-medium text-muted-foreground transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    active && "text-primary",
+                  )}
+                  data-tour={item.tour}
+                  href={resolveHref(item.href)}
+                  key={item.href}
+                >
+                  <span
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-xl transition-colors",
+                      active && "bg-primary/10",
+                    )}
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className="size-4"
+                      strokeWidth={active ? 2.3 : 1.9}
+                    />
+                  </span>
+                  <span className="max-w-full truncate">{item.label}</span>
+                  {active ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute bottom-0.5 h-0.5 w-1.5 rounded-full bg-primary"
+                    />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
     );
   }
 
   return (
-    <nav aria-label="Navegacion principal" className="grid gap-6">
+    <nav aria-label="Navegación principal" className="grid gap-6">
       <div className="grid gap-1">
         <div className="mb-1 flex items-center justify-between">
           <p className="px-2 text-xs font-medium text-muted-foreground">
@@ -188,7 +222,7 @@ export function AppNavigation({ placement }: AppNavigationProps) {
 
       <div className="grid gap-1">
         <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">
-          Gestion
+          Gestión
         </p>
         {managementItems.map((item) => {
           const Icon = item.icon;

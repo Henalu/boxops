@@ -71,19 +71,19 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "class-type-required": "No se ha recibido el tipo a actualizar.",
-  "duplicate-slug": "Ya existe un tipo con ese slug en esta organizacion.",
+  "duplicate-slug": "Ya existe un tipo con ese slug en esta organización.",
   forbidden: "Tu rol no permite gestionar tipos de actividad.",
-  "invalid-category": "La categoria seleccionada no es valida.",
+  "invalid-category": "La categoría seleccionada no es válida.",
   "invalid-color": "Usa un color hexadecimal, por ejemplo #2563eb.",
   "invalid-required-coaches":
-    "Los coaches necesarios deben ser un numero entero entre 0 y 20.",
-  "invalid-slug": "Usa un slug en minusculas, numeros y guiones.",
-  "invalid-status": "El estado seleccionado no es valido.",
+    "Los coaches necesarios deben ser un número entero entre 0 y 20.",
+  "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
+  "invalid-status": "El estado seleccionado no es válido.",
   "missing-fields": "Completa nombre y slug.",
   no_active_memberships: "No hay accesos activos para este usuario.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
+  organization_not_found: "La organización solicitada no está disponible.",
   organization_required:
-    "Elige una organizacion antes de gestionar tipos de actividad.",
+    "Elige una organización antes de gestionar tipos de actividad.",
   "save-failed": "No se han podido guardar los cambios.",
 };
 
@@ -128,7 +128,7 @@ function getSafeColor(value: string | null) {
 
 function selectClassName(className = "") {
   return [
-    "h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm",
+    "h-11 w-full rounded-md border border-input bg-transparent px-2.5 text-sm md:h-9",
     "outline-none transition-colors focus-visible:border-ring",
     "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
@@ -195,7 +195,7 @@ function CertificationCheckbox({
   defaultChecked?: boolean;
 }) {
   return (
-    <label className="flex min-h-9 items-center gap-2 rounded-md border border-border px-2.5 text-sm">
+    <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-2.5 text-sm md:min-h-9">
       <input
         className="size-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         defaultChecked={defaultChecked}
@@ -484,7 +484,7 @@ export default async function ClassTypesPage({
     <div className="space-y-6">
       <PageHeader
         badge="Tipos de actividad"
-        description="Mantiene el catalogo operativo que alimenta horarios, plantillas y cobertura."
+        description="Mantiene el catálogo operativo que alimenta horarios, plantillas y cobertura."
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
@@ -498,7 +498,7 @@ export default async function ClassTypesPage({
         <Alert>
           <AlertTitle>{successMessages[status]}</AlertTitle>
           <AlertDescription>
-            El catalogo ya muestra los tipos actuales.
+            El catálogo ya muestra los tipos actuales.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -513,7 +513,7 @@ export default async function ClassTypesPage({
       {canManageClassTypes ? (
         <CollapsibleActionPanel
           actionLabel="Crear"
-          description="Anade clases, recepcion u otras actividades que luego se programan como bloques."
+          description="Añade clases, recepción u otras actividades que luego se programan como bloques."
           icon={Plus}
           title="Crear tipo de actividad"
         >
@@ -523,7 +523,7 @@ export default async function ClassTypesPage({
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar el catalogo, pero no crear ni editar
+            Tu rol coach puede consultar el catálogo, pero no crear ni editar
             tipos de actividad.
           </AlertDescription>
         </Alert>
@@ -532,8 +532,8 @@ export default async function ClassTypesPage({
       <section className="space-y-3">
         <SectionHeader
           action={<Badge variant="outline">{classTypes.length} tipos</Badge>}
-          description="Nombre, categoria, coaches necesarios, certificacion y color."
-          title="Catalogo"
+          description="Nombre, categoría, coaches necesarios, certificación y color."
+          title="Catálogo"
         />
 
         {classTypes.length === 0 ? (
@@ -541,9 +541,9 @@ export default async function ClassTypesPage({
             description={
               canManageClassTypes
                 ? "Crea el primer tipo para preparar horarios y plantillas."
-                : "Un admin debe crear el catalogo antes de que aparezca aqui."
+                : "Un admin debe crear el catálogo antes de que aparezca aquí."
             }
-            title="No hay tipos de actividad todavia"
+            title="No hay tipos de actividad todavía"
           />
         ) : (
           <div className="grid gap-3">
@@ -571,7 +571,7 @@ export default async function ClassTypesPage({
         <CircleOff aria-hidden="true" className="size-4" />
         <AlertTitle>Fuera de este corte</AlertTitle>
         <AlertDescription>
-          Esta pantalla solo define el catalogo de actividades. El horario y la
+          Esta pantalla solo define el catálogo de actividades. El horario y la
           cobertura se gestionan en sus secciones.
         </AlertDescription>
       </Alert>

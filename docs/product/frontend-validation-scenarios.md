@@ -82,7 +82,7 @@ Riesgos:
 - Sin asignaciones reales, el dashboard solo puede usar `schedule_blocks.status = 'uncovered'` como pista temporal.
 - Las solicitudes urgentes todavia no existen en schema, asi que no deben bloquear MVP 1.
 
-## Escenario B - Tenant Pequeno De Un Centro
+## Escenario B - Tenant Pequeño De Un Centro
 
 Concepto:
 
@@ -136,7 +136,7 @@ Riesgos:
 
 Validacion:
 
-- El estado "Todo cubierto para esta vista" es clave en tenants pequenos.
+- El estado "Todo cubierto para esta vista" es clave en tenants pequeños.
 - Debe mostrar siguiente contexto util: proximo bloque, semana activa o filtros aplicados.
 - Si no hay incidencias, no se deben inventar graficas para llenar espacio.
 
@@ -294,6 +294,8 @@ Evidencia generada:
 ## Que Debe Validarse Con STL
 
 Sin inventar datos, falta confirmar con STL:
+
+Nota Fase A 2026-05-06: la validacion real sigue pendiente. La base local de STL no tiene bloques, plantillas ni asignaciones; ver `docs/operations/mvp1-fase-a-validation.md` para el estado de cierre y bloqueos.
 
 - semana real de los centros iniciales;
 - volumen de bloques por dia y por semana;

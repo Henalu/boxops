@@ -74,7 +74,7 @@ Reglas aplicadas:
 - `coach` consulta en modo lectura.
 - `class_types` queda como catalogo por organizacion; no hay tipos globales compartidos entre tenants.
 - Los tipos se activan/desactivan cambiando `status`; no se borran desde UI.
-- No se anade relacion con centros en este corte.
+- No se añade relacion con centros en este corte.
 
 ## Bloques Operativos Semanales Protegidos
 
@@ -112,7 +112,7 @@ Reglas aplicadas:
 
 ## Perfiles Visibles Y Personas Operativas
 
-Task 009 anade `person_profiles` y ajusta `coach_profiles` con una migracion nueva.
+Task 009 añade `person_profiles` y ajusta `coach_profiles` con una migracion nueva.
 
 Reglas aplicadas:
 

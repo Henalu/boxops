@@ -44,7 +44,7 @@ Resultado esperado:
 
 ## Escenario B - Tenant De Un Centro Sin Incidencias
 
-Objetivo: validar el camino feliz para una semana pequena.
+Objetivo: validar el camino feliz para una semana pequeña.
 
 Datos minimos:
 

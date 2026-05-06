@@ -3,6 +3,8 @@ import { expect, type Page } from "@playwright/test";
 import type { SmokeCredentials } from "./env";
 import { organizationId, smokeWeek } from "./env";
 
+const onboardingStorageKey = "boxops_onboarding_seen_v3";
+
 type QueryValue = string | null | undefined;
 
 export function buildProtectedPath(
@@ -36,13 +38,17 @@ export function buildProtectedPath(
 }
 
 export async function loginAs(page: Page, credentials: SmokeCredentials) {
+  await page.addInitScript((storageKey) => {
+    window.localStorage.setItem(storageKey, "true");
+  }, onboardingStorageKey);
+
   await page.goto("/login");
   await expect(
-    page.getByRole("heading", { name: /Iniciar sesion/i }),
+    page.getByRole("heading", { name: /Iniciar sesión/i }),
   ).toBeVisible();
 
   await page.getByLabel(/^Email$/i).fill(credentials.email);
-  await page.getByLabel(/Contrasena/i).fill(credentials.password);
+  await page.getByLabel(/Contraseña/i).fill(credentials.password);
   await page.getByRole("button", { name: /Entrar/i }).click();
 
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
@@ -54,8 +60,7 @@ export async function openAndExpectHeading(
   path: string,
   heading: RegExp,
 ) {
-  await page.goto(path);
-  await page.waitForLoadState("networkidle");
+  await page.goto(path, { waitUntil: "domcontentloaded" });
 
   await expectNoFrameworkError(page);
   await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();

@@ -111,7 +111,30 @@ Ya existe:
   - evidencia local de Task 017 en `test-results/ux-refactor-2026-05-04/`
   - deuda pendiente: targets tactiles moviles de controles compactos si se decide endurecer UX movil
 
-Todavia no hay cambios, invitaciones, ausencias, fichaje, documentos ni CRUD avanzado.
+Todavia no hay cambios, invitaciones, ausencias, fichaje, documentos, area personal/RRHH, firma dibujada reutilizable, roles avanzados, branding real por tenant ni CRUD avanzado.
+
+Estado consolidado 2026-05-06:
+
+- MVP 1 debe tratarse como base visual/operativa ya avanzada, no como plan pendiente.
+- Fase A ya tiene una semana de prueba STL L-V cargable localmente con `supabase/snippets/stl-test-week-2026-05-04.sql`: 165 bloques, una plantilla activa y bloques vacantes sin coaches inventados.
+- La UI y el smoke E2E local admin/coach ya pasan contra esa semana; `/app/templates` edita un bloque por URL y ofrece vistas Semana/Agenda para mantener usable una plantilla grande.
+- La siguiente prioridad no es implementar modulos nuevos a ciegas, sino cerrar MVP 1 real con centro por bloque, asignaciones/huecos confirmados y validacion operativa antes de ordenar fases posteriores.
+- Las nuevas fases deben ampliar BoxOps hacia configuracion de tenant, seguridad auth, roles avanzados, area personal/RRHH, documentos, fichaje y futura app movil.
+- Esta revision no implementa codigo de app, migraciones ni seeds automaticos.
+
+## Roadmap Actual
+
+La vista resumida vive en `docs/product/roadmap.md` y el backlog ejecutable en `TASKS.md`.
+
+- Fase A: cierre MVP 1 real con datos validados y deuda pequena.
+- Fase B: configuracion de tenant, branding y roles avanzados.
+- Fase C: auth/security polish.
+- Fase D: area personal y modelo RRHH.
+- Fase E: documentos, permisos, nominas, firmas y certificaciones.
+- Fase F: fichaje manual legal/auditable.
+- Fase G: fichaje geolocalizado asistido.
+- Fase H: PWA/app movil y geofencing nativo.
+- Fase I: cambios, ausencias, eventos, horas extra e IA.
 
 ## Objetivo Inicial
 
@@ -191,20 +214,26 @@ Primer tenant:
 
 Ver `docs/tenants/stl/README.md`.
 
-## Roles Iniciales
+## Roles Y Permisos
 
-MVP:
+Roles implementados hoy:
 
-- `admin`: gestiona centros, usuarios, horarios, plantillas, clases/bloques, cobertura y aprobaciones.
-- `coach`: ve horarios, clases, solicitudes, fichajes/horas cuando entren en fase, documentos y certificados.
+- `admin`: gestiona centros, usuarios/coaches basicos, tipos de actividad, horario, asignaciones, plantillas y cobertura.
+- `coach`: consulta centros, equipo, tipos, horario, asignaciones y cobertura en modo lectura.
 
-Futuros:
+Evolucion recomendada sin romper lo existente:
 
-- `owner`: controla organizacion, billing y configuracion global.
-- `manager`: opera uno o varios centros.
-- `center_manager`: responsable de centro.
-- `document_admin`: gestiona documentos laborales.
-- `payroll_manager`: valida horas extra, cierres y exportes.
+- `owner` o `superadmin`: configuracion global de organizacion, branding, billing futuro, permisos maximos y decisiones sensibles de tenant.
+- `manager` o `admin`: gestion diaria de equipo, horarios, plantillas, cobertura, aprobaciones y operaciones.
+- `coach`: uso operativo, horario, cobertura visible segun permisos, documentos propios, fichaje y funciones personales.
+- roles especializados futuros: `document_admin`, `payroll_manager`, `center_manager` si la matriz de permisos lo justifica.
+
+Reglas:
+
+- Separar permisos de configuracion global de permisos de gestion diaria.
+- Todos los usuarios, incluidos admins/owners, deben acceder a funciones personales porque un admin puede ser coach.
+- No asumir que un rol operativo alto puede ver salario, nominas o documentos sensibles sin permiso explicito.
+- Mantener compatibilidad con `admin` y `coach` actuales hasta una migracion/feature flag de roles avanzada.
 
 ## Alcance MVP
 
@@ -223,6 +252,8 @@ MVP 1 incluye:
 - Deteccion basica de cobertura insuficiente.
 - Dashboard admin basico de cobertura.
 
+Estado: MVP 1 visual/operativo esta avanzado tras Task 017. Queda cerrar datos reales, deuda pequena y validacion operativa antes de abrir modulos nuevos.
+
 Fuera de scope inicial:
 
 - App movil nativa.
@@ -234,6 +265,9 @@ Fuera de scope inicial:
 - Fichaje geolocalizado.
 - Nominas o payroll completo.
 - IA sobre documentos de programacion.
+- Branding libre por tenant o rebranding completo del producto.
+- Documentos sensibles, fichaje y geolocalizacion sin revision legal/privacidad.
+- Firma dibujada reutilizable o firma documental sin almacenamiento privado, snapshot y auditoria.
 
 Ver `docs/product/mvp.md`.
 
@@ -250,6 +284,13 @@ Ver `docs/product/mvp.md`.
 | Events como log operativo flexible | Cambios de turno, vacaciones, horas extra y documentos comparten necesidad de trazabilidad. |
 | Fichaje geolocalizado fuera del MVP 1 | Tiene riesgo legal/privacidad y depende de horarios fiables. |
 | IA fuera de las primeras fases | Sin documentos y programacion bien modelados, seria decoracion cara. |
+| `organizations.theme_config` como primera opcion | El branding inicial es ligero y pertenece a la organizacion activa; una tabla dedicada se reserva para permisos/versionado complejos. |
+| Estados criticos no tematizables | Sin cubrir, conflicto, error y foco deben seguir siendo reconocibles por encima de marca de tenant, centro o tipo. |
+| Roles avanzados separados por responsabilidad | Configuracion global, gestion diaria y funciones personales no deben mezclarse en un unico `admin` permanente. |
+| Reset de password con Supabase Auth | La regla de seguridad debe vivir en Auth y repetirse en la app solo para feedback visual. |
+| Fichaje manual antes de geolocalizacion | Permite cumplir mejor auditoria/correcciones antes de depender de ubicacion y permisos moviles. |
+| PWA/web antes de nativo | La app nativa se evalua si el caso comercial exige geofencing fiable con app cerrada. |
+| "Mi firma" antes de documentos firmables | La firma dibujada reutilizable pertenece al perfil/cuenta del usuario; los botones "Firmar" deben consumirla despues y guardar snapshot/auditoria. |
 | Docs antes de codigo | Reduce decisiones implicitas y evita empezar por UI sin schema ni permisos. |
 
 ## Supuestos
@@ -259,10 +300,22 @@ Ver `docs/product/mvp.md`.
 - Supabase es suficiente para el MVP: Postgres + RLS + Auth + Storage.
 - El producto se usara principalmente en desktop/tablet por admins y en movil por coaches.
 - Los documentos pueden empezar como archivos en Storage con metadata en Postgres.
-- Algunos documentos podran requerir firma de miembros concretos; la firma dibujada vive en el perfil del usuario y al firmar debe generar evidencia/version firmada auditable.
+- Algunos documentos podran requerir firma de miembros concretos.
+- "Mi firma" sera una capacidad personal disponible para todos los usuarios, incluidos admins, managers y coaches.
+- La firma dibujada vive en "Mi perfil"/"Mi cuenta", se crea dibujandola en pantalla, se puede borrar/redibujar antes de guardar y se reutiliza despues cuando el usuario pulse "Firmar".
+- Para el primer corte se recomienda que la firma sea tenant-scoped (`organization_id` + `person_profile_id`) si encaja con RLS y documentos laborales; la alternativa global por usuario queda como duda abierta.
+- La firma guardada debe estar en Storage privado o mecanismo equivalente, con metadata en Postgres y frontera de tenant; nunca como asset publico.
+- Actualizar la firma no cambia documentos ya firmados.
+- Al firmar, no basta con apuntar a la firma actual del perfil: debe guardarse un snapshot/version de la firma usada y evidencia/auditoria de esa firma concreta.
+- Un admin no puede firmar en nombre de otra persona usando su firma guardada.
+- La firma dibujada se trata inicialmente como firma/confirmacion interna; no es firma electronica avanzada/cualificada sin validacion legal.
 - El fichaje puede empezar simple y evolucionar; no se diseña todavia control laboral completo.
 - La geolocalizacion de fichaje, si existe, sera puntual y vinculada a turno/centro; no seguimiento continuo.
 - Horas extra sera tracking interno validable/exportable, no generacion de nominas.
+- Los documentos sensibles usaran Storage privado, RLS, URLs firmadas y auditoria si procede.
+- Nominas, salario/retribucion, contrato, jornada y datos laborales requieren permisos mas finos que el rol operativo basico.
+- En Espana, el fichaje debe contemplar inicio/fin de jornada, conservacion de registros durante 4 anos y acceso para trabajador, representantes e Inspeccion, pendiente de revision legal antes de prometer cumplimiento.
+- La geolocalizacion en navegador/PWA no debe asumirse fiable con app cerrada; geofencing en segundo plano requerira fase nativa o wrapper movil si se vuelve requisito comercial.
 
 ## Convenciones
 
@@ -294,17 +347,20 @@ npm run supabase:types
 
 ## Proximos Pasos
 
-1. Validar con STL una semana real completa de horarios, centros, coaches, tipos de clase y clases/bloques sin cubrir.
-2. Validar la vista semanal de `schedule_blocks` y las asignaciones contra una semana real del primer tenant.
-3. Validar plantillas semanales aplicadas contra una semana real: bloques vacantes, coaches por defecto, excepciones y duplicados.
-4. Validar Inicio y Cobertura con una semana real y ajustar prioridad/empty states sin convertir datos STL en logica generica.
-5. Decidir si los colores de `class_types` necesitan una paleta cerrada antes de exponer vistas de calendario mas densas.
-6. Resolver como tarea dedicada los targets tactiles moviles de controles compactos si se prioriza una UX movil aun mas exigente.
+1. Cerrar Fase A: validar MVP 1 con una semana real, plantillas, excepciones, asignaciones, cobertura y deuda pequena sin hardcodear STL.
+2. Preparar Fase B: configurar tenant/branding con `organizations.theme_config`, validacion de contraste y roles avanzados compatibles.
+3. Preparar Fase C: reset de password, politica de contrasena y decision tecnica sobre bloqueo/cooldown sin enumeracion de emails.
+4. Modelar Fase D: separar area personal, datos operativos y datos RRHH sensibles.
+5. Modelar Fase E: documentos privados, permisos por rol/persona, nominas/certificaciones, botones "Firmar", snapshots de firma, Storage privado y auditoria.
+6. Modelar Fase F antes de geolocalizacion: fichaje manual, correcciones, aprobacion semanal, exportes y revision legal.
+7. Dejar Fase G/H condicionadas: geolocalizacion asistida y app movil/nativa solo si privacidad, tecnica y negocio lo justifican.
+8. Reordenar cambios, ausencias, eventos, horas extra e IA en Fase I, despues de no romper la base operativa.
 
 ## Documentos De Referencia
 
 - `PRD.md`: vision funcional general.
 - `docs/product/mvp.md`: fases MVP y criterios de exito.
+- `docs/product/roadmap.md`: vista resumida de fases A-I despues de Task 017.
 - `docs/product/design-direction.md`: direccion visual, theming y estados UI para futuras fases.
 - `docs/product/design-tokens.md`: propuesta documental de tokens base neutrales y densidad responsive.
 - `docs/product/theming.md`: modelo de theming multi-tenant sin hardcodear el primer tenant.

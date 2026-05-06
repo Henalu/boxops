@@ -2,12 +2,14 @@
 
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CircleHelp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getAppPath } from "@/lib/navigation/app-paths";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "boxops_onboarding_seen_v2";
+const STORAGE_KEY = "boxops_onboarding_seen_v3";
 const OPEN_EVENT = "boxops:onboarding-open";
 const SPOTLIGHT_PADDING = 8;
 const TARGET_GAP = 12;
@@ -20,6 +22,7 @@ type TourStep = {
   description: string;
   id: string;
   preferredPlacement: PreferredPlacement;
+  route?: string;
   target: string;
   title: string;
 };
@@ -29,7 +32,7 @@ const steps = [
     id: "home",
     target: '[data-tour="nav-home"]',
     title: "Inicio",
-    description: "Aqui vuelves al resumen operativo del box.",
+    description: "Aquí vuelves al resumen operativo del box.",
     preferredPlacement: "right",
   },
   {
@@ -37,7 +40,7 @@ const steps = [
     target: '[data-tour="nav-schedule"]',
     title: "Horario",
     description:
-      "Aqui revisas la semana, creas bloques y ves el estado de las clases.",
+      "Aquí revisas la semana, creas bloques y ves el estado de las clases.",
     preferredPlacement: "right",
   },
   {
@@ -45,7 +48,7 @@ const steps = [
     target: '[data-tour="nav-coverage"]',
     title: "Cobertura",
     description:
-      "Aqui aparecen clases sin coach, conflictos y riesgos que requieren accion.",
+      "Aquí aparecen clases sin coach, conflictos y riesgos que requieren acción.",
     preferredPlacement: "right",
   },
   {
@@ -53,37 +56,40 @@ const steps = [
     target: '[data-tour="nav-team"]',
     title: "Equipo",
     description:
-      "Aqui gestionas coaches y revisas la base operativa del equipo.",
+      "Aquí gestionas coaches y revisas la base operativa del equipo.",
     preferredPlacement: "right",
   },
   {
     id: "management",
     target: '[data-tour="nav-management"]',
-    title: "Gestion",
-    description: "Aqui estan centros, tipos de actividad, plantillas y ayuda.",
+    title: "Gestión",
+    description: "Aquí están centros, tipos de actividad, plantillas y ayuda.",
     preferredPlacement: "right",
   },
   {
     id: "dashboard-summary",
+    route: "/app",
     target: '[data-tour="dashboard-summary"]',
     title: "Resumen de la semana",
     description:
-      "Aqui ves los numeros clave para saber como va la operativa.",
+      "Aquí ves los números clave para saber cómo va la operativa.",
     preferredPlacement: "top",
   },
   {
     id: "coverage-risks",
+    route: "/app",
     target: '[data-tour="coverage-risks"]',
     title: "Pendiente",
-    description: "Aqui aparecen los riesgos que conviene resolver primero.",
+    description: "Aquí aparecen los riesgos que conviene resolver primero.",
     preferredPlacement: "right",
   },
   {
     id: "quick-actions",
+    route: "/app",
     target: '[data-tour="quick-actions"]',
-    title: "Acciones rapidas",
+    title: "Acciones rápidas",
     description:
-      "Desde aqui puedes abrir las tareas habituales sin buscar en menus.",
+      "Desde aquí puedes abrir las tareas habituales sin buscar en menús.",
     preferredPlacement: "top",
   },
 ] satisfies TourStep[];
@@ -461,12 +467,6 @@ function buildTourLayout({
   };
 }
 
-function getScrollBehavior() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "auto"
-    : "smooth";
-}
-
 function OverlayPanels({ spotlightRect }: { spotlightRect: Rect | null }) {
   const panelClassName =
     "fixed bg-foreground/40 backdrop-blur-sm transition-all duration-150";
@@ -584,6 +584,9 @@ export function OnboardingTour() {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [tooltipSize, setTooltipSize] =
@@ -591,8 +594,21 @@ export function OnboardingTour() {
   const [layout, setLayout] = useState<TourLayout | null>(null);
   const step = steps[stepIndex];
 
+  const getStepRoutePath = useCallback(
+    (route: string) =>
+      getAppPath(route, {
+        organizationId: searchParams.get("organizationId"),
+        week: searchParams.get("week"),
+      }),
+    [searchParams],
+  );
+
   const updateLayout = useCallback(() => {
     if (!open) {
+      return;
+    }
+
+    if (step.route && pathname !== step.route) {
       return;
     }
 
@@ -604,7 +620,7 @@ export function OnboardingTour() {
         viewport: getViewportSize(),
       }),
     );
-  }, [open, step, tooltipSize]);
+  }, [open, pathname, step, tooltipSize]);
 
   useEffect(() => {
     let initialOpenTimer: number | undefined;
@@ -660,10 +676,14 @@ export function OnboardingTour() {
       return;
     }
 
+    if (step.route && pathname !== step.route) {
+      return;
+    }
+
     const target = getTourTarget(step.target);
 
     target?.scrollIntoView({
-      behavior: getScrollBehavior(),
+      behavior: "auto",
       block: "center",
       inline: "center",
     });
@@ -681,7 +701,15 @@ export function OnboardingTour() {
         window.clearTimeout(timer);
       }
     };
-  }, [open, step.target, updateLayout]);
+  }, [open, pathname, step.route, step.target, updateLayout]);
+
+  useEffect(() => {
+    if (!open || !step.route || pathname === step.route) {
+      return;
+    }
+
+    router.push(getStepRoutePath(step.route));
+  }, [getStepRoutePath, open, pathname, router, step.route]);
 
   useEffect(() => {
     if (!open) {
@@ -746,7 +774,13 @@ export function OnboardingTour() {
       return;
     }
 
-    setStepIndex((current) => current + 1);
+    setLayout(null);
+    setStepIndex(stepIndex + 1);
+  }
+
+  function previousStep() {
+    setLayout(null);
+    setStepIndex(Math.max(0, stepIndex - 1));
   }
 
   const currentLayout =
@@ -770,6 +804,7 @@ export function OnboardingTour() {
       <div
         className={cn(
           "fixed z-20 max-h-[calc(100dvh-2rem)] w-[min(calc(100vw-2rem),24rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xl outline-none transition-[left,top,bottom,right] duration-150 sm:p-5",
+          currentLayout.fallback && "transition-none",
           isSheet && "w-auto rounded-b-xl rounded-t-2xl",
         )}
         data-tour-fallback={currentLayout.fallback ? "true" : "false"}
@@ -826,7 +861,7 @@ export function OnboardingTour() {
           <div className="flex gap-2">
             <Button
               disabled={stepIndex === 0}
-              onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
+              onClick={previousStep}
               type="button"
               variant="outline"
             >
@@ -844,7 +879,7 @@ export function OnboardingTour() {
 
 export function OnboardingLaunchButton({
   className,
-  label = "Guia",
+  label = "Guía",
 }: {
   className?: string;
   label?: string;

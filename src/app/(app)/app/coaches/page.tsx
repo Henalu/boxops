@@ -113,26 +113,26 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "auth-user-not-found":
-    "Esa cuenta no existe todavia. Crea primero la cuenta de la persona.",
+    "Esa cuenta no existe todavía. Crea primero la cuenta de la persona.",
   "duplicate-membership":
-    "Esa persona ya tiene acceso en esta organizacion.",
+    "Esa persona ya tiene acceso en esta organización.",
   "duplicate-profile":
-    "Ese coach ya tiene una ficha operativa en esta organizacion.",
+    "Ese coach ya tiene una ficha operativa en esta organización.",
   forbidden: "Tu rol no permite gestionar usuarios ni perfiles.",
-  "invalid-center": "El centro principal seleccionado no es valido.",
+  "invalid-center": "El centro principal seleccionado no es válido.",
   "invalid-hours": "Las horas semanales deben estar entre 0 y 168.",
   "invalid-profile-reference":
-    "La ficha no se ha podido guardar porque falta un acceso o centro valido.",
+    "La ficha no se ha podido guardar porque falta un acceso o centro válido.",
   "invalid-role": "El rol debe ser admin o coach.",
-  "invalid-status": "El estado seleccionado no es valido.",
-  "invalid-user-id": "La cuenta del coach debe usar un UUID valido.",
-  "membership-required": "No se ha encontrado el acceso de esta organizacion.",
+  "invalid-status": "El estado seleccionado no es válido.",
+  "invalid-user-id": "La cuenta del coach debe usar un UUID válido.",
+  "membership-required": "No se ha encontrado el acceso de esta organización.",
   "missing-fields": "Completa los campos obligatorios.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   "notes-too-long": "Las notas no pueden superar 1000 caracteres.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
+  organization_not_found: "La organización solicitada no está disponible.",
   organization_required:
-    "Elige una organizacion antes de gestionar usuarios y coaches.",
+    "Elige una organización antes de gestionar usuarios y coaches.",
   "profile-required": "No se ha recibido el perfil de coach a actualizar.",
   "save-failed": "No se han podido guardar los cambios.",
   "self-membership":
@@ -315,7 +315,7 @@ function getCoachProfileIdentity(
 
 function selectClassName(className = "") {
   return [
-    "h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm",
+    "h-11 w-full rounded-md border border-input bg-transparent px-2.5 text-sm md:h-9",
     "outline-none transition-colors focus-visible:border-ring",
     "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
@@ -549,6 +549,88 @@ function CoachProfileCreateForm({
   );
 }
 
+function MembershipMobileCard({
+  currentUserId,
+  identity,
+  isAdmin,
+  membership,
+  organizationId,
+  timezone,
+}: {
+  currentUserId: string;
+  identity: ReturnType<typeof getMembershipIdentity>;
+  isAdmin: boolean;
+  membership: MembershipRow;
+  organizationId: string;
+  timezone: string;
+}) {
+  const isSelf = membership.user_id === currentUserId;
+
+  return (
+    <Card size="sm">
+      <CardContent className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold tracking-tight">
+              {identity.label}
+              {isSelf ? (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  tu usuario
+                </span>
+              ) : null}
+            </h3>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {identity.detail}
+            </p>
+          </div>
+          <MembershipStatusBadge status={membership.status} />
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div className="min-w-0">
+            <dt className="text-xs font-medium text-muted-foreground">Rol</dt>
+            <dd className="mt-1">
+              <Badge variant="outline">
+                {getMembershipRoleLabel(membership.role)}
+              </Badge>
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-xs font-medium text-muted-foreground">
+              Entrada
+            </dt>
+            <dd className="mt-1 truncate font-medium">
+              {formatDate(membership.joined_at ?? membership.invited_at, timezone)}
+            </dd>
+          </div>
+        </dl>
+
+        {isAdmin ? (
+          isSelf ? (
+            <p className="text-sm text-muted-foreground">
+              Tu propio acceso está protegido.
+            </p>
+          ) : (
+            <InlineEditDetails label="Ajustar acceso">
+              <form action={updateMembership} className="grid gap-3">
+                <input name="organizationId" type="hidden" value={organizationId} />
+                <input name="membershipId" type="hidden" value={membership.id} />
+                <input name="userId" type="hidden" value={membership.user_id} />
+                <MembershipRoleSelect defaultValue={membership.role} />
+                <MembershipStatusSelect defaultValue={membership.status} />
+                <Button className="w-full" type="submit">
+                  <Save aria-hidden="true" />
+                  Guardar
+                </Button>
+              </form>
+            </InlineEditDetails>
+          )
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 function MembershipsSection({
   currentUserId,
   isAdmin,
@@ -570,7 +652,7 @@ function MembershipsSection({
     <section className="space-y-3">
       <SectionHeader
         action={<Badge variant="outline">{memberships.length} accesos</Badge>}
-        description="Quien puede entrar en la organizacion y con que rol."
+        description="Quién puede entrar en la organización y con qué rol."
         title="Accesos del equipo"
       />
 
@@ -579,12 +661,34 @@ function MembershipsSection({
           description={
             isAdmin
               ? "Invita el primer coach usando la cuenta que ya existe en Auth."
-              : "Un admin debe revisar tu acceso antes de que aparezca aqui."
+              : "Un admin debe revisar tu acceso antes de que aparezca aquí."
           }
           title="No hay accesos visibles"
         />
       ) : (
-        <Card size="sm">
+        <>
+          <div className="grid gap-3 md:hidden">
+            {memberships.map((membership) => {
+              const identity = getMembershipIdentity(
+                membership,
+                personProfilesByUserId,
+              );
+
+              return (
+                <MembershipMobileCard
+                  currentUserId={currentUserId}
+                  identity={identity}
+                  isAdmin={isAdmin}
+                  key={membership.id}
+                  membership={membership}
+                  organizationId={organizationId}
+                  timezone={timezone}
+                />
+              );
+            })}
+          </div>
+
+        <Card className="hidden md:flex" size="sm">
           <CardContent className="overflow-x-auto p-0">
             <Table>
               <TableHeader>
@@ -594,7 +698,7 @@ function MembershipsSection({
                   <TableHead>Estado</TableHead>
                   <TableHead>Organizacion</TableHead>
                   <TableHead>Entrada</TableHead>
-                  {isAdmin ? <TableHead>Gestion</TableHead> : null}
+                  {isAdmin ? <TableHead>Gestión</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -688,6 +792,7 @@ function MembershipsSection({
             </Table>
           </CardContent>
         </Card>
+        </>
       )}
     </section>
   );
@@ -830,9 +935,9 @@ function CoachProfilesSection({
           description={
             isAdmin
               ? "Crea una ficha cuando una persona del equipo vaya a cubrir clases."
-              : "Todavia no hay fichas de coach visibles para esta organizacion."
+              : "Todavía no hay fichas de coach visibles para esta organización."
           }
-          title="No hay fichas de coach todavia"
+          title="No hay fichas de coach todavía"
         />
       ) : (
         <div className="grid gap-3">

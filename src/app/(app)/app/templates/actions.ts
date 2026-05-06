@@ -28,14 +28,30 @@ function getRequiredFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getTemplateView(formData: FormData) {
+  return getRequiredFormString(formData, "view") === "agenda"
+    ? "agenda"
+    : "week";
+}
+
+function getTemplateDay(formData: FormData) {
+  const day = Number(getRequiredFormString(formData, "day"));
+
+  return Number.isInteger(day) && day >= 1 && day <= 7 ? String(day) : "1";
+}
+
 function getErrorPath(
   organizationId: string | null,
   week: string | null,
   error: string,
+  view?: string | null,
+  day?: string | null,
 ) {
   return getScheduleTemplatesPath({
+    day,
     error,
     organizationId,
+    view,
     week,
   });
 }
@@ -43,8 +59,12 @@ function getErrorPath(
 async function getAdminActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
+  const day = getTemplateDay(formData);
+  const view = getTemplateView(formData);
   const redirectPath = getScheduleTemplatesPath({
+    day,
     organizationId,
+    view,
     week: rawWeekStart || null,
   });
   const user = await getAuthenticatedUser();
@@ -57,17 +77,35 @@ async function getAdminActionContext(formData: FormData) {
   const resolution = resolveActiveOrganization(memberships, organizationId);
 
   if (!resolution.ok) {
-    redirect(getErrorPath(organizationId, rawWeekStart || null, resolution.reason));
+    redirect(
+      getErrorPath(
+        organizationId,
+        rawWeekStart || null,
+        resolution.reason,
+        view,
+        day,
+      ),
+    );
   }
 
   if (resolution.membership.role !== "admin") {
-    redirect(getErrorPath(resolution.organization.id, rawWeekStart || null, "forbidden"));
+    redirect(
+      getErrorPath(
+        resolution.organization.id,
+        rawWeekStart || null,
+        "forbidden",
+        view,
+        day,
+      ),
+    );
   }
 
   const week = resolveWeek(rawWeekStart || undefined, resolution.organization.timezone);
 
   return {
+    day,
     organization: resolution.organization,
+    view,
     weekStart: week.weekStart,
   };
 }
@@ -274,7 +312,15 @@ export async function createScheduleTemplate(formData: FormData) {
   const validation = validateScheduleTemplateForm(formData);
 
   if (!validation.ok) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, validation.error));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        validation.error,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const supabase = await createClient();
@@ -285,7 +331,15 @@ export async function createScheduleTemplate(formData: FormData) {
   });
 
   if (centerError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, centerError));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        centerError,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const { error } = await supabase.from("schedule_templates").insert({
@@ -304,14 +358,18 @@ export async function createScheduleTemplate(formData: FormData) {
         context.organization.id,
         context.weekStart,
         getMutationError(error.code),
+        context.view,
+        context.day,
       ),
     );
   }
 
   redirect(
     getScheduleTemplatesPath({
+      day: context.day,
       organizationId: context.organization.id,
       status: "template-created",
+      view: context.view,
       week: context.weekStart,
     }),
   );
@@ -323,15 +381,39 @@ export async function updateScheduleTemplate(formData: FormData) {
   const validation = validateScheduleTemplateForm(formData);
 
   if (!templateId) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "template-required"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "template-required",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   if (!isScheduleTemplateUuid(templateId)) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "invalid-template"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   if (!validation.ok) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, validation.error));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        validation.error,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const supabase = await createClient();
@@ -342,7 +424,15 @@ export async function updateScheduleTemplate(formData: FormData) {
   });
 
   if (centerError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, centerError));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        centerError,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const { error } = await supabase
@@ -366,14 +456,18 @@ export async function updateScheduleTemplate(formData: FormData) {
         context.organization.id,
         context.weekStart,
         getMutationError(error.code),
+        context.view,
+        context.day,
       ),
     );
   }
 
   redirect(
     getScheduleTemplatesPath({
+      day: context.day,
       organizationId: context.organization.id,
       status: "template-updated",
+      view: context.view,
       week: context.weekStart,
     }),
   );
@@ -384,7 +478,15 @@ export async function createScheduleTemplateBlock(formData: FormData) {
   const validation = validateScheduleTemplateBlockForm(formData);
 
   if (!validation.ok) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, validation.error));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        validation.error,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const supabase = await createClient();
@@ -398,7 +500,15 @@ export async function createScheduleTemplateBlock(formData: FormData) {
   });
 
   if (referenceError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, referenceError));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        referenceError,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const { error } = await supabase.from("schedule_template_blocks").insert({
@@ -420,14 +530,18 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         context.organization.id,
         context.weekStart,
         getMutationError(error.code),
+        context.view,
+        context.day,
       ),
     );
   }
 
   redirect(
     getScheduleTemplatesPath({
+      day: context.day,
       organizationId: context.organization.id,
       status: "template-block-created",
+      view: context.view,
       week: context.weekStart,
     }),
   );
@@ -440,18 +554,38 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
 
   if (!templateBlockId) {
     redirect(
-      getErrorPath(context.organization.id, context.weekStart, "template-block-required"),
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "template-block-required",
+        context.view,
+        context.day,
+      ),
     );
   }
 
   if (!isScheduleTemplateUuid(templateBlockId)) {
     redirect(
-      getErrorPath(context.organization.id, context.weekStart, "invalid-template-block"),
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+      ),
     );
   }
 
   if (!validation.ok) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, validation.error));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        validation.error,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const supabase = await createClient();
@@ -468,7 +602,13 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
     existingBlock.template_id !== validation.values.templateId
   ) {
     redirect(
-      getErrorPath(context.organization.id, context.weekStart, "invalid-template-block"),
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+      ),
     );
   }
 
@@ -482,7 +622,15 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
   });
 
   if (referenceError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, referenceError));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        referenceError,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const { error } = await supabase
@@ -508,14 +656,18 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         context.organization.id,
         context.weekStart,
         getMutationError(error.code),
+        context.view,
+        context.day,
       ),
     );
   }
 
   redirect(
     getScheduleTemplatesPath({
+      day: context.day,
       organizationId: context.organization.id,
       status: "template-block-updated",
+      view: context.view,
       week: context.weekStart,
     }),
   );
@@ -526,7 +678,15 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
   const templateId = getRequiredFormString(formData, "templateId");
 
   if (!templateId || !isScheduleTemplateUuid(templateId)) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "invalid-template"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const supabase = await createClient();
@@ -538,7 +698,15 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
   });
 
   if (templateResult.error) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, templateResult.error));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        templateResult.error,
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const { data: templateBlocks, error: templateBlocksError } = await supabase
@@ -552,11 +720,27 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
     .order("start_time", { ascending: true });
 
   if (templateBlocksError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "save-failed"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "save-failed",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   if (templateBlocks.length === 0) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "template-empty"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "template-empty",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const defaultCoachProfileIds = [
@@ -575,7 +759,15 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
     });
 
     if (coachError) {
-      redirect(getErrorPath(context.organization.id, context.weekStart, coachError));
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          coachError,
+          context.view,
+          context.day,
+        ),
+      );
     }
   }
 
@@ -591,7 +783,15 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
     .in("template_block_id", templateBlockIds);
 
   if (existingBlocksError) {
-    redirect(getErrorPath(context.organization.id, context.weekStart, "save-failed"));
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "save-failed",
+        context.view,
+        context.day,
+      ),
+    );
   }
 
   const existingKeys = new Set(
@@ -651,6 +851,8 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
         context.organization.id,
         context.weekStart,
         getMutationError(insertError.code),
+        context.view,
+        context.day,
       ),
     );
   }
@@ -694,6 +896,8 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
           context.organization.id,
           context.weekStart,
           getMutationError(assignmentsError.code),
+          context.view,
+          context.day,
         ),
       );
     }

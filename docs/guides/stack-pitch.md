@@ -6,7 +6,7 @@ Esta es la explicacion para cuando alguien pregunta "por que este stack" y no qu
 
 BoxOps usa Next.js, React, TypeScript, Tailwind, shadcn/ui, Supabase y Vercel porque el producto necesita avanzar rapido sin renunciar a auth, tenant safety, Postgres, RLS y una UI operativa decente.
 
-No es un stack elegido para impresionar. Es un stack elegido para no construir desde cero cosas que ya existen y que suelen romper productos pequenos cuando crecen.
+No es un stack elegido para impresionar. Es un stack elegido para no construir desde cero cosas que ya existen y que suelen romper productos pequeños cuando crecen.
 
 ## Por que tiene sentido para BoxOps
 
@@ -51,7 +51,7 @@ Tailwind CSS 4:
 
 - velocidad para construir UI
 - responsive controlable
-- menos CSS suelto sin dueno
+- menos CSS suelto sin dueño
 
 shadcn/ui + Radix + lucide:
 

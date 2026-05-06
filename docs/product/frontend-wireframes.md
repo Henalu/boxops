@@ -71,7 +71,7 @@ Desktop/tablet:
 ### Theming Y Color
 
 - El tema base usa neutrales, superficies claras, bordes sutiles y foco visible.
-- El acento del tenant puede aparecer en nav activo, logo/switcher, filtros seleccionados o pequenos detalles.
+- El acento del tenant puede aparecer en nav activo, logo/switcher, filtros seleccionados o pequeños detalles.
 - Los colores de centro y tipo de actividad son contexto secundario: dot, rail fino, chip o borde suave.
 - Los estados `sin cubrir`, `conflicto` y `pendiente` ganan siempre sobre color de centro, tipo o tenant.
 
