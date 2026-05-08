@@ -7,9 +7,10 @@ import {
   OnboardingLaunchButton,
   OnboardingTour,
 } from "@/components/layout/onboarding-tour";
+import { TenantThemeScope } from "@/components/layout/tenant-theme-scope";
 import { Button } from "@/components/ui/button";
 import { getLoginPath } from "@/lib/auth/redirects";
-import { getAuthenticatedUser } from "@/lib/auth/tenant";
+import { getActiveMemberships, getAuthenticatedUser } from "@/lib/auth/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -24,82 +25,90 @@ export default async function ProtectedAppLayout({
     redirect(getLoginPath("/app"));
   }
 
+  const memberships = await getActiveMemberships(user.id);
+  const themeOrganizations = memberships.map((membership) => ({
+    id: membership.organization.id,
+    themeConfig: membership.organization.theme_config,
+  }));
+
   return (
-    <div className="min-h-screen bg-muted/35 text-foreground">
-      <div className="md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)]">
-        <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-background/95 px-4 py-5 md:flex">
-          <div className="mb-7">
-            <Link
-              className="flex min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              href="/app"
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                B
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-base font-semibold tracking-tight">
-                  BoxOps
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  Operación semanal
-                </span>
-              </span>
-            </Link>
-          </div>
-
-          <div className="min-h-0 flex-1">
-            <Suspense
-              fallback={
-                <nav aria-label="Navegación principal" className="h-40" />
-              }
-            >
-              <AppNavigation placement="sidebar" />
-            </Suspense>
-          </div>
-
-          <div className="grid gap-3 border-t border-border pt-4">
-            <OnboardingLaunchButton className="justify-start" />
-            <p className="truncate text-xs text-muted-foreground">
-              {user.email ?? user.id}
-            </p>
-            <form action="/auth/sign-out" method="post">
-              <Button className="w-full" type="submit" variant="outline">
-                Cerrar sesión
-              </Button>
-            </form>
-          </div>
-        </aside>
-
-        <div className="min-w-0">
-          <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-            <div className="flex min-h-[3.25rem] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]">
+    <TenantThemeScope organizations={themeOrganizations}>
+      <div className="min-h-screen bg-muted/35 text-foreground">
+        <div className="md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)]">
+          <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-background/95 px-4 py-5 md:flex">
+            <div className="mb-7">
               <Link
-                className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="flex min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 href="/app"
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
                   B
                 </span>
-                <span className="min-w-0 truncate text-base font-semibold tracking-tight">
-                  BoxOps
+                <span className="min-w-0">
+                  <span className="block truncate text-base font-semibold tracking-tight">
+                    BoxOps
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    Operación semanal
+                  </span>
                 </span>
               </Link>
-              <OnboardingLaunchButton label="Guía" />
             </div>
-          </header>
 
-          <main className="mx-auto w-full max-w-6xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-8 lg:px-8">
-            {children}
-          </main>
+            <div className="min-h-0 flex-1">
+              <Suspense
+                fallback={
+                  <nav aria-label="Navegación principal" className="h-40" />
+                }
+              >
+                <AppNavigation placement="sidebar" />
+              </Suspense>
+            </div>
+
+            <div className="grid gap-3 border-t border-border pt-4">
+              <OnboardingLaunchButton className="justify-start" />
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email ?? user.id}
+              </p>
+              <form action="/auth/sign-out" method="post">
+                <Button className="w-full" type="submit" variant="outline">
+                  Cerrar sesión
+                </Button>
+              </form>
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+            <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+              <div className="flex min-h-[3.25rem] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]">
+                <Link
+                  className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  href="/app"
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
+                    B
+                  </span>
+                  <span className="min-w-0 truncate text-base font-semibold tracking-tight">
+                    BoxOps
+                  </span>
+                </Link>
+                <OnboardingLaunchButton label="Guía" />
+              </div>
+            </header>
+
+            <main className="mx-auto w-full max-w-6xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-8 lg:px-8">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
 
-      <Suspense
-        fallback={<nav aria-label="Navegación principal" className="h-16" />}
-      >
-        <AppNavigation placement="bottom" />
-      </Suspense>
-      <OnboardingTour />
-    </div>
+        <Suspense
+          fallback={<nav aria-label="Navegación principal" className="h-16" />}
+        >
+          <AppNavigation placement="bottom" />
+        </Suspense>
+        <OnboardingTour />
+      </div>
+    </TenantThemeScope>
   );
 }

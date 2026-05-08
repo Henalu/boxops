@@ -1,8 +1,8 @@
 # Decision De Persistencia De Theme Config - BoxOps
 
-Este documento decide la persistencia recomendada para la configuracion visual futura de tenant. No crea migraciones ni codigo.
+Este documento decide la persistencia recomendada para la configuracion visual de tenant.
 
-Estado 2026-05-06: la decision sigue vigente para Fase B. `organizations.theme_config jsonb` es la primera opcion porque el branding previsto es controlado: logo, colores corporativos, colores por centro y preferencias visuales ligeras. Si aparecen permisos, borradores, versionado o auditoria propia de tema, reabrir esta decision antes de migrar.
+Estado 2026-05-07: la decision se aplica en B.1 con `supabase/migrations/00003_organization_theme_config.sql`. El primer corte solo guarda `version` y `accentColor`; logo, colores por centro, permisos avanzados, borradores, versionado o auditoria propia siguen siendo motivos para reabrir la decision antes de migrar a una tabla dedicada.
 
 ## Decision Recomendada
 
@@ -108,16 +108,22 @@ Mover a `organization_theme_settings` si aparece al menos una de estas necesidad
 - necesidad de constraints SQL fuertes por campo;
 - cambios de tema frecuentes que hagan incomoda la fila de `organizations`.
 
-## Impacto En Implementacion Futura
+## Impacto En Implementacion
 
-Cuando empiece frontend real:
+Aplicado en B.1:
 
 1. Crear migracion para `organizations.theme_config`.
 2. Resolver organizacion activa con los helpers existentes.
 3. Leer `theme_config` junto con la organizacion activa.
-4. Validar y normalizar el objeto en server.
+4. Validar y normalizar `accentColor` en server/app.
 5. Combinar con fallback de BoxOps.
 6. Aplicar variables solo dentro del shell de la organizacion activa.
-7. Probar tema base, tenant con acento valido y tenant con config vacia.
+
+Pendiente para siguientes cortes:
+
+- probar con mas tenants reales o demo;
+- modelar logo/asset privado;
+- decidir si colores por centro siguen en `theme_config` o pasan a entidad propia;
+- reabrir tabla dedicada si hay permisos, versionado o auditoria granular.
 
 La configuracion visual no debe introducir condiciones tipo "si el tenant es STL". STL, como cualquier tenant, usara datos/configuracion.

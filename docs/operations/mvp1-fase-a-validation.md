@@ -1,12 +1,12 @@
 # Validacion Fase A - Cierre MVP 1 Real
 
-Fecha: 2026-05-06.
+Fecha: 2026-05-06. Actualizado: 2026-05-07.
 
 ## Resultado
 
-Fase A queda ejecutada con una semana de prueba L-V de STL cargada en local, sin inventar asignaciones de coaches ni reglas genericas de producto. La UI se valido contra 165 bloques reales y una plantilla vacante. No se cierra del todo todavia porque faltan centro real por bloque si aplica a mas de una sede, coaches reales por bloque o huecos confirmados, y credenciales/flujo E2E reales del tenant piloto.
+Fase A queda cerrada para QA interno con una semana de prueba L-V de STL cargada en local, una muestra representativa de coaches por defecto/asignaciones/vacantes y smoke E2E admin/coach. No es validacion oficial ni produccion: centro real por bloque, asignaciones oficiales y huecos confirmados siguen pendientes del tester STL.
 
-No se tocaron permisos, migraciones ni seeds automaticos de MVP 1. La deuda de codigo resuelta fue acotada a Fase A: `/app/templates` dejo de renderizar todos los formularios de edicion de bloque a la vez, suma una vista semanal por dias para plantillas grandes y el smoke E2E evita que el onboarding local bloquee la navegacion automatizada.
+No se tocaron permisos, migraciones ni seeds automaticos de MVP 1. La deuda de codigo resuelta fue acotada a Fase A: `/app/templates` dejo de renderizar todos los formularios de edicion de bloque a la vez, suma una vista semanal por dias para plantillas grandes, el smoke E2E evita que el onboarding local bloquee la navegacion automatizada y ahora cubre explicitamente `/app/schedule?mine=1`.
 
 ## Fase Confirmada
 
@@ -63,6 +63,19 @@ La semana se carga en `STL Tremanes` como centro tecnico de prueba porque el usu
 
 La validacion E2E local creo memberships de prueba para `e2e.admin@boxops.local` y `e2e.coach@boxops.local` dentro del tenant STL. Esto no sustituye credenciales reales del piloto.
 
+Tras aplicar `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql` en local:
+
+| Dato fixture interno | Valor |
+|---|---:|
+| Bloques de plantilla con coach por defecto | 20 |
+| Bloques de plantilla vacantes | 145 |
+| Bloques reales asignados | 20 |
+| Bloques reales vacantes | 145 |
+| Bloques insuficientes | 1 |
+| Conflictos deliberados | 1 |
+
+La muestra usa coaches reales del tenant como dato editable, no crea usuarios Auth ni envia invitaciones. Si existe la cuenta E2E coach local, se vincula a la ficha operativa de Lucas para validar "Mi horario".
+
 ## Deuda Pequena Resuelta
 
 La pantalla `/app/templates` era funcional, pero con 165 bloques renderizaba un formulario de edicion completo por cada bloque aunque estuviera cerrado. Para mantener la UI usable con una semana real:
@@ -78,26 +91,26 @@ La pantalla `/app/templates` era funcional, pero con 165 bloques renderizaba un 
 - coach conserva modo lectura;
 - no se introducen reglas especiales de STL ni datos hardcodeados en `src`.
 
-## Bloqueos Para Cerrar Fase A
+## Pendiente Para Piloto Oficial
 
-Faltan estos datos o decisiones antes de marcar la fase como completamente cerrada:
+Faltan estos datos o decisiones antes de presentar la semana como validada oficialmente:
 
 - coach asignado por bloque real, o decision explicita de dejar huecos reales vacantes;
 - confirmacion de si todos los bloques de prueba pertenecen a un centro o deben repartirse entre STL Tremanes y STL City;
-- confirmacion de si se quiere introducir asignaciones de prueba o mantener todos los bloques vacantes;
-- credenciales o flujo E2E real para validar al menos un admin y un coach contra el tenant STL;
+- credenciales o flujo real para validar al menos un admin y un coach contra el tenant STL;
 - decision final de almacenamiento del horario/asignaciones reales: base privada de piloto, snippet local privado o fixture anonimizado.
 
-Hasta que esos puntos esten cerrados, no se debe mover el horario real ni asignaciones reales a un seed automatico generico.
+Hasta que esos puntos esten cerrados, no se debe mover el horario real ni asignaciones reales a un seed automatico generico ni tratarlos como datos de produccion.
 
 ## Decision De Fixture
 
 Para Fase A, el camino recomendado es:
 
 1. Mantener `supabase/snippets/stl-test-week-2026-05-04.sql` como fixture local nombrado, no automatico.
-2. No mover el fixture a seed automatico hasta confirmar centro por bloque y politica de asignaciones.
-3. Crear un fixture anonimizado solo despues de confirmar la semana completa y los casos de cobertura que se quieren preservar para pruebas.
-4. Mantener el seed generico `demo-box` como base publica de smoke y desarrollo.
+2. Mantener `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql` como muestra QA interna reejecutable.
+3. No mover ningun fixture a seed automatico hasta confirmar centro por bloque y politica de asignaciones.
+4. Crear un fixture anonimizado solo despues de confirmar la semana completa y los casos de cobertura que se quieren preservar para pruebas.
+5. Mantener el seed generico `demo-box` como base publica de smoke y desarrollo.
 
 ## Deuda Tactil Movil
 
@@ -118,12 +131,13 @@ Comandos ejecutados en esta pasada:
 Resultado:
 
 - lint, typecheck, build y smoke pasan.
-- `npm run test:smoke` con `E2E_ORGANIZATION_ID=00000000-0000-0000-0000-000000200001` y `E2E_WEEK=2026-05-04`: 13 passed.
+- `npm run test:smoke` con `E2E_ORGANIZATION_ID=00000000-0000-0000-0000-000000200001` y `E2E_WEEK=2026-05-04`: 14 passed, incluido `/app/schedule?mine=1`.
 - `rg -n "STL" src` no devuelve coincidencias.
 - Validacion browser en 390x844 y 1280x800 sobre Inicio, Horario, Cobertura, Plantillas, Equipo y Mas: contenido renderizado, sin overlay de framework, sin errores de consola/pageerror y sin overflow horizontal.
+- Validacion browser adicional en 390x844 y 1280x800 sobre Equipo, Mi horario y Cobertura con la muestra interna: sin overlay de framework, sin errores de consola/pageerror y sin overflow horizontal.
 - Validacion browser adicional sobre `/app/templates?view=week` y `/app/templates?view=agenda` en 390x844 y desktop: cambio de vista, apertura de edicion por `edit_block_id`, vista semanal sin cabecera duplicada, movil con un unico dia visible, sin errores de consola/pageerror y sin overflow horizontal de pagina.
 - Se creo acceso E2E local de admin/coach al tenant STL para validar la UI con `organizationId=00000000-0000-0000-0000-000000200001`.
 
 ## Siguiente Paso Permitido
 
-No abrir Fase B todavia. El siguiente paso dentro de Fase A es confirmar centro por bloque y asignaciones reales o huecos intencionados; despues se puede decidir si el fixture local pasa a seed privado/anonimizado o sigue solo como snippet de validacion.
+No abrir Fase B dentro de esta tarea. La base tecnica de Fase A ya sirve para QA interno; el siguiente paso de producto es validacion oficial STL de centro por bloque, asignaciones reales o huecos intencionados, y decidir si el fixture local pasa a seed privado/anonimizado o sigue solo como snippet de validacion.

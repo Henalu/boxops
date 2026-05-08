@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
@@ -25,7 +26,7 @@ function getErrorPath(organizationId: string | null, error: string) {
   });
 }
 
-async function getAdminActionContext(formData: FormData) {
+async function getOperationalActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const redirectPath = getCentersPath({ organizationId });
   const user = await getAuthenticatedUser();
@@ -41,7 +42,7 @@ async function getAdminActionContext(formData: FormData) {
     redirect(getErrorPath(organizationId, resolution.reason));
   }
 
-  if (resolution.membership.role !== "admin") {
+  if (!canManageOperationalData(resolution.membership.role)) {
     redirect(getErrorPath(resolution.organization.id, "forbidden"));
   }
 
@@ -59,7 +60,7 @@ function getMutationError(errorCode?: string) {
 }
 
 export async function createCenter(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateCenterForm(formData);
 
   if (!validation.ok) {
@@ -88,7 +89,7 @@ export async function createCenter(formData: FormData) {
 }
 
 export async function updateCenter(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const centerId = getRequiredFormString(formData, "centerId");
   const validation = validateCenterForm(formData);
 
@@ -127,7 +128,7 @@ export async function updateCenter(formData: FormData) {
 }
 
 export async function setCenterStatus(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const centerId = getRequiredFormString(formData, "centerId");
   const nextStatus = getRequiredFormString(formData, "nextStatus");
 

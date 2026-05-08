@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
@@ -56,7 +57,7 @@ function getErrorPath(
   });
 }
 
-async function getAdminActionContext(formData: FormData) {
+async function getOperationalActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
   const day = getTemplateDay(formData);
@@ -88,7 +89,7 @@ async function getAdminActionContext(formData: FormData) {
     );
   }
 
-  if (resolution.membership.role !== "admin") {
+  if (!canManageOperationalData(resolution.membership.role)) {
     redirect(
       getErrorPath(
         resolution.organization.id,
@@ -308,7 +309,7 @@ async function validateTemplateBlockReferences({
 }
 
 export async function createScheduleTemplate(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateScheduleTemplateForm(formData);
 
   if (!validation.ok) {
@@ -376,7 +377,7 @@ export async function createScheduleTemplate(formData: FormData) {
 }
 
 export async function updateScheduleTemplate(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const templateId = getRequiredFormString(formData, "templateId");
   const validation = validateScheduleTemplateForm(formData);
 
@@ -474,7 +475,7 @@ export async function updateScheduleTemplate(formData: FormData) {
 }
 
 export async function createScheduleTemplateBlock(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateScheduleTemplateBlockForm(formData);
 
   if (!validation.ok) {
@@ -548,7 +549,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
 }
 
 export async function updateScheduleTemplateBlock(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const templateBlockId = getRequiredFormString(formData, "templateBlockId");
   const validation = validateScheduleTemplateBlockForm(formData);
 
@@ -674,7 +675,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
 }
 
 export async function applyScheduleTemplateToWeek(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const templateId = getRequiredFormString(formData, "templateId");
 
   if (!templateId || !isScheduleTemplateUuid(templateId)) {

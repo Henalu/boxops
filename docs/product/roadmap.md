@@ -12,13 +12,13 @@ MVP 1 visual/operativo ya esta avanzado:
 - plantillas semanales basicas, dashboard, `/app/coverage`, `/app/more`;
 - navegacion mobile-first, onboarding local, smoke tests y audit visual/responsive de Task 017.
 
-No existen todavia cambios, ausencias, documentos, fichaje, RRHH completo, roles avanzados ni app movil nativa.
+No existen todavia cambios, ausencias, documentos firmables, fichaje, RRHH completo ni app movil nativa. Roles avanzados compatibles, area personal minima, matriz documental de permisos personales, modelo documental de avatar privado, primer avatar privado propio y "Mi firma" privada propia ya existen como cortes B.2, D.1, D.2, D.3, D.4 y D.5.
 
 ## Fase A - Cierre MVP 1 Real
 
 Objetivo: cerrar MVP 1 con datos reales validados y deuda pequena, sin abrir modulos nuevos.
 
-Estado 2026-05-06: semana de prueba L-V cargada localmente con `supabase/snippets/stl-test-week-2026-05-04.sql`. La UI ya fue validada con 165 bloques reales, una plantilla vacante y smoke E2E local admin/coach. `/app/templates` quedo ajustada para editar un bloque por URL sin renderizar todos los formularios cerrados y para alternar todas las plantillas entre vista Semana y vista Agenda. Fase A no se cierra por completo hasta confirmar centro por bloque, asignaciones/huecos reales y credenciales o flujo E2E real de admin/coach del tenant piloto.
+Estado 2026-05-07: Fase A queda cerrada para QA interno y desarrollo. La semana L-V se carga con `supabase/snippets/stl-test-week-2026-05-04.sql` y la muestra interna opcional con `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`. Smoke E2E local admin/coach pasa e incluye `Mi horario`. La validacion oficial STL queda para una etapa posterior de producto casi completo y no bloquea Fase B.
 
 Alcance:
 
@@ -50,6 +50,8 @@ Criterio de salida:
 
 Objetivo: permitir configuracion global de organizacion y marca ligera sin romper la identidad BoxOps.
 
+Estado 2026-05-07: B.1 implementada como primer corte generico y B.2 implementada como corte minimo de roles avanzados compatibles. Existe `/app/settings`, enlazada desde `/app/more`, para editar nombre visible y acento del tenant en `organizations.theme_config`. `owner` y `admin` mutan configuracion global; `manager` muta operativa MVP 1 tenant-wide sin tocar accesos ni configuracion global; `coach` queda en lectura. Logo real, colores por centro, permisos por centro y modulos RRHH sensible/documentos siguen pendientes.
+
 Alcance:
 
 - pagina real de Configuracion para organizacion activa;
@@ -73,19 +75,24 @@ Dependencias:
 
 Criterio de salida:
 
-- un tenant puede configurar marca ligera sin cambiar semantica ni rutas;
-- `owner` o `superadmin` queda reservado para configuracion global, branding y billing futuro;
-- `manager` o `admin` queda reservado para gestion diaria;
+- B.1 permite configurar marca ligera minima sin cambiar semantica ni rutas;
+- B.2 reconoce roles del schema en la app y centraliza permisos en helpers reutilizables;
+- `owner` y `admin` controlan configuracion global, branding ligero y accesos compatibles;
+- `manager` y `admin` gestionan operativa diaria sin controlar todo el tenant;
+- `coach` mantiene lectura operativa y no gana mutaciones;
 - todos los usuarios conservan acceso a funciones personales aunque tengan rol alto.
 
 Decision recomendada:
 
 - evolucionar hacia `owner`, `admin`/`manager` y `coach`, manteniendo compatibilidad con `admin` actual.
 - usar `organizations.theme_config` primero; migrar a tabla dedicada solo si hacen falta permisos, versionado o auditoria granular de tema.
+- mantener `center_manager`, `document_admin`, `payroll_manager` y `staff` como roles reconocidos/documentados, sin permisos especializados hasta que existan schema y UX propios.
 
 ## Fase C - Auth Y Security Polish
 
 Objetivo: endurecer autenticacion sin filtrar informacion sensible.
+
+Estado 2026-05-07: implementada como corte minimo de producto. Se anade recuperacion de contrasena desde `/login`, solicitud generica en `/forgot-password`, callback SSR existente reutilizado para recovery y pagina `/reset-password` para guardar nueva contrasena.
 
 Alcance:
 
@@ -104,8 +111,8 @@ No incluye:
 
 Dependencias:
 
-- configuracion real de Supabase Auth;
-- decision tecnica sobre rate limits, Password Verification Hook y tabla propia de intentos;
+- configurar en Supabase Auth la misma regla minima de contrasena: 8 caracteres, al menos una letra y un numero;
+- permitir en Supabase Auth Redirect URLs el callback de recuperacion hacia `/auth/callback?next=/reset-password`;
 - copy que no exponga si un email existe.
 
 Criterio de salida:
@@ -115,21 +122,30 @@ Criterio de salida:
 - la politica de contrasena queda documentada y aplicada en Auth y UI;
 - queda decidido si el bloqueo de 3 intentos se apoya en Supabase, hook, tabla propia o combinacion.
 
-Decision que requiere validacion tecnica:
+Decision tecnica:
 
-- Supabase Auth rate limits pueden cubrir parte del riesgo, pero avisos de intentos restantes y cooldown por usuario/email probablemente requieren hook o tabla propia con cuidado anti-enumeracion.
+- En Fase C se usan los rate limits nativos de Supabase Auth como defensa suficiente para el corte minimo. La app no muestra intentos restantes ni bloqueos por email para no introducir enumeracion.
+- Si mas adelante negocio/legal exige bloqueo exacto de 3 intentos, cooldown visible o auditoria propia, se abrira una fase con Password Verification Hook + tabla propia restringida a `supabase_auth_admin`.
 
 ## Fase D - Area Personal Y Modelo RRHH
 
 Objetivo: crear "Mi perfil" o "Mi cuenta" como base personal y RRHH, separando lo editable por el usuario de lo gestionado por roles autorizados.
 
+Estado 2026-05-08: D.1 implementa `/app/account` como corte minimo seguro. Todos los roles reconocidos con membership activa pueden abrir su area personal. La pantalla separa cuenta/Auth, perfil visible operativo, ficha de coach propia y RRHH sensible futuro; solo permite editar el `person_profiles` propio vinculado por `organization_id` + `user_id`. D.2 cierra la matriz documental de permisos por campo en `docs/architecture/personal-data-permissions.md`. D.3 modela avatar privado tenant-scoped como asset futuro. D.4 implementa el primer avatar privado propio con `profile_assets`, bucket privado `profile-assets`, RLS/RPC y subida/reemplazo minimo desde `/app/account`. D.5 implementa "Mi firma" privada propia con `profile_signatures`, bucket privado `profile-signatures`, RLS/RPC y canvas minimo en `/app/account`, sin documentos firmables ni boton "Firmar".
+
 Alcance:
 
-- datos personales visibles/editables segun permisos;
-- "Mi firma" como capacidad personal para todos los usuarios;
+- D.1: nombre visible, alias y email publico opcional;
+- cuenta/Auth en lectura, sin cambiar email desde BoxOps;
+- ficha de coach propia en lectura, sin editar datos de otra persona;
+- `weekly_contracted_hours` se conserva como capacidad operativa MVP 1, no como salario/nomina/contrato;
+- avatar propio privado en `/app/account`, con fallback visual si no hay avatar;
+- D.2: matriz por campo para decidir que es visible, propio, operativo, RRHH sensible, payroll, documento privado, firma o auditoria;
+- D.3/D.4: avatar como `profile_assets`, privado, tenant-scoped, con signed URL corta y sin URL publica libre persistente;
+- "Mi firma" como capacidad personal propia para todos los usuarios con membership activa y rol reconocido;
 - crear firma dibujandola en canvas/touch area;
 - borrar/redibujar antes de guardar;
-- guardar y actualizar la firma reutilizable;
+- guardar y actualizar la firma reutilizable en Storage privado;
 - advertir que actualizar la firma no cambia documentos ya firmados;
 - puesto, antiguedad, datos laborales, contrato/jornada cuando proceda;
 - retribucion/salario solo para roles autorizados;
@@ -144,28 +160,35 @@ No incluye:
 
 Dependencias:
 
-- matriz de permisos por campo;
+- matriz de permisos por campo documentada en D.2 como entrada obligatoria para siguientes cortes tecnicos;
 - revision de privacidad para salario/retribucion y datos laborales;
 - decision sobre si ampliar `person_profiles` o crear tablas RRHH separadas.
-- decision firma tenant-scoped vs global por usuario; recomendacion inicial: tenant-scoped con `organization_id` + `person_profile_id`.
-- Storage privado o mecanismo equivalente para el artefacto de firma.
+- decision D.5 aplicada: firma tenant-scoped con `organization_id` + `person_profile_id`; global por usuario queda abierta solo si aparece necesidad multi-tenant real.
+- Storage privado `profile-signatures` para el artefacto de firma.
 
 Criterio de salida:
 
 - cada usuario tiene area personal usable;
-- cada usuario puede crear/actualizar su propia firma;
+- cada usuario puede editar solo su perfil visible propio en D.1;
+- avatar propio queda implementado como asset privado tenant-scoped, sin reemplazo ajeno;
+- cada usuario puede crear/actualizar su propia firma si tiene `person_profiles` vinculado;
 - la firma no es asset publico y respeta frontera de tenant;
 - ningun admin/manager puede firmar en nombre de otra persona usando su firma guardada;
 - datos sensibles no aparecen en equipo operativo general;
 - admin/manager no hereda acceso a salario por defecto si no corresponde;
 - la frontera entre cuenta, persona operativa y datos laborales queda documentada.
+- documentos firmables y RRHH sensible no se implementan hasta tener schema, Storage privado/RLS, snapshots y permisos explicitos.
 
 Decision recomendada:
 
 - separar datos publicos/operativos de datos laborales sensibles. `person_profiles` no debe convertirse en cajon de salario, contrato y documentos.
-- implementar "Mi firma" antes de botones "Firmar" en documentos o nominas.
+- usar D.2/D.3/D.4/D.5 como puerta de entrada: avatar propio y firma propia ya existen con Storage privado; despues, si procede, modelar documentos firmables sin mezclar creacion de firma con firma aplicada.
+- "Mi firma" ya existe antes de botones "Firmar" en documentos o nominas.
+- no crear tablas RRHH nuevas sin capacidades, policies, auditoria y revision de privacidad/legal.
 
 ## Fase E - Documentos, Permisos, Nominas, Firmas Y Certificaciones
+
+Estado 2026-05-08: E.1 queda documentada como fase de modelado seguro. Define entidades candidatas, frontera `organization_id`, buckets privados candidatos, permisos por rol/persona, separacion entre "Mi firma" y "Firmar documento", snapshot futuro y auditoria candidata. No implementa migraciones, buckets, UI, boton "Firmar", documentos firmables ni snapshots reales.
 
 Objetivo: centralizar documentos de empresa, documentos personales, firmas y certificaciones con permisos estrictos.
 
@@ -190,7 +213,7 @@ No incluye:
 Dependencias:
 
 - modelo de documentos y permisos;
-- Fase D cerrada para "Mi firma";
+- Fase D con "Mi firma" real cerrada antes de botones de firma documental;
 - Supabase Storage privado;
 - politica de retencion, borrado y auditoria;
 - revision legal para documentos sensibles y firmas.
@@ -209,6 +232,12 @@ Criterio de salida:
 Decision recomendada:
 
 - modelar permisos con una combinacion de scope, rol y grants por persona concreta. Evitar que `admin` sea sinonimo automatico de acceso a todo documento sensible.
+- E.1 debe cerrar el modelo antes de implementar: `documents`, `document_versions`, `document_subjects`, `document_access_grants`, auditoria candidata, certificaciones y solicitudes/evidencias de firma futuras.
+- usar buckets privados candidatos (`document-files` y `document-signature-evidence`) con rutas internas tenant-scoped; no guardar URLs publicas ni rutas sin `organization_id`.
+- separar documentos de empresa, documentos privados de persona y documentos de gestion/admin; cada categoria necesita permisos explicitos y puede requerir auditoria distinta.
+- tratar certificaciones como dato operativo con adjunto potencialmente privado: el estado/caducidad puede alimentar cobertura futura, pero el archivo no debe hacerse visible por defecto.
+- mantener "Mi firma" como asset personal privado ya existente; "Firmar documento" sera una accion futura que genera evidencia inmutable y no permite firma por delegacion.
+- registrar auditoria de lectura/descarga/cambio de documentos sensibles y evidencias, no solo de subida.
 
 ## Fase F - Fichaje Manual Legal Y Auditable
 

@@ -1,29 +1,31 @@
 import type { User } from "@supabase/supabase-js";
 
+import {
+  APPLICATION_ROLES,
+  isApplicationRole,
+  type ApplicationRole,
+} from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/supabase";
 
-export const MVP_ROLES = ["admin", "coach"] as const;
-export type MvpRole = (typeof MVP_ROLES)[number];
-
 type MembershipRow = Tables<"organization_memberships">;
 type OrganizationRow = Tables<"organizations">;
-type MvpMembershipRow = Omit<MembershipRow, "role"> & {
-  role: MvpRole;
+type ApplicationMembershipRow = Omit<MembershipRow, "role"> & {
+  role: ApplicationRole;
 };
 
 const ACTIVE_ORGANIZATION_STATUSES = ["trialing", "active"] as const;
 
 export type ActiveOrganization = Pick<
   OrganizationRow,
-  "id" | "name" | "slug" | "status" | "timezone"
+  "id" | "name" | "slug" | "status" | "theme_config" | "timezone"
 >;
 
 export type ActiveMembership = Pick<
   MembershipRow,
   "id" | "organization_id" | "user_id" | "status" | "joined_at" | "created_at"
 > & {
-  role: MvpRole;
+  role: ApplicationRole;
   organization: ActiveOrganization;
 };
 
@@ -41,10 +43,6 @@ export type ActiveOrganizationResolution =
         | "organization_not_found";
       memberships: ActiveMembership[];
     };
-
-function isMvpRole(role: string): role is MvpRole {
-  return MVP_ROLES.includes(role as MvpRole);
-}
 
 function isUsableOrganizationStatus(status: string) {
   return ACTIVE_ORGANIZATION_STATUSES.includes(
@@ -76,7 +74,7 @@ export async function getActiveMemberships(
     .select("id, organization_id, user_id, role, status, joined_at, created_at")
     .eq("user_id", userId)
     .eq("status", "active")
-    .in("role", [...MVP_ROLES])
+    .in("role", [...APPLICATION_ROLES])
     .order("created_at", { ascending: true });
 
   if (membershipsError) {
@@ -86,11 +84,11 @@ export async function getActiveMemberships(
   }
 
   const validMemberships = memberships.flatMap((membership) => {
-    if (!isMvpRole(membership.role)) {
+    if (!isApplicationRole(membership.role)) {
       return [];
     }
 
-    return [membership as MvpMembershipRow];
+    return [membership as ApplicationMembershipRow];
   });
 
   if (validMemberships.length === 0) {
@@ -103,7 +101,7 @@ export async function getActiveMemberships(
 
   const { data: organizations, error: organizationsError } = await supabase
     .from("organizations")
-    .select("id, name, slug, status, timezone")
+    .select("id, name, slug, status, timezone, theme_config")
     .in("id", organizationIds);
 
   if (organizationsError) {

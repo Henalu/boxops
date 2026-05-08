@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getApplicationRoleLabel } from "@/lib/auth/permissions";
 import type { ActiveOrganizationResolution } from "@/lib/auth/tenant";
 import { getAppPath } from "@/lib/navigation/app-paths";
 
@@ -68,7 +69,7 @@ export function OrganizationResolutionState({
                     {membership.organization.name}
                   </span>
                   <span className="ml-auto text-muted-foreground">
-                    {membership.role}
+                    {getApplicationRoleLabel(membership.role)}
                   </span>
                 </Link>
               </Button>

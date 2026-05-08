@@ -113,3 +113,11 @@ export function getScheduleTemplatesPath(options: AppPathOptions = {}) {
 export function getMorePath(options: AppPathOptions = {}) {
   return getAppPath("/app/more", options);
 }
+
+export function getAccountPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/account", options);
+}
+
+export function getSettingsPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/settings", options);
+}

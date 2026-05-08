@@ -13,6 +13,7 @@ type LoginPageProps = {
   searchParams: Promise<{
     error?: string | string[];
     redirectTo?: string | string[];
+    status?: string | string[];
   }>;
 };
 
@@ -20,6 +21,10 @@ const errorMessages: Record<string, string> = {
   "missing-credentials": "Introduce email y contraseña para iniciar sesión.",
   "invalid-credentials": "No se ha podido iniciar sesión con esos datos.",
   callback: "No se ha podido completar el inicio de sesión.",
+};
+
+const successMessages: Record<string, string> = {
+  "password-updated": "Contraseña actualizada. Inicia sesión con la nueva contraseña.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -30,6 +35,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const redirectTo = getSafeRedirectPath(getParam(params.redirectTo));
   const error = getParam(params.error);
+  const status = getParam(params.status);
   const user = await getAuthenticatedUser();
   const memberships = user ? await getActiveMemberships(user.id) : [];
 
@@ -50,6 +56,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          {status && successMessages[status] ? (
+            <p className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-900">
+              {successMessages[status]}
+            </p>
+          ) : null}
+
           {user ? (
             <div className="space-y-5">
               <div>
@@ -124,6 +136,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   type="password"
                 />
               </label>
+
+              <div className="flex justify-end">
+                <Link
+                  className="text-sm font-medium text-slate-700 underline-offset-4 transition-colors hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
+                  href="/forgot-password"
+                >
+                  He olvidado mi contraseña
+                </Link>
+              </div>
 
               <button
                 className="inline-flex w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"

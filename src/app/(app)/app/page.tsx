@@ -26,6 +26,10 @@ import {
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -492,7 +496,7 @@ function PageHeader({
   weekEnd?: string;
   weekStart?: string;
 }) {
-  const roleLabel = role === "admin" ? "Admin" : role === "coach" ? "Coach" : role;
+  const roleLabel = role ? getApplicationRoleLabel(role) : null;
 
   return (
     <section className="flex flex-col gap-3">
@@ -1055,6 +1059,8 @@ function ReadOnlyHome({
   timezone: string;
   weekStart: string;
 }) {
+  const roleLabel = getApplicationRoleLabel(role);
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <Card>
@@ -1078,7 +1084,7 @@ function ReadOnlyHome({
             <div>
               <dt className="text-sm text-muted-foreground">Acceso</dt>
               <dd className="mt-1">
-                <Badge variant="outline">{role}</Badge>
+                <Badge variant="outline">{roleLabel}</Badge>
               </dd>
             </div>
             <div className="min-w-0 sm:col-span-2">
@@ -1202,8 +1208,10 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   const weekParam = getParam(params.week);
   const week = resolveWeek(weekParam, resolution.organization.timezone);
   const currentWeek = resolveWeek(undefined, resolution.organization.timezone);
-  const canViewAdminDashboard = resolution.membership.role === "admin";
-  const dashboardData = canViewAdminDashboard
+  const canViewOperationalDashboard = canManageOperationalData(
+    resolution.membership.role,
+  );
+  const dashboardData = canViewOperationalDashboard
     ? await getDashboardData({
         organizationId: resolution.organization.id,
         weekEnd: week.weekEnd,

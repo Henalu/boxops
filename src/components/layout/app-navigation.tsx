@@ -9,7 +9,9 @@ import {
   Home,
   LayoutGrid,
   MapPin,
+  Settings,
   ShieldAlert,
+  UserRound,
   UsersRound,
 } from "lucide-react";
 
@@ -17,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   getAppPath,
+  getAccountPath,
   getCentersPath,
   getClassTypesPath,
   getCoachesPath,
@@ -24,6 +27,7 @@ import {
   getMorePath,
   getSchedulePath,
   getScheduleTemplatesPath,
+  getSettingsPath,
 } from "@/lib/navigation/app-paths";
 
 type AppNavigationProps = {
@@ -79,9 +83,28 @@ const managementItems = [
     icon: CalendarRange,
     label: "Plantillas",
   },
+  {
+    href: "/app/settings",
+    icon: Settings,
+    label: "Configuración",
+  },
 ] as const;
 
-const mobileMorePaths = ["/app/centers", "/app/class-types", "/app/templates"];
+const personalItems = [
+  {
+    href: "/app/account",
+    icon: UserRound,
+    label: "Mi cuenta",
+  },
+] as const;
+
+const mobileMorePaths = [
+  "/app/account",
+  "/app/centers",
+  "/app/class-types",
+  "/app/templates",
+  "/app/settings",
+];
 
 function isActivePath(pathname: string, href: string) {
   return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
@@ -125,12 +148,20 @@ export function AppNavigation({ placement }: AppNavigationProps) {
       return getMorePath({ organizationId, week });
     }
 
+    if (href === "/app/account") {
+      return getAccountPath({ organizationId });
+    }
+
     if (href === "/app/centers") {
       return getCentersPath({ organizationId });
     }
 
     if (href === "/app/class-types") {
       return getClassTypesPath({ organizationId });
+    }
+
+    if (href === "/app/settings") {
+      return getSettingsPath({ organizationId });
     }
 
     return getScheduleTemplatesPath({ organizationId, week });
@@ -225,6 +256,31 @@ export function AppNavigation({ placement }: AppNavigationProps) {
           Gestión
         </p>
         {managementItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActivePath(pathname, item.href);
+
+          return (
+            <Link
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                active && "bg-secondary text-secondary-foreground",
+              )}
+              href={resolveHref(item.href)}
+              key={item.href}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-1">
+        <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">
+          Personal
+        </p>
+        {personalItems.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
 

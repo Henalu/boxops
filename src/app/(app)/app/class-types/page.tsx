@@ -25,6 +25,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -478,7 +482,10 @@ export default async function ClassTypesPage({
   }
 
   const classTypes = await getClassTypes(resolution.organization.id);
-  const canManageClassTypes = resolution.membership.role === "admin";
+  const canManageClassTypes = canManageOperationalData(
+    resolution.membership.role,
+  );
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
 
   return (
     <div className="space-y-6">
@@ -488,7 +495,7 @@ export default async function ClassTypesPage({
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {resolution.membership.role}</Badge>
+            <Badge variant="outline">Rol {roleLabel}</Badge>
           </>
         }
         title="Tipos de actividad"
@@ -523,8 +530,8 @@ export default async function ClassTypesPage({
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar el catálogo, pero no crear ni editar
-            tipos de actividad.
+            Tu rol puede consultar el catálogo, pero no crear ni editar tipos
+            de actividad.
           </AlertDescription>
         </Alert>
       )}
@@ -541,7 +548,7 @@ export default async function ClassTypesPage({
             description={
               canManageClassTypes
                 ? "Crea el primer tipo para preparar horarios y plantillas."
-                : "Un admin debe crear el catálogo antes de que aparezca aquí."
+                : "Un rol operativo debe crear el catálogo antes de que aparezca aquí."
             }
             title="No hay tipos de actividad todavía"
           />

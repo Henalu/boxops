@@ -85,6 +85,12 @@ Estas dudas ordenan Fase B-I. No bloquean cerrar MVP 1 real, pero si deben resol
 
 ### Auth Y Seguridad
 
+Respuestas Fase C 2026-05-07:
+
+- Politica minima elegida: 8 caracteres, al menos una letra y un numero. Debe configurarse en Supabase Auth y se repite en app solo para feedback.
+- Copy de reset elegido: respuesta generica sin confirmar si el email existe.
+- Bloqueo/cooldown: en Fase C bastan rate limits de Supabase Auth. Avisos de intentos restantes, bloqueo exacto de 3 intentos y cooldown propio quedan pendientes para Password Verification Hook + tabla propia si se justifican.
+
 - Que configuracion concreta de Supabase Auth se usara para contrasena minima: 8 caracteres, al menos una letra y un numero?
 - La validacion visual de app debe mostrar checklist de requisitos o solo error resumido?
 - Que mensaje de reset se muestra para no revelar si un email existe?
@@ -96,7 +102,67 @@ Estas dudas ordenan Fase B-I. No bloquean cerrar MVP 1 real, pero si deben resol
 
 ### Area Personal Y RRHH
 
-- El nombre visible, alias, foto y centro principal siguen en `person_profiles`, pero donde viven datos laborales sensibles?
+Respuestas Fase D.1 2026-05-07:
+
+- D.1 usa `/app/account` como area personal minima para todos los roles reconocidos con membership activa.
+- Datos seguros para MVP en perfil visible: `display_name`, `preferred_alias` y `public_email` opcional. Avatar queda pendiente hasta asset privado/Storage/permisos.
+- Cuenta/Auth queda separada: email de acceso y usuario se muestran en lectura; BoxOps no cambia email Auth en este corte.
+- Perfil de coach queda separado: se muestra ficha propia en lectura, sin editar fichas ajenas ni abrir notas/horas como RRHH.
+- RRHH sensible queda fuera de `person_profiles`: salario/retribucion, contrato, jornada legal, puesto contractual, antiguedad laboral, documentos, nominas, datos bancarios, fichaje y geolocalizacion necesitaran tablas/permisos especificos.
+- "Mi firma" queda como capacidad futura tenant-scoped recomendada (`organization_id` + `person_profile_id`), privada y versionada, sin Storage real ni firma documental en D.1.
+- Si una cuenta no tiene `person_profiles.user_id` vinculado, la UI no crea personas ni invitaciones; muestra estado pendiente para que owner/admin lo vincule desde Equipo.
+
+Respuestas Fase D.2 2026-05-07:
+
+- El siguiente corte elegido es documentacion/modelado de permisos por campo, no avatar ni firma real.
+- La matriz vive en `docs/architecture/personal-data-permissions.md` y separa perfil visible, asset personal, ficha operativa, RRHH sensible, payroll, documentos privados, firma, evidencias y auditoria.
+- `person_profiles` no debe almacenar datos laborales sensibles. Contacto privado, empleo, retribucion, documentos y auditoria necesitan tablas especificas si se implementan.
+- `owner`, `admin` y `manager` no heredan por defecto acceso a salario, nominas, contrato, datos bancarios, documentos privados, fichaje, geolocalizacion ni evidencias de firma.
+- Avatar quedo pendiente de implementacion hasta modelar asset privado tenant-scoped, sin URL publica libre, con acciones propias derivadas de sesion + tenant.
+- "Mi firma" quedo pendiente en D.2 hasta modelar `profile_signatures`, Storage privado o equivalente, hash/version y reglas que impidan crear/usar firma ajena; D.5 cierra ese primer corte propio.
+- Una firma guardada en perfil sera tenant-scoped por defecto; la firma global por usuario queda abierta solo si aparece una necesidad multi-tenant real.
+- Las evidencias/snapshots de firma pertenecen al flujo documental futuro, no a D.2.
+
+Respuestas Fase D.3 2026-05-08:
+
+- El siguiente corte seguro elegido es la opcion A: modelar avatar privado como asset tenant-scoped, sin subida real.
+- Avatar se modela como `profile_assets` candidato con `organization_id`, `person_profile_id`, `asset_type = 'avatar'`, `uploaded_by_user_id`, `storage_path`, `mime_type`, `size_bytes`, dimensiones, `asset_hash`, `status` y timestamps.
+- `person_profiles.avatar_url` no debe usarse como URL publica libre; queda como legado/cache interna o se sustituira por `avatar_asset_id` si una migracion futura lo justifica.
+- El avatar futuro debe vivir en bucket privado o mecanismo equivalente, y servirse por ruta controlada o signed URL corta despues de validar tenant, membership activa y visibilidad del perfil.
+- Mi cuenta no aceptara `person_profile_id` para avatar: la persona propia se derivara de `auth.uid()` + `organization_id`.
+- `owner`, `admin` y `manager` podran ver la representacion controlada del avatar de perfiles visibles, pero no reemplazar avatar ajeno por defecto.
+- D.3 no crea Storage, migracion, UI, subida, cropper ni cambios de permisos en `src`.
+- Firma real, documentos, nominas, contratos, salario, fichaje, geolocalizacion, cambios y ausencias siguen fuera.
+
+Respuestas Fase D.4 2026-05-08:
+
+- El primer avatar privado real se implementa solo para la persona propia desde `/app/account`.
+- Se crea `profile_assets` con metadata tenant-scoped y bucket privado `profile-assets`; el bucket no es publico.
+- `person_profiles.avatar_url` queda como legacy/no usado en D.4; no se escribe una URL publica persistente.
+- El formulario solo envia `organizationId` como contexto; no acepta `person_profile_id`.
+- La persona propia se deriva desde `auth.uid()` + `organization_id` en la action y en RPCs de base de datos.
+- Formatos permitidos del primer corte: JPG, PNG y WebP; tamano maximo 2 MB; sin cropper ni transformaciones.
+- El reemplazo es no destructivo a nivel metadata: el nuevo asset pasa de `pending` a `active` y el anterior queda `replaced`.
+- La preview propia usa signed URL corta y mantiene fallback visual si no hay avatar o no hay preview.
+- `owner`, `admin` y `manager` no pueden reemplazar avatar ajeno desde Mi cuenta.
+- Firma real, documentos, nominas, contratos, salario, fichaje, geolocalizacion, cambios y ausencias siguen fuera.
+
+Respuestas Fase D.5 2026-05-08:
+
+- "Mi firma" propia se implementa solo desde `/app/account` como firma/confirmacion interna reutilizable.
+- Se crea `profile_signatures` con metadata tenant-scoped y bucket privado `profile-signatures`; el bucket no es publico.
+- El formulario solo envia `organizationId` y la firma dibujada como PNG; no acepta `person_profile_id`.
+- La persona propia se deriva desde `auth.uid()` + `organization_id` en la action y en RPCs de base de datos.
+- Formato permitido del primer corte: PNG; tamano maximo 512 KB; canvas minimo sin documentos firmables.
+- El reemplazo es versionado y no destructivo a nivel metadata: la firma nueva pasa de `pending` a `active`, la anterior queda `replaced` y aumenta `signature_version`.
+- La preview propia usa signed URL corta y mantiene fallback visual si no hay firma o no hay preview.
+- `owner`, `admin` y `manager` no pueden crear, actualizar ni usar firmas ajenas desde Mi cuenta.
+- La UI aclara que "Mi firma" es una firma/confirmacion interna reutilizable, no firma electronica avanzada/cualificada.
+- Documentos firmables, boton "Firmar", snapshots documentales, nominas, contratos, salario, fichaje, geolocalizacion, cambios y ausencias siguen fuera.
+
+Siguen abiertas para implementacion concreta:
+
+- El nombre visible y alias siguen en `person_profiles`; la foto queda modelada como asset privado futuro. Donde viven datos laborales sensibles?
 - Que datos puede editar el usuario: telefono, direccion, foto, alias, contacto emergencia, datos bancarios, certificaciones?
 - Que datos solo edita personal autorizado: puesto, antiguedad, jornada, contrato, salario/retribucion, centro laboral, horas contratadas?
 - Debe existir historial de cambios de salario/retribucion o basta valor actual en el primer corte?
@@ -104,11 +170,13 @@ Estas dudas ordenan Fase B-I. No bloquean cerrar MVP 1 real, pero si deben resol
 - Quien puede ver salario/retribucion: owner, payroll_manager, document_admin, admin, manager o solo permisos explicitos?
 - Como se maneja un admin que tambien es coach para que pueda ver sus datos personales sin ver datos sensibles de todo el equipo?
 - Se necesita consentimiento o aviso especifico para almacenar datos laborales personales?
-- La firma dibujada reutilizable debe ser tenant-scoped por `organization_id` + `person_profile_id` o global por usuario?
-- Si un usuario pertenece a varias organizaciones, debe tener una firma distinta por tenant o una firma compartida entre tenants?
+- Si un usuario pertenece a varias organizaciones, debe mantener firmas separadas por tenant como en D.5 o se justificara una firma global futura?
 - Que roles, si alguno, pueden ver metadata o evidencias de "Mi firma" sin poder usarla para firmar?
 - Que retencion aplica a la firma guardada en perfil si el usuario deja la organizacion?
-- Debe existir historial/versionado de cambios de "Mi firma" o solo conservar snapshots cuando se firma algo?
+- La firma de perfil ya tiene `signature_version`; falta decidir retencion/borrado de versiones reemplazadas y como se relacionaran con snapshots documentales futuros.
+- Para avatar: si se muestra en Equipo/Horario, se servira por ruta controlada compartida o por signed URLs emitidas por cada superficie?
+- Para avatar: se anadira `avatar_asset_id` a `person_profiles` o basta consultar `profile_assets` activo por persona?
+- Para avatar: hace falta moderacion/auditoria de reemplazo ajeno en algun rol futuro, o basta gestion propia indefinidamente?
 
 ### Documentos Y Permisos
 

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
@@ -28,7 +29,7 @@ function getErrorPath(organizationId: string | null, error: string) {
   });
 }
 
-async function getAdminActionContext(formData: FormData) {
+async function getOperationalActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const redirectPath = getClassTypesPath({ organizationId });
   const user = await getAuthenticatedUser();
@@ -44,7 +45,7 @@ async function getAdminActionContext(formData: FormData) {
     redirect(getErrorPath(organizationId, resolution.reason));
   }
 
-  if (resolution.membership.role !== "admin") {
+  if (!canManageOperationalData(resolution.membership.role)) {
     redirect(getErrorPath(resolution.organization.id, "forbidden"));
   }
 
@@ -62,7 +63,7 @@ function getMutationError(errorCode?: string) {
 }
 
 export async function createClassType(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateClassTypeForm(formData);
 
   if (!validation.ok) {
@@ -94,7 +95,7 @@ export async function createClassType(formData: FormData) {
 }
 
 export async function updateClassType(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const classTypeId = getRequiredFormString(formData, "classTypeId");
   const validation = validateClassTypeForm(formData);
 
@@ -136,7 +137,7 @@ export async function updateClassType(formData: FormData) {
 }
 
 export async function setClassTypeStatus(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const classTypeId = getRequiredFormString(formData, "classTypeId");
   const nextStatus = getRequiredFormString(formData, "nextStatus");
 

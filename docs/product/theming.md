@@ -2,7 +2,7 @@
 
 Este documento define como deberia funcionar el theming por tenant en BoxOps. Es una especificacion de producto/arquitectura visual, no una implementacion.
 
-Estado 2026-05-06: theming sigue sin implementacion real. La primera fase candidata es Fase B del roadmap, usando `organizations.theme_config jsonb` como opcion preferente si no aparecen necesidades de permisos, versionado o auditoria mas complejas.
+Estado 2026-05-07: B.1 implementa el primer corte real de theming ligero y B.2 ajusta permisos compatibles. `organizations.theme_config jsonb` existe y `/app/settings` permite a `owner` y `admin` compatible editar `accentColor`; `manager`, `coach` y roles especializados quedan en lectura para configuracion global. La aplicacion solo usa el acento para tokens de marca ligera (`primary`, `secondary`, `accent` y equivalentes de sidebar), con fallback de BoxOps si falta o no valida. Logo real, colores por centro y permisos por centro siguen pendientes.
 
 ## Principio
 
@@ -84,8 +84,8 @@ Forma conceptual:
 ```json
 {
   "version": 1,
-  "logoAssetId": "asset-id",
   "accentColor": "#334155",
+  "logoAssetId": "asset-id",
   "secondaryAccentColor": "#0f766e",
   "logoMode": "mark-and-name",
   "centerColors": {
@@ -98,6 +98,7 @@ Forma conceptual:
 
 Notas:
 
+- B.1/B.2 solo escriben `version` y `accentColor`;
 - los IDs reales deben ser UUIDs o referencias internas, no nombres de centro;
 - `logoAssetId` debe apuntar a un asset controlado, idealmente privado o servido mediante ruta segura;
 - `accentColor` debe validarse y derivar variantes seguras;
@@ -167,6 +168,12 @@ Antes de subir logos reales hay que decidir:
 - quien puede reemplazarlo;
 - si el logo puede aparecer en exports/documentos con datos laborales.
 
+Decision B.1:
+
+- no se implementa subida real de logo;
+- no se guarda una URL publica en `theme_config`;
+- el logo queda bloqueado hasta definir modelo de asset/Storage privado, formatos, permisos y usos en documentos/exportes.
+
 ## Centros Y Colores
 
 Los colores de centro ayudan en vistas multi-centro, pero deben ser discretos:
@@ -211,14 +218,13 @@ El primer tenant real puede definir logo, acento y colores de centro con este mi
 - defaults globales;
 - copy de producto.
 
-## Criterios Para Implementacion Futura
+## Criterios Para Siguientes Cortes
 
-La fase frontend puede empezar a implementar theming cuando:
+El primer corte B.1 ya cubre persistencia y acento minimo. Los siguientes cortes de theming deben comprobar:
 
-- se aplique la decision de persistencia documentada en `theme-config-decision.md`;
-- se definan fallbacks seguros de BoxOps;
-- se haya validado contraste de tokens base;
+- que los fallbacks seguros de BoxOps siguen activos;
+- que contraste y estados criticos no se rompen con tenants reales;
 - se pruebe con al menos dos configuraciones de tenant;
-- exista matriz de permisos para quien cambia logo/colores;
+- exista matriz de permisos para quien cambia logo, colores por centro o branding avanzado; B.2 solo habilita configuracion global para `owner`/`admin`;
 - `rg -n "STL" src` no encuentre referencias hardcodeadas;
 - la UI siga siendo usable sin logo ni color configurado.

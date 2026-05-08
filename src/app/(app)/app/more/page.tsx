@@ -8,6 +8,7 @@ import {
   LogOut,
   MapPin,
   Settings,
+  UserRound,
   UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -29,16 +30,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
+import { getApplicationRoleLabel } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
 import {
+  getAccountPath,
   getCentersPath,
   getClassTypesPath,
   getCoachesPath,
   getScheduleTemplatesPath,
+  getSettingsPath,
 } from "@/lib/navigation/app-paths";
 import { resolveWeek } from "@/lib/schedule-blocks";
 
@@ -112,13 +116,19 @@ export default async function MorePage({ searchParams }: MorePageProps) {
     organizationId: resolution.organization.id,
     week: week.weekStart,
   };
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
 
   return (
     <div className="space-y-5 md:space-y-6">
       <PageHeader
         badge="Más"
         description="Gestión del box, ayuda y accesos secundarios."
-        meta={<Badge variant="outline">{resolution.organization.name}</Badge>}
+        meta={
+          <>
+            <Badge variant="outline">{resolution.organization.name}</Badge>
+            <Badge variant="outline">Rol {roleLabel}</Badge>
+          </>
+        }
         title="Más"
       />
 
@@ -148,6 +158,12 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             href={getScheduleTemplatesPath(baseOptions)}
             icon={CalendarRange}
             title="Plantillas"
+          />
+          <MobileHubLink
+            description="Marca y organización"
+            href={getSettingsPath(baseOptions)}
+            icon={Settings}
+            title="Configuración"
           />
         </div>
         <div className="hidden gap-3 md:grid md:grid-cols-2">
@@ -179,11 +195,24 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             label="Abrir plantillas"
             title="Plantillas"
           />
+          <ActionCard
+            description="Ajusta nombre visible y marca ligera del tenant."
+            href={getSettingsPath(baseOptions)}
+            icon={Settings}
+            label="Abrir configuración"
+            title="Configuración"
+          />
         </div>
       </section>
 
       <section className="space-y-2.5 md:hidden">
         <SectionHeader title="Mi cuenta" />
+        <MobileHubLink
+          description="Perfil visible y cuenta"
+          href={getAccountPath(baseOptions)}
+          icon={UserRound}
+          title="Mi cuenta"
+        />
         <Card size="sm">
           <CardContent className="space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -192,7 +221,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                   {resolution.organization.name}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Rol {resolution.membership.role}
+                  Rol {roleLabel}
                 </p>
               </div>
               <Badge variant="outline">Activo</Badge>
@@ -205,6 +234,19 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             </form>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="hidden space-y-3 md:block">
+        <SectionHeader title="Personal" />
+        <div className="grid gap-3 md:grid-cols-2">
+          <ActionCard
+            description="Revisa tu cuenta, perfil visible y frontera personal segura."
+            href={getAccountPath(baseOptions)}
+            icon={UserRound}
+            label="Abrir Mi cuenta"
+            title="Mi cuenta"
+          />
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -225,20 +267,6 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             </CardContent>
           </Card>
 
-          <Card className="opacity-80" size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings aria-hidden="true" className="size-4" />
-                Configuración
-              </CardTitle>
-              <CardDescription>
-                Ajustes avanzados del box. Pendiente de una tarea dedicada.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline">No disponible todavía</Badge>
-            </CardContent>
-          </Card>
         </div>
       </section>
 
@@ -247,7 +275,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
           <CardTitle>Acceso actual</CardTitle>
           <CardDescription>
             Estás trabajando en {resolution.organization.name} con rol{" "}
-            {resolution.membership.role}.
+            {roleLabel}.
           </CardDescription>
         </CardHeader>
         <CardContent>

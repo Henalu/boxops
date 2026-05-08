@@ -321,6 +321,7 @@ export type Database = {
           name: string
           slug: string
           status: string
+          theme_config: Json
           timezone: string
           updated_at: string
         }
@@ -331,6 +332,7 @@ export type Database = {
           name: string
           slug: string
           status?: string
+          theme_config?: Json
           timezone?: string
           updated_at?: string
         }
@@ -341,6 +343,7 @@ export type Database = {
           name?: string
           slug?: string
           status?: string
+          theme_config?: Json
           timezone?: string
           updated_at?: string
         }
@@ -406,6 +409,167 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organization_memberships"
             referencedColumns: ["organization_id", "user_id"]
+          },
+        ]
+      }
+      profile_assets: {
+        Row: {
+          asset_hash: string
+          asset_type: string
+          created_at: string
+          height: number | null
+          id: string
+          metadata: Json
+          mime_type: string
+          organization_id: string
+          person_profile_id: string
+          size_bytes: number
+          status: string
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          uploaded_by_user_id: string
+          width: number | null
+        }
+        Insert: {
+          asset_hash: string
+          asset_type?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          metadata?: Json
+          mime_type: string
+          organization_id: string
+          person_profile_id: string
+          size_bytes: number
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by_user_id: string
+          width?: number | null
+        }
+        Update: {
+          asset_hash?: string
+          asset_type?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          metadata?: Json
+          mime_type?: string
+          organization_id?: string
+          person_profile_id?: string
+          size_bytes?: number
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by_user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_assets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_assets_organization_id_uploaded_by_user_id_fkey"
+            columns: ["organization_id", "uploaded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "profile_assets_person_profile_id_organization_id_fkey"
+            columns: ["person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      profile_signatures: {
+        Row: {
+          activated_at: string | null
+          created_at: string
+          height: number | null
+          id: string
+          metadata: Json
+          mime_type: string
+          organization_id: string
+          person_profile_id: string
+          signature_hash: string
+          signature_version: number
+          size_bytes: number
+          status: string
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          uploaded_by_user_id: string
+          width: number | null
+        }
+        Insert: {
+          activated_at?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          metadata?: Json
+          mime_type?: string
+          organization_id: string
+          person_profile_id: string
+          signature_hash: string
+          signature_version: number
+          size_bytes: number
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by_user_id: string
+          width?: number | null
+        }
+        Update: {
+          activated_at?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          metadata?: Json
+          mime_type?: string
+          organization_id?: string
+          person_profile_id?: string
+          signature_hash?: string
+          signature_version?: number
+          size_bytes?: number
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by_user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_signatures_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_signatures_organization_id_uploaded_by_user_id_fkey"
+            columns: ["organization_id", "uploaded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "profile_signatures_person_profile_id_organization_id_fkey"
+            columns: ["person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -709,6 +873,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_own_profile_avatar_asset: {
+        Args: { target_asset_id: string }
+        Returns: Database["public"]["Tables"]["profile_assets"]["Row"]
+      }
+      activate_own_profile_signature: {
+        Args: { target_signature_id: string }
+        Returns: Database["public"]["Tables"]["profile_signatures"]["Row"]
+      }
+      begin_own_profile_avatar_upload: {
+        Args: {
+          target_asset_hash: string
+          target_file_extension: string
+          target_height?: number | null
+          target_mime_type: string
+          target_organization_id: string
+          target_size_bytes: number
+          target_width?: number | null
+        }
+        Returns: Database["public"]["Tables"]["profile_assets"]["Row"]
+      }
+      begin_own_profile_signature_upload: {
+        Args: {
+          target_height?: number | null
+          target_organization_id: string
+          target_signature_hash: string
+          target_size_bytes: number
+          target_width?: number | null
+        }
+        Returns: Database["public"]["Tables"]["profile_signatures"]["Row"]
+      }
+      cancel_own_profile_avatar_upload: {
+        Args: { target_asset_id: string }
+        Returns: undefined
+      }
+      cancel_own_profile_signature_upload: {
+        Args: { target_signature_id: string }
+        Returns: undefined
+      }
       has_org_role: {
         Args: { allowed_roles: string[]; target_organization_id: string }
         Returns: boolean
@@ -852,4 +1054,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

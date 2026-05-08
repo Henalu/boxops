@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
@@ -136,7 +137,7 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
   };
 }
 
-async function getAdminActionContext(formData: FormData) {
+async function getOperationalActionContext(formData: FormData) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
   const filters = getScheduleRedirectFilters(formData);
@@ -165,7 +166,7 @@ async function getAdminActionContext(formData: FormData) {
     );
   }
 
-  if (resolution.membership.role !== "admin") {
+  if (!canManageOperationalData(resolution.membership.role)) {
     redirect(
       getActionResultPath({
         key: "error",
@@ -378,7 +379,7 @@ async function validateAssignableCoach({
 }
 
 export async function createScheduleBlock(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateScheduleBlockForm(formData, context.weekStart);
 
   if (!validation.ok) {
@@ -440,7 +441,7 @@ export async function createScheduleBlock(formData: FormData) {
 }
 
 export async function assignScheduleBlockCoach(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateScheduleAssignmentForm(formData);
 
   if (!validation.ok) {
@@ -565,7 +566,7 @@ export async function assignScheduleBlockCoach(formData: FormData) {
 }
 
 export async function removeScheduleBlockAssignment(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const validation = validateScheduleAssignmentRemovalForm(formData);
 
   if (!validation.ok) {
@@ -649,7 +650,7 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
 }
 
 export async function updateScheduleBlock(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const scheduleBlockId = getRequiredFormString(formData, "scheduleBlockId");
   const validation = validateScheduleBlockForm(formData, context.weekStart);
 
@@ -755,7 +756,7 @@ export async function updateScheduleBlock(formData: FormData) {
 }
 
 export async function cancelScheduleBlock(formData: FormData) {
-  const context = await getAdminActionContext(formData);
+  const context = await getOperationalActionContext(formData);
   const scheduleBlockId = getRequiredFormString(formData, "scheduleBlockId");
 
   if (!scheduleBlockId) {

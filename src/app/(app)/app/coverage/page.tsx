@@ -39,6 +39,10 @@ import {
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -962,7 +966,7 @@ function ResolveNow({
   return (
     <section className="space-y-3">
       <SectionHeader
-        description="Lo primero que debería revisar un admin está arriba."
+        description="Lo primero que debería revisar un rol operativo está arriba."
         title="Resolver ahora"
       />
 
@@ -1131,7 +1135,10 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
   const classTypesById = new Map(
     data.classTypes.map((classType) => [classType.id, classType]),
   );
-  const canManageSchedule = resolution.membership.role === "admin";
+  const canManageSchedule = canManageOperationalData(
+    resolution.membership.role,
+  );
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
   const coverageBasePath = getCoveragePath({
     organizationId: resolution.organization.id,
     week: week.weekStart,
@@ -1178,7 +1185,12 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         }
         badge="Cobertura"
         description="Riesgos accionables de la semana: clases sin coach, cobertura insuficiente y conflictos."
-        meta={<Badge variant="outline">{resolution.organization.name}</Badge>}
+        meta={
+          <>
+            <Badge variant="outline">{resolution.organization.name}</Badge>
+            <Badge variant="outline">Rol {roleLabel}</Badge>
+          </>
+        }
         title="Cobertura"
       >
         <p className="text-sm text-muted-foreground">

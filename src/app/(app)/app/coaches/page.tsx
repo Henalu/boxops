@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import {
   BadgeCheck,
   CircleOff,
+  Link2,
   Plus,
   Save,
   UserPlus,
@@ -10,6 +11,7 @@ import {
 import {
   createCoachProfile,
   createMembership,
+  linkCoachProfileToExistingAccount,
   updateCoachProfile,
   updateMembership,
 } from "./actions";
@@ -41,6 +43,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalTeamProfiles,
+  canManageTeamAccess,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -52,6 +59,7 @@ import {
   getCoachProfileStatusLabel,
   getMembershipRoleLabel,
   getMembershipStatusLabel,
+  isMembershipRole,
 } from "@/lib/coaches";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/supabase";
@@ -105,35 +113,55 @@ type PersonProfileMaps = {
 };
 
 const successMessages: Record<string, string> = {
-  "membership-created": "Coach invitado.",
+  "account-linked": "Cuenta vinculada.",
+  "membership-created": "Acceso creado.",
   "membership-updated": "Acceso actualizado.",
   "profile-created": "Ficha de coach creada.",
   "profile-updated": "Ficha de coach actualizada.",
 };
 
 const errorMessages: Record<string, string> = {
+  "account-link-conflict":
+    "Esa cuenta ya esta vinculada a otra persona o ficha del equipo.",
+  "account-linked-to-other-coach":
+    "Esa cuenta ya esta vinculada a otra ficha de coach de esta organizacion.",
+  "account-linked-to-other-person":
+    "Esa cuenta ya esta vinculada a otra persona de esta organizacion.",
   "auth-user-not-found":
-    "Esa cuenta no existe todavía. Crea primero la cuenta de la persona.",
+    "Esa cuenta no existe en Supabase Auth. Crea o confirma primero la cuenta real.",
+  "coach-user-conflict":
+    "La ficha de coach ya esta vinculada a otra cuenta.",
   "duplicate-membership":
-    "Esa persona ya tiene acceso en esta organización.",
+    "Esa persona ya tiene acceso en esta organizacion.",
   "duplicate-profile":
-    "Ese coach ya tiene una ficha operativa en esta organización.",
+    "Ese coach ya tiene una ficha operativa en esta organizacion.",
   forbidden: "Tu rol no permite gestionar usuarios ni perfiles.",
   "invalid-center": "El centro principal seleccionado no es válido.",
   "invalid-hours": "Las horas semanales deben estar entre 0 y 168.",
+  "invalid-person-profile":
+    "La persona vinculada a esa ficha no pertenece a esta organizacion.",
+  "invalid-profile-id": "La ficha de coach recibida no es valida.",
   "invalid-profile-reference":
     "La ficha no se ha podido guardar porque falta un acceso o centro válido.",
-  "invalid-role": "El rol debe ser admin o coach.",
+  "invalid-role": "El rol debe ser owner, admin compatible, manager o coach.",
   "invalid-status": "El estado seleccionado no es válido.",
   "invalid-user-id": "La cuenta del coach debe usar un UUID válido.",
-  "membership-required": "No se ha encontrado el acceso de esta organización.",
+  "membership-required": "No se ha encontrado el acceso de esta organizacion.",
   "missing-fields": "Completa los campos obligatorios.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   "notes-too-long": "Las notas no pueden superar 1000 caracteres.",
-  organization_not_found: "La organización solicitada no está disponible.",
+  organization_not_found: "La organizacion solicitada no esta disponible.",
   organization_required:
-    "Elige una organización antes de gestionar usuarios y coaches.",
-  "profile-required": "No se ha recibido el perfil de coach a actualizar.",
+    "Elige una organizacion antes de gestionar usuarios y coaches.",
+  "person-profile-inactive": "La persona de esa ficha no esta activa.",
+  "person-profile-internal":
+    "Los perfiles internos no pueden vincularse como coaches operativos.",
+  "person-user-conflict":
+    "La persona de esa ficha ya esta vinculada a otra cuenta.",
+  "profile-inactive": "La ficha de coach no esta activa.",
+  "profile-required": "No se ha recibido una ficha de coach valida.",
+  "profile-without-person":
+    "Esa ficha no conserva una persona operativa pendiente de cuenta.",
   "save-failed": "No se han podido guardar los cambios.",
   "self-membership":
     "No puedes cambiar tu propio acceso desde esta pantalla para evitar quedarte sin acceso.",
@@ -272,7 +300,7 @@ function getMembershipIdentity(
 
   return {
     detail: `Cuenta MVP ${shortId(membership.user_id)}`,
-    label: `Coach ${shortId(membership.user_id)}`,
+    label: `Miembro ${shortId(membership.user_id)}`,
   };
 }
 
@@ -344,7 +372,7 @@ function MembershipStatusSelect({ defaultValue }: { defaultValue?: string }) {
   return (
     <select
       className={selectClassName()}
-      defaultValue={defaultValue ?? "invited"}
+      defaultValue={defaultValue ?? "active"}
       name="status"
     >
       {MEMBERSHIP_STATUSES.map((status) => (
@@ -430,15 +458,15 @@ function MembershipCreateForm({
       <input name="organizationId" type="hidden" value={organizationId} />
 
       <label className="grid gap-2 lg:col-span-2">
-        <span className="text-sm font-medium">Cuenta del coach</span>
+        <span className="text-sm font-medium">Cuenta existente</span>
         <Input
           name="userId"
           placeholder="UUID de la cuenta existente"
           required
         />
         <span className="text-xs leading-5 text-muted-foreground">
-          MVP: usa el UUID de Supabase Auth hasta que exista invitacion por
-          email.
+          Este MVP no envia invitaciones por email: usa el UUID de una cuenta
+          real de Supabase Auth.
         </span>
       </label>
 
@@ -448,14 +476,94 @@ function MembershipCreateForm({
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Estado inicial</span>
+        <span className="text-sm font-medium">Estado del acceso</span>
         <MembershipStatusSelect />
       </label>
 
       <div className="flex items-end lg:col-span-4">
         <Button type="submit">
           <Plus aria-hidden="true" />
-          Invitar coach
+          Crear acceso
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function CoachAccountLinkForm({
+  organizationId,
+  pendingProfiles,
+  personProfiles,
+}: {
+  organizationId: string;
+  pendingProfiles: CoachProfileRow[];
+  personProfiles: PersonProfileMaps;
+}) {
+  const canLinkProfile = pendingProfiles.length > 0;
+
+  return (
+    <form
+      action={linkCoachProfileToExistingAccount}
+      className="grid gap-4 lg:grid-cols-4"
+    >
+      <input name="organizationId" type="hidden" value={organizationId} />
+
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Ficha pendiente</span>
+        <select
+          className={selectClassName()}
+          disabled={!canLinkProfile}
+          name="coachProfileId"
+          required
+        >
+          {canLinkProfile ? (
+            pendingProfiles.map((profile) => {
+              const identity = getCoachProfileIdentity(profile, personProfiles);
+
+              return (
+                <option key={profile.id} value={profile.id}>
+                  {identity.label} / {identity.detail}
+                </option>
+              );
+            })
+          ) : (
+            <option value="">Sin fichas pendientes visibles</option>
+          )}
+        </select>
+        <span className="text-xs leading-5 text-muted-foreground">
+          Solo aparecen fichas con persona activa y visible, aun sin cuenta
+          vinculada en la ficha.
+        </span>
+      </label>
+
+      <label className="grid gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Cuenta real</span>
+        <Input
+          disabled={!canLinkProfile}
+          name="userId"
+          placeholder="UUID de Supabase Auth"
+          required
+        />
+        <span className="text-xs leading-5 text-muted-foreground">
+          Vincula una cuenta Auth existente. Esto no crea usuarios ni envia
+          emails.
+        </span>
+      </label>
+
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Rol</span>
+        <MembershipRoleSelect />
+      </label>
+
+      <label className="grid gap-2">
+        <span className="text-sm font-medium">Estado del acceso</span>
+        <MembershipStatusSelect />
+      </label>
+
+      <div className="flex items-end lg:col-span-4">
+        <Button disabled={!canLinkProfile} type="submit">
+          <Link2 aria-hidden="true" />
+          Vincular cuenta
         </Button>
       </div>
     </form>
@@ -480,7 +588,7 @@ function CoachProfileCreateForm({
       <input name="organizationId" type="hidden" value={organizationId} />
 
       <label className="grid gap-2 lg:col-span-2">
-        <span className="text-sm font-medium">Coach invitado</span>
+        <span className="text-sm font-medium">Cuenta con acceso</span>
         <select
           className={selectClassName()}
           disabled={!canCreateProfile}
@@ -542,7 +650,8 @@ function CoachProfileCreateForm({
 
       {!canCreateProfile ? (
         <p className="text-sm text-muted-foreground lg:col-span-4">
-          Invita primero a un coach para poder crear su ficha operativa.
+          Crea primero un acceso por UUID para poder crear una ficha desde
+          cuenta.
         </p>
       ) : null}
     </form>
@@ -550,21 +659,22 @@ function CoachProfileCreateForm({
 }
 
 function MembershipMobileCard({
+  canManageAccess,
   currentUserId,
   identity,
-  isAdmin,
   membership,
   organizationId,
   timezone,
 }: {
+  canManageAccess: boolean;
   currentUserId: string;
   identity: ReturnType<typeof getMembershipIdentity>;
-  isAdmin: boolean;
   membership: MembershipRow;
   organizationId: string;
   timezone: string;
 }) {
   const isSelf = membership.user_id === currentUserId;
+  const canEditMembershipRole = isMembershipRole(membership.role);
 
   return (
     <Card size="sm">
@@ -605,10 +715,14 @@ function MembershipMobileCard({
           </div>
         </dl>
 
-        {isAdmin ? (
+        {canManageAccess ? (
           isSelf ? (
             <p className="text-sm text-muted-foreground">
               Tu propio acceso está protegido.
+            </p>
+          ) : !canEditMembershipRole ? (
+            <p className="text-sm text-muted-foreground">
+              Este rol futuro se conserva, pero no se edita desde el corte B.2.
             </p>
           ) : (
             <InlineEditDetails label="Ajustar acceso">
@@ -632,16 +746,16 @@ function MembershipMobileCard({
 }
 
 function MembershipsSection({
+  canManageAccess,
   currentUserId,
-  isAdmin,
   memberships,
   organizationId,
   organizationName,
   personProfilesByUserId,
   timezone,
 }: {
+  canManageAccess: boolean;
   currentUserId: string;
-  isAdmin: boolean;
   memberships: MembershipRow[];
   organizationId: string;
   organizationName: string;
@@ -659,9 +773,9 @@ function MembershipsSection({
       {memberships.length === 0 ? (
         <EmptyState
           description={
-            isAdmin
-              ? "Invita el primer coach usando la cuenta que ya existe en Auth."
-              : "Un admin debe revisar tu acceso antes de que aparezca aquí."
+            canManageAccess
+              ? "Crea el primer acceso usando una cuenta real que ya exista en Auth."
+              : "Owner o admin compatible deben revisar tu acceso antes de que aparezca aquí."
           }
           title="No hay accesos visibles"
         />
@@ -676,9 +790,9 @@ function MembershipsSection({
 
               return (
                 <MembershipMobileCard
+                  canManageAccess={canManageAccess}
                   currentUserId={currentUserId}
                   identity={identity}
-                  isAdmin={isAdmin}
                   key={membership.id}
                   membership={membership}
                   organizationId={organizationId}
@@ -698,12 +812,15 @@ function MembershipsSection({
                   <TableHead>Estado</TableHead>
                   <TableHead>Organizacion</TableHead>
                   <TableHead>Entrada</TableHead>
-                  {isAdmin ? <TableHead>Gestión</TableHead> : null}
+                  {canManageAccess ? <TableHead>Gestión</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {memberships.map((membership) => {
                   const isSelf = membership.user_id === currentUserId;
+                  const canEditMembershipRole = isMembershipRole(
+                    membership.role,
+                  );
                   const identity = getMembershipIdentity(
                     membership,
                     personProfilesByUserId,
@@ -743,11 +860,15 @@ function MembershipsSection({
                           timezone,
                         )}
                       </TableCell>
-                      {isAdmin ? (
+                      {canManageAccess ? (
                         <TableCell className="min-w-64">
                           {isSelf ? (
                             <span className="text-sm text-muted-foreground">
                               Protegida
+                            </span>
+                          ) : !canEditMembershipRole ? (
+                            <span className="text-sm text-muted-foreground">
+                              Rol futuro sin edición B.2
                             </span>
                           ) : (
                             <InlineEditDetails label="Ajustar acceso">
@@ -799,15 +920,15 @@ function MembershipsSection({
 }
 
 function CoachProfileCard({
+  canManageProfiles,
   centers,
-  isAdmin,
   organizationId,
   personProfiles,
   profile,
   timezone,
 }: {
+  canManageProfiles: boolean;
   centers: CenterRow[];
-  isAdmin: boolean;
   organizationId: string;
   personProfiles: PersonProfileMaps;
   profile: CoachProfileRow;
@@ -846,7 +967,7 @@ function CoachProfileCard({
           </div>
         </div>
 
-        {isAdmin ? (
+        {canManageProfiles ? (
           <InlineEditDetails label="Gestionar ficha">
             <form
               action={updateCoachProfile}
@@ -908,15 +1029,15 @@ function CoachProfileCard({
 }
 
 function CoachProfilesSection({
+  canManageProfiles,
   centers,
-  isAdmin,
   organizationId,
   personProfiles,
   profiles,
   timezone,
 }: {
+  canManageProfiles: boolean;
   centers: CenterRow[];
-  isAdmin: boolean;
   organizationId: string;
   personProfiles: PersonProfileMaps;
   profiles: CoachProfileRow[];
@@ -933,7 +1054,7 @@ function CoachProfilesSection({
       {profiles.length === 0 ? (
         <EmptyState
           description={
-            isAdmin
+            canManageProfiles
               ? "Crea una ficha cuando una persona del equipo vaya a cubrir clases."
               : "Todavía no hay fichas de coach visibles para esta organización."
           }
@@ -943,8 +1064,8 @@ function CoachProfilesSection({
         <div className="grid gap-3">
           {profiles.map((profile) => (
             <CoachProfileCard
+              canManageProfiles={canManageProfiles}
               centers={centers}
-              isAdmin={isAdmin}
               key={profile.id}
               organizationId={organizationId}
               personProfiles={personProfiles}
@@ -996,25 +1117,42 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       getPersonProfiles(resolution.organization.id),
     ]);
   const personProfiles = buildPersonProfileMaps(personProfileRows);
-  const canManagePeople = resolution.membership.role === "admin";
+  const canManageAccess = canManageTeamAccess(resolution.membership.role);
+  const canManageProfiles = canManageOperationalTeamProfiles(
+    resolution.membership.role,
+  );
+  const canManageAnyTeamData = canManageAccess || canManageProfiles;
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
   const profileUserIds = new Set(
     coachProfiles.flatMap((profile) =>
       profile.user_id ? [profile.user_id] : [],
     ),
   );
   const membershipsWithoutProfile = tenantMemberships.filter(
-    (membership) => !profileUserIds.has(membership.user_id),
+    (membership) =>
+      isMembershipRole(membership.role) && !profileUserIds.has(membership.user_id),
   );
+  const pendingLinkProfiles = coachProfiles.filter((profile) => {
+    if (
+      profile.status !== "active" ||
+      !profile.person_profile_id ||
+      profile.user_id
+    ) {
+      return false;
+    }
+
+    return isVisiblePerson(personProfiles.byId.get(profile.person_profile_id));
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         badge="Equipo"
-        description="Invita coaches y mantiene sus fichas operativas sin exponer el UUID como tarea principal."
+        description="Mantiene accesos y fichas operativas del equipo. La vinculacion usa cuentas Auth existentes; no envia invitaciones por email."
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {resolution.membership.role}</Badge>
+            <Badge variant="outline">Rol {roleLabel}</Badge>
           </>
         }
         title="Equipo"
@@ -1036,43 +1174,71 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         </Alert>
       ) : null}
 
-      {canManagePeople ? (
-        <div className="grid gap-3 xl:grid-cols-2">
-          <CollapsibleActionPanel
-            actionLabel="Invitar"
-            description="Da acceso a un coach que ya tiene cuenta creada para este MVP."
-            icon={UserPlus}
-            title="Invitar coach"
-          >
-            <MembershipCreateForm organizationId={resolution.organization.id} />
-          </CollapsibleActionPanel>
-          <CollapsibleActionPanel
-            actionLabel="Crear"
-            description="Activa la ficha operativa para asignarlo a horarios y plantillas."
-            icon={BadgeCheck}
-            title="Crear ficha de coach"
-          >
-            <CoachProfileCreateForm
-              centers={centers}
-              memberships={membershipsWithoutProfile}
-              organizationId={resolution.organization.id}
-              personProfilesByUserId={personProfiles.byUserId}
-            />
-          </CollapsibleActionPanel>
+      {canManageAnyTeamData ? (
+        <div className="grid gap-3 xl:grid-cols-3">
+          {canManageAccess ? (
+            <>
+              <CollapsibleActionPanel
+                actionLabel="Crear"
+                description="Da acceso con el UUID de una cuenta Auth existente."
+                icon={UserPlus}
+                title="Crear acceso"
+              >
+                <MembershipCreateForm organizationId={resolution.organization.id} />
+              </CollapsibleActionPanel>
+              <CollapsibleActionPanel
+                actionLabel="Vincular"
+                description="Conecta una ficha/persona pendiente con una cuenta real."
+                icon={Link2}
+                title="Vincular cuenta existente"
+              >
+                <CoachAccountLinkForm
+                  organizationId={resolution.organization.id}
+                  pendingProfiles={pendingLinkProfiles}
+                  personProfiles={personProfiles}
+                />
+              </CollapsibleActionPanel>
+            </>
+          ) : null}
+          {canManageProfiles ? (
+            <CollapsibleActionPanel
+              actionLabel="Crear"
+              description="Crea una ficha desde un acceso ya existente."
+              icon={BadgeCheck}
+              title="Crear ficha de coach"
+            >
+              <CoachProfileCreateForm
+                centers={centers}
+                memberships={membershipsWithoutProfile}
+                organizationId={resolution.organization.id}
+                personProfilesByUserId={personProfiles.byUserId}
+              />
+            </CollapsibleActionPanel>
+          ) : null}
         </div>
       ) : (
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar esta base operativa, pero no crear ni
-            editar accesos o fichas.
+            Tu rol puede consultar esta base operativa, pero no crear ni editar
+            accesos o fichas.
           </AlertDescription>
         </Alert>
       )}
 
+      {canManageProfiles && !canManageAccess ? (
+        <Alert>
+          <AlertTitle>Accesos protegidos</AlertTitle>
+          <AlertDescription>
+            Tu rol puede ajustar fichas operativas, pero owner y admin
+            compatible mantienen altas, roles y vinculaciones de cuenta.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <MembershipsSection
+        canManageAccess={canManageAccess}
         currentUserId={user.id}
-        isAdmin={canManagePeople}
         memberships={tenantMemberships}
         organizationId={resolution.organization.id}
         organizationName={resolution.organization.name}
@@ -1081,8 +1247,8 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       />
 
       <CoachProfilesSection
+        canManageProfiles={canManageProfiles}
         centers={centers}
-        isAdmin={canManagePeople}
         organizationId={resolution.organization.id}
         personProfiles={personProfiles}
         profiles={coachProfiles}

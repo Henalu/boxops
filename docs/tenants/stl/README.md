@@ -409,13 +409,15 @@ Decision de datos iniciales recibida despues:
 
 Pendiente para implementacion: definir si la distribucion de STL City entre CrossFit y Wellness sera alterna, aleatoria deterministica o configurada manualmente antes del seed.
 
-Estado Fase A 2026-05-06:
+Estado Fase A 2026-05-07:
 
 - El horario recibido sirve como semana real base para STL Tremañes.
 - STL City sigue parcial: estan validadas las mismas franjas y el limite a CrossFit/Wellness, pero falta la actividad exacta por franja.
 - No hay coach asignado validado por bloque real.
+- Para QA interno se cargo una muestra representativa editable con coaches reales del tenant, bloques vacantes, cobertura insuficiente y un conflicto deliberado.
+- La cuenta Auth E2E coach local queda vinculada a la ficha operativa de Lucas cuando existe en Supabase Auth local, para validar "Mi horario".
 - La UI y smoke E2E local admin/coach pasan contra la semana `2026-05-04`.
-- No se debe presentar esta semana como cerrada para piloto hasta cargar o confirmar asignaciones reales, huecos vacantes y estado operativo por bloque.
+- No se debe presentar esta semana como cerrada para piloto oficial hasta confirmar asignaciones reales, huecos vacantes y estado operativo por bloque con STL.
 
 ### Semana De Prueba L-V Recibida - 2026-05-06
 
@@ -451,12 +453,20 @@ Bloques diarios de la semana de prueba:
 | 19:50-20:50 | CrossFit, Halterofilia Mix, Wellness |
 | 21:00-22:00 | CrossFit, Wellness, Open Box |
 
-Fixture local:
+Fixture base local:
 
 - Archivo: `supabase/snippets/stl-test-week-2026-05-04.sql`.
 - Semana cargada: 2026-05-04 a 2026-05-08.
 - Resultado esperado: 1 plantilla activa, 165 bloques de plantilla, 165 bloques reales y 0 asignaciones.
 - Todos los bloques quedan vacantes para que `/app/coverage` muestre riesgos sin inventar coaches.
+
+Fixture interno de asignaciones:
+
+- Archivo: `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`.
+- Uso: QA interno y smoke tests; no es seed automatico, produccion ni validacion oficial de STL.
+- Resultado esperado sobre la semana base: 20 bloques de plantilla con coach por defecto, 20 bloques reales asignados, 145 bloques vacantes, 1 caso de cobertura insuficiente y 1 conflicto deliberado.
+- Los bloques de muestra usan coaches reales del tenant como dato editable y representativo.
+- El snippet no crea usuarios Auth ni invita por email. Si existe el usuario Auth E2E coach local, lo vincula a Lucas para validar "Mi horario".
 
 La tabla anterior es la fuente vigente de la semana de prueba. El detalle historico anterior con sabado/domingo queda fuera de este fixture.
 
@@ -464,7 +474,7 @@ La tabla anterior es la fuente vigente de la semana de prueba. El detalle histor
 
 - Confirmar si la semana de prueba L-V pertenece a STL Tremañes, a STL City o debe repartirse entre centros por bloque.
 - Confirmar coach asignado por bloque, o si todos/parte de los bloques deben quedar vacantes como huecos reales.
-- Confirmar si se quieren asignaciones de prueba para validar estados cubiertos/conflicto, o si la primera validacion debe centrarse en bloques sin cubrir.
+- Confirmar asignaciones oficiales y huecos reales despues del test interno; la muestra actual solo sirve para QA y smoke tests.
 - Email de Nuria y confirmacion de si los emails recibidos se usaran para invitacion Auth o podran cambiarse antes de activar cuenta.
 - Reglas exactas de aprobacion para cambios de turno.
 - Politica de vacaciones y ausencias.

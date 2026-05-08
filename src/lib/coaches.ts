@@ -1,6 +1,12 @@
+import {
+  MANAGED_ACCESS_ROLES,
+  getApplicationRoleLabel,
+  isManagedAccessRole,
+  type ManagedAccessRole,
+} from "@/lib/auth/permissions";
 import { isPostgresUuid } from "@/lib/uuid";
 
-export const MEMBERSHIP_ROLES = ["admin", "coach"] as const;
+export const MEMBERSHIP_ROLES = MANAGED_ACCESS_ROLES;
 export const MEMBERSHIP_STATUSES = [
   "invited",
   "active",
@@ -9,7 +15,7 @@ export const MEMBERSHIP_STATUSES = [
 ] as const;
 export const COACH_PROFILE_STATUSES = ["active", "inactive"] as const;
 
-export type MembershipRole = (typeof MEMBERSHIP_ROLES)[number];
+export type MembershipRole = ManagedAccessRole;
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
 export type CoachProfileStatus = (typeof COACH_PROFILE_STATUSES)[number];
 
@@ -21,6 +27,10 @@ type MembershipFormValues = {
 
 type CoachProfileCreateValues = CoachProfileEditableValues & {
   userId: string;
+};
+
+type CoachAccountLinkValues = MembershipFormValues & {
+  coachProfileId: string;
 };
 
 type CoachProfileEditableValues = {
@@ -71,12 +81,27 @@ export type CoachProfileUpdateValidationResult =
         | "notes-too-long";
     };
 
+export type CoachAccountLinkValidationResult =
+  | {
+      ok: true;
+      values: CoachAccountLinkValues;
+    }
+  | {
+      ok: false;
+      error:
+        | "invalid-profile-id"
+        | "invalid-role"
+        | "invalid-status"
+        | "invalid-user-id"
+        | "missing-fields";
+    };
+
 export function isUuid(value: string) {
   return isPostgresUuid(value);
 }
 
 export function isMembershipRole(value: string): value is MembershipRole {
-  return MEMBERSHIP_ROLES.includes(value as MembershipRole);
+  return isManagedAccessRole(value);
 }
 
 export function isMembershipStatus(value: string): value is MembershipStatus {
@@ -90,22 +115,14 @@ export function isCoachProfileStatus(
 }
 
 export function getMembershipRoleLabel(role: string) {
-  if (role === "admin") {
-    return "Admin";
-  }
-
-  if (role === "coach") {
-    return "Coach";
-  }
-
-  return role;
+  return getApplicationRoleLabel(role);
 }
 
 export function getMembershipStatusLabel(status: string) {
   const labels: Record<MembershipStatus, string> = {
     active: "Activo",
     inactive: "Inactivo",
-    invited: "Invitado",
+    invited: "Pendiente",
     suspended: "Suspendido",
   };
 
@@ -273,4 +290,37 @@ export function validateCoachProfileUpdateForm(
   formData: FormData,
 ): CoachProfileUpdateValidationResult {
   return validateCoachProfileEditableForm(formData);
+}
+
+export function validateCoachAccountLinkForm(
+  formData: FormData,
+): CoachAccountLinkValidationResult {
+  const coachProfileId = getFormString(formData, "coachProfileId");
+  const membershipValidation = validateMembershipForm(formData);
+
+  if (!coachProfileId) {
+    return {
+      ok: false,
+      error: "missing-fields",
+    };
+  }
+
+  if (!isUuid(coachProfileId)) {
+    return {
+      ok: false,
+      error: "invalid-profile-id",
+    };
+  }
+
+  if (!membershipValidation.ok) {
+    return membershipValidation;
+  }
+
+  return {
+    ok: true,
+    values: {
+      ...membershipValidation.values,
+      coachProfileId,
+    },
+  };
 }

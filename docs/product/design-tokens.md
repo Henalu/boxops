@@ -258,5 +258,5 @@ Antes de convertir esto en CSS real:
 - decidir si el tema base reemplaza los valores shadcn neutros actuales o los extiende;
 - validar contraste de tokens `primary`, `accent` y estados;
 - definir nombres finales en CSS custom properties;
-- confirmar si `organizations` necesita `theme_config` o una tabla especifica de theme;
+- `organizations.theme_config` ya existe desde Fase B.1 para acento minimo; tabla especifica de theme queda reservada para permisos/versionado/auditoria;
 - probar los tokens con una semana real y un segundo tenant demo conceptual.

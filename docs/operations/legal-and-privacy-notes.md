@@ -119,6 +119,9 @@ Reglas:
 - Control de permisos estricto por organizacion.
 - Separar documentos de empresa, documentos privados de empleado, documentos de gestion y certificaciones.
 - Permitir permisos por rol y por persona concreta cuando el caso lo requiera.
+- No asumir que `owner`, `admin` o `manager` pueden ver todos los documentos por defecto.
+- Separar cabecera documental, version/archivo, sujetos afectados, grants y auditoria candidata.
+- Tratar titulo, tipo, sensibilidad y metadata como potencialmente sensibles si describen nominas, contratos, bajas o justificantes.
 - Registrar quien sube, quien puede ver y, si procede, quien accede.
 - Valorar confirmacion de lectura para documentos importantes.
 - Definir retencion y borrado antes de datos reales sensibles.
@@ -144,6 +147,10 @@ Implicaciones tecnicas:
 - Metadata en Postgres con `organization_id`, propietario/persona afectada, uploader y visibilidad.
 - Auditoria de acceso para documentos sensibles si procede.
 - Versionado si un documento puede reemplazarse.
+- E.1 propone `document-files` como bucket privado candidato para archivos y `document-signature-evidence` para snapshots/evidencias futuras; no estan implementados.
+- Rutas internas candidatas: `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}`, `signature-snapshots/{organization_id}/{document_id}/{request_id}/{evidence_id}.png` y `signed-documents/{organization_id}/{document_id}/{document_version_id}/{evidence_id}.{ext}`.
+- Accesos a preview, descarga, cambios de grants, cambios de sensibilidad, reemplazos de version y exportaciones masivas son candidatos fuertes a auditoria.
+- Certificaciones pueden tener estado operativo visible, pero el adjunto/titulo/certificado puede requerir permiso privado.
 
 ## Firmas De Documentos
 
@@ -154,16 +161,19 @@ BoxOps debe separar dos capacidades:
 - "Mi firma": el usuario crea, guarda y actualiza su firma personal dibujada desde "Mi perfil"/"Mi cuenta".
 - "Firmar": una accion posterior en documentos, nominas, politicas internas, confirmaciones u otras secciones que reutiliza la firma guardada del usuario autenticado y genera evidencia propia.
 
-Reglas minimas antes de implementarla:
+Reglas minimas para "Mi firma" ya aplicadas en D.5:
 
-- Consentimiento claro del usuario al crear su firma dibujada.
-- La firma debe guardarse en Storage privado o mecanismo equivalente, nunca como imagen publica.
-- Guardar metadata en Postgres con frontera de tenant.
-- Para el primer corte se recomienda firma tenant-scoped con `organization_id` + `person_profile_id`, si encaja con RLS y documentos laborales.
+- Copy claro al crear la firma: es firma/confirmacion interna, no firma electronica avanzada/cualificada.
+- La firma se guarda en Storage privado (`profile-signatures`), nunca como imagen publica.
+- La metadata vive en Postgres (`profile_signatures`) con frontera de tenant.
+- El primer corte usa firma tenant-scoped con `organization_id` + `person_profile_id`.
 - La opcion global por usuario requiere decision explicita porque puede complicar permisos, revocacion y separacion entre organizaciones.
-- Solo el usuario propietario debe poder crear/actualizar su firma.
-- Roles explicitamente autorizados podran ver evidencias o metadata si se decide, pero no usar la firma para firmar en nombre de otra persona.
+- Solo el usuario propietario puede crear/actualizar su firma desde `/app/account`.
+- Roles explicitamente autorizados podran ver evidencias o metadata en una fase futura si se decide, pero no usar la firma para firmar en nombre de otra persona.
 - No permitir que un admin firme en nombre de otra persona usando su firma guardada.
+
+Reglas minimas antes de documentos firmables:
+
 - Firmar un documento o entidad debe crear evidencia auditada: organizacion, documento/version o entidad firmada, usuario autenticado, persona firmante, fecha/hora, snapshot usado, IP/user agent si se decide y estado.
 - Debe conservarse un snapshot de la firma usada en esa firma concreta, porque la firma del perfil puede cambiar despues.
 - La evidencia no debe depender solo del artefacto editable de "Mi firma".
@@ -171,6 +181,10 @@ Reglas minimas antes de implementarla:
 - Si se modifica el documento, las firmas anteriores no deben parecer aplicadas automaticamente a la nueva version.
 - Los documentos firmados deben tener retencion, acceso y borrado definidos antes de usar datos laborales reales.
 - Revisar si se necesita proveedor especializado para contratos, anexos u otros documentos con exigencia legal fuerte.
+- E.1 separa la solicitud de firma futura (`document_signature_requests`) de la evidencia inmutable futura (`document_signature_evidences`).
+- La solicitud debe apuntar a una version concreta de documento; la evidencia debe guardar snapshot/version de firma, hash de documento/version, persona firmante y usuario autenticado.
+- La lectura o descarga de evidencias/snapshots debe requerir grant/capacidad explicita y puede requerir auditoria de acceso.
+- Ningun rol autorizado debe poder firmar por otra persona usando la firma guardada de esa persona; solo podria gestionar solicitudes o permisos segun capacidad futura.
 
 Flujo de producto recomendado:
 

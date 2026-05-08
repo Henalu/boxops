@@ -48,6 +48,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -2109,7 +2113,9 @@ export default async function TemplatesPage({
     },
     new Map<string, ScheduleTemplateBlockRow[]>(),
   );
-  const canManageTemplates = resolution.membership.role === "admin";
+  const canManageTemplates = canManageOperationalData(
+    resolution.membership.role,
+  );
   const activeCenters = centers.filter((center) => center.status === "active");
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
@@ -2171,8 +2177,8 @@ export default async function TemplatesPage({
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar plantillas, pero no crearlas,
-            editarlas ni aplicarlas a semanas reales.
+            Tu rol puede consultar plantillas, pero no crearlas, editarlas ni
+            aplicarlas a semanas reales.
           </AlertDescription>
         </Alert>
       )}
@@ -2200,7 +2206,7 @@ export default async function TemplatesPage({
             description={
               canManageTemplates
                 ? "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
-                : "Un admin debe crear plantillas antes de que aparezcan aquí."
+                : "Un rol operativo debe crear plantillas antes de que aparezcan aquí."
             }
             title="No hay plantillas todavía"
           />
@@ -2258,6 +2264,8 @@ function PageHeader({
   weekEnd?: string;
   weekStart?: string;
 }) {
+  const roleLabel = role ? getApplicationRoleLabel(role) : null;
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -2265,7 +2273,7 @@ function PageHeader({
         {organizationName ? (
           <Badge variant="secondary">{organizationName}</Badge>
         ) : null}
-        {role ? <Badge variant="outline">Rol {role}</Badge> : null}
+        {roleLabel ? <Badge variant="outline">Rol {roleLabel}</Badge> : null}
         {typeof templateCount === "number" ? (
           <Badge variant="outline">{templateCount} plantillas</Badge>
         ) : null}
@@ -2283,7 +2291,10 @@ function PageHeader({
       <div className="grid gap-3 sm:grid-cols-2 lg:max-w-3xl">
         <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
           <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>Solo admins pueden crear, editar o aplicar plantillas.</span>
+          <span>
+            Owner, admin compatible y manager operativo pueden crear, editar o
+            aplicar plantillas.
+          </span>
         </div>
         <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
           <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0" />

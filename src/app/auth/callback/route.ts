@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
     requestUrl.searchParams.get("redirectTo") ??
       requestUrl.searchParams.get("next"),
   );
+  const errorRedirectPath = redirectTo.startsWith("/reset-password")
+    ? "/reset-password?error=callback"
+    : "/login?error=callback";
 
   if (code) {
     const supabase = await createClient();
@@ -20,7 +23,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(
-    new URL("/login?error=callback", requestUrl.origin),
-  );
+  return NextResponse.redirect(new URL(errorRedirectPath, requestUrl.origin));
 }

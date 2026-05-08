@@ -82,7 +82,7 @@ La vista resumida por fases vive en `docs/product/roadmap.md`; `TASKS.md` mantie
 - Fase A: cerrar MVP 1 real con datos validados, plantillas, cobertura y deuda pequena.
 - Fase B: configuracion de tenant, logo, colores, `organizations.theme_config`, contraste y roles avanzados.
 - Fase C: reset de contrasena, politica de password y estudio de bloqueo por intentos fallidos sin exponer si un email existe.
-- Fase D: "Mi perfil"/"Mi cuenta", datos personales, datos laborales, permisos de salario/retribucion y "Mi firma" dibujada reutilizable.
+- Fase D: "Mi perfil"/"Mi cuenta", datos personales, avatar propio privado, "Mi firma" propia privada, datos laborales futuros y permisos de salario/retribucion.
 - Fase E: documentos de empresa, "Mis documentos", nominas, certificaciones, botones "Firmar", permisos por rol/persona, Storage privado, snapshots y auditoria.
 - Fase F: fichaje manual, correcciones con motivo, aprobacion semanal, exporte y revision legal.
 - Fase G: fichaje geolocalizado asistido, opcional, con consentimiento, radio por centro y sin tracking continuo.

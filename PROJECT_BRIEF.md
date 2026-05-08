@@ -111,16 +111,27 @@ Ya existe:
   - evidencia local de Task 017 en `test-results/ux-refactor-2026-05-04/`
   - deuda pendiente: targets tactiles moviles de controles compactos si se decide endurecer UX movil
 
-Todavia no hay cambios, invitaciones, ausencias, fichaje, documentos, area personal/RRHH, firma dibujada reutilizable, roles avanzados, branding real por tenant ni CRUD avanzado.
+Todavia no hay cambios, invitaciones, ausencias, fichaje, documentos, RRHH sensible, firma documental, branding avanzado por tenant ni CRUD avanzado. El area personal existe como corte seguro en `/app/account`, con perfil visible propio, avatar privado propio y firma interna propia.
 
-Estado consolidado 2026-05-06:
+Estado consolidado 2026-05-08:
 
 - MVP 1 debe tratarse como base visual/operativa ya avanzada, no como plan pendiente.
-- Fase A ya tiene una semana de prueba STL L-V cargable localmente con `supabase/snippets/stl-test-week-2026-05-04.sql`: 165 bloques, una plantilla activa y bloques vacantes sin coaches inventados.
-- La UI y el smoke E2E local admin/coach ya pasan contra esa semana; `/app/templates` edita un bloque por URL y ofrece vistas Semana/Agenda para mantener usable una plantilla grande.
-- La siguiente prioridad no es implementar modulos nuevos a ciegas, sino cerrar MVP 1 real con centro por bloque, asignaciones/huecos confirmados y validacion operativa antes de ordenar fases posteriores.
+- Fase A tiene una semana de prueba STL L-V cargable localmente con `supabase/snippets/stl-test-week-2026-05-04.sql`: 165 bloques, una plantilla activa y bloques vacantes sin coaches inventados.
+- Fase A tambien tiene una muestra interna opcional en `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`: 20 coaches por defecto/asignaciones, 145 vacantes, 1 insuficiencia y 1 conflicto deliberado para QA interno y smoke tests.
+- El flujo `/app/coaches` puede vincular una ficha operativa pendiente (`person_profiles` + `coach_profiles`) con una cuenta Auth/membership existente por `user_id`; no crea cuentas ni envia invitaciones reales.
+- La UI y el smoke E2E local admin/coach pasan contra esa semana; `/app/templates` edita un bloque por URL y ofrece vistas Semana/Agenda para mantener usable una plantilla grande, y el smoke cubre `/app/schedule?mine=1`.
+- Fase A queda cerrada para QA interno, sin considerarse validacion oficial ni produccion. La siguiente validacion de producto es que STL revise centro por bloque, asignaciones reales o huecos intencionados antes de mover datos a seed/produccion.
+- Fase B.1 implementa configuracion generica minima en `/app/settings`: `admin` edita nombre visible y `organizations.theme_config.accentColor`; `coach` queda en lectura; el acento se aplica como marca ligera sin tematizar estados criticos, error ni foco.
+- Fase B.2 implementa permisos avanzados compatibles: `owner` y `admin` controlan configuracion global y accesos, `manager` gestiona operativa tenant-wide de MVP 1 sin tocar configuracion global ni roles, y `coach` conserva lectura/uso operativo sin mutaciones.
+- Fase C implementa auth/security polish minimo: enlace "He olvidado mi contrasena", solicitud de reset generica sin enumeracion, callback Supabase SSR hacia `/reset-password`, validacion minima de contrasena y decision de mantener rate limits nativos de Supabase por ahora.
+- Fase D.1 implementa area personal minima en `/app/account`: cuenta/Auth en lectura, edicion propia de `person_profiles.display_name`, `preferred_alias` y `public_email`, ficha de coach propia en lectura, avatar y "Mi firma" como pendientes, sin Storage ni datos RRHH sensibles.
+- Fase D.2 documenta la matriz de permisos por campo en `docs/architecture/personal-data-permissions.md`: no cambia UI ni schema, y deja avatar privado, firma real, documentos y RRHH sensible bloqueados hasta tener Storage/RLS/permisos explicitos.
+- Fase D.3 documenta el modelo de avatar privado tenant-scoped: `profile_assets` como candidato futuro, artefacto privado, lectura controlada/signed URL corta y acciones propias derivadas de sesion + tenant. No cambia `src`, migraciones, Storage ni UI.
+- Fase D.4 implementa el primer avatar privado minimo propio: `profile_assets`, bucket privado `profile-assets`, RLS/RPC de metadata, policies de Storage por ruta tenant/persona y subida/reemplazo desde `/app/account` sin aceptar `person_profile_id` ni usar `person_profiles.avatar_url` como URL publica.
+- Fase D.5 implementa "Mi firma" propia reutilizable privada: `profile_signatures`, bucket privado `profile-signatures`, RLS/RPC de metadata, policies de Storage por ruta tenant/persona y canvas minimo en `/app/account`, sin documentos firmables ni boton "Firmar".
+- Fase E.1 documenta el primer modelo seguro de documentos privados/empresa/persona: `documents`, `document_versions`, `document_subjects`, `document_access_grants`, `document_access_events`, certificaciones y firma documental futura con snapshot/evidencia propia. No implementa schema, buckets, UI ni boton "Firmar".
 - Las nuevas fases deben ampliar BoxOps hacia configuracion de tenant, seguridad auth, roles avanzados, area personal/RRHH, documentos, fichaje y futura app movil.
-- Esta revision no implementa codigo de app, migraciones ni seeds automaticos.
+- Esta revision no implementa seeds automaticos, billing, documentos firmables, buckets documentales reales, snapshots documentales reales, RRHH sensible, fichaje, geolocalizacion, cambios ni ausencias.
 
 ## Roadmap Actual
 
@@ -130,7 +141,7 @@ La vista resumida vive en `docs/product/roadmap.md` y el backlog ejecutable en `
 - Fase B: configuracion de tenant, branding y roles avanzados.
 - Fase C: auth/security polish.
 - Fase D: area personal y modelo RRHH.
-- Fase E: documentos, permisos, nominas, firmas y certificaciones.
+- Fase E: documentos, permisos, nominas, firmas y certificaciones; E.1 ya modela documentos/permisos sin implementacion.
 - Fase F: fichaje manual legal/auditable.
 - Fase G: fichaje geolocalizado asistido.
 - Fase H: PWA/app movil y geofencing nativo.
@@ -216,10 +227,13 @@ Ver `docs/tenants/stl/README.md`.
 
 ## Roles Y Permisos
 
-Roles implementados hoy:
+Roles de aplicacion tras Fase B.2:
 
-- `admin`: gestiona centros, usuarios/coaches basicos, tipos de actividad, horario, asignaciones, plantillas y cobertura.
+- `owner`: gestiona configuracion global del tenant, accesos y operativa MVP 1.
+- `admin`: rol compatible que conserva todo lo que hacia en MVP 1: configuracion global, accesos, equipo, centros, tipos, horario, asignaciones, plantillas y cobertura.
+- `manager`: gestiona operativa tenant-wide de MVP 1: centros, tipos, fichas operativas de coach, horario, asignaciones, plantillas y cobertura. No gestiona configuracion global ni altas/roles de memberships.
 - `coach`: consulta centros, equipo, tipos, horario, asignaciones y cobertura en modo lectura.
+- `staff`, `center_manager`, `document_admin` y `payroll_manager`: roles reconocidos por schema/app para no bloquear memberships existentes, pero sin mutaciones especificas en B.2.
 
 Evolucion recomendada sin romper lo existente:
 
@@ -233,7 +247,8 @@ Reglas:
 - Separar permisos de configuracion global de permisos de gestion diaria.
 - Todos los usuarios, incluidos admins/owners, deben acceder a funciones personales porque un admin puede ser coach.
 - No asumir que un rol operativo alto puede ver salario, nominas o documentos sensibles sin permiso explicito.
-- Mantener compatibilidad con `admin` y `coach` actuales hasta una migracion/feature flag de roles avanzada.
+- Mantener compatibilidad con `admin` y `coach` actuales hasta una migracion mas fina de roles avanzada.
+- No activar `center_manager` por centro hasta tener frontera de centro en schema/RLS y UX.
 
 ## Alcance MVP
 
@@ -267,7 +282,7 @@ Fuera de scope inicial:
 - IA sobre documentos de programacion.
 - Branding libre por tenant o rebranding completo del producto.
 - Documentos sensibles, fichaje y geolocalizacion sin revision legal/privacidad.
-- Firma dibujada reutilizable o firma documental sin almacenamiento privado, snapshot y auditoria.
+- Firma documental, validez avanzada/cualificada o uso de "Mi firma" sin snapshot y auditoria.
 
 Ver `docs/product/mvp.md`.
 
@@ -288,9 +303,15 @@ Ver `docs/product/mvp.md`.
 | Estados criticos no tematizables | Sin cubrir, conflicto, error y foco deben seguir siendo reconocibles por encima de marca de tenant, centro o tipo. |
 | Roles avanzados separados por responsabilidad | Configuracion global, gestion diaria y funciones personales no deben mezclarse en un unico `admin` permanente. |
 | Reset de password con Supabase Auth | La regla de seguridad debe vivir en Auth y repetirse en la app solo para feedback visual. |
+| `person_profiles` para perfil visible propio | D.1 usa la tabla existente solo para nombre visible, alias y email publico; salario, contrato, documentos y datos laborales sensibles quedan fuera. |
+| Matriz D.2 antes de Storage o RRHH | Avatar, firma, documentos, payroll y datos laborales no deben implementarse hasta separar campos, capacidades, RLS, auditoria y frontera de tenant. |
+| Avatar D.3 como asset privado | El avatar se modelo como asset tenant-scoped, no como URL publica libre en `person_profiles.avatar_url`; la subida real quedo bloqueada hasta migracion, bucket privado, RLS y ruta controlada. |
+| Avatar D.4 propio y privado | El primer corte real usa `profile_assets` + Storage privado; Mi cuenta deriva persona desde sesion/tenant, no permite reemplazo ajeno y sirve preview con signed URL corta. |
+| Firma D.5 propia y privada | "Mi firma" usa `profile_signatures` + Storage privado separado; Mi cuenta deriva persona desde sesion/tenant, no permite firma ajena y no firma documentos por si sola. |
 | Fichaje manual antes de geolocalizacion | Permite cumplir mejor auditoria/correcciones antes de depender de ubicacion y permisos moviles. |
 | PWA/web antes de nativo | La app nativa se evalua si el caso comercial exige geofencing fiable con app cerrada. |
 | "Mi firma" antes de documentos firmables | La firma dibujada reutilizable pertenece al perfil/cuenta del usuario; los botones "Firmar" deben consumirla despues y guardar snapshot/auditoria. |
+| E.1 documentos antes de schema | Documentos, versiones, sujetos, grants, auditoria candidata y evidencias futuras se modelan antes de crear buckets, UI o boton "Firmar". |
 | Docs antes de codigo | Reduce decisiones implicitas y evita empezar por UI sin schema ni permisos. |
 
 ## Supuestos
@@ -301,10 +322,10 @@ Ver `docs/product/mvp.md`.
 - El producto se usara principalmente en desktop/tablet por admins y en movil por coaches.
 - Los documentos pueden empezar como archivos en Storage con metadata en Postgres.
 - Algunos documentos podran requerir firma de miembros concretos.
-- "Mi firma" sera una capacidad personal disponible para todos los usuarios, incluidos admins, managers y coaches.
-- La firma dibujada vive en "Mi perfil"/"Mi cuenta", se crea dibujandola en pantalla, se puede borrar/redibujar antes de guardar y se reutiliza despues cuando el usuario pulse "Firmar".
-- Para el primer corte se recomienda que la firma sea tenant-scoped (`organization_id` + `person_profile_id`) si encaja con RLS y documentos laborales; la alternativa global por usuario queda como duda abierta.
-- La firma guardada debe estar en Storage privado o mecanismo equivalente, con metadata en Postgres y frontera de tenant; nunca como asset publico.
+- "Mi firma" es una capacidad personal disponible para todos los usuarios con membership activa y rol reconocido, incluidos admins, managers y coaches.
+- La firma dibujada vive en "Mi perfil"/"Mi cuenta", se crea dibujandola en pantalla, se puede borrar/redibujar antes de guardar y se reutilizara despues cuando exista un flujo "Firmar".
+- D.5 elige firma tenant-scoped (`organization_id` + `person_profile_id`) con metadata en `profile_signatures`; la alternativa global por usuario queda como duda abierta solo si aparece necesidad multi-tenant real.
+- La firma guardada esta en Storage privado con metadata en Postgres y frontera de tenant; nunca como asset publico.
 - Actualizar la firma no cambia documentos ya firmados.
 - Al firmar, no basta con apuntar a la firma actual del perfil: debe guardarse un snapshot/version de la firma usada y evidencia/auditoria de esa firma concreta.
 - Un admin no puede firmar en nombre de otra persona usando su firma guardada.
@@ -313,7 +334,12 @@ Ver `docs/product/mvp.md`.
 - La geolocalizacion de fichaje, si existe, sera puntual y vinculada a turno/centro; no seguimiento continuo.
 - Horas extra sera tracking interno validable/exportable, no generacion de nominas.
 - Los documentos sensibles usaran Storage privado, RLS, URLs firmadas y auditoria si procede.
+- E.1 propone buckets privados candidatos `document-files` y `document-signature-evidence` con rutas internas que incluyen `organization_id`; no estan implementados.
+- Los documentos deben separar cabecera, version/archivo, sujetos afectados, grants y auditoria candidata; no basta con un archivo suelto en Storage.
 - Nominas, salario/retribucion, contrato, jornada y datos laborales requieren permisos mas finos que el rol operativo basico.
+- `owner`, `admin` y `manager` no heredan por defecto acceso a datos laborales sensibles; cada campo futuro necesita capacidad explicita y, cuando proceda, grants/auditoria.
+- Los assets personales, como avatar y firma, deben derivar la persona desde sesion + tenant para acciones propias y no permitir edicion de otra persona desde Mi cuenta.
+- El avatar personal de D.4 se guarda como asset privado tenant-scoped; no se guarda una URL publica libre ni se permite reemplazo ajeno desde Mi cuenta.
 - En Espana, el fichaje debe contemplar inicio/fin de jornada, conservacion de registros durante 4 anos y acceso para trabajador, representantes e Inspeccion, pendiente de revision legal antes de prometer cumplimiento.
 - La geolocalizacion en navegador/PWA no debe asumirse fiable con app cerrada; geofencing en segundo plano requerira fase nativa o wrapper movil si se vuelve requisito comercial.
 
@@ -347,11 +373,11 @@ npm run supabase:types
 
 ## Proximos Pasos
 
-1. Cerrar Fase A: validar MVP 1 con una semana real, plantillas, excepciones, asignaciones, cobertura y deuda pequena sin hardcodear STL.
-2. Preparar Fase B: configurar tenant/branding con `organizations.theme_config`, validacion de contraste y roles avanzados compatibles.
-3. Preparar Fase C: reset de password, politica de contrasena y decision tecnica sobre bloqueo/cooldown sin enumeracion de emails.
-4. Modelar Fase D: separar area personal, datos operativos y datos RRHH sensibles.
-5. Modelar Fase E: documentos privados, permisos por rol/persona, nominas/certificaciones, botones "Firmar", snapshots de firma, Storage privado y auditoria.
+1. Mantener Fase A como base para QA interno y desarrollo; la validacion oficial STL queda para una etapa posterior de producto casi completo antes de seed/produccion.
+2. Dejar pendientes de Fase B para cortes futuros: logo/asset privado, colores por centro y validacion con mas tenants.
+3. Configurar en Supabase Auth real la politica de contrasena y Redirect URLs de Fase C antes de QA con emails reales.
+4. Validar D.4/D.5 en Supabase local/QA: avatar propio y firma propia con buckets privados, metadata tenant-scoped, signed URL corta y fallback visual. No saltar a documentos ni RRHH sensible.
+5. Convertir E.1 en una tarea tecnica solo cuando se decida implementar documentos: schema/RLS, buckets privados, rutas controladas, grants, auditoria real y, mas adelante, boton "Firmar" con snapshot/evidencia.
 6. Modelar Fase F antes de geolocalizacion: fichaje manual, correcciones, aprobacion semanal, exportes y revision legal.
 7. Dejar Fase G/H condicionadas: geolocalizacion asistida y app movil/nativa solo si privacidad, tecnica y negocio lo justifican.
 8. Reordenar cambios, ausencias, eventos, horas extra e IA en Fase I, despues de no romper la base operativa.
@@ -373,6 +399,7 @@ npm run supabase:types
 - `docs/product/ui-references.md`: referencias de diseño y producto usadas como inspiracion, no copia.
 - `docs/product/open-questions.md`: dudas pendientes.
 - `docs/architecture/domain-model.md`: entidades candidatas.
+- `docs/architecture/personal-data-permissions.md`: matriz D.2 y E.1 de permisos por campo para area personal, assets, firma, documentos y RRHH sensible futuro.
 - `docs/architecture/tenancy-and-billing.md`: decision de tenancy, infraestructura y modelo de cobro.
 - `docs/guides/README.md`: guias personales para volver al proyecto sin reconstruirlo entero.
 - `docs/user-guides/README.md`: guias de uso por rol, incompletas donde el producto aun no existe.

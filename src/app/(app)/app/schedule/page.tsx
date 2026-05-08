@@ -45,6 +45,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -2004,7 +2008,7 @@ function MyScheduleEmptyCard({
   if (myScheduleFilter.status === "missing") {
     title = "No hay ficha de coach vinculada";
     description =
-      "Tu usuario tiene acceso, pero todavía no tiene una ficha de coach asociada. Un admin debe vincular tu persona antes de usar Mi horario.";
+      "Tu usuario tiene acceso, pero todavía no tiene una ficha de coach asociada. Owner o admin compatible deben vincular tu persona antes de usar Mi horario.";
   } else if (myScheduleFilter.status === "ambiguous") {
     title = "Mi horario necesita una revisión de perfiles";
     description = `Tu usuario aparece vinculado a ${myScheduleFilter.profileCount} fichas de coach. Por seguridad no se elige una automáticamente.`;
@@ -3593,7 +3597,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         ? myScheduleFilter.coachProfileId
         : null,
   });
-  const canManageSchedule = resolution.membership.role === "admin";
+  const canManageSchedule = canManageOperationalData(
+    resolution.membership.role,
+  );
   const activeCenters = centers.filter((center) => center.status === "active");
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
@@ -3722,7 +3728,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar bloques operativos, pero no crearlos,
+            Tu rol puede consultar bloques operativos, pero no crearlos,
             editarlos ni cancelarlos.
           </AlertDescription>
         </Alert>
@@ -3781,7 +3787,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
               <CardDescription>
                 {canManageSchedule
                   ? "Crea el primer bloque operativo manual o aplica una plantilla semanal para empezar a cargar una semana real."
-                  : "Un admin debe crear bloques antes de que aparezcan aquí."}
+                  : "Un rol operativo debe crear bloques antes de que aparezcan aquí."}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -3886,6 +3892,8 @@ function PageHeader({
   weekEnd?: string;
   weekStart?: string;
 }) {
+  const roleLabel = role ? getApplicationRoleLabel(role) : null;
+
   return (
     <section className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
       <div className="min-w-0 space-y-3">
@@ -3894,7 +3902,7 @@ function PageHeader({
           {organizationName ? (
             <Badge variant="secondary">{organizationName}</Badge>
           ) : null}
-          {role ? <Badge variant="outline">Rol {role}</Badge> : null}
+          {roleLabel ? <Badge variant="outline">Rol {roleLabel}</Badge> : null}
           {typeof blockCount === "number" ? (
             <Badge variant="outline">{blockCount} bloques</Badge>
           ) : null}

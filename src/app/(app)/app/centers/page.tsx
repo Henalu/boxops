@@ -21,6 +21,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
+import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
@@ -317,7 +321,8 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
   }
 
   const centers = await getCenters(resolution.organization.id);
-  const canManageCenters = resolution.membership.role === "admin";
+  const canManageCenters = canManageOperationalData(resolution.membership.role);
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
 
   return (
     <div className="space-y-6">
@@ -327,7 +332,7 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {resolution.membership.role}</Badge>
+            <Badge variant="outline">Rol {roleLabel}</Badge>
           </>
         }
         title="Centros"
@@ -365,7 +370,8 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
         <Alert>
           <AlertTitle>Modo lectura</AlertTitle>
           <AlertDescription>
-            Tu rol coach puede consultar centros, pero no crearlos ni editarlos.
+            Tu rol puede consultar centros, pero no crear ni editar datos
+            operativos.
           </AlertDescription>
         </Alert>
       )}
@@ -382,7 +388,7 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
             description={
               canManageCenters
                 ? "Crea el primer centro para que el box tenga una sede operativa."
-                : "Un admin debe crear los centros antes de que aparezcan aquí."
+                : "Un rol operativo debe crear los centros antes de que aparezcan aquí."
             }
             title="No hay centros todavía"
           />

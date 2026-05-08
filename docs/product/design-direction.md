@@ -179,6 +179,8 @@ El diseño base pertenece a BoxOps. Cada tenant puede configurar una capa visual
 - colores secundarios de centros si se validan;
 - pequeños ajustes de marca en areas permitidas.
 
+Estado B.1 2026-05-07: solo estan implementados nombre visible de organizacion y color de acento. Logo, colores de centro y ajustes de marca mas amplios siguen pendientes.
+
 No deben ser configurables:
 
 - semantica de estados criticos;

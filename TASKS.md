@@ -1,6 +1,6 @@
 # Tasks - BoxOps
 
-## Plan Canonico Actualizado - 2026-05-06
+## Plan Canonico Actualizado - 2026-05-08
 
 Estado base: Task 017 dejo implementado MVP 1 visual/operativo con auth, multi-tenant, centros, equipo/coaches, tipos de actividad, horario semanal, asignaciones, cobertura, plantillas, dashboard, `/app/coverage`, `/app/more`, navegacion mobile-first y onboarding local.
 
@@ -20,7 +20,7 @@ La vista resumida de producto vive en `docs/product/roadmap.md`.
 
 Objetivo: cerrar la base operativa ya construida contra datos reales, sin abrir modulos nuevos.
 
-Estado 2026-05-06: semana de prueba L-V recibida y cargada en local mediante `supabase/snippets/stl-test-week-2026-05-04.sql`. La UI se valido con 165 bloques y smoke E2E local admin/coach del tenant STL; `/app/templates` quedo ajustada para alternar todas las plantillas entre vista Semana y Agenda, y abrir la edicion de bloque en cliente sin recargar, con panel lateral en escritorio e inline en movil. La fase avanza, pero no se cierra del todo hasta confirmar centro por bloque, coaches reales o huecos intencionados y credenciales/flujo E2E reales del tenant piloto. No abrir Fase B hasta resolver esos bloqueos.
+Estado 2026-05-07: Fase A queda cerrada para QA interno, sin considerarla validacion oficial ni produccion. La semana L-V se carga con `supabase/snippets/stl-test-week-2026-05-04.sql`; la muestra representativa de coaches/defaults/vacantes se carga con `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`; smoke E2E local admin/coach pasa contra el tenant STL y cubre "Mi horario". No abrir Fase B dentro de esta tarea; la validacion oficial STL queda como paso de producto antes de seed/produccion.
 
 Alcance:
 
@@ -42,18 +42,25 @@ Criterio de salida:
 
 - [x] Una semana real se puede cargar, revisar y corregir con la UI actual.
 - [x] Dashboard y `/app/coverage` muestran riesgos utiles con datos reales.
-- [ ] Plantillas funcionan con coaches por defecto y huecos vacantes reales.
+- [x] `/app/coaches` permite vincular una ficha operativa pendiente (`person_profiles` + `coach_profiles`) con una cuenta Auth existente por `user_id`, creando o actualizando la membership del tenant sin inventar cuentas.
+- [x] Plantillas funcionan con coaches por defecto y huecos vacantes en fixture interno; validacion oficial real pendiente.
 - [x] Deuda tactil movil priorizada o descartada explicitamente.
 - [x] `rg -n "STL" src` sigue sin referencias hardcodeadas.
 - [x] `docs/tenants/stl/README.md` queda actualizado solo con datos validados.
 
 Nota 2026-05-06: huecos vacantes reales quedan validados con la semana local; coaches por defecto reales siguen pendientes porque no se han recibido asignaciones por bloque.
 
+Nota 2026-05-07: se implementa un flujo generico y minimo en `/app/coaches` para vincular fichas operativas pendientes con cuentas Auth reales existentes mediante `user_id`. No se implementa invitacion por email ni creacion de usuarios Auth en este corte: Supabase Auth Admin/invite requeriria service role o configuracion server-side no presente en la app actual.
+
+Nota QA 2026-05-07: se carga una muestra representativa editable con 20 coaches por defecto/asignaciones, 145 vacantes, 1 insuficiencia y 1 conflicto deliberado. Esto desbloquea Fase A para pruebas internas y smoke; no sustituye la validacion oficial de STL.
+
 Nota UX 2026-05-06: la edicion de plantillas grandes queda priorizada dentro de Fase A con vista global Semana/Agenda. Semana agrupa bloques por dia para reducir scroll, sin cabecera duplicada en escritorio y con un unico dia visible en movil; Agenda conserva la lista vertical existente. Abrir un bloque para editar no cambia la URL ni mueve el scroll; escritorio usa panel lateral y movil expande el formulario bajo la tarjeta seleccionada.
 
 ### Fase B - Configuracion De Tenant, Branding Y Roles Avanzados
 
 Objetivo: abrir configuracion real de organizacion y evolucionar permisos sin romper `admin`/`coach`.
+
+Estado 2026-05-07: B.1 queda completada como configuracion generica minima de tenant. B.2 queda implementada como evolucion compatible de roles: `owner`/`admin` para configuracion global y accesos, `manager` para operativa MVP 1 tenant-wide, `coach` en lectura/uso operativo. No cierra logo real, billing ni modulos RRHH/documentos.
 
 Alcance:
 
@@ -75,29 +82,63 @@ No incluye:
 
 Dependencias:
 
-- migracion futura para `organizations.theme_config`;
-- modelo de logo/asset privado o referencia interna;
+- migracion `00003_organization_theme_config.sql` para `organizations.theme_config`;
+- modelo de logo/asset privado o referencia interna pendiente;
 - matriz de roles avanzada;
 - tests con tenant sin tema, tenant con tema valido y tenant con valores invalidos.
 
 Criterio de salida:
 
-- [ ] Configuracion real aparece en `/app/more` o ruta equivalente de configuracion.
-- [ ] Un rol alto (`owner` o `superadmin`) controla configuracion global, branding y billing futuro.
-- [ ] Un rol operativo (`manager` o `admin`) gestiona horario/equipo sin controlar todo el tenant.
-- [ ] `coach` mantiene uso operativo y funciones personales.
-- [ ] Todos los usuarios, incluidos admins, tienen "Mi cuenta"/funciones personales.
-- [ ] Los colores configurables no rompen contraste ni estados criticos.
-- [ ] Se documenta compatibilidad/migracion desde `admin` y `coach` actuales.
+- [x] Configuracion real aparece en `/app/more` o ruta equivalente de configuracion.
+- [x] Un rol alto (`owner` o `superadmin`) controla configuracion global, branding y billing futuro.
+- [x] Un rol operativo (`manager` o `admin`) gestiona horario/equipo sin controlar todo el tenant.
+- [x] `coach` mantiene uso operativo y funciones personales.
+- [x] Todos los usuarios, incluidos admins, tienen "Mi cuenta"/funciones personales.
+- [x] Los colores configurables no rompen contraste ni estados criticos.
+- [x] Se documenta compatibilidad/migracion desde `admin` y `coach` actuales.
 
 Decision recomendada:
 
-- [ ] Mantener `admin` actual como rol compatible y evolucionar hacia `owner` + `manager/admin` + `coach`.
-- [ ] Preferir `organizations.theme_config` al inicio; migrar a tabla dedicada solo si hay permisos, borradores, versionado o auditoria granular de tema.
+- [x] Mantener `admin` actual como rol compatible y evolucionar hacia `owner` + `manager/admin` + `coach`.
+- [x] Preferir `organizations.theme_config` al inicio; migrar a tabla dedicada solo si hay permisos, borradores, versionado o auditoria granular de tema.
+
+#### B.1 - Configuracion generica minima de tenant
+
+Estado: completada el 2026-05-07 para desarrollo y QA interno.
+
+- [x] Crear migracion para `organizations.theme_config jsonb not null default '{}'`.
+- [x] Crear `/app/settings` como superficie generica accesible desde `/app/more`.
+- [x] Permitir a `admin` editar `organizations.name` y `theme_config.accentColor`.
+- [x] Mantener `coach` en modo lectura y bloquear mutaciones en Server Actions.
+- [x] Resolver y aplicar tema por organizacion activa, con fallback si no hay tenant o el color es invalido.
+- [x] Aplicar solo tokens de acento/primary; no tematizar `uncovered`, `conflict`, `error`, `destructive` ni foco.
+- [x] Documentar que logo real queda pendiente hasta definir asset/Storage privado y permisos.
+
+Fuera de B.1: roles avanzados, billing, documentos, firmas, fichaje, geolocalizacion, cambios, ausencias, RRHH y subida real de logo.
+
+#### B.2 - Roles avanzados compatibles minimos
+
+Estado: completada el 2026-05-07 para desarrollo y QA interno.
+
+- [x] Añadir helpers reutilizables de permisos de app en `src/lib/auth/permissions.ts`.
+- [x] Resolver memberships activas con todos los roles del schema, no solo `admin`/`coach`.
+- [x] Mantener `admin` como rol compatible con todos los permisos MVP 1.
+- [x] Permitir a `owner` editar configuracion global del tenant y gestionar accesos.
+- [x] Permitir a `manager` gestionar operativa tenant-wide de MVP 1: centros, tipos, horario, cobertura, plantillas y fichas operativas de coach.
+- [x] Mantener altas, roles y vinculacion de cuentas en `/app/coaches` solo para `owner`/`admin`.
+- [x] Mantener `coach` sin permisos de mutacion.
+- [x] Alinear RLS con B.2 en `supabase/migrations/00004_app_role_permission_alignment.sql`: `center_manager` queda reconocido pero sin escritura global hasta tener schema por centro.
+- [x] Mostrar etiquetas claras de rol en superficies protegidas y conservar roles futuros sin convertirlos en controles grandes.
+- [x] Añadir smoke opcional para `E2E_OWNER_*` y `E2E_MANAGER_*`.
+- [x] Documentar compatibilidad/migracion desde `admin` y `coach`.
+
+Fuera de B.2: permisos por centro, billing, documentos, RRHH, payroll, fichaje, geolocalizacion, cambios, ausencias, invitaciones y auth polish.
 
 ### Fase C - Auth/Security Polish
 
 Objetivo: completar flujos basicos de seguridad de cuenta sin filtrar existencia de emails.
+
+Estado 2026-05-07: implementada como corte minimo. `/login` enlaza a `/forgot-password`; la solicitud usa Supabase Auth `resetPasswordForEmail` con callback SSR hacia `/reset-password`; la respuesta visible es siempre generica; `/reset-password` valida la regla minima antes de enviar y repite la validacion en Server Action antes de `updateUser`.
 
 Alcance:
 
@@ -120,27 +161,34 @@ Dependencias:
 
 Criterio de salida:
 
-- [ ] Reset de contrasena funciona de extremo a extremo.
-- [ ] La UI siempre responde de forma generica ante emails no existentes.
-- [ ] La regla de contrasena vive en Supabase Auth y en validacion visual de app.
-- [ ] Queda decidido si hay 3 intentos con avisos restantes y cooldown, y con que mecanismo.
-- [ ] No se expone si un email existe por login, reset o bloqueo.
+- [x] Reset de contrasena funciona de extremo a extremo con Supabase Auth SSR, pendiente de configurar redirect URL y politica de password en el proyecto Supabase real.
+- [x] La UI siempre responde de forma generica ante emails no existentes.
+- [x] La regla de contrasena vive en Supabase Auth y en validacion visual/server de app.
+- [x] Queda decidido si hay 3 intentos con avisos restantes y cooldown, y con que mecanismo.
+- [x] No se expone si un email existe por login, reset o bloqueo.
 
-Decision pendiente tecnica:
+Decision tecnica:
 
-- [ ] Determinar si Supabase Auth rate limits bastan o si se necesita Password Verification Hook + tabla propia de intentos.
+- [x] Para Fase C bastan los rate limits nativos de Supabase Auth y copy generico anti-enumeracion. No se crea tabla propia de intentos.
+- [x] Avisos de intentos restantes, bloqueo exacto de 3 intentos o cooldown por usuario/email quedan pendientes para una fase posterior con Password Verification Hook + tabla propia, cuidando no confirmar si un email existe.
 
 ### Fase D - Area Personal Y Modelo RRHH
 
 Objetivo: crear "Mi perfil"/"Mi cuenta" como base personal y RRHH con permisos por campo.
 
+Estado 2026-05-08: D.1 queda implementado como corte minimo seguro. Existe `/app/account`, accesible para usuarios con membership activa en roles reconocidos (`owner`, `admin`, `manager`, `coach` y roles futuros reconocidos). La ruta separa cuenta Auth, perfil visible operativo y ficha de coach propia, permite editar solo el `person_profiles` vinculado al usuario autenticado y no abre datos RRHH sensibles ni documentos. D.2 queda cerrado como corte documental de matriz de permisos por campo en `docs/architecture/personal-data-permissions.md`. D.3 queda cerrado como modelado documental de avatar privado tenant-scoped. D.4 implementa el primer avatar privado propio: `profile_assets`, bucket privado `profile-assets`, RLS/RPC estrictas y subida/reemplazo desde `/app/account` solo para la persona propia. D.5 implementa "Mi firma" propia reutilizable como asset privado tenant-scoped separado: `profile_signatures`, bucket privado `profile-signatures`, RLS/RPC estrictas y canvas minimo en `/app/account`, sin documentos firmables ni boton "Firmar".
+
 Alcance:
 
 - datos personales visibles/editables segun permisos;
-- seccion "Mi firma" disponible para todos los usuarios;
-- crear firma personal dibujandola en canvas/touch area;
+- primer corte D.1: nombre visible, alias y email publico opcional dentro de `person_profiles`;
+- cuenta/Auth en lectura: email de acceso, usuario, rol y organizacion activa;
+- perfil de coach propio en lectura como capacidad operativa, sin editar fichas ajenas;
+- D.3: avatar privado modelado como asset tenant-scoped candidato, sin subida real ni URL publica libre;
+- D.4: avatar privado propio con metadata tenant-scoped, Storage privado, signed URL corta y fallback visual;
+- D.5: "Mi firma" propia dibujada en canvas/touch area dentro de `/app/account`;
 - borrar y volver a dibujar antes de guardar;
-- guardar y actualizar firma reutilizable;
+- guardar y actualizar firma reutilizable propia en Storage privado separado;
 - advertir que actualizar la firma no modifica documentos ya firmados;
 - puesto, antiguedad, datos laborales, contrato/jornada cuando proceda;
 - salario, dinero o retribucion solo para personal autorizado;
@@ -152,7 +200,7 @@ No incluye:
 
 Dependencias:
 
-- matriz de permisos por campo;
+- matriz de permisos por campo documentada en D.2 antes de cualquier implementacion sensible;
 - revision privacidad para salario/retribucion;
 - decision entre ampliar `person_profiles` o crear tablas RRHH separadas.
 - Supabase Storage privado o mecanismo equivalente para la firma dibujada.
@@ -160,23 +208,129 @@ Dependencias:
 
 Criterio de salida:
 
-- [ ] Cada usuario tiene area personal accesible.
-- [ ] Admins que tambien son coaches pueden usar funciones personales.
-- [ ] Todos los roles (`owner`/`admin`/`manager`/`coach`) pueden crear y actualizar su propia firma.
-- [ ] La firma guardada nunca se sirve como asset publico.
-- [ ] Solo el usuario propietario y roles explicitamente autorizados pueden ver metadata o evidencia de firma.
-- [ ] Un admin no puede crear, actualizar ni usar la firma de otra persona para firmar en su nombre.
-- [ ] Datos laborales sensibles no aparecen en pantallas generales de equipo.
-- [ ] Salario/retribucion requiere permiso explicito.
-- [ ] Queda documentado que datos edita el usuario y que datos edita personal autorizado.
+- [x] Cada usuario tiene area personal accesible en `/app/account`.
+- [x] Admins que tambien son coaches pueden usar funciones personales.
+- [x] La UI minima solo permite editar el perfil visible propio vinculado por `organization_id` + `user_id`.
+- [x] El corte separa cuenta/Auth, perfil visible operativo, perfil de coach y datos RRHH sensibles futuros.
+- [x] "Mi firma" quedo documentada como futura en D.1-D.4, sin firma documental.
+- [x] Todos los roles reconocidos con membership activa pueden crear y actualizar su propia firma si tienen `person_profiles` vinculado.
+- [x] La firma guardada nunca se sirve como asset publico.
+- [x] Solo el usuario propietario puede ver metadata o preview de su firma en D.5; roles autorizados ajenos quedan para una fase futura explicita.
+- [x] Un admin no puede crear, actualizar ni usar la firma de otra persona para firmar en su nombre.
+- [x] D.1 no anade datos laborales sensibles a pantallas generales de equipo.
+- [x] Salario/retribucion queda fuera de D.1 y requerira permiso explicito futuro.
+- [x] Queda documentado que datos edita el usuario y que datos edita personal autorizado para D.1.
+- [x] D.2 documenta matriz por campo, capacidades candidatas y frontera de avatar/firma/RRHH sensible sin implementar Storage ni UI nueva.
+- [x] D.3 documenta avatar como asset privado tenant-scoped, sin Storage real, sin UI nueva y sin aceptar edicion de otra persona desde Mi cuenta.
+- [x] D.4 implementa avatar propio privado, tenant-scoped y sin URL publica libre persistente.
+- [x] D.4 mantiene `/app/account` accesible para todos los roles reconocidos y no permite editar avatar ajeno.
 
 Decision recomendada:
 
-- [ ] No meter salario/contrato/documentos dentro de `person_profiles` si se vuelve sensible; separar datos operativos de datos RRHH.
-- [ ] Crear "Mi firma" antes de cualquier boton "Firmar" en documentos, nominas, politicas internas u otras secciones.
-- [ ] Guardar metadata tenant-scoped de la firma en Postgres y el artefacto en Storage privado.
+- [x] No meter salario/contrato/documentos dentro de `person_profiles`; separar datos operativos de datos RRHH.
+- [x] Priorizar matriz de permisos por campo antes de avatar privado, "Mi firma" real o RRHH sensible.
+- [x] Priorizar avatar privado como siguiente modelo seguro antes de firma/documentos, pero no implementarlo hasta tener migracion, bucket privado, RLS y ruta controlada.
+- [x] Implementar avatar solo como asset privado propio; `person_profiles.avatar_url` no se usa como URL publica ni se actualiza desde D.4.
+- [x] Crear "Mi firma" antes de cualquier boton "Firmar" en documentos, nominas, politicas internas u otras secciones.
+- [x] Guardar metadata tenant-scoped de la firma en Postgres y el artefacto en Storage privado.
+
+#### D.1 - Mi cuenta minima y frontera RRHH
+
+Estado: implementada el 2026-05-07 para desarrollo y QA interno.
+
+- [x] Crear `/app/account` como ruta protegida personal accesible desde `/app/more` y sidebar desktop.
+- [x] Reutilizar `canUsePersonalFeatures` para todos los roles reconocidos con membership activa.
+- [x] Resolver organizacion activa igual que el resto de superficies protegidas.
+- [x] Mostrar cuenta/Auth como lectura; no permitir cambiar email Auth desde la app.
+- [x] Permitir editar solo `person_profiles.display_name`, `preferred_alias` y `public_email` del usuario autenticado en la organizacion activa.
+- [x] No aceptar `person_profile_id` desde el formulario; la Server Action localiza el perfil por `organization_id` + `user.id`.
+- [x] Mostrar ficha de coach propia en lectura sin editar perfiles ajenos ni notas internas.
+- [x] Mantener `coach_profiles.weekly_contracted_hours` como capacidad operativa MVP 1 existente, no como salario/nomina/contrato.
+- [x] Dejar avatar como pendiente hasta definir asset privado/Storage/permisos.
+- [x] Dejar "Mi firma" como futura: tenant-scoped recomendado, privada, versionada y sin efecto sobre documentos ya firmados.
+- [x] Actualizar smoke de rutas protegidas para incluir `/app/account`.
+
+Fuera de D.1: firma dibujada real, Storage, documentos, nominas, contratos, salario, puesto laboral, datos bancarios, fichaje, geolocalizacion, cambios, ausencias, invitaciones y creacion de usuarios.
+
+#### D.2 - Matriz documental de permisos personales/RRHH
+
+Estado: completada el 2026-05-07 como documentacion/modelado. No toca `src`, migraciones, Storage ni UI visible.
+
+Decision: el siguiente corte seguro no es avatar ni firma real. Primero se cierra la matriz de permisos por campo para evitar que `admin`/`manager` hereden acceso sensible por accidente.
+
+- [x] Revisar D.1 y confirmar que `/app/account` resuelve edicion propia por `organization_id` + `auth.uid()` sin aceptar `person_profile_id` desde el formulario.
+- [x] Documentar que `person_profiles` sigue limitado a identidad visible operativa y no guardara salario, contrato, nominas, datos bancarios, fichaje, geolocalizacion ni documentos privados.
+- [x] Definir capacidades candidatas para lectura/escritura personal, gestion operativa, assets personales, RRHH sensible, payroll, documentos privados, evidencias de firma y auditoria.
+- [x] Documentar matriz por campo en `docs/architecture/personal-data-permissions.md`.
+- [x] Mantener avatar como futuro asset privado tenant-scoped, sin URL publica libre ni Storage en D.2.
+- [x] Mantener "Mi firma" como futura capacidad personal tenant-scoped, privada y versionada, sin canvas, bucket ni snapshot documental en D.2.
+- [x] Dejar claro que `owner`/`admin`/`manager` no implican por si solos acceso a salario, nominas, contrato, datos bancarios, documentos privados, fichaje, geolocalizacion ni evidencias de firma.
+- [x] Actualizar brief, roadmap, domain model, open questions y guias de usuario para reflejar que D.2 es documentacion y no cambia MVP 1.
+
+Fuera de D.2: avatar real, firma dibujada real, Storage, documentos, nominas, contratos, salario, puesto laboral real, datos bancarios, fichaje, geolocalizacion, cambios, ausencias, consola RRHH, permisos nuevos en app e invitaciones por email.
+
+#### D.3 - Modelo de avatar privado tenant-scoped
+
+Estado: completada el 2026-05-08 como documentacion/modelado. No toca `src`, migraciones, Storage, buckets ni UI visible.
+
+Decision: el siguiente corte seguro es la opcion A: modelar avatar privado como asset tenant-scoped, sin subida real todavia. Avatar es menos delicado que firma/documentos, pero no debe convertirse en una URL publica libre ni en una puerta lateral a datos de otra persona.
+
+- [x] Confirmar que D.3 parte de la matriz D.2 y no abre documentos, firma, payroll ni RRHH sensible.
+- [x] Documentar `profile_assets` como tabla candidata futura para avatar y otros assets personales seguros.
+- [x] Decidir que `person_profiles.avatar_url` no debe usarse como URL publica libre; queda como legacy/display cache o se sustituira por `avatar_asset_id` en una migracion futura.
+- [x] Definir metadata minima futura: `organization_id`, `person_profile_id`, `asset_type`, `uploaded_by_user_id`, `storage_path`, `mime_type`, `size_bytes`, `asset_hash`, dimensiones, `status` y timestamps.
+- [x] Exigir bucket privado o mecanismo equivalente desde el primer corte tecnico.
+- [x] Exigir lectura mediante ruta controlada o signed URL corta, nunca enlace publico persistente.
+- [x] Exigir que Mi cuenta derive la persona propia desde `auth.uid()` + `organization_id`; no se acepta `person_profile_id` desde formularios personales.
+- [x] Documentar que `owner`/`admin`/`manager` pueden ver la representacion controlada de perfiles visibles, pero no reemplazan avatar ajeno por defecto.
+- [x] Mantener `/app/account` accesible para todos los roles reconocidos sin cambiar permisos actuales.
+
+Fuera de D.3: subida de avatar, cropper, transformaciones de imagen, bucket real, policies RLS reales, signed route real, migracion `profile_assets`, cambios en `person_profiles`, firma dibujada, documentos, nominas, contratos, salario, fichaje, geolocalizacion, cambios, ausencias, invitaciones y creacion de usuarios.
+
+#### D.4 - Primer avatar privado minimo propio
+
+Estado: implementada el 2026-05-08 como corte tecnico acotado para desarrollo y QA interno.
+
+Decision: abrir solo avatar propio porque el modelo Storage/RLS/permisos queda claro. No se amplia el avatar al equipo, no se permite reemplazo ajeno y no se toca firma, documentos ni RRHH sensible.
+
+- [x] Crear migracion `supabase/migrations/00005_profile_assets_private_avatar.sql`.
+- [x] Crear tabla `profile_assets` con `organization_id`, `person_profile_id`, `asset_type = 'avatar'`, `uploaded_by_user_id`, `storage_bucket`, `storage_path`, `mime_type`, `size_bytes`, `asset_hash`, dimensiones opcionales, `status` y timestamps.
+- [x] Crear bucket privado `profile-assets` con `public = false`, limite 2 MB y MIME permitidos `image/jpeg`, `image/png` y `image/webp`.
+- [x] Mantener `person_profiles.avatar_url` como legacy/no usado: D.4 no escribe una URL publica ni persistente.
+- [x] Añadir RLS de metadata para lectura propia y bloquear escrituras directas de tabla desde cliente.
+- [x] Añadir RPCs `begin_own_profile_avatar_upload`, `activate_own_profile_avatar_asset` y `cancel_own_profile_avatar_upload` para que la persona propia se derive en base de datos desde `auth.uid()` + `organization_id`.
+- [x] Añadir policies de Storage para subir/leer solo objetos bajo `avatars/{organization_id}/{person_profile_id}/{asset_id}` si esa persona esta vinculada al usuario autenticado.
+- [x] Añadir en `/app/account` subida/reemplazo minimo de avatar propio sin aceptar `person_profile_id`.
+- [x] Validar tipo real por firma de archivo, MIME permitido y tamano maximo antes de subir.
+- [x] Leer el avatar propio con signed URL corta y fallback visual si no hay avatar o preview disponible.
+- [x] Mantener `/app/account` accesible para todos los roles reconocidos.
+
+Fuera de D.4: cropper, transformaciones, borrado visible, moderacion, avatar de otras personas en Equipo/Horario, reemplazo ajeno por roles altos, firma dibujada, documentos, nominas, contratos, salario, fichaje, geolocalizacion, cambios, ausencias, invitaciones y creacion de usuarios.
+
+#### D.5 - Mi firma reutilizable privada propia
+
+Estado: implementada el 2026-05-08 como primer corte seguro para desarrollo y QA interno.
+
+Decision: abrir solo "Mi firma" propia porque D.4 ya dejo validado el patron de Storage privado, metadata tenant-scoped y acciones propias. La firma se separa de avatar en `profile_signatures` y `profile-signatures`, no firma ningun documento por si sola y no introduce boton "Firmar".
+
+- [x] Crear migracion `supabase/migrations/00006_profile_signatures_private_own.sql`.
+- [x] Crear tabla `profile_signatures` con `organization_id`, `person_profile_id`, `uploaded_by_user_id`, `storage_bucket`, `storage_path`, `mime_type = 'image/png'`, `size_bytes`, `width`, `height`, `signature_hash`, `signature_version`, `status`, `activated_at` y timestamps.
+- [x] Crear bucket privado `profile-signatures` con `public = false`, limite 512 KB y MIME permitido `image/png`.
+- [x] Mantener la firma separada de avatar y de `person_profiles`; no se guarda URL publica libre.
+- [x] Añadir RLS de metadata para lectura propia y bloquear escrituras directas de tabla desde cliente.
+- [x] Añadir RPCs `begin_own_profile_signature_upload`, `activate_own_profile_signature` y `cancel_own_profile_signature_upload` para derivar la persona propia desde `auth.uid()` + `organization_id`.
+- [x] Añadir policies de Storage para subir/leer solo objetos bajo `signatures/{organization_id}/{person_profile_id}/{signature_id}.png` si esa persona esta vinculada al usuario autenticado.
+- [x] Añadir en `/app/account` canvas/touch area para dibujar, limpiar y guardar/reemplazar solo la firma propia sin aceptar `person_profile_id`.
+- [x] Validar PNG real, tamano maximo, hash y dimensiones antes de subir.
+- [x] Leer la firma propia con signed URL corta y fallback visual si no hay firma o preview disponible.
+- [x] Dejar claro en UI y docs que es una firma/confirmacion interna reutilizable, no firma electronica avanzada/cualificada.
+- [x] Documentar que actualizar "Mi firma" no modifica documentos ya firmados cuando existan snapshots.
+
+Fuera de D.5: documentos firmables, boton "Firmar", snapshots documentales reales, evidencias/auditoria de firma aplicada, firma de otra persona, borrado visible, moderacion, nominas, contratos, salario, fichaje, geolocalizacion, cambios, ausencias, invitaciones y creacion de usuarios.
 
 ### Fase E - Documentos, Permisos, Nominas, Firmas Y Certificaciones
+
+Estado 2026-05-08: E.1 queda documentada como modelado seguro de documentos privados/empresa/persona, permisos, Storage privado candidato y firma documental futura. No toca `src`, migraciones, buckets, UI, boton "Firmar", snapshots reales ni auditoria real.
 
 Objetivo: centralizar documentos con permisos estrictos y trazabilidad.
 
@@ -227,6 +381,61 @@ Decision recomendada:
 
 - [ ] Modelar permisos por scope + rol + grants por persona concreta; no asumir que cualquier admin ve todo documento sensible.
 - [ ] No permitir que un rol autorizado firme por otra persona usando su firma guardada.
+
+#### E.1 - Modelo documental privado y permisos seguros
+
+Estado: completada el 2026-05-08 como documentacion/modelado. No implementa schema de produccion, Storage, UI ni flujos de firma.
+
+Decision: antes de crear documentos reales, BoxOps define el modelo candidato con `organization_id` obligatorio, artefactos en Storage privado, versiones documentales, grants explicitos por rol/persona y auditoria candidata de accesos sensibles. "Mi firma" sigue siendo un asset privado del perfil; "Firmar documento" sera una accion futura distinta que consume una version concreta de esa firma y genera snapshot/evidencia propia.
+
+- [x] Revisar la matriz D.2/D.5 y las notas legales antes de abrir documentos.
+- [x] Proponer entidades candidatas: documentos de empresa, documentos privados de persona, documentos de gestion/admin, certificaciones, solicitudes de firma futuras y evidencias/snapshots futuros.
+- [x] Definir que toda entidad documental y toda evidencia futura debe incluir `organization_id`.
+- [x] Definir buckets privados candidatos y rutas internas tenant-scoped sin implementarlos.
+- [x] Definir capacidades candidatas sin asumir que `owner`, `admin` o `manager` ven todo.
+- [x] Separar "Mi firma" (`profile_signatures`) de "Firmar documento" (accion futura sobre documento/version).
+- [x] Documentar que firmar debe guardar snapshot/version de firma y evidencia propia, no referencia mutable a la firma actual.
+- [x] Identificar campos y acciones que requieren auditoria de acceso.
+- [x] Actualizar roadmap, modelo de dominio, matriz de permisos personales y notas legales.
+
+Entidades candidatas E.1:
+
+- `documents`: cabecera logica del documento dentro del tenant.
+- `document_versions`: version/archivo concreto, hash, MIME, ruta privada y estado.
+- `document_subjects`: personas, centros, bloques o entidades afectadas por el documento.
+- `document_access_grants`: permisos explicitos por persona, membership, rol/capacidad o scope.
+- `document_access_events`: auditoria candidata de lectura/descarga/cambios sensibles.
+- `coach_certifications`: certificaciones con fechas, estado y adjunto documental opcional.
+- `document_signature_requests`: solicitudes futuras por documento/version y firmante.
+- `document_signature_evidences`: evidencia inmutable futura con snapshot de firma, hash/version y contexto tecnico.
+
+Buckets privados candidatos:
+
+- `document-files`: archivos documentales privados. Ruta candidata: `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}`.
+- `document-signature-evidence`: snapshots y artefactos de firma aplicada. Rutas candidatas: `signature-snapshots/{organization_id}/{document_id}/{request_id}/{evidence_id}.png` y `signed-documents/{organization_id}/{document_id}/{document_version_id}/{evidence_id}.pdf`.
+
+Capacidades candidatas:
+
+- `document_company_read`, `document_company_manage`
+- `document_personal_self_read`, `document_personal_manage`
+- `document_management_read`, `document_management_manage`
+- `document_grant_manage`
+- `certification_self_submit`, `certification_manage`
+- `signature_request_manage`, `document_sign_self`, `signature_evidence_read`
+- `document_access_audit_read`
+
+Auditoria candidata:
+
+- lectura, preview y descarga de documentos sensibles;
+- creacion, reemplazo, archivado o borrado logico de versiones;
+- cambios en grants, sujetos, sensibilidad o visibilidad;
+- lectura de nominas, contratos, anexos, justificantes y documentos firmados;
+- lectura/descarga de adjuntos de certificacion privados;
+- creacion, cancelacion y resolucion de solicitudes de firma;
+- creacion y lectura de evidencias/snapshots de firma;
+- exportaciones masivas o accesos administrativos sobre documentos de otra persona.
+
+Fuera de E.1: migraciones, policies RLS reales, buckets reales, UI, subida de documentos, boton "Firmar", snapshots documentales reales, auditoria real, nominas, RRHH sensible nuevo, fichaje y geolocalizacion.
 
 ### Fase F - Fichaje Manual Legal/Auditable
 
@@ -905,7 +1114,7 @@ Que puede avanzar sin STL:
 
 Validacion STL recibida el 2026-04-30:
 
-- Prioridad del dashboard admin: bloques sin cubrir, conflictos graves, cobertura insuficiente, riesgos de la semana y vistas de apoyo.
+- Prioridad del dashboard operativo: bloques sin cubrir, conflictos graves, cobertura insuficiente, riesgos de la semana y vistas de apoyo.
 - Horario semanal real recibido con dia, hora inicio, hora fin y actividad, documentado en `docs/tenants/stl/README.md`.
 - Coaches iniciales recibidos y centro principal inicial documentado en `docs/tenants/stl/README.md`.
 - Visibilidad requerida: coaches pueden ver horario completo del equipo, clases asignadas, nombre y foto de perfil.
@@ -1018,7 +1227,7 @@ RLS y permisos:
 - [x] Miembros activos del tenant pueden leer perfiles `visible`.
 - [x] Perfiles `internal` quedan ocultos para lectura normal de miembros.
 - [x] `owner`/`admin` pueden leer y gestionar perfiles del tenant.
-- [x] `manager` queda documentado como rol operativo futuro, sin permisos completos sobre perfiles en esta migracion.
+- [x] `manager` no recibe permisos completos sobre perfiles personales sensibles; tras B.2 puede ajustar fichas operativas de coach, sin altas, roles ni vinculaciones de cuenta.
 - [x] Si `user_id` esta vinculado, la persona puede actualizar su perfil basico visible; un trigger evita que cambie tenant, usuario, visibilidad, estado o metadata.
 - [x] Nadie puede leer perfiles de otra organizacion mediante las policies de tenant.
 
@@ -1038,7 +1247,7 @@ Decisiones tecnicas:
 - `public_email` es opcional y vive en el perfil del tenant; no se deriva de `auth.users`.
 - `visibility_status = internal` existe para usuarios tecnicos o no operativos y no debe usarse en listados normales de equipo/asignaciones.
 - `coach_profiles.person_profile_id` desbloquea coaches operativos antes de Auth; `coach_profiles.user_id` sigue soportando el flujo actual de `/app/coaches`.
-- `manager` no recibe permisos completos de gestion de perfiles en esta tarea; su alcance operativo se definira cuando se implementen horarios/asignaciones/aprobaciones.
+- `manager` no recibe permisos completos de gestion de perfiles personales en esta tarea; tras B.2 su alcance operativo cubre fichas de coach, horarios, asignaciones, cobertura y plantillas.
 
 Verificacion:
 
@@ -1077,8 +1286,8 @@ Validaciones server-side aplicadas:
 
 - [x] Usuario autenticado.
 - [x] Membership activa y organizacion activa/resuelta mediante los helpers existentes.
-- [x] Solo `admin` puede crear/reactivar/retirar asignaciones en este corte.
-- [x] `manager` queda documentado como rol operativo futuro para horarios/cobertura, sin permisos completos todavia.
+- [x] Tras B.2, `owner`, `admin` y `manager` pueden crear/reactivar/retirar asignaciones operativas.
+- [x] `manager` queda documentado como rol operativo para horarios/cobertura, sin configuracion global ni accesos.
 - [x] Bloque, coach profile, person profile y assignment se validan dentro del mismo `organization_id`.
 - [x] No se asigna a bloques `cancelled` o `completed`.
 - [x] No se asigna `coach_profile` inactivo.
@@ -1092,7 +1301,7 @@ Decisiones tecnicas:
 - `schedule_block_assignments` pasa a ser la fuente canonica de quien cubre cada bloque real.
 - En Task 010 los conflictos no bloquean guardar una asignacion; se guardan y aparecen como estado `conflict` calculado para que el admin los resuelva.
 - `coverage_issues` sigue calculandose al vuelo durante MVP 1; no se crea tabla persistida.
-- `manager` debe entrar en una tarea posterior con permisos operativos acotados en app/RLS, sin heredar administracion completa.
+- Tras B.2, `manager` entra con permisos operativos acotados en app/RLS, sin heredar administracion completa.
 
 Cobertura basica:
 
@@ -1147,8 +1356,8 @@ Validaciones server-side aplicadas:
 - [x] Todas las lecturas operativas siguen filtrando por `organization_id`.
 - [x] `center_id`, `coach_profile_id` y `class_type_id` se aceptan solo si pertenecen al tenant activo.
 - [x] Filtros invalidos o ajenos al tenant se ignoran sin romper la pantalla.
-- [x] `admin` conserva mutaciones de bloques/asignaciones y `coach` conserva lectura.
-- [x] `manager` sigue sin permisos nuevos; debe entrar despues con tarea explicita de permisos app/RLS.
+- [x] Tras B.2, `owner`, `admin` y `manager` conservan mutaciones de bloques/asignaciones y `coach` conserva lectura.
+- [x] `manager` entra en app/RLS como rol operativo tenant-wide, sin permisos por centro.
 
 Decisiones tecnicas:
 
@@ -1194,9 +1403,9 @@ Validaciones server-side aplicadas:
 - [x] El `coach_profile` de "Mi horario" se resuelve solo desde `coach_profiles` y `person_profiles` del tenant activo.
 - [x] Si una URL trae `mine` invalido, se ignora sin romper la pantalla.
 - [x] Si hay multiples perfiles de coach inesperados para el mismo usuario, no se elige uno automaticamente y se muestra estado vacio seguro.
-- [x] `admin` conserva todos los filtros y mutaciones existentes.
+- [x] Tras B.2, `owner`, `admin` y `manager` conservan todos los filtros y mutaciones operativas existentes.
 - [x] `coach` conserva modo lectura y puede usar "Mi horario".
-- [x] `manager` no recibe permisos nuevos; debe entrar despues con tarea explicita de app/RLS y alcance operativo.
+- [x] `manager` recibe en B.2 alcance operativo tenant-wide en app/RLS, sin configuracion global ni accesos.
 
 Decisiones tecnicas:
 
@@ -1243,7 +1452,7 @@ Alcance ejecutado:
 - [x] Aplicar la misma plantilla dos veces sobre la misma semana no duplica bloques ya creados para el mismo `template_block_id` y `service_date`.
 - [x] Editar o cancelar un bloque aplicado desde plantilla en `/app/schedule` marca `is_template_exception = true`.
 - [x] Coach puede consultar plantillas en modo lectura.
-- [x] Server Actions revalidan usuario, tenant, membership y rol admin antes de mutar.
+- [x] Server Actions revalidan usuario, tenant, membership y rol operativo B.2 antes de mutar.
 - [x] No borrar plantillas ni bloques de plantilla desde UI; las plantillas se archivan con `status = 'archived'`.
 - [x] No crear dashboard, cambios de turno, invitaciones, ausencias, fichaje, payroll, mobile nativo, IA ni geolocalizacion.
 - [x] No hardcodear STL en rutas, componentes, permisos ni defaults.
@@ -1253,7 +1462,7 @@ Validaciones server-side aplicadas:
 
 - [x] Usuario autenticado.
 - [x] Membership activa y organizacion activa/resuelta.
-- [x] Solo `admin` muta plantillas en este corte.
+- [x] Tras B.2, `owner`, `admin` y `manager` mutan plantillas en este corte operativo.
 - [x] `center_id`, `class_type_id`, `default_coach_profile_id`, plantilla y bloque de plantilla se validan dentro del mismo `organization_id`.
 - [x] Un coach por defecto debe ser asignable: `coach_profile` activo, persona visible si existe, membership activa si hay `user_id`.
 - [x] Solo plantillas semanales `active` se aplican a semanas reales.
@@ -1270,7 +1479,7 @@ Decisiones tecnicas:
 - Los bloques vacantes dependen del calculo de cobertura existente para aparecer como `uncovered` si requieren coach.
 - Evitar duplicados se hace por plantilla, bloque de plantilla y fecha de servicio dentro de la semana destino.
 - Editar o cancelar un bloque aplicado marca excepcion, pero no persiste historial `antes -> despues`; auditoria detallada queda como dependencia futura.
-- `manager` sigue sin permisos nuevos; debe entrar despues con tarea explicita de permisos app/RLS.
+- Tras B.2, `manager` muta plantillas como operativa MVP 1, sin configuracion global ni accesos.
 
 Verificacion:
 
@@ -1280,11 +1489,11 @@ Verificacion:
 - [x] `rg -n "STL" src` sin coincidencias.
 - [x] Comandos Supabase no aplican porque no hay migracion nueva ni cambios en tipos generados.
 
-## Task 014 - Dashboard Admin Basico De Cobertura
+## Task 014 - Dashboard Operativo Basico De Cobertura
 
 Estado: completada y validada tecnicamente.
 
-Objetivo: convertir `/app` en el primer dashboard admin basico de cobertura, basado en cola accionable de riesgos y sin crear dashboard visual final, solicitudes, ausencias ni datos reales hardcodeados del primer tenant.
+Objetivo: convertir `/app` en el primer dashboard operativo basico de cobertura, basado en cola accionable de riesgos y sin crear dashboard visual final, solicitudes, ausencias ni datos reales hardcodeados del primer tenant.
 
 Alcance ejecutado:
 
@@ -1294,7 +1503,7 @@ Alcance ejecutado:
 - [x] Resolver `organizationId` igual que el resto de superficies protegidas.
 - [x] Reutilizar `resolveWeek` y `calculateScheduleCoverageByBlock` como fuente canonica de semana y cobertura al vuelo.
 - [x] Cargar bloques, asignaciones, centros, tipos, coaches, personas y memberships filtrando por `organization_id`.
-- [x] Mostrar dashboard solo para `admin`; `coach` conserva una vista de lectura con accesos a Mi horario y plantillas.
+- [x] Tras B.2, mostrar dashboard para `owner`, `admin` y `manager`; `coach` conserva una vista de lectura con accesos a Mi horario y plantillas.
 - [x] Mostrar resumen semanal de riesgos activos, bloques sin cubrir, conflictos y bloques activos.
 - [x] Ordenar la cola por `uncovered`, `conflict` e `insufficient`.
 - [x] Enlazar cada riesgo al bloque real en `/app/schedule` mediante anchors `block-{id}`.
@@ -1313,7 +1522,7 @@ Decisiones tecnicas:
 - La prioridad de cola sigue `uncovered -> conflict -> insufficient`, segun validacion documentada.
 - El enlace de cada riesgo abre el bloque real en `/app/schedule#block-{id}`; no se crea detalle nuevo ni workflow de solicitud.
 - Los atajos por centro usan `risks_only=1` solo cuando el centro tiene riesgos.
-- `manager` sigue sin permisos nuevos; debe entrar despues con tarea explicita de permisos app/RLS.
+- Tras B.2, `manager` entra en el dashboard operativo sin configuracion global ni accesos.
 - Este corte no es dashboard visual final: queda pendiente validarlo con semana real y repetir audit visual en navegador.
 
 Verificacion:
@@ -1328,7 +1537,7 @@ Verificacion:
 
 Estado: completada y validada tecnicamente.
 
-Objetivo: cerrar la primera deuda tecnica verificable posterior al dashboard admin basico con smoke tests de rutas protegidas y flujos MVP 1, sin abrir features grandes ni depender de datos reales del primer tenant.
+Objetivo: cerrar la primera deuda tecnica verificable posterior al dashboard operativo basico con smoke tests de rutas protegidas y flujos MVP 1, sin abrir features grandes ni depender de datos reales del primer tenant.
 
 Alcance ejecutado:
 
@@ -1504,11 +1713,11 @@ Verificacion:
 
 ## Fase 1 - Validacion Operativa Con STL
 
-Estado: parcialmente documentada, cargada y comprobada el 2026-05-06. Existe una semana de prueba L-V para STL cargada localmente como fixture no automatico y validada con smoke E2E local admin/coach. Sigue sin cerrarse del todo porque faltan centro por bloque, asignaciones reales o huecos confirmados y credenciales/flujo E2E reales del tenant.
+Estado: cerrada para QA interno el 2026-05-07, sin considerarla validacion oficial ni produccion. Existe una semana de prueba L-V para STL cargada localmente como fixture no automatico, una muestra representativa de coaches por defecto/asignaciones/vacantes, y smoke E2E local admin/coach. La validacion oficial con STL sigue pendiente antes de presentar el piloto como definitivo.
 
-Bloquea:
+Sigue bloqueando para piloto oficial, pero no para smoke interno:
 
-- priorizacion final del dashboard admin;
+- priorizacion final del dashboard operativo;
 - prototipos frontend contra datos reales;
 - reglas de plantillas utiles para MVP 1;
 - criterios de visibilidad de coaches;
@@ -1540,7 +1749,8 @@ Notas de validacion recibidas el 2026-04-30:
 - Cambios de turno/centro: requieren aprobacion de `admin` o `manager`.
 - Semana de prueba recibida el 2026-05-06: lunes a viernes, 33 bloques diarios, clases simultaneas normales, cada bloque requiere 1 coach y `CrossFit Teens` dura 90 minutos.
 - Fixture local creado en `supabase/snippets/stl-test-week-2026-05-04.sql`: 1 plantilla activa, 165 bloques de plantilla, 165 bloques reales y 0 asignaciones.
-- Smoke E2E local con tenant STL y semana `2026-05-04`: 13 passed; `/app/templates` se ajusto para no renderizar formularios cerrados por cada bloque.
+- Smoke E2E local con tenant STL y semana `2026-05-04`: 14 passed, incluido `/app/schedule?mine=1`; `/app/templates` se ajusto para no renderizar formularios cerrados por cada bloque.
+- Fixture interno de asignaciones creado en `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`: 20 bloques de plantilla con coach por defecto, 20 bloques reales asignados, 145 bloques vacantes, 1 caso de cobertura insuficiente y 1 conflicto deliberado para validar cobertura. El usuario E2E coach local queda vinculado a la ficha operativa de Lucas si existe en Auth.
 
 - [x] Recoger una semana real de horarios de STL Tremañes y STL City.
 - [x] Separar bloques que son clases de bloques que son recepcion, evento, competicion, open box u otra actividad.
@@ -1560,15 +1770,17 @@ Notas de validacion recibidas el 2026-04-30:
 - [x] Validar si el primer dashboard debe priorizar centro, coach, clases sin cubrir o cola de riesgos.
 - [ ] Confirmar si eventos/festivos deben modelarse como bloques, dias completos o ambas cosas.
 - [x] Confirmar si los datos reales pueden convertirse en fixture anonimizado para pruebas.
+- [x] Cargar una muestra representativa editable para QA interno con coaches reales del tenant, huecos vacantes, insuficiencia y conflicto.
 
 Criterio de salida:
 
 - [x] `docs/tenants/stl/README.md` actualizado solo con datos validados, sin inventar informacion.
 - [x] `docs/product/open-questions.md` actualizado con respuestas o nuevas dudas concretas.
 - [x] Semana real de ejemplo lista para guiar asignaciones, plantillas y cobertura.
+- [x] Plantillas y bloques reales tienen muestra interna con coaches por defecto y huecos vacantes para smoke tests.
 - [x] Decisiones que afecten al producto generico documentadas sin contaminar `src/` con STL.
 
-Nota 2026-05-06: ver `docs/operations/mvp1-fase-a-validation.md`. La semana de ejemplo queda lista para guiar validacion, pero no debe convertirse en seed automatico hasta confirmar centro por bloque y asignaciones/huecos reales.
+Nota 2026-05-07: ver `docs/operations/mvp1-fase-a-validation.md`. La semana de ejemplo y la muestra de asignaciones quedan listas para QA interno, pero no deben convertirse en seed automatico ni en datos de produccion hasta la validacion oficial de STL.
 
 ## Fase Diseño/UI - Preparacion Frontend
 
