@@ -16,7 +16,7 @@ No son datos de producto ni fixtures reales. Sirven como guia para seeds demo, p
 
 ## Escenario A - Tenant Multi-Centro Con Riesgos Mixtos
 
-Objetivo: validar que un tenant con dos centros puede mezclar bloques cubiertos, sin cubrir, insuficientes y conflictos sin cruzar datos.
+Objetivo: validar que un tenant con dos centros puede mezclar bloques cubiertos, sin cubrir, insuficientes e intentos de solape sin cruzar datos.
 
 Datos minimos:
 
@@ -31,7 +31,8 @@ Casos:
 - Bloque cubierto: `required_coaches = 1` y una asignacion `assigned`.
 - Bloque sin cubrir: `required_coaches = 1` y sin asignaciones validas.
 - Bloque insuficiente: `required_coaches = 2` y una sola asignacion `assigned`.
-- Conflicto: el mismo `coach_profile_id` asignado a dos bloques activos con la misma `service_date` y horas solapadas.
+- Intento de conflicto: el mismo `coach_profile_id` no debe poder asignarse a dos bloques activos con la misma `service_date` y horas solapadas; Postgres debe devolver `coach-unavailable`.
+- Conflicto legacy: si existen datos importados antiguos con ese solape, la lectura puede seguir mostrandolos como `conflict` hasta resolverlos.
 - Bloques simultaneos sin conflicto: dos bloques a la misma hora con coaches distintos.
 
 Resultado esperado:
@@ -39,7 +40,8 @@ Resultado esperado:
 - `covered` solo en el bloque con asignacion suficiente y sin solape.
 - `uncovered` en el bloque accionable sin coach.
 - `insufficient` en el bloque con ratio menor que `required_coaches`.
-- `conflict` en ambos bloques solapados del mismo coach.
+- `coach-unavailable` al intentar crear el solape desde la operativa normal.
+- `conflict` solo al leer datos legacy/importados que ya contengan ambos bloques solapados del mismo coach.
 - La simultaneidad por si sola no crea conflicto.
 
 ## Escenario B - Tenant De Un Centro Sin Incidencias

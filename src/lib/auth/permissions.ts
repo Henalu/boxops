@@ -20,23 +20,54 @@ export type ApplicationRole = (typeof APPLICATION_ROLES)[number];
 export type ManagedAccessRole = (typeof MANAGED_ACCESS_ROLES)[number];
 
 const ROLE_LABELS: Record<ApplicationRole, string> = {
-  admin: "Admin compatible",
+  admin: "Administrador",
   center_manager: "Responsable de centro (futuro)",
-  coach: "Coach",
-  document_admin: "Documentos (futuro)",
-  manager: "Manager operativo",
-  owner: "Owner",
-  payroll_manager: "Nominas (futuro)",
-  staff: "Staff (futuro)",
+  coach: "Entrenador",
+  document_admin: "Responsable documental (futuro)",
+  manager: "Responsable",
+  owner: "Propietario",
+  payroll_manager: "Responsable de nóminas (futuro)",
+  staff: "Personal (futuro)",
 };
 
 const TENANT_SETTINGS_ROLES: ApplicationRole[] = ["owner", "admin"];
+const TIME_TRACKING_SETTINGS_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
 const OPERATIONAL_MANAGEMENT_ROLES: ApplicationRole[] = [
   "owner",
   "admin",
   "manager",
 ];
 const TEAM_ACCESS_MANAGEMENT_ROLES: ApplicationRole[] = ["owner", "admin"];
+const TIME_TRACKING_REVIEW_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
+const TIME_LOCATION_SETTINGS_MANAGEMENT_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+];
+const TIME_LOCATION_SETTINGS_ACTIVATION_ROLES: ApplicationRole[] = ["owner"];
+const CHANGE_REQUEST_MANAGEMENT_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
+const ABSENCE_SELF_SERVICE_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+  "coach",
+];
+const ABSENCE_REQUEST_MANAGEMENT_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
 
 export function isApplicationRole(role: string): role is ApplicationRole {
   return APPLICATION_ROLES.includes(role as ApplicationRole);
@@ -52,6 +83,10 @@ export function getApplicationRoleLabel(role: string) {
 
 export function canManageTenantSettings(role: string) {
   return TENANT_SETTINGS_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageTimeTrackingSettings(role: string) {
+  return TIME_TRACKING_SETTINGS_ROLES.includes(role as ApplicationRole);
 }
 
 export function canManageOperationalData(role: string) {
@@ -72,4 +107,28 @@ export function canReadOperationalData(role: string) {
 
 export function canUsePersonalFeatures(role: string) {
   return isApplicationRole(role);
+}
+
+export function canReviewTimeTracking(role: string) {
+  return TIME_TRACKING_REVIEW_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageTimeLocationSettings(role: string) {
+  return TIME_LOCATION_SETTINGS_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canActivateTimeLocationSettings(role: string) {
+  return TIME_LOCATION_SETTINGS_ACTIVATION_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageChangeRequests(role: string) {
+  return CHANGE_REQUEST_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canUseAbsenceSelfService(role: string) {
+  return ABSENCE_SELF_SERVICE_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageAbsenceRequests(role: string) {
+  return ABSENCE_REQUEST_MANAGEMENT_ROLES.includes(role as ApplicationRole);
 }

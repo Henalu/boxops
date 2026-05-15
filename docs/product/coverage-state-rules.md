@@ -78,7 +78,7 @@ Desde Task 010, `schedule_block_assignments` es la fuente canonica para saber qu
 
 Las reglas de disponibilidad avanzada, certificaciones, ausencias y margen de traslado entre centros quedan fuera del calculo basico hasta validacion real.
 
-Decision Task 010: un conflicto de solapamiento no bloquea guardar la asignacion manual. La asignacion se conserva como dato real y el bloque aparece con estado calculado `conflict` para que el admin lo resuelva.
+Decision 2026-05-11: un solapamiento temporal de coach ya no debe poder guardarse desde la operativa normal. Postgres bloquea nuevas asignaciones `assigned` que solapen al mismo coach dentro del mismo tenant/dia con `coach-unavailable`; la UI filtra coaches ocupados solo como ayuda. El estado `conflict` se conserva para lectura de datos legacy/importados, anomalias previas o reglas futuras no cubiertas por el solape temporal basico.
 
 Decision Task 011: los estados calculados se pueden usar como filtro de `/app/schedule` sin crear una tabla persistida. El filtro `coverage_state` acepta `covered`, `uncovered`, `insufficient` y `conflict`; el filtro rapido `risks_only=1` incluye solo `uncovered`, `insufficient` y `conflict`. Los bloques `cancelled` y `completed` siguen calculandose como `inactive`, quedan fuera de riesgos activos y solo se consultan si el usuario filtra por estado operativo.
 
@@ -107,7 +107,7 @@ Esta precedencia separa dos cosas: un bloque cancelado no debe parecer "sin cubr
 | `covered` | Bloque accionable con `valid_assignments >= required_coaches` y sin conflicto activo. | `schedule_blocks.required_coaches`; `schedule_block_assignments`; `coach_profiles.status`; `person_profiles`; `organization_memberships.status` cuando haya Auth. | Reglas de certificacion/disponibilidad y tests dedicados de calculo. |
 | `uncovered` | Bloque accionable con `required_coaches > 0` y `valid_assignments = 0`. | `schedule_blocks.required_coaches`; `schedule_blocks.status`; asignaciones existentes. `schedule_blocks.status = 'uncovered'` puede servir como pista temporal. | Decidir si el status persistido se recalcula o se mantiene solo como override historico. |
 | `insufficient` | Bloque accionable con `0 < valid_assignments < required_coaches`. | `required_coaches`; asignaciones por bloque; perfiles activos. | Tests dedicados de ratio `assigned/required`. |
-| `conflict` | Coach con asignacion valida en dos o mas bloques activos que se solapan en tiempo, o regla futura de ausencia/certificacion/centro incompatible. | `schedule_blocks.service_date`, `start_time`, `end_time`, `center_id`; `schedule_block_assignments.coach_profile_id`; `centers`. | Reglas de buffer entre centros; disponibilidad/ausencias; certificaciones; estrategia para centros en distintas zonas horarias; tabla materializada opcional `coverage_issues`. |
+| `conflict` | Dato legacy/importado donde un coach aparece con asignacion valida en dos o mas bloques activos solapados, o regla futura de ausencia/certificacion/centro incompatible. La UI normal no debe crear solapes temporales nuevos. | `schedule_blocks.service_date`, `start_time`, `end_time`, `center_id`; `schedule_block_assignments.coach_profile_id`; `centers`; guardrail `00011_schedule_assignment_overlap_guard.sql`. | Reglas de buffer entre centros; disponibilidad/ausencias; certificaciones; estrategia para centros en distintas zonas horarias; tabla materializada opcional `coverage_issues`. |
 | `pending` | Solicitud, asignacion o validacion esperando respuesta. En cobertura, `assignment_status = 'pending'` no cubre el bloque. | `schedule_block_assignments.assignment_status = 'pending'`. | `change_requests`, `absence_requests`, aprobaciones admin, motivos, fechas limite y actor que debe responder. |
 | `approved` | Solicitud o validacion aceptada y aun relevante para el usuario. | Parcial: una asignacion `assigned` con `source = 'change_request'` podria indicar resultado aplicado, pero no conserva decision. | Tabla de solicitudes con `status = 'approved'`, aprobador, fecha, motivo y si ya se aplico al horario. |
 | `rejected` | Solicitud, cobertura, ausencia, correccion u hora extra denegada. | Parcial: `assignment_status = 'declined'` puede reflejar rechazo de una oferta de cobertura. | Solicitudes con estado `rejected`, motivo, actor, trazabilidad y reglas de visibilidad. |
@@ -129,13 +129,13 @@ valid_assignments = count(assignments where assignment_status = 'assigned' and c
 pending_assignments = count(assignments where assignment_status = 'pending')
 
 if block is cancelled or completed -> inactive/no active risk
-if required_coaches = 0 and no conflict -> no coverage requirement
+if required_coaches = 0 -> not_required/no coverage requirement
 if valid_assignments = 0 -> uncovered
 if 0 < valid_assignments < required_coaches -> insufficient
 if valid_assignments >= required_coaches and no conflict -> covered
 ```
 
-`pending_assignments` puede mostrarse como contexto, pero no convierte un bloque en cubierto.
+`pending_assignments` puede mostrarse como contexto, pero no convierte un bloque en cubierto. Los bloques con `required_coaches = 0` no cuentan pendientes, ausencias ni asignaciones como riesgo de cobertura.
 
 ### Solapamientos
 

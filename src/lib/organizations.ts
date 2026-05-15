@@ -10,6 +10,11 @@ export type OrganizationSettingsValues = {
   accentColor: string | null;
 };
 
+export type OrganizationTimeTrackingSettingsValues = {
+  correctionApprovalRequired: boolean;
+  scheduleAutoPunchesEnabled?: boolean;
+};
+
 export type OrganizationSettingsValidationResult =
   | {
       ok: true;
@@ -20,10 +25,25 @@ export type OrganizationSettingsValidationResult =
       error: "invalid-accent-color" | "missing-name";
     };
 
+export type OrganizationTimeTrackingSettingsValidationResult =
+  | {
+      ok: true;
+      values: OrganizationTimeTrackingSettingsValues;
+    }
+  | {
+      ok: false;
+      error: "invalid-time-tracking-config";
+    };
+
 export type ResolvedOrganizationTheme = {
   accentColor: string | null;
   foregroundColor: string | null;
   isApplied: boolean;
+};
+
+export type ResolvedOrganizationTimeTrackingSettings = {
+  correctionApprovalRequired: boolean;
+  scheduleAutoPunchesEnabled: boolean;
 };
 
 export type TenantThemeCssVariables = Record<`--${string}`, string>;
@@ -209,4 +229,87 @@ export function buildOrganizationThemeConfig(
   }
 
   return nextThemeConfig;
+}
+
+export function resolveOrganizationTimeTrackingSettings(
+  timeTrackingConfig: Json | undefined,
+): ResolvedOrganizationTimeTrackingSettings {
+  if (!isJsonObject(timeTrackingConfig)) {
+    return {
+      correctionApprovalRequired: false,
+      scheduleAutoPunchesEnabled: false,
+    };
+  }
+
+  return {
+    correctionApprovalRequired:
+      timeTrackingConfig.correctionApprovalRequired === true,
+    scheduleAutoPunchesEnabled:
+      timeTrackingConfig.scheduleAutoPunchesEnabled === true,
+  };
+}
+
+export function validateOrganizationTimeTrackingSettingsForm(
+  formData: FormData,
+): OrganizationTimeTrackingSettingsValidationResult {
+  const rawCorrectionMode = formData.get("correctionMode");
+  const rawApprovalRequired = formData.get("correctionApprovalRequired");
+
+  if (rawCorrectionMode !== null) {
+    if (
+      rawCorrectionMode !== "direct" &&
+      rawCorrectionMode !== "approval"
+    ) {
+      return {
+        error: "invalid-time-tracking-config",
+        ok: false,
+      };
+    }
+
+    return {
+      ok: true,
+      values: {
+        correctionApprovalRequired: rawCorrectionMode === "approval",
+      },
+    };
+  }
+
+  if (
+    rawApprovalRequired !== null &&
+    rawApprovalRequired !== "on" &&
+    rawApprovalRequired !== "true"
+  ) {
+    return {
+      error: "invalid-time-tracking-config",
+      ok: false,
+    };
+  }
+
+  return {
+    ok: true,
+    values: {
+      correctionApprovalRequired: rawApprovalRequired !== null,
+    },
+  };
+}
+
+export function buildOrganizationTimeTrackingConfig(
+  currentTimeTrackingConfig: Json | undefined,
+  values: OrganizationTimeTrackingSettingsValues,
+): Json {
+  const nextTimeTrackingConfig: Record<string, Json> = isJsonObject(
+    currentTimeTrackingConfig,
+  )
+    ? { ...currentTimeTrackingConfig }
+    : {};
+
+  nextTimeTrackingConfig.version = 1;
+  nextTimeTrackingConfig.correctionApprovalRequired =
+    values.correctionApprovalRequired;
+  nextTimeTrackingConfig.scheduleAutoPunchesEnabled =
+    typeof values.scheduleAutoPunchesEnabled === "boolean"
+      ? values.scheduleAutoPunchesEnabled
+      : nextTimeTrackingConfig.scheduleAutoPunchesEnabled === true;
+
+  return nextTimeTrackingConfig;
 }

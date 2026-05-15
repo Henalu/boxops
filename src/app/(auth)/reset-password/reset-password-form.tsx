@@ -32,7 +32,7 @@ export function ResetPasswordForm({ action }: ResetPasswordFormProps) {
 
     if (password !== confirmPassword) {
       event.preventDefault();
-      setClientError("Las contrasenas no coinciden.");
+      setClientError("Las contraseñas no coinciden.");
       return;
     }
 
@@ -43,13 +43,13 @@ export function ResetPasswordForm({ action }: ResetPasswordFormProps) {
     <form action={action} className="space-y-4" onSubmit={handleSubmit}>
       {clientError ? (
         <Alert variant="destructive">
-          <AlertTitle>Revisa la contrasena</AlertTitle>
+          <AlertTitle>Revisa la contraseña</AlertTitle>
           <AlertDescription>{clientError}</AlertDescription>
         </Alert>
       ) : null}
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Nueva contrasena</span>
+        <span className="text-sm font-medium">Nueva contraseña</span>
         <Input
           aria-describedby="password-policy"
           aria-invalid={clientError ? true : undefined}
@@ -66,7 +66,7 @@ export function ResetPasswordForm({ action }: ResetPasswordFormProps) {
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Confirmar contrasena</span>
+        <span className="text-sm font-medium">Confirmar contraseña</span>
         <Input
           aria-invalid={clientError ? true : undefined}
           autoComplete="new-password"
@@ -83,7 +83,7 @@ export function ResetPasswordForm({ action }: ResetPasswordFormProps) {
       </p>
 
       <Button className="w-full" type="submit">
-        Guardar nueva contrasena
+        Guardar nueva contraseña
       </Button>
     </form>
   );

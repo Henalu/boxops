@@ -17,3 +17,6 @@ playwright-report/
 
 *.tsbuildinfo
 *.log
+
+# Supabase Studio scratch queries; keep named snippets explicit.
+supabase/snippets/Untitled query *.sql

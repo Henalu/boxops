@@ -32,6 +32,22 @@ export type ScheduleTemplateBlockFormValues = {
   templateId: string;
 };
 
+export type ScheduleTemplateCoachAvailabilityBlockInput = {
+  default_coach_profile_id: string | null;
+  day_of_week: number;
+  end_time: string;
+  id: string;
+  start_time: string;
+};
+
+export type ScheduleTemplateCoachUnavailableBlock = {
+  coachProfileId: string;
+  dayOfWeek: number;
+  endTime: string;
+  startTime: string;
+  templateBlockId: string;
+};
+
 export type ScheduleTemplateValidationResult =
   | {
       ok: true;
@@ -91,6 +107,48 @@ export function getScheduleTemplateStatusLabel(status: string) {
   return isScheduleTemplateStatus(status) ? labels[status] : status;
 }
 
+export function scheduleTemplateBlockRequiresCoach(requiredCoaches: number) {
+  return requiredCoaches > 0;
+}
+
+export function getScheduleTemplateRequiredCoachesLabel(
+  requiredCoaches: number,
+) {
+  if (!scheduleTemplateBlockRequiresCoach(requiredCoaches)) {
+    return "No requiere entrenador";
+  }
+
+  return `${requiredCoaches} entrenador${requiredCoaches === 1 ? "" : "es"} necesario${requiredCoaches === 1 ? "" : "s"}`;
+}
+
+export function getScheduleTemplateDefaultCoachLabel({
+  defaultCoachLabel,
+  requiredCoaches,
+}: {
+  defaultCoachLabel?: string | null;
+  requiredCoaches: number;
+}) {
+  if (!scheduleTemplateBlockRequiresCoach(requiredCoaches)) {
+    return "Sin requisito";
+  }
+
+  return defaultCoachLabel ?? "Vacante";
+}
+
+export function getScheduleTemplateDefaultCoachDetail({
+  defaultCoachLabel,
+  requiredCoaches,
+}: {
+  defaultCoachLabel?: string | null;
+  requiredCoaches: number;
+}) {
+  if (!scheduleTemplateBlockRequiresCoach(requiredCoaches)) {
+    return "No requiere entrenador";
+  }
+
+  return defaultCoachLabel ?? "Vacante";
+}
+
 export function getScheduleTemplateDayLabel(day: number) {
   const labels: Record<ScheduleTemplateDay, string> = {
     1: "Lunes",
@@ -123,6 +181,73 @@ function timeToMinutes(value: string) {
   const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
 
   return hours * 60 + minutes;
+}
+
+function timeRangesOverlap(
+  firstStart: string,
+  firstEnd: string,
+  secondStart: string,
+  secondEnd: string,
+) {
+  return (
+    timeToMinutes(firstStart) < timeToMinutes(secondEnd) &&
+    timeToMinutes(secondStart) < timeToMinutes(firstEnd)
+  );
+}
+
+export function getUnavailableScheduleTemplateCoachBlocks({
+  blocks,
+  targetBlock,
+}: {
+  blocks: ScheduleTemplateCoachAvailabilityBlockInput[];
+  targetBlock: {
+    day_of_week: number;
+    end_time: string;
+    id?: string | null;
+    start_time: string;
+  };
+}) {
+  const targetStartTime = normalizeTime(targetBlock.start_time);
+  const targetEndTime = normalizeTime(targetBlock.end_time);
+
+  if (
+    !targetStartTime ||
+    !targetEndTime ||
+    timeToMinutes(targetStartTime) >= timeToMinutes(targetEndTime)
+  ) {
+    return [];
+  }
+
+  return blocks.flatMap((block) => {
+    const blockStartTime = normalizeTime(block.start_time);
+    const blockEndTime = normalizeTime(block.end_time);
+
+    if (
+      !block.default_coach_profile_id ||
+      block.id === targetBlock.id ||
+      block.day_of_week !== targetBlock.day_of_week ||
+      !blockStartTime ||
+      !blockEndTime ||
+      !timeRangesOverlap(
+        blockStartTime,
+        blockEndTime,
+        targetStartTime,
+        targetEndTime,
+      )
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        coachProfileId: block.default_coach_profile_id,
+        dayOfWeek: block.day_of_week,
+        endTime: blockEndTime,
+        startTime: blockStartTime,
+        templateBlockId: block.id,
+      } satisfies ScheduleTemplateCoachUnavailableBlock,
+    ];
+  });
 }
 
 function parseRequiredCoaches(value: string) {
@@ -266,7 +391,9 @@ export function validateScheduleTemplateBlockForm(
   const notes = getFormString(formData, "notes");
   const dayOfWeek = parseDayOfWeek(rawDayOfWeek);
   const requiredCoaches = parseRequiredCoaches(rawRequiredCoaches);
-  const defaultCoachProfileId = parseOptionalUuid(rawDefaultCoachProfileId);
+  const parsedDefaultCoachProfileId = parseOptionalUuid(
+    rawDefaultCoachProfileId,
+  );
 
   if (
     !templateId ||
@@ -324,7 +451,10 @@ export function validateScheduleTemplateBlockForm(
     };
   }
 
-  if (defaultCoachProfileId === undefined) {
+  if (
+    scheduleTemplateBlockRequiresCoach(requiredCoaches) &&
+    parsedDefaultCoachProfileId === undefined
+  ) {
     return {
       ok: false,
       error: "invalid-coach",
@@ -337,6 +467,12 @@ export function validateScheduleTemplateBlockForm(
       error: "notes-too-long",
     };
   }
+
+  const defaultCoachProfileId = scheduleTemplateBlockRequiresCoach(
+    requiredCoaches,
+  )
+    ? (parsedDefaultCoachProfileId ?? null)
+    : null;
 
   return {
     ok: true,

@@ -17,8 +17,8 @@ export default function AppError({
       <AlertTriangle aria-hidden="true" className="size-4" />
       <AlertTitle>No se ha podido cargar el panel</AlertTitle>
       <AlertDescription>
-        Reintenta la carga. Si vuelve a fallar, revisa que la sesión, el tenant
-        y las lecturas de horario sigan disponibles.
+        Reintenta la carga. Si vuelve a fallar, revisa que la sesión, la
+        organización y las lecturas de horario sigan disponibles.
       </AlertDescription>
       <div className="mt-3">
         <Button onClick={reset} size="sm" type="button" variant="outline">

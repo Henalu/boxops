@@ -2,12 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
+  BarChart3,
+  CalendarDays,
+  CalendarOff,
   CalendarRange,
   CircleHelp,
   Dumbbell,
+  FileText,
+  Inbox,
   LogOut,
   MapPin,
   Settings,
+  Timer,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -30,19 +36,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
-import { getApplicationRoleLabel } from "@/lib/auth/permissions";
+import {
+  canManageOperationalData,
+  getApplicationRoleLabel,
+} from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
 import {
+  getAbsencesPath,
   getAccountPath,
   getCentersPath,
   getClassTypesPath,
   getCoachesPath,
+  getRequestsPath,
+  getSchedulePath,
   getScheduleTemplatesPath,
   getSettingsPath,
+  getStatsPath,
+  getTimePath,
 } from "@/lib/navigation/app-paths";
 import { resolveWeek } from "@/lib/schedule-blocks";
 
@@ -89,6 +103,60 @@ function MobileHubLink({
   );
 }
 
+function MobileHubNote({
+  description,
+  icon: Icon,
+  title,
+}: {
+  description: string;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <div className="flex min-h-16 items-center gap-3 rounded-xl bg-muted/35 px-4 py-2.5 text-left ring-1 ring-foreground/10 md:hidden">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      <Badge variant="outline">Pendiente</Badge>
+    </div>
+  );
+}
+
+function InfoCard({
+  description,
+  icon: Icon,
+  title,
+}: {
+  description: string;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="flex h-full flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+            <Icon aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-medium">{title}</h3>
+              <Badge variant="outline">Pendiente</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function MorePage({ searchParams }: MorePageProps) {
   const user = await getAuthenticatedUser();
 
@@ -117,12 +185,19 @@ export default async function MorePage({ searchParams }: MorePageProps) {
     week: week.weekStart,
   };
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
+  const canManageOperational = canManageOperationalData(
+    resolution.membership.role,
+  );
 
   return (
     <div className="space-y-5 md:space-y-6">
       <PageHeader
         badge="Más"
-        description="Gestión del box, ayuda y accesos secundarios."
+        description={
+          canManageOperational
+            ? "Gestión del box, ayuda y accesos secundarios."
+            : "Tus accesos personales, consulta operativa y ayuda."
+        }
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -132,86 +207,217 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         title="Más"
       />
 
-      <section className="space-y-2.5 md:space-y-3">
-        <div className="space-y-1">
-          <SectionHeader title="Gestión" />
-          <p className="hidden text-sm text-muted-foreground md:block">
-            Pantallas de administración que no necesitan estar siempre en la
-            navegación principal.
-          </p>
-        </div>
-        <div className="grid gap-2.5 md:hidden">
-          <MobileHubLink
-            description="Sedes y estado operativo"
-            href={getCentersPath(baseOptions)}
-            icon={MapPin}
-            title="Centros"
-          />
-          <MobileHubLink
-            description="Clases y actividades"
-            href={getClassTypesPath(baseOptions)}
-            icon={Dumbbell}
-            title="Tipos de actividad"
-          />
-          <MobileHubLink
-            description="Semanas base reutilizables"
-            href={getScheduleTemplatesPath(baseOptions)}
-            icon={CalendarRange}
-            title="Plantillas"
-          />
-          <MobileHubLink
-            description="Marca y organización"
-            href={getSettingsPath(baseOptions)}
-            icon={Settings}
-            title="Configuración"
-          />
-        </div>
-        <div className="hidden gap-3 md:grid md:grid-cols-2">
-          <ActionCard
-            description="Gestiona sedes activas e inactivas del box."
-            href={getCentersPath(baseOptions)}
-            icon={MapPin}
-            label="Abrir centros"
-            title="Centros"
-          />
-          <ActionCard
-            description="Revisa accesos, roles y fichas operativas de coaches."
-            href={getCoachesPath(baseOptions)}
-            icon={UsersRound}
-            label="Abrir equipo"
-            title="Equipo"
-          />
-          <ActionCard
-            description="Define las clases y actividades usadas en horario y plantillas."
-            href={getClassTypesPath(baseOptions)}
-            icon={Dumbbell}
-            label="Abrir tipos"
-            title="Tipos de actividad"
-          />
-          <ActionCard
-            description="Crea semanas tipo y aplícalas al horario real."
-            href={getScheduleTemplatesPath(baseOptions)}
-            icon={CalendarRange}
-            label="Abrir plantillas"
-            title="Plantillas"
-          />
-          <ActionCard
-            description="Ajusta nombre visible y marca ligera del tenant."
-            href={getSettingsPath(baseOptions)}
-            icon={Settings}
-            label="Abrir configuración"
-            title="Configuración"
-          />
-        </div>
-      </section>
+      {canManageOperational ? (
+        <section className="space-y-2.5 md:space-y-3">
+          <div className="space-y-1">
+            <SectionHeader title="Gestión" />
+            <p className="hidden text-sm text-muted-foreground md:block">
+              Pantallas de administración que no necesitan estar siempre en la
+              navegación principal.
+            </p>
+          </div>
+          <div className="grid gap-2.5 md:hidden">
+            <MobileHubLink
+              description="Sedes y estado operativo"
+              href={getCentersPath(baseOptions)}
+              icon={MapPin}
+              title="Centros"
+            />
+            <MobileHubLink
+              description="Clases y actividades"
+              href={getClassTypesPath(baseOptions)}
+              icon={Dumbbell}
+              title="Tipos de actividad"
+            />
+            <MobileHubLink
+              description="Semanas base reutilizables"
+              href={getScheduleTemplatesPath(baseOptions)}
+              icon={CalendarRange}
+              title="Plantillas"
+            />
+            <MobileHubLink
+              description="Carga, clases y cobertura"
+              href={getStatsPath(baseOptions)}
+              icon={BarChart3}
+              title="Estadísticas"
+            />
+            <MobileHubLink
+              description="Marca y organización"
+              href={getSettingsPath(baseOptions)}
+              icon={Settings}
+              title="Configuración"
+            />
+          </div>
+          <div className="hidden gap-3 md:grid md:grid-cols-2">
+            <ActionCard
+              description="Gestiona sedes activas e inactivas del box."
+              href={getCentersPath(baseOptions)}
+              icon={MapPin}
+              label="Abrir centros"
+              title="Centros"
+            />
+            <ActionCard
+              description="Revisa accesos, roles y fichas operativas de entrenadores."
+              href={getCoachesPath(baseOptions)}
+              icon={UsersRound}
+              label="Abrir equipo"
+              title="Equipo"
+            />
+            <ActionCard
+              description="Define las clases y actividades usadas en horario y plantillas."
+              href={getClassTypesPath(baseOptions)}
+              icon={Dumbbell}
+              label="Abrir tipos"
+              title="Tipos de actividad"
+            />
+            <ActionCard
+              description="Crea semanas tipo y aplícalas al horario real."
+              href={getScheduleTemplatesPath(baseOptions)}
+              icon={CalendarRange}
+              label="Abrir plantillas"
+              title="Plantillas"
+            />
+            <ActionCard
+              description="Compara carga de coaches, tipos de clase y riesgos de cobertura."
+              href={getStatsPath(baseOptions)}
+              icon={BarChart3}
+              label="Abrir estadísticas"
+              title="Estadísticas"
+            />
+            <ActionCard
+              description="Ajusta nombre visible y marca ligera de la organización."
+              href={getSettingsPath(baseOptions)}
+              icon={Settings}
+              label="Abrir configuración"
+              title="Configuración"
+            />
+          </div>
+        </section>
+      ) : (
+        <>
+          <section className="space-y-2.5 md:space-y-3">
+            <SectionHeader
+              description="Accesos centrados en tu jornada, tus próximas clases y tu información personal."
+              title="Mi actividad"
+            />
+            <div className="grid gap-2.5 md:hidden">
+              <MobileHubLink
+                description="Clases asignadas"
+                href={getSchedulePath({ ...baseOptions, mineOnly: true })}
+                icon={CalendarDays}
+                title="Próximas clases"
+              />
+              <MobileHubLink
+                description="Semana, avisos y correcciones"
+                href={getTimePath(baseOptions)}
+                icon={BarChart3}
+                title="Estadísticas personales"
+              />
+              <MobileHubNote
+                description="Bandeja documental futura"
+                icon={FileText}
+                title="Documentos"
+              />
+            </div>
+            <div className="hidden gap-3 md:grid md:grid-cols-2">
+              <ActionCard
+                description="Consulta solo tus bloques asignados y abre el detalle de la semana."
+                href={getSchedulePath({ ...baseOptions, mineOnly: true })}
+                icon={CalendarDays}
+                label="Abrir mi horario"
+                title="Próximas clases"
+              />
+              <ActionCard
+                description="Revisa tu semana de fichaje, avisos personales y correcciones."
+                href={getTimePath(baseOptions)}
+                icon={BarChart3}
+                label="Abrir fichaje"
+                title="Estadísticas personales"
+              />
+              <InfoCard
+                description="La bandeja documental visible todavía no está abierta en este corte. Mi cuenta mantiene tu perfil, avatar y firma privada."
+                icon={FileText}
+                title="Documentos"
+              />
+            </div>
+          </section>
+          <section className="space-y-2.5 md:space-y-3">
+            <SectionHeader
+              description="Datos de la organización que un entrenador puede consultar en modo lectura."
+              title="Consulta"
+            />
+            <div className="grid gap-2.5 md:hidden">
+              <MobileHubLink
+                description="Personas y fichas visibles"
+                href={getCoachesPath(baseOptions)}
+                icon={UsersRound}
+                title="Equipo"
+              />
+              <MobileHubLink
+                description="Sedes disponibles"
+                href={getCentersPath(baseOptions)}
+                icon={MapPin}
+                title="Centros"
+              />
+              <MobileHubLink
+                description="Clases y actividades"
+                href={getClassTypesPath(baseOptions)}
+                icon={Dumbbell}
+                title="Tipos de actividad"
+              />
+            </div>
+            <div className="hidden gap-3 md:grid md:grid-cols-2">
+              <ActionCard
+                description="Consulta personas, fichas visibles y datos de equipo en modo lectura."
+                href={getCoachesPath(baseOptions)}
+                icon={UsersRound}
+                label="Abrir equipo"
+                title="Equipo"
+              />
+              <ActionCard
+                description="Revisa sedes disponibles y contexto básico de centros."
+                href={getCentersPath(baseOptions)}
+                icon={MapPin}
+                label="Abrir centros"
+                title="Centros"
+              />
+              <ActionCard
+                description="Consulta el catálogo de clases y actividades usadas en el horario."
+                href={getClassTypesPath(baseOptions)}
+                icon={Dumbbell}
+                label="Abrir tipos"
+                title="Tipos de actividad"
+              />
+            </div>
+          </section>
+        </>
+      )}
 
       <section className="space-y-2.5 md:hidden">
-        <SectionHeader title="Mi cuenta" />
+        <SectionHeader title="Personal" />
+        <MobileHubLink
+          description="Vacaciones y permisos"
+          href={getAbsencesPath(baseOptions)}
+          icon={CalendarOff}
+          title="Ausencias"
+        />
+        <MobileHubLink
+          description="Cambios y cobertura"
+          href={getRequestsPath(baseOptions)}
+          icon={Inbox}
+          title="Solicitudes"
+        />
         <MobileHubLink
           description="Perfil visible y cuenta"
           href={getAccountPath(baseOptions)}
           icon={UserRound}
           title="Mi cuenta"
+        />
+        <MobileHubLink
+          description="Entrada, salida y registros"
+          href={getTimePath(baseOptions)}
+          icon={Timer}
+          title="Mi fichaje"
         />
         <Card size="sm">
           <CardContent className="space-y-3">
@@ -240,11 +446,32 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         <SectionHeader title="Personal" />
         <div className="grid gap-3 md:grid-cols-2">
           <ActionCard
+            description="Consulta tus ausencias y, si gestionas el box, revisa pendientes minimizados."
+            href={getAbsencesPath(baseOptions)}
+            icon={CalendarOff}
+            label="Abrir ausencias"
+            title="Ausencias"
+          />
+          <ActionCard
+            description="Revisa cambios de bloque y cobertura propios o recibidos."
+            href={getRequestsPath(baseOptions)}
+            icon={Inbox}
+            label="Abrir solicitudes"
+            title="Solicitudes"
+          />
+          <ActionCard
             description="Revisa tu cuenta, perfil visible y frontera personal segura."
             href={getAccountPath(baseOptions)}
             icon={UserRound}
             label="Abrir Mi cuenta"
             title="Mi cuenta"
+          />
+          <ActionCard
+            description="Registra entrada o salida manual y consulta tus jornadas recientes."
+            href={getTimePath(baseOptions)}
+            icon={Timer}
+            label="Abrir fichaje"
+            title="Mi fichaje"
           />
         </div>
       </section>
@@ -270,23 +497,25 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         </div>
       </section>
 
-      <Card className="hidden md:flex">
-        <CardHeader>
-          <CardTitle>Acceso actual</CardTitle>
-          <CardDescription>
-            Estás trabajando en {resolution.organization.name} con rol{" "}
-            {roleLabel}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link
-            className="text-sm font-medium underline underline-offset-4"
-            href={getScheduleTemplatesPath(baseOptions)}
-          >
-            Ir a plantillas semanales
-          </Link>
-        </CardContent>
-      </Card>
+      {canManageOperational ? (
+        <Card className="hidden md:flex">
+          <CardHeader>
+            <CardTitle>Acceso actual</CardTitle>
+            <CardDescription>
+              Estás trabajando en {resolution.organization.name} con rol{" "}
+              {roleLabel}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              className="text-sm font-medium underline underline-offset-4"
+              href={getScheduleTemplatesPath(baseOptions)}
+            >
+              Ir a plantillas semanales
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

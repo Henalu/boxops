@@ -1,6 +1,6 @@
-# Personal Data Permissions - Fases D.2/D.3/D.4/D.5/E.1
+# Personal Data Permissions - Fases D.2/D.3/D.4/D.5/E.1/E.2/E.3/E.4/E.5
 
-Estado: D.2 queda cerrada el 2026-05-07 como matriz documental de permisos. D.3 queda cerrada el 2026-05-08 como modelo documental de avatar privado tenant-scoped. D.4 queda implementada el 2026-05-08 como primer avatar privado propio con `profile_assets`, bucket privado, RLS/RPC, policies de Storage y UI minima en `/app/account`. D.5 queda implementada el 2026-05-08 como "Mi firma" privada propia con `profile_signatures`, bucket privado, RLS/RPC, policies de Storage y canvas minimo en `/app/account`. E.1 queda documentada el 2026-05-08 como modelo seguro de documentos privados/empresa/persona, grants, Storage privado candidato y evidencias futuras. Documentos firmables, boton "Firmar", snapshots reales, auditoria real y RRHH sensible siguen fuera.
+Estado: D.2 queda cerrada el 2026-05-07 como matriz documental de permisos. D.3 queda cerrada el 2026-05-08 como modelo documental de avatar privado tenant-scoped. D.4 queda implementada el 2026-05-08 como primer avatar privado propio con `profile_assets`, bucket privado, RLS/RPC, policies de Storage y UI minima en `/app/account`. D.5 queda implementada el 2026-05-08 como "Mi firma" privada propia con `profile_signatures`, bucket privado, RLS/RPC, policies de Storage y canvas minimo en `/app/account`. E.1 queda documentada el 2026-05-08 como modelo seguro de documentos privados/empresa/persona, grants, Storage privado candidato y evidencias futuras. E.2 implementa el primer schema minimo de metadata documental privada con `documents`, `document_versions`, `document_subjects` y `document_access_grants`. E.3 implementa `document-files` como bucket privado minimo con RPCs y policies de Storage por `document_versions`. E.4 implementa `document_access_events` como auditoria documental minima segura con RLS y RPCs de registro/consulta. E.5 implementa rutas backend minimas de preview/descarga con signed URLs cortas y auditoria. F.10 ya deja fichaje manual propio con historial visible de cambios; G.2 documenta decision tecnica/legal de ubicacion asistida sin implementarla. I.9 documenta ausencias/vacaciones/permisos como dominio propio separado de cambios/cobertura, I.10 implementa una foundation interna DB/RLS/RPC, I.11 anade helper server-side interno, I.12 abre una primera bandeja visible protegida, I.13 anade creacion minima de solicitud propia sin calendario, I.14 endurece filtros/validacion/estados no accionables, I.15 anade QA tecnico de regresion e I.16 integra impacto derivado en lectura de cobertura sin cambiar visibilidad real ni campos personales. Documentos firmables, boton "Firmar", snapshots reales, pagina documental, subida desde app, geolocalizacion activa y RRHH sensible siguen fuera.
 
 ## Decision D.2
 
@@ -85,6 +85,71 @@ La decision concreta:
 
 E.1 no implementa documentos, permisos reales, buckets, boton "Firmar", snapshots reales, nominas, RRHH sensible, fichaje ni geolocalizacion.
 
+## Decision E.2
+
+E.2 convierte una parte de E.1 en schema tecnico minimo, pero sigue sin crear documentos reales ni superficie de producto.
+
+La decision concreta:
+
+- crear `documents`, `document_versions`, `document_subjects` y `document_access_grants` con `organization_id` obligatorio;
+- mantener `documents` como cabecera logica, `document_versions` como metadata de archivo/version, `document_subjects` como afectados y `document_access_grants` como permisos explicitos;
+- guardar `storage_bucket = 'document-files'` y rutas internas tipo `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}` solo como metadata candidata;
+- no crear el bucket `document-files`, policies de Storage, subida, preview ni descarga real;
+- mantener `requires_signature` en `documents`, pero con CHECK `requires_signature = false` para no abrir documentos firmables;
+- permitir lectura por sujeto persona propio o por grant explicito; los grants pueden apuntar a persona, membership, rol o capability;
+- no conceder lectura global de documentos personales sensibles a `owner`, `admin` ni `manager`;
+- usar `document_admin` como rol explicito para documentos privados/gestion/sensitive HR no payroll y `payroll_manager` para documentos `payroll`;
+- permitir `owner`/`admin` solo en gestion de documentos no sensibles de empresa/programacion/certificacion;
+- dejar `document_access_events`, `coach_certifications`, `document_signature_requests` y `document_signature_evidences` para fases futuras.
+
+E.2 no implementa buckets, UI, documentos firmables, boton "Firmar", snapshots reales, auditoria real, nominas, RRHH sensible nuevo, fichaje ni geolocalizacion.
+
+## Decision E.3
+
+E.3 convierte `document-files` en Storage privado real sin abrir un modulo visible de documentos.
+
+La decision concreta:
+
+- crear bucket privado `document-files` con `public = false`, limite 10 MB y MIME permitidos cerrados;
+- mantener la ruta `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}`;
+- crear `begin_document_version_upload`, `activate_document_version_upload` y `cancel_document_version_upload` como RPCs seguras para el ciclo de version;
+- permitir upload en `storage.objects` solo si existe una `document_versions.pending` del uploader y path exacto;
+- permitir lectura de archivo solo para `document_versions.active/archived` y documentos `active/archived` accesibles por sujeto propio, grant o capacidad documental explicita;
+- revocar escritura directa autenticada sobre `document_versions` para que las versiones de archivo pasen por las RPCs;
+- no crear UI documental, preview/descarga desde app, documentos firmables, snapshots, auditoria real, nominas, RRHH sensible nuevo, fichaje ni geolocalizacion.
+
+## Decision E.4
+
+E.4 convierte la auditoria documental candidata en una base tecnica minima, sin abrir el modulo visible de documentos.
+
+La decision concreta:
+
+- crear `document_access_events` con `organization_id` obligatorio, documento, version opcional, actor autenticado, membership, persona resuelta si existe, evento, access level, resultado, metadata minimizada y timestamp;
+- cerrar `event_type` a metadata, preview, descarga, version, grants y sujetos; cerrar `result` a `allowed`/`denied`;
+- no guardar contenido documental, URLs publicas, signed URLs, rutas Storage, tokens, firmas ni hashes documentales en metadata de auditoria;
+- no conceder lectura de auditoria por herencia a `owner`, `admin` ni `manager`;
+- permitir a `document_admin` leer auditoria no payroll, incluida `sensitive_hr`, y reservar auditoria `payroll` a `payroll_manager`;
+- no abrir lectura propia de auditoria a usuarios normales en E.4; queda como decision futura si se disena una pantalla controlada;
+- crear `record_document_access_event` y `list_document_access_events_for_document` como RPCs seguras;
+- conectar `activate_document_version_upload` con eventos `version_activated` y `version_archived`;
+- dejar `file_preview` y `file_download` preparados para futuras rutas controladas, sin registrar preview/descarga real desde app en E.4.
+
+## Decision E.5
+
+E.5 convierte esos eventos preparados en el primer acceso real controlado a archivos documentales privados, sin abrir UI documental.
+
+La decision concreta:
+
+- crear solo rutas backend bajo `/app/documents/[documentId]/versions/[documentVersionId]/preview` y `/download`;
+- resolver siempre usuario autenticado, organizacion activa y membership en servidor;
+- validar UUIDs, tenant, documento, version, bucket privado, estado `active`/`archived` y `requires_signature = false`;
+- reutilizar `can_access_document(..., 'preview')` para preview y `can_access_document(..., 'download')` para descarga;
+- generar signed URLs cortas de `document-files` solo tras validar acceso;
+- registrar `file_preview` y `file_download` permitidos con `record_document_access_event`;
+- registrar `denied` cuando falta permiso y el documento/version existe dentro del tenant;
+- no guardar signed URLs, URLs publicas persistentes, rutas Storage, tokens, hashes ni contenido documental en metadata, auditoria, logs o base de datos;
+- mantener estas rutas como infraestructura para una UI futura, no como modulo documental visible.
+
 ## Principios
 
 - `organization_id` es obligatorio en cualquier dato personal tenant-scoped.
@@ -124,6 +189,13 @@ Estas capacidades son nombres de diseno, no helpers implementados todavia:
 | `signature_evidence_read` | Leer evidencia de firma o snapshot asociado a una entidad firmada. |
 | `document_access_audit_read` | Leer auditoria de accesos documentales sensibles. |
 | `personal_data_audit_read` | Leer auditoria de acceso/cambio sobre datos personales sensibles. |
+| `time_location_settings_manage` | Mantener configuracion de ubicacion por centro si una fase futura implementa G.2. |
+| `time_location_event_self_read` | Leer los propios eventos de ubicacion minimizados. |
+| `time_location_event_review` | Ver eventos minimizados asociados a revision de fichaje, sin coordenadas crudas. |
+| `time_location_audit_read` | Leer auditoria/accesos de ubicacion si legalmente procede y se disena una pantalla/exporte. |
+| `absence_self_request` | Solicitar, leer y cancelar ausencias propias dentro del tenant activo. |
+| `absence_operational_review` | Revisar, aprobar o rechazar ausencias operativas minimizadas del tenant. |
+| `absence_impact_review` | Ver impacto de ausencias sobre bloques/asignaciones sin exponer motivos sensibles a coaches candidatos. |
 
 `owner`, `admin` y `manager` no deben mapearse en bloque a estas capacidades sensibles. Se decide capacidad por capacidad.
 
@@ -139,15 +211,17 @@ Estas capacidades son nombres de diseno, no helpers implementados todavia:
 | Contacto privado | telefono, direccion, contacto de emergencia | Tabla futura `person_private_profiles` o equivalente | Lee/edita parte propia segun politica | Sin acceso por defecto | `sensitive_hr_read/write` con auditoria | Pendiente |
 | Datos laborales base | puesto contractual, antiguedad, jornada legal, estado laboral | Tabla futura `employment_profiles` | Lee propios si legal/producto lo permite | `manager` no accede por defecto; `admin` tampoco por herencia automatica | `sensitive_hr_read/write`; posiblemente `owner` explicito | Pendiente |
 | Retribucion y payroll | salario, complementos, datos bancarios, nominas | Tablas/documentos separados y versionados | Lee sus documentos/valores si se decide | Sin acceso por defecto | `payroll_private_manage`; grants explicitos | Pendiente y fuera de Fase D |
-| Documentos de empresa | politicas internas, manuales, avisos, plantillas | E.1: `documents` + `document_versions` + grants; bucket privado `document-files` | Lee solo si el tenant/grant lo permite | No acceso por defecto a todo; depende de scope/grant | `document_company_read/manage`, `document_grant_manage` | E.1 documentado |
-| Documentos privados de persona | contratos, anexos, nominas, justificantes, documentos firmados | E.1: `documents`, `document_subjects`, `document_access_grants`, versiones privadas | Lee documentos propios con Auth activa si la politica lo permite | Sin acceso global automatico | `document_personal_self_read`, `document_personal_manage`, `payroll_private_manage`, grants por persona | E.1 documentado |
-| Documentos de gestion/admin | documentos internos de gestion, compliance, incidencias administrativas | E.1: `documents` con `document_scope = management_private` + grants | Sin acceso salvo grant/sujeto propio | `owner`/`admin`/`manager` no ven todo por herencia | `document_management_read/manage`, `document_grant_manage` | E.1 documentado |
-| Certificaciones | cursos, titulos, caducidades, adjuntos | E.1: `coach_certifications` + documento/adjunto privado opcional | Puede proponer/subir si se decide | Estado/caducidad podria ser operativo; adjunto privado no por defecto | `certification_self_submit`, `certification_manage` | E.1 documentado |
+| Documentos de empresa | politicas internas, manuales, avisos, plantillas | E.2: `documents` + `document_versions` + grants; E.3: bucket privado `document-files` | Lee solo si el tenant/grant lo permite | No acceso por defecto a todo; depende de scope/grant | `document_company_read/manage`, `document_grant_manage` | E.3 Storage tecnico; sin UI |
+| Documentos privados de persona | contratos, anexos, nominas, justificantes, documentos firmados | E.2: `documents`, `document_subjects`, `document_access_grants`, versiones privadas; E.3: archivo privado | Lee documentos propios con Auth activa si es sujeto persona o tiene grant | Sin acceso global automatico | `document_personal_self_read`, `document_personal_manage`, `payroll_private_manage`, grants por persona | E.3 Storage tecnico; sin UI/documentos reales visibles |
+| Documentos de gestion/admin | documentos internos de gestion, compliance, incidencias administrativas | E.2: `documents` con `document_scope = management_private` + grants; E.3: archivo privado | Sin acceso salvo grant/sujeto propio | `owner`/`admin`/`manager` no ven todo por herencia | `document_management_read/manage`, `document_grant_manage` | E.3 Storage tecnico; sin UI |
+| Certificaciones | cursos, titulos, caducidades, adjuntos | E.2 permite `document_scope = certification`; E.3 puede guardar adjunto privado; `coach_certifications` queda futuro | Puede proponer/subir si se decide | Estado/caducidad podria ser operativo; adjunto privado no por defecto | `certification_self_submit`, `certification_manage` | Storage documental tecnico; certificaciones pendientes |
 | Mi firma reutilizable | firma dibujada actual del perfil | `profile_signatures` real + Storage privado + hash/version | Crea/actualiza solo la propia desde `/app/account` | No pueden crear, actualizar ni usar firma ajena | Metadata limitada; evidencia solo al firmar entidades futuras | D.5 implementado para firma propia |
 | Solicitudes de firma documental | peticion pendiente para firmar documento/version | E.1 futuro: `document_signature_requests` | Firma solo solicitudes propias con Auth/persona vinculada | No firma por otra persona | `signature_request_manage`, `document_sign_self` | E.1 documentado; no implementado |
 | Snapshots/evidencias de firma | copia usada al firmar, hash, fecha, user agent/IP si procede | E.1 futuro: `document_signature_evidences` + bucket `document-signature-evidence` | Lee evidencia propia segun documento/grant | No acceso por rol alto generico | `signature_evidence_read` + grants/auditoria | E.1 documentado; no implementado |
-| Fichaje y geolocalizacion | entradas/salidas, correcciones, punto de ubicacion | Fases F/G con tablas propias | Lee registros propios | Aprobacion solo con permiso explicito | Auditoria, retencion y revision legal | Pendiente |
-| Cambios y ausencias | vacaciones, permisos, bajas, cambios de bloque | Fase I con tablas propias | Solicita/lee lo propio | Gestion operativa solo en workflow propio | Puede impactar RRHH y cobertura | Pendiente |
+| Fichaje manual | entradas/salidas, correcciones, historial de cambios, aprobacion opcional | Fase F con `time_records`, `time_punches`, correcciones, aprobaciones, exportes y auditoria | Lee y corrige registros propios segun politica del tenant | `owner`/`admin`/`manager` gestionan revision de fichaje, no payroll | Auditoria, exportes y retencion legal pendientes de cierre definitivo | F.10 implementado, sin geolocalizacion |
+| Ubicacion asistida | resultado dentro/fuera/desconocido, buckets de precision/distancia, fallback | G.2 candidato: `center_time_location_settings` + `time_location_events`, snapshot minimo opcional en `time_punches.metadata` | Lee eventos minimizados propios | Sin acceso por rol alto a coordenadas; gestion solo con capacidad de fichaje/configuracion | `time_location_settings_manage`, `time_location_event_self_read`, `time_location_event_review`, `time_location_audit_read` | G.2 documentado; no implementado |
+| Cambios/cobertura | solicitudes para cubrir o cambiar un bloque asignado | I.2-I.8: `change_requests`, `change_request_targets`, `change_request_events` | Solicita/responde lo propio segun workflow | `owner`/`admin`/`manager` gestionan decision operativa | No es ausencia, payroll ni horas extra aprobadas | Implementado para cobertura/cambio minimo |
+| Ausencias/vacaciones/permisos | vacaciones, dias libres, tramos, permisos minimizados, no disponibilidad | I.10: `absence_requests`, `absence_request_periods`, `absence_request_events`; I.11: helper interno `src/lib/absence-requests.ts`; I.12/I.13/I.14: bandeja, creacion propia, filtros query string y estados no accionables en `/app/absences`; I.15: smoke/guardrails de regresion; I.16: impacto derivado en cobertura; sin tabla de impactos | Crea/lee/cancela lo propio en bandeja visible, derivando persona desde sesion + tenant; no acepta `person_profile_id` ni `coach_profile_id` propio; resumen corto minimizado con confirmacion visible de no incluir datos sensibles | `owner`/`admin`/`manager` revisan datos minimizados desde cola protegida y ven impacto operativo en `/app/schedule`, `/app/coverage`, Inicio y `/app/stats`; los filtros no amplian visibilidad ni otorgan permisos; no ven salud/documentos/payroll por herencia | `absence_self_request`, `absence_operational_review`, `absence_impact_review`; legal/privacidad antes de datos reales/produccion | I.16 sin cambios de campos personales, sin motivos en cobertura, sin calendario, saldos legales, creacion para otra persona, resolucion automatica ni datos reales |
 
 ## Reglas Para Avatar
 
@@ -227,19 +301,19 @@ Minimos D.5 cumplidos:
 - actualizar la firma no cambia documentos o evidencias ya firmadas cuando existan snapshots;
 - cualquier boton "Firmar" futuro debe guardar snapshot/version de la firma usada y auditoria de la accion.
 
-## Reglas Para Documentos E.1
+## Reglas Para Documentos E.1/E.2/E.3/E.4/E.5
 
-E.1 define modelo candidato, no implementacion.
+E.1 define el modelo candidato. E.2 implementa las cuatro tablas base de metadata y permisos: `documents`, `document_versions`, `document_subjects` y `document_access_grants`. E.3 conecta `document_versions` con Storage privado minimo. E.4 implementa auditoria documental minima con `document_access_events`. E.5 abre rutas controladas de preview/descarga sin UI.
 
 Entidades candidatas:
 
 | Entidad | Regla |
 |---|---|
-| `documents` | Cabecera logica; incluye `organization_id`, scope, sensibilidad, estado y version actual. |
-| `document_versions` | Archivo/version concreta con bucket privado, ruta interna, MIME, tamano y hash. |
-| `document_subjects` | Personas o entidades afectadas por el documento; no equivale a permiso de lectura. |
-| `document_access_grants` | Permisos explicitos por persona, membership, rol/capacidad o version. |
-| `document_access_events` | Auditoria candidata de lectura, descarga, cambios de grants/versiones y evidencias. |
+| `documents` | Implementado en E.2 como cabecera logica; incluye `organization_id`, scope, sensibilidad, estado, version actual y `requires_signature = false`. |
+| `document_versions` | Implementado en E.2 como metadata de archivo/version; E.3 lo conecta a `document-files` privado con RPCs y policies de Storage. |
+| `document_subjects` | Implementado en E.2 para personas o entidades afectadas; no equivale a permiso de lectura para terceros. |
+| `document_access_grants` | Implementado en E.2 para permisos explicitos por persona, membership, rol/capability o version. |
+| `document_access_events` | Implementado en E.4 para auditoria minima de metadata, preview/descarga y cambios de version/grants/sujetos, con RLS estricta. E.5 registra accesos reales desde rutas controladas. |
 | `coach_certifications` | Certificaciones con estado/caducidad y adjunto privado opcional. |
 | `document_signature_requests` | Solicitudes futuras por documento/version y firmante. |
 | `document_signature_evidences` | Evidencia futura inmutable con snapshot de firma y hash/version documental. |
@@ -248,7 +322,7 @@ Buckets privados candidatos:
 
 | Bucket | Ruta candidata |
 |---|---|
-| `document-files` | `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}` |
+| `document-files` | E.3 lo crea privado: `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}` |
 | `document-signature-evidence` | `signature-snapshots/{organization_id}/{document_id}/{request_id}/{evidence_id}.png` |
 | `document-signature-evidence` | `signed-documents/{organization_id}/{document_id}/{document_version_id}/{evidence_id}.{ext}` |
 
@@ -260,6 +334,11 @@ Reglas de permisos:
 - Nominas, retribucion y datos bancarios requieren `payroll_private_manage` o grants explicitos, no `document_private_manage` generico.
 - Las certificaciones pueden exponer estado/caducidad como dato operativo, pero el adjunto puede seguir siendo privado.
 - Los grants y cambios de sensibilidad/visibilidad son acciones auditables candidatas.
+- En E.2, `owner`/`admin` solo gestionan documentos no sensibles de empresa/programacion/certificacion; `document_admin` gestiona documentos privados/gestion/sensitive HR no payroll; `payroll_manager` queda reservado para `payroll`.
+- En E.2, la lectura de documentos se abre por sujeto persona propio o por grant explicito; no hay lectura global por `manager`.
+- En E.3, la lectura del binario en Storage exige version/documento en estado publicable y reutiliza `can_access_document(..., 'preview')`; un `admin` sin grant no lee `sensitive_hr` ni `payroll`.
+- En E.4, la lectura de auditoria exige `document_admin` para no payroll o `payroll_manager` para payroll; `owner`, `admin` y `manager` no la leen por herencia.
+- En E.5, `file_preview` y `file_download` se emiten solo desde rutas backend controladas que generan signed URLs cortas despues de validar acceso.
 
 Reglas de firma documental futura:
 
@@ -281,10 +360,10 @@ Antes de guardar salario, contrato, jornada, datos bancarios, documentos laboral
 - documentar retencion, borrado, exportacion y acceso legal;
 - validar privacidad/legal antes de usar datos reales.
 
-## Fuera De D.2/D.3/D.4/D.5/E.1
+## Fuera De D.2/D.3/D.4/D.5/E.1/E.2/E.3/E.4/E.5/F.10/G.2
 
-- No hay documentos privados implementados.
+- Hay schema minimo de metadata documental privada, bucket `document-files` privado, auditoria documental minima y rutas backend de preview/descarga, pero no hay modulo visible de documentos ni subida/listado desde la app.
 - No hay documentos firmables ni boton "Firmar".
 - No hay snapshots documentales reales ni evidencias de firma aplicada.
-- No hay subida/consulta real de documentos, nominas, contratos, salario, fichaje, geolocalizacion, cambios ni ausencias.
+- No hay nominas, contratos, salario, geolocalizacion activa, swap, calendario completo de ausencias ni ausencias con datos reales.
 - No hay consola RRHH ni permisos sensibles nuevos en `src`.

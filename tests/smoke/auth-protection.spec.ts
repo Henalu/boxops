@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const protectedRoutes = [
   "/app",
+  "/app/absences",
+  "/app/absences?view=review&absence_type=vacation&absence_status=pending_review",
   "/app/account",
   "/app/centers",
   "/app/coaches",
@@ -12,7 +14,10 @@ const protectedRoutes = [
   "/app/settings",
   "/app/schedule?week=2026-05-04&risks_only=1",
   "/app/schedule?week=2026-05-04&view=agenda&block_id=00000000-0000-0000-0000-000000100400",
+  "/app/stats?week=2026-05-04",
   "/app/templates?week=2026-05-04",
+  "/app/time",
+  "/app/time/export?organizationId=00000000-0000-0000-0000-000000000000&from=2026-05-04&to=2026-05-10",
 ];
 
 test("login page renders the public auth surface", async ({ request }) => {
@@ -32,7 +37,7 @@ test("forgot password page renders a generic reset response", async ({ request }
   expect(response.ok()).toBeTruthy();
 
   const html = await response.text();
-  expect(html).toContain("Recuperar contrasena");
+  expect(html).toContain("Recuperar contraseña");
   expect(html).toContain(
     "Si el email corresponde a una cuenta con acceso, enviaremos instrucciones",
   );
@@ -47,7 +52,7 @@ test("reset password page is public and waits for a validated link", async ({
   expect(response.ok()).toBeTruthy();
 
   const html = await response.text();
-  expect(html).toContain("Nueva contrasena");
+  expect(html).toContain("Nueva contraseña");
   expect(html).toContain("Enlace pendiente de validar");
 });
 

@@ -18,9 +18,14 @@ export function buildProtectedPath(
   }
 
   if (
-    ["/app", "/app/schedule", "/app/templates", "/app/coverage", "/app/more"].includes(
-      path,
-    ) &&
+    [
+      "/app",
+      "/app/schedule",
+      "/app/templates",
+      "/app/coverage",
+      "/app/more",
+      "/app/stats",
+    ].includes(path) &&
     smokeWeek
   ) {
     query.set("week", smokeWeek);

@@ -328,7 +328,7 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
     <div className="space-y-6">
       <PageHeader
         badge="Centros"
-        description="Gestiona sedes, zona horaria y estado sin perder el contexto del tenant."
+        description="Gestiona sedes, zona horaria y estado sin perder el contexto de la organización."
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>

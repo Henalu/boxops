@@ -31,7 +31,7 @@ Estas respuestas informan MVP 1, pero no deben convertirse en reglas hardcodeada
 - Los perfiles `internal` no se exponen como equipo operativo normal; Henalu queda como perfil tecnico interno sin `coach_profile`.
 - `manager` queda como rol operativo futuro para horarios/asignaciones/aprobaciones, pero Task 009 no le da permisos completos de gestion de perfiles.
 - Task 010 implementa asignaciones manuales y cobertura basica desde `schedule_block_assignments`, sin dashboard ni plantillas.
-- En Task 010 los conflictos de solapamiento no bloquean guardar una asignacion; se muestran como riesgo `conflict` calculado.
+- Desde 2026-05-11 los conflictos de solapamiento temporal no deben poder guardarse desde la operativa normal: Postgres bloquea nuevas asignaciones `assigned` solapadas con `coach-unavailable`. `conflict` queda para datos legacy/importados o reglas futuras.
 - `manager` sigue pendiente para permisos operativos de horarios/cobertura: no recibe permisos completos hasta una tarea explicita.
 - Task 014 implementa el primer dashboard admin basico en `/app`, con cola de riesgos calculada al vuelo y enlaces al bloque real.
 - Perfiles operativos iniciales STL pendientes de Auth:

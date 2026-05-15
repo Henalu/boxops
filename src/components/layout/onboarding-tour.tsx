@@ -1,11 +1,19 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CircleHelp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import { getAppPath } from "@/lib/navigation/app-paths";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +28,7 @@ type PreferredPlacement = "top" | "bottom" | "left" | "right" | "center";
 
 type TourStep = {
   description: string;
+  fallbackTarget?: string;
   id: string;
   preferredPlacement: PreferredPlacement;
   route?: string;
@@ -48,7 +57,7 @@ const steps = [
     target: '[data-tour="nav-coverage"]',
     title: "Cobertura",
     description:
-      "Aquí aparecen clases sin coach, conflictos y riesgos que requieren acción.",
+      "Aquí aparecen clases sin entrenador, conflictos y riesgos que requieren acción.",
     preferredPlacement: "right",
   },
   {
@@ -56,7 +65,7 @@ const steps = [
     target: '[data-tour="nav-team"]',
     title: "Equipo",
     description:
-      "Aquí gestionas coaches y revisas la base operativa del equipo.",
+      "Aquí gestionas entrenadores y revisas la base operativa del equipo.",
     preferredPlacement: "right",
   },
   {
@@ -70,6 +79,7 @@ const steps = [
     id: "dashboard-summary",
     route: "/app",
     target: '[data-tour="dashboard-summary"]',
+    fallbackTarget: '[data-tour="next-assigned-block"]',
     title: "Resumen de la semana",
     description:
       "Aquí ves los números clave para saber cómo va la operativa.",
@@ -79,6 +89,7 @@ const steps = [
     id: "coverage-risks",
     route: "/app",
     target: '[data-tour="coverage-risks"]',
+    fallbackTarget: '[data-tour="personal-pending"], [data-tour="quick-actions"]',
     title: "Pendiente",
     description: "Aquí aparecen los riesgos que conviene resolver primero.",
     preferredPlacement: "right",
@@ -115,6 +126,13 @@ type TourLayout = {
   placement: TooltipPlacement;
   spotlightRect: Rect | null;
   tooltipStyle: CSSProperties;
+};
+
+type OnboardingTourProps = {
+  memberships?: {
+    organizationId: string;
+    role: string;
+  }[];
 };
 
 const defaultTooltipSize: ViewportSize = {
@@ -229,6 +247,13 @@ function getTourTarget(selector: string) {
     Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
       isElementMeasurable,
     ) ?? null
+  );
+}
+
+function getTourTargetForStep(step: TourStep) {
+  return (
+    getTourTarget(step.target) ??
+    (step.fallbackTarget ? getTourTarget(step.fallbackTarget) : null)
   );
 }
 
@@ -579,7 +604,7 @@ function TooltipPointer({
   );
 }
 
-export function OnboardingTour() {
+export function OnboardingTour({ memberships = [] }: OnboardingTourProps) {
   const descriptionId = useId();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -592,7 +617,29 @@ export function OnboardingTour() {
   const [tooltipSize, setTooltipSize] =
     useState<ViewportSize>(defaultTooltipSize);
   const [layout, setLayout] = useState<TourLayout | null>(null);
-  const step = steps[stepIndex];
+  const organizationId = searchParams.get("organizationId");
+  const currentRole =
+    (organizationId
+      ? memberships.find(
+          (membership) => membership.organizationId === organizationId,
+        )
+      : null)?.role ??
+    memberships[0]?.role ??
+    null;
+  const canReviewCoverage = currentRole
+    ? canManageOperationalData(currentRole)
+    : false;
+  const visibleSteps = useMemo(
+    () =>
+      steps.filter(
+        (candidate) =>
+          canReviewCoverage ||
+          (candidate.id !== "coverage" && candidate.id !== "coverage-risks"),
+      ),
+    [canReviewCoverage],
+  );
+  const safeStepIndex = Math.min(stepIndex, visibleSteps.length - 1);
+  const step = visibleSteps[safeStepIndex] ?? steps[0];
 
   const getStepRoutePath = useCallback(
     (route: string) =>
@@ -616,7 +663,7 @@ export function OnboardingTour() {
       buildTourLayout({
         rawTooltipSize: tooltipSize,
         step,
-        target: getTourTarget(step.target),
+        target: getTourTargetForStep(step),
         viewport: getViewportSize(),
       }),
     );
@@ -680,20 +727,27 @@ export function OnboardingTour() {
       return;
     }
 
-    const target = getTourTarget(step.target);
+    let frameId = 0;
+    const timers: number[] = [];
 
-    target?.scrollIntoView({
-      behavior: "auto",
-      block: "center",
-      inline: "center",
-    });
+    function syncTargetLayout() {
+      const target = getTourTargetForStep(step);
 
-    const frameId = window.requestAnimationFrame(updateLayout);
+      target?.scrollIntoView({
+        behavior: "auto",
+        block: "center",
+        inline: "center",
+      });
 
-    const timers = [
-      window.setTimeout(updateLayout, 150),
-      window.setTimeout(updateLayout, 450),
-    ];
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(updateLayout);
+    }
+
+    syncTargetLayout();
+
+    for (const delay of [120, 300, 700, 1100]) {
+      timers.push(window.setTimeout(syncTargetLayout, delay));
+    }
 
     return () => {
       window.cancelAnimationFrame(frameId);
@@ -701,7 +755,7 @@ export function OnboardingTour() {
         window.clearTimeout(timer);
       }
     };
-  }, [open, pathname, step.route, step.target, updateLayout]);
+  }, [open, pathname, step, updateLayout]);
 
   useEffect(() => {
     if (!open || !step.route || pathname === step.route) {
@@ -769,24 +823,24 @@ export function OnboardingTour() {
   }
 
   function nextStep() {
-    if (stepIndex === steps.length - 1) {
+    if (safeStepIndex === visibleSteps.length - 1) {
       closeTour();
       return;
     }
 
     setLayout(null);
-    setStepIndex(stepIndex + 1);
+    setStepIndex(safeStepIndex + 1);
   }
 
   function previousStep() {
     setLayout(null);
-    setStepIndex(Math.max(0, stepIndex - 1));
+    setStepIndex(Math.max(0, safeStepIndex - 1));
   }
 
   const currentLayout =
     layout ?? buildFallbackLayout(getViewportSize(), tooltipSize);
   const isSheet = currentLayout.placement === "sheet";
-  const progress = `${((stepIndex + 1) / steps.length) * 100}%`;
+  const progress = `${((safeStepIndex + 1) / visibleSteps.length) * 100}%`;
 
   return (
     <div
@@ -820,7 +874,7 @@ export function OnboardingTour() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
-              Paso {stepIndex + 1} de {steps.length}
+              Paso {safeStepIndex + 1} de {visibleSteps.length}
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight" id={titleId}>
               {step.title}
@@ -860,7 +914,7 @@ export function OnboardingTour() {
           </Button>
           <div className="flex gap-2">
             <Button
-              disabled={stepIndex === 0}
+              disabled={safeStepIndex === 0}
               onClick={previousStep}
               type="button"
               variant="outline"
@@ -868,7 +922,9 @@ export function OnboardingTour() {
               Anterior
             </Button>
             <Button onClick={nextStep} type="button">
-              {stepIndex === steps.length - 1 ? "Terminar" : "Siguiente"}
+              {safeStepIndex === visibleSteps.length - 1
+                ? "Terminar"
+                : "Siguiente"}
             </Button>
           </div>
         </div>

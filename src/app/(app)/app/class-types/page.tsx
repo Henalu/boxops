@@ -6,6 +6,7 @@ import {
   setClassTypeStatus,
   updateClassType,
 } from "./actions";
+import { ColorPaletteField } from "@/components/features/color-palette-field";
 import {
   CollapsibleActionPanel,
   InlineEditDetails,
@@ -73,6 +74,14 @@ const successMessages: Record<string, string> = {
   updated: "Tipo actualizado.",
 };
 
+const successDescriptions: Record<string, string> = {
+  activated: "Los horarios y plantillas volveran a leer este tipo como activo.",
+  created: "Ya puedes usarlo al crear bloques o plantillas.",
+  deactivated: "No se elimina ningun bloque historico vinculado.",
+  updated:
+    "Todos los bloques de plantilla y los horarios actuales o futuros vinculados se sincronizan sin tocar fechas pasadas.",
+};
+
 const errorMessages: Record<string, string> = {
   "class-type-required": "No se ha recibido el tipo a actualizar.",
   "duplicate-slug": "Ya existe un tipo con ese slug en esta organización.",
@@ -80,7 +89,7 @@ const errorMessages: Record<string, string> = {
   "invalid-category": "La categoría seleccionada no es válida.",
   "invalid-color": "Usa un color hexadecimal, por ejemplo #2563eb.",
   "invalid-required-coaches":
-    "Los coaches necesarios deben ser un número entero entre 0 y 20.",
+    "Los entrenadores necesarios deben ser un número entero entre 0 y 20.",
   "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
   "invalid-status": "El estado seleccionado no es válido.",
   "missing-fields": "Completa nombre y slug.",
@@ -211,24 +220,6 @@ function CertificationCheckbox({
   );
 }
 
-function ColorField({ defaultValue }: { defaultValue?: string | null }) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-sm font-medium">Color</span>
-      <div className="flex items-center gap-2">
-        <ColorSwatch color={defaultValue ?? null} />
-        <Input
-          defaultValue={defaultValue ?? ""}
-          maxLength={7}
-          name="color"
-          pattern="#?[0-9a-fA-F]{6}"
-          placeholder="#2563eb"
-        />
-      </div>
-    </label>
-  );
-}
-
 function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
   return (
     <form action={createClassType} className="grid gap-4 lg:grid-cols-6">
@@ -246,12 +237,12 @@ function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Categoria</span>
+        <span className="text-sm font-medium">Categoría</span>
         <ClassTypeCategorySelect />
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Coaches</span>
+        <span className="text-sm font-medium">Entrenadores</span>
         <Input
           defaultValue="1"
           max="20"
@@ -263,7 +254,7 @@ function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
       </label>
 
       <div className="lg:col-span-2">
-        <ColorField />
+        <ColorPaletteField label="Color" name="color" placeholder="#2563eb" />
       </div>
 
       <div className="flex items-end lg:col-span-2">
@@ -300,10 +291,10 @@ function ClassTypeReadOnlyCard({
           </p>
         </div>
         <MetaGrid className="lg:grid-cols-4">
-          <MetaItem label="Categoria">
+          <MetaItem label="Categoría">
             {getClassTypeCategoryLabel(classType.category)}
           </MetaItem>
-          <MetaItem label="Coaches">{classType.required_coaches}</MetaItem>
+          <MetaItem label="Entrenadores">{classType.required_coaches}</MetaItem>
           <MetaItem label="Certificacion">
             {classType.requires_certification ? "Si" : "No"}
           </MetaItem>
@@ -345,10 +336,10 @@ function ClassTypeAdminCard({
             </p>
           </div>
           <MetaGrid className="lg:grid-cols-4">
-            <MetaItem label="Categoria">
+            <MetaItem label="Categoría">
               {getClassTypeCategoryLabel(classType.category)}
             </MetaItem>
-            <MetaItem label="Coaches">{classType.required_coaches}</MetaItem>
+            <MetaItem label="Entrenadores">{classType.required_coaches}</MetaItem>
             <MetaItem label="Certificacion">
               {classType.requires_certification ? "Si" : "No"}
             </MetaItem>
@@ -385,12 +376,12 @@ function ClassTypeAdminCard({
               </label>
 
               <label className="grid gap-2">
-                <span className="text-sm font-medium">Categoria</span>
+                <span className="text-sm font-medium">Categoría</span>
                 <ClassTypeCategorySelect defaultValue={classType.category} />
               </label>
 
               <label className="grid gap-2">
-                <span className="text-sm font-medium">Coaches</span>
+                <span className="text-sm font-medium">Entrenadores</span>
                 <Input
                   defaultValue={classType.required_coaches}
                   max="20"
@@ -402,7 +393,12 @@ function ClassTypeAdminCard({
               </label>
 
               <div className="lg:col-span-2">
-                <ColorField defaultValue={classType.color} />
+                <ColorPaletteField
+                  defaultValue={classType.color}
+                  label="Color"
+                  name="color"
+                  placeholder="#2563eb"
+                />
               </div>
 
               <label className="grid gap-2">
@@ -504,9 +500,7 @@ export default async function ClassTypesPage({
       {status && successMessages[status] ? (
         <Alert>
           <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            El catálogo ya muestra los tipos actuales.
-          </AlertDescription>
+          <AlertDescription>{successDescriptions[status]}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -539,7 +533,7 @@ export default async function ClassTypesPage({
       <section className="space-y-3">
         <SectionHeader
           action={<Badge variant="outline">{classTypes.length} tipos</Badge>}
-          description="Nombre, categoría, coaches necesarios, certificación y color."
+          description="Nombre, categoría, entrenadores necesarios, certificación y color."
           title="Catálogo"
         />
 

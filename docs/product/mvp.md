@@ -4,9 +4,9 @@
 
 El MVP no intenta cubrir toda la operativa de un box. El primer corte debe validar que BoxOps resuelve mejor que hojas de calculo, WhatsApp y Factorial la parte mas especifica del negocio: horario semanal, clases y cobertura multi-centro.
 
-Estado actualizado 2026-05-06: MVP 1 visual/operativo ya esta avanzado tras Task 017. La prioridad inmediata es cerrar esa base con datos reales y ordenar las siguientes fases; no empezar documentos, fichaje, RRHH o app movil sin modelo de permisos, privacidad y criterio de salida.
+Estado actualizado 2026-05-10: MVP 1 visual/operativo ya esta avanzado y Fase A queda cerrada para QA interno, sin considerarse validacion oficial ni produccion. B.1/B.2, C y D.1-D.5 ya tienen primeros cortes implementados; E.1 queda documentada/modelada, E.2 abre metadata documental, E.3 crea Storage privado minimo, E.4 crea auditoria documental minima y E.5 abre preview/descarga backend controlada. La prioridad sigue siendo no abrir UI documental, documentos firmables, fichaje, RRHH sensible o app movil sin permisos, privacidad y criterio de salida.
 
-Nota Fase A 2026-05-06: STL ya tiene una semana de prueba L-V cargable en local mediante `supabase/snippets/stl-test-week-2026-05-04.sql`: 165 bloques, una plantilla activa y todos los bloques vacantes. La UI y el smoke E2E local admin/coach ya pasan con esa semana. `/app/templates` soporta vista Semana para editar por dias y vista Agenda para revision lineal. Falta confirmar centro por bloque, asignaciones/huecos reales y validacion E2E con credenciales o flujo reales del piloto.
+Nota Fase A 2026-05-08: STL tiene una semana de prueba L-V cargable en local mediante `supabase/snippets/stl-test-week-2026-05-04.sql`: 165 bloques, una plantilla activa y bloques vacantes sin coaches inventados. Tambien existe una muestra interna opcional en `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql` para QA interno y smoke tests, con coaches por defecto/asignaciones representativas, vacantes y una insuficiencia. Ya no siembra un conflicto deliberado porque los solapes imposibles de coach se bloquean en Postgres. La validacion oficial STL sigue pendiente antes de mover datos a seed/produccion.
 
 Regla de prioridad actual:
 
@@ -62,10 +62,10 @@ No incluye:
 - Vacaciones formales.
 - Fichaje.
 - Horas extra.
-- Documentos laborales.
-- Configuracion real de tenant/branding.
-- Roles avanzados fuera de `admin` y `coach`.
-- Area personal/RRHH.
+- Documentos laborales o firmables.
+- Branding avanzado por tenant o logo real.
+- RRHH sensible.
+- Firma documental.
 - IA.
 
 ### Criterio De Exito
@@ -79,11 +79,11 @@ No incluye:
 
 La vista resumida por fases vive en `docs/product/roadmap.md`; `TASKS.md` mantiene el backlog ejecutable.
 
-- Fase A: cerrar MVP 1 real con datos validados, plantillas, cobertura y deuda pequena.
-- Fase B: configuracion de tenant, logo, colores, `organizations.theme_config`, contraste y roles avanzados.
-- Fase C: reset de contrasena, politica de password y estudio de bloqueo por intentos fallidos sin exponer si un email existe.
-- Fase D: "Mi perfil"/"Mi cuenta", datos personales, avatar propio privado, "Mi firma" propia privada, datos laborales futuros y permisos de salario/retribucion.
-- Fase E: documentos de empresa, "Mis documentos", nominas, certificaciones, botones "Firmar", permisos por rol/persona, Storage privado, snapshots y auditoria.
+- Fase A: cerrada para QA interno con semana local, muestra interna y validacion oficial STL pendiente.
+- Fase B: B.1/B.2 implementan configuracion minima, acento de tenant y roles compatibles; quedan logo real, colores por centro y validacion con mas tenants.
+- Fase C: implementa reset de contrasena, politica minima en app y decision de usar rate limits nativos de Supabase por ahora.
+- Fase D: D.1-D.5 implementan "Mi cuenta", perfil visible propio, avatar privado propio y "Mi firma" propia privada; RRHH sensible sigue fuera.
+- Fase E: E.1 documenta documentos, permisos, certificaciones y firma documental futura; E.2 implementa metadata/grants documentales minimos; E.3 implementa Storage privado minimo; E.4 implementa auditoria documental minima; E.5 implementa rutas backend de preview/descarga con signed URL corta, sin UI, boton "Firmar", documentos firmables ni snapshots reales.
 - Fase F: fichaje manual, correcciones con motivo, aprobacion semanal, exporte y revision legal.
 - Fase G: fichaje geolocalizado asistido, opcional, con consentimiento, radio por centro y sin tracking continuo.
 - Fase H: PWA primero, app movil/wrapper/nativo despues si geofencing con app cerrada es requisito comercial.
@@ -178,6 +178,8 @@ Nota legal/tecnica:
 
 Objetivo: centralizar documentos utiles, firmas basicas y certificaciones sin construir un gestor documental pesado.
 
+Estado E.5 2026-05-10: este MVP tiene schema minimo de metadata documental, grants, Storage privado tecnico, auditoria documental minima y rutas backend controladas de preview/descarga, no modulo de producto. E.1 define entidades candidatas, permisos y evidencia/snapshot de firma futura; E.2 crea `documents`, `document_versions`, `document_subjects` y `document_access_grants`; E.3 crea `document-files` privado y policies/RPCs de archivo; E.4 crea `document_access_events` y RPCs de auditoria; E.5 crea rutas que emiten signed URLs cortas tras validar acceso y registrar auditoria. No hay UI, boton "Firmar", documentos firmables, snapshots reales, pagina documental ni subida desde app.
+
 Incluye:
 
 - Documentos laborales por empleado.
@@ -244,12 +246,15 @@ No empezar este MVP hasta que horarios, cobertura, cambios y documentos basicos 
 
 ## Estado Tecnico Actual Y Siguiente Corte
 
-La base tecnica de MVP 1 ya esta implementada hasta Task 017:
+La base tecnica ya esta implementada hasta los cortes B.1-E.5:
 
 - schema multi-tenant con RLS;
 - seeds demo y STL separados;
 - auth Supabase SSR;
+- reset de contrasena y politica minima de password en app;
 - resolucion de tenant por membership;
+- configuracion minima de tenant con `organizations.theme_config.accentColor`;
+- roles compatibles `owner`, `admin`, `manager`, `coach` y roles futuros reconocidos sin permisos especializados;
 - gestion basica de centros;
 - gestion basica de usuarios/coaches;
 - catalogo de tipos de clase/actividad;
@@ -260,15 +265,22 @@ La base tecnica de MVP 1 ya esta implementada hasta Task 017:
 - dashboard operativo en `/app`;
 - cola de cobertura en `/app/coverage`;
 - navegacion mobile-first y guia inicial;
+- area personal en `/app/account` con perfil visible propio;
+- avatar privado propio con `profile_assets` y bucket privado;
+- "Mi firma" propia privada con `profile_signatures` y bucket privado, sin documentos firmables;
+- schema minimo E.2 para metadata documental privada, versiones, sujetos y grants;
+- Storage documental privado E.3 con bucket `document-files`, RPCs y policies por `document_versions`, sin UI documental;
+- auditoria documental E.4 con `document_access_events`, RLS estricta y RPCs de registro/consulta;
+- rutas documentales E.5 para preview/descarga privada con signed URL corta, control servidor y auditoria, sin UI documental;
 - smoke tests basicos de rutas protegidas y flujos MVP 1;
 - audit real de accesibilidad, responsive y theming sobre UI implementada con viewports reales.
 
-El siguiente corte debe priorizar validacion operativa real antes de abrir modulos nuevos:
+El siguiente corte debe mantener la frontera marcada en `PROJECT_BRIEF.md`:
 
-1. Validar una semana real del primer tenant antes de cerrar prioridades finales de dashboard y fixtures reales.
-2. Validar plantillas aplicadas contra datos reales: vacantes, coaches por defecto, excepciones y duplicados.
-3. Validar Inicio y Cobertura contra una semana real y ajustar la cola accionable sin convertir datos STL en reglas de producto.
-4. Decidir permisos operativos de `manager` antes de darle mutaciones de horario, plantillas o aprobaciones.
+1. Mantener Fase A como base de QA interno y validar oficialmente con STL centro por bloque, asignaciones reales o huecos intencionados antes de seed/produccion.
+2. Validar D.4/D.5 en Supabase local/QA: buckets privados, metadata tenant-scoped, signed URL corta y fallback visual.
+3. Validar E.5 en Supabase local/QA: preview/descarga solo con sujeto/grant/capacidad, signed URLs cortas, auditoria `file_preview`/`file_download`, denegaciones aplicables y auditoria `document_access_events` no legible por roles sin permiso. UI documental, subida desde app y boton "Firmar" siguen despues.
+4. Modelar Fase F antes de geolocalizacion: fichaje manual, correcciones, aprobacion semanal, exportes y revision legal.
 5. Resolver como tarea dedicada los targets tactiles moviles de controles compactos si se decide endurecer aun mas la UX movil.
 
 Despues de ese cierre, el orden recomendado es el de `docs/product/roadmap.md`: configuracion/branding/roles, auth/security, area personal/RRHH, documentos, fichaje manual, geolocalizacion asistida, PWA/app movil y despues cambios/ausencias/eventos/horas/IA.

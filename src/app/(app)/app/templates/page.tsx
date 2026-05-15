@@ -1,28 +1,33 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { redirect } from "next/navigation";
 import {
   CalendarDays,
   CalendarRange,
-  CircleOff,
   Clock,
-  Copy,
   List,
   MapPin,
   Pencil,
   Plus,
+  RotateCcw,
   Save,
   ShieldCheck,
   X,
 } from "lucide-react";
 
 import {
+  archiveScheduleTemplate,
   applyScheduleTemplateToWeek,
   createScheduleTemplate,
   createScheduleTemplateBlock,
+  restoreScheduleTemplate,
   updateScheduleTemplate,
   updateScheduleTemplateBlock,
 } from "./actions";
+import { TemplateArchiveSubmit } from "./template-archive-submit";
+import { TemplateApplySubmit } from "./template-apply-submit";
 import { TemplateBlocksEditor } from "./template-blocks-editor";
+import { TemplateExpansionControls } from "./template-expansion-controls";
 import {
   CollapsibleActionPanel,
   InlineEditDetails,
@@ -61,11 +66,16 @@ import {
   getScheduleTemplatesPath,
 } from "@/lib/navigation/app-paths";
 import { formatTimeForInput, resolveWeek } from "@/lib/schedule-blocks";
+import { ensureActiveScheduleTemplatesForWindow } from "@/lib/schedule-template-application";
 import {
   SCHEDULE_TEMPLATE_DAYS,
   SCHEDULE_TEMPLATE_STATUSES,
+  getScheduleTemplateDefaultCoachDetail,
+  getScheduleTemplateDefaultCoachLabel,
   getScheduleTemplateDayLabel,
+  getScheduleTemplateRequiredCoachesLabel,
   getScheduleTemplateStatusLabel,
+  scheduleTemplateBlockRequiresCoach,
 } from "@/lib/schedule-templates";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -89,9 +99,11 @@ type TemplatesPageProps = {
 
 type ScheduleTemplateRow = Pick<
   Tables<"schedule_templates">,
+  | "archived_at"
   | "center_id"
   | "id"
   | "name"
+  | "recoverable_until"
   | "status"
   | "updated_at"
   | "valid_from"
@@ -142,6 +154,18 @@ type CoachDisplay = {
   label: string;
 };
 
+type AppliedWeekTemplateSummary = {
+  blockCount: number;
+  centerIds: string[];
+  templateId: string;
+  templateName: string;
+};
+
+type AppliedTemplateConflict = {
+  blockCount: number;
+  templateName: string;
+};
+
 const templateViews = [
   {
     icon: CalendarDays,
@@ -169,26 +193,30 @@ const templateDayShortLabels: Record<TemplateDay, string> = {
 };
 
 const successMessages: Record<string, string> = {
+  "template-archived": "Plantilla archivada.",
   "template-block-created": "Bloque de plantilla creado.",
   "template-block-updated": "Bloque de plantilla actualizado.",
   "template-created": "Plantilla creada.",
+  "template-restored": "Plantilla recuperada como borrador.",
   "template-updated": "Plantilla actualizada.",
 };
 
 const errorMessages: Record<string, string> = {
   forbidden: "Tu rol no permite gestionar plantillas.",
+  "coach-unavailable":
+    "Ese entrenador ya está asignado por defecto en otro bloque solapado de la plantilla.",
   "invalid-center": "El centro seleccionado no es válido.",
   "invalid-class-type":
     "El tipo de actividad seleccionado no es válido.",
   "invalid-coach":
-    "El coach por defecto debe estar activo y visible.",
+    "El entrenador por defecto debe estar activo y visible.",
   "invalid-date": "Usa fechas válidas para la plantilla.",
   "invalid-date-range": "La fecha fin no puede ser anterior a la fecha inicio.",
   "invalid-day": "El día de la semana no es válido.",
   "invalid-reference":
     "Alguna referencia de plantilla ya no está disponible.",
   "invalid-required-coaches":
-    "Los coaches necesarios deben ser un número entero entre 0 y 20.",
+    "Los entrenadores necesarios deben ser un número entero entre 0 y 20.",
   "invalid-status": "El estado de la plantilla no es válido.",
   "invalid-template": "La plantilla recibida no es válida.",
   "invalid-template-block": "El bloque de plantilla recibido no es válido.",
@@ -203,10 +231,26 @@ const errorMessages: Record<string, string> = {
     "Elige una organización antes de gestionar plantillas.",
   "save-failed": "No se han podido guardar los cambios.",
   "template-archived": "Las plantillas archivadas no se pueden modificar.",
+  "template-archive-confirmation-required":
+    "Para archivar una plantilla usa Eliminar plantilla y confirma el aviso.",
+  "template-block-delete-confirmation-required":
+    "Para eliminar bloques de plantilla confirma el aviso.",
   "template-block-required": "No se ha recibido el bloque de plantilla.",
   "template-empty": "La plantilla necesita al menos un bloque antes de aplicarse.",
   "template-not-active": "Solo se pueden aplicar plantillas activas.",
+  "template-out-of-range":
+    "La semana seleccionada no cruza el rango de validez de esa plantilla.",
+  "template-recovery-expired":
+    "El periodo de recuperación de esta plantilla ha terminado. Mantendremos sus horarios históricos sin cambios.",
   "template-required": "No se ha recibido la plantilla.",
+  "template-sync-coach-unavailable":
+    "La plantilla se ha guardado, pero el horario generado no se ha sincronizado porque ese entrenador queda ocupado en otra franja.",
+  "template-sync-failed":
+    "La plantilla se ha guardado, pero no se ha podido sincronizar el horario generado.",
+  "template-sync-invalid-coach":
+    "La plantilla se ha guardado, pero el horario generado no se ha sincronizado porque el entrenador por defecto ya no está disponible.",
+  "template-week-has-template":
+    "Esta semana ya tiene una plantilla aplicada. Confirma la sustitución para reemplazar solo esa semana.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -230,7 +274,7 @@ async function getScheduleTemplates(organizationId: string) {
   const { data, error } = await supabase
     .from("schedule_templates")
     .select(
-      "id, center_id, name, status, valid_from, valid_until, updated_at",
+      "id, center_id, name, status, valid_from, valid_until, archived_at, recoverable_until, updated_at",
     )
     .eq("organization_id", organizationId)
     .eq("template_type", "weekly")
@@ -271,6 +315,94 @@ async function getScheduleTemplateBlocks({
   }
 
   return data satisfies ScheduleTemplateBlockRow[];
+}
+
+async function getAppliedWeekTemplateSummaries({
+  organizationId,
+  weekEnd,
+  weekStart,
+}: {
+  organizationId: string;
+  weekEnd: string;
+  weekStart: string;
+}) {
+  const supabase = await createClient();
+  const { data: blocks, error } = await supabase
+    .from("schedule_blocks")
+    .select("center_id, template_id")
+    .eq("organization_id", organizationId)
+    .gte("service_date", weekStart)
+    .lte("service_date", weekEnd)
+    .not("template_id", "is", null)
+    .neq("status", "cancelled");
+
+  if (error) {
+    throw new Error(`Could not load applied schedule templates: ${error.message}`);
+  }
+
+  const templateIds = [
+    ...new Set(
+      blocks.flatMap((block) => (block.template_id ? [block.template_id] : [])),
+    ),
+  ];
+
+  if (templateIds.length === 0) {
+    return [];
+  }
+
+  const { data: templates, error: templatesError } = await supabase
+    .from("schedule_templates")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .in("id", templateIds);
+
+  if (templatesError) {
+    throw new Error(
+      `Could not load applied schedule template names: ${templatesError.message}`,
+    );
+  }
+
+  const templateNamesById = new Map(
+    templates.map((template) => [template.id, template.name]),
+  );
+  const summariesByTemplateId = blocks.reduce((summaries, block) => {
+    if (!block.template_id) {
+      return summaries;
+    }
+
+    const summary =
+      summaries.get(block.template_id) ??
+      ({
+        blockCount: 0,
+        centerIds: new Set<string>(),
+        templateId: block.template_id,
+        templateName:
+          templateNamesById.get(block.template_id) ?? "Plantilla anterior",
+      } satisfies {
+        blockCount: number;
+        centerIds: Set<string>;
+        templateId: string;
+        templateName: string;
+      });
+
+    summary.blockCount += 1;
+    summary.centerIds.add(block.center_id);
+    summaries.set(block.template_id, summary);
+
+    return summaries;
+  }, new Map<string, {
+    blockCount: number;
+    centerIds: Set<string>;
+    templateId: string;
+    templateName: string;
+  }>());
+
+  return [...summariesByTemplateId.values()].map((summary) => ({
+    blockCount: summary.blockCount,
+    centerIds: [...summary.centerIds],
+    templateId: summary.templateId,
+    templateName: summary.templateName,
+  })) satisfies AppliedWeekTemplateSummary[];
 }
 
 async function getCenters(organizationId: string) {
@@ -372,7 +504,7 @@ async function getScheduleCoachContext(organizationId: string) {
 
 function selectClassName(className = "") {
   return [
-    "h-11 w-full rounded-md border border-input bg-transparent px-2.5 text-sm md:h-9",
+    "h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
     "outline-none transition-colors focus-visible:border-ring",
     "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
@@ -412,12 +544,85 @@ function formatTime(value: string) {
   return formatTimeForInput(value) || value;
 }
 
+function formatDateTime(value: string | null, timezone: string) {
+  if (!value) {
+    return "Sin fecha";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("es-ES", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: timezone,
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
 function getSafeColor(value: string | null) {
   return value && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
 }
 
+function getClassTypeCardStyle(color: string | null): CSSProperties | undefined {
+  const safeColor = getSafeColor(color);
+
+  if (!safeColor) {
+    return undefined;
+  }
+
+  return {
+    backgroundColor: `color-mix(in oklch, ${safeColor} 8%, var(--background))`,
+    borderColor: `color-mix(in oklch, ${safeColor} 32%, var(--border))`,
+    borderLeftColor: safeColor,
+    borderLeftWidth: "3px",
+  };
+}
+
 function shortId(value: string) {
   return value.slice(0, 8);
+}
+
+function canRecoverTemplate(value: string | null, now: Date) {
+  if (!value) {
+    return true;
+  }
+
+  return new Date(value).getTime() >= now.getTime();
+}
+
+function getAppliedTemplateConflict({
+  appliedTemplates,
+  template,
+}: {
+  appliedTemplates: AppliedWeekTemplateSummary[];
+  template: ScheduleTemplateRow;
+}): AppliedTemplateConflict | null {
+  const conflictingTemplates = appliedTemplates.filter((appliedTemplate) => {
+    if (appliedTemplate.templateId === template.id) {
+      return false;
+    }
+
+    if (!template.center_id) {
+      return true;
+    }
+
+    return appliedTemplate.centerIds.includes(template.center_id);
+  });
+
+  if (conflictingTemplates.length === 0) {
+    return null;
+  }
+
+  return {
+    blockCount: conflictingTemplates.reduce(
+      (total, appliedTemplate) => total + appliedTemplate.blockCount,
+      0,
+    ),
+    templateName: conflictingTemplates
+      .map((appliedTemplate) => appliedTemplate.templateName)
+      .join(", "),
+  };
 }
 
 function ColorSwatch({ color }: { color: string | null }) {
@@ -461,7 +666,7 @@ function getCoachDisplay({
       detail: `Cuenta sin persona visible (${shortId(coachProfile.user_id)})`,
       id: coachProfile.id,
       isFallback: true,
-      label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+      label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
     };
   }
 
@@ -469,7 +674,7 @@ function getCoachDisplay({
     detail: `Perfil técnico incompleto ${shortId(coachProfile.id)}`,
     id: coachProfile.id,
     isFallback: true,
-    label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+    label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
   };
 }
 
@@ -609,13 +814,17 @@ function TemplateViewTabs({
 }
 
 function TemplateStatusSelect({ defaultValue }: { defaultValue?: string }) {
+  const editableStatuses = SCHEDULE_TEMPLATE_STATUSES.filter(
+    (status) => status !== "archived",
+  );
+
   return (
     <select
       className={selectClassName()}
       defaultValue={defaultValue ?? "draft"}
       name="status"
     >
-      {SCHEDULE_TEMPLATE_STATUSES.map((status) => (
+      {editableStatuses.map((status) => (
         <option key={status} value={status}>
           {getScheduleTemplateStatusLabel(status)}
         </option>
@@ -678,6 +887,25 @@ function CenterSelect({
   );
 }
 
+function CenterReadOnlyField({
+  center,
+  name = "centerId",
+}: {
+  center: CenterRow | undefined;
+  name?: string;
+}) {
+  return (
+    <div className="grid gap-2">
+      <input name={name} type="hidden" value={center?.id ?? ""} />
+      <Input
+        aria-readonly="true"
+        readOnly
+        value={center?.name ?? "Centro no disponible"}
+      />
+    </div>
+  );
+}
+
 function ClassTypeSelect({
   classTypes,
   defaultValue,
@@ -711,17 +939,35 @@ function ClassTypeSelect({
 function CoachSelect({
   coaches,
   defaultValue,
+  requiredCoaches = 1,
 }: {
   coaches: CoachDisplay[];
   defaultValue?: string | null;
+  requiredCoaches?: number;
 }) {
+  if (!scheduleTemplateBlockRequiresCoach(requiredCoaches)) {
+    return (
+      <>
+        <input name="defaultCoachProfileId" type="hidden" value="none" />
+        <select
+          aria-readonly="true"
+          className={selectClassName()}
+          disabled
+          value="none"
+        >
+          <option value="none">No requiere entrenador</option>
+        </select>
+      </>
+    );
+  }
+
   return (
     <select
       className={selectClassName()}
       defaultValue={defaultValue ?? "none"}
       name="defaultCoachProfileId"
     >
-      <option value="none">Sin coach por defecto (vacante)</option>
+      <option value="none">Sin entrenador por defecto (vacante)</option>
       {coaches.map((coach) => (
         <option key={coach.id} value={coach.id}>
           {coach.label}
@@ -802,7 +1048,7 @@ function TemplateCreateForm({
         weekStart={weekStart}
       />
 
-      <label className="grid gap-2 lg:col-span-2">
+      <label className="grid min-w-0 gap-2 lg:col-span-2">
         <span className="text-sm font-medium">Nombre</span>
         <Input
           maxLength={120}
@@ -812,17 +1058,17 @@ function TemplateCreateForm({
         />
       </label>
 
-      <label className="grid gap-2 lg:col-span-2">
+      <label className="grid min-w-0 gap-2 lg:col-span-2">
         <span className="text-sm font-medium">Alcance de centro</span>
         <OptionalCenterSelect centers={activeCenters} />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Válida desde</span>
         <Input name="validFrom" type="date" />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Válida hasta</span>
         <Input name="validUntil" type="date" />
       </label>
@@ -867,7 +1113,7 @@ function TemplateMetaForm({
         weekStart={weekStart}
       />
 
-      <label className="grid gap-2 lg:col-span-2">
+      <label className="grid min-w-0 gap-2 lg:col-span-2">
         <span className="text-sm font-medium">Nombre</span>
         <Input
           defaultValue={template.name}
@@ -877,12 +1123,15 @@ function TemplateMetaForm({
         />
       </label>
 
-      <label className="grid gap-2 lg:col-span-2">
+      <label className="grid min-w-0 gap-2 lg:col-span-2">
         <span className="text-sm font-medium">Alcance de centro</span>
-        <OptionalCenterSelect centers={centers} defaultValue={template.center_id} />
+        <OptionalCenterSelect
+          centers={centers}
+          defaultValue={template.center_id}
+        />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Valida desde</span>
         <Input
           defaultValue={template.valid_from ?? ""}
@@ -891,7 +1140,7 @@ function TemplateMetaForm({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Valida hasta</span>
         <Input
           defaultValue={template.valid_until ?? ""}
@@ -900,7 +1149,7 @@ function TemplateMetaForm({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Estado</span>
         <TemplateStatusSelect defaultValue={template.status} />
       </label>
@@ -922,6 +1171,7 @@ function TemplateBlockFields({
   classTypes,
   defaultDay,
   disabled,
+  templateCenterId,
 }: {
   assignableCoaches: CoachDisplay[];
   block?: ScheduleTemplateBlockRow;
@@ -929,15 +1179,20 @@ function TemplateBlockFields({
   classTypes: ClassTypeRow[];
   defaultDay?: TemplateDay;
   disabled?: boolean;
+  templateCenterId?: string | null;
 }) {
+  const templateCenter = templateCenterId
+    ? centers.find((center) => center.id === templateCenterId)
+    : undefined;
+
   return (
     <>
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Día</span>
         <DaySelect defaultValue={block?.day_of_week ?? defaultDay} />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Inicio</span>
         <Input
           defaultValue={block ? formatTime(block.start_time) : ""}
@@ -947,7 +1202,7 @@ function TemplateBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Fin</span>
         <Input
           defaultValue={block ? formatTime(block.end_time) : ""}
@@ -957,16 +1212,25 @@ function TemplateBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Centro</span>
-        <CenterSelect
-          centers={centers}
-          defaultValue={block?.center_id}
-          disabled={disabled}
-        />
+        {templateCenterId ? (
+          <CenterReadOnlyField center={templateCenter} />
+        ) : (
+          <CenterSelect
+            centers={centers}
+            defaultValue={block?.center_id}
+            disabled={disabled}
+          />
+        )}
+        {templateCenterId ? (
+          <span className="text-xs leading-5 text-muted-foreground">
+            Lo marca el alcance de la plantilla.
+          </span>
+        ) : null}
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Tipo de actividad</span>
         <ClassTypeSelect
           classTypes={classTypes}
@@ -975,8 +1239,8 @@ function TemplateBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Coaches necesarios</span>
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Entrenadores necesarios</span>
         <Input
           defaultValue={block?.required_coaches ?? 1}
           max="20"
@@ -987,18 +1251,16 @@ function TemplateBlockFields({
         />
       </label>
 
-      <label className="grid gap-2 lg:col-span-2">
-        <span className="text-sm font-medium">Coach por defecto</span>
+      <label className="grid min-w-0 gap-2 lg:col-span-2">
+        <span className="text-sm font-medium">Entrenador por defecto</span>
         <CoachSelect
           coaches={assignableCoaches}
           defaultValue={block?.default_coach_profile_id}
+          requiredCoaches={block?.required_coaches ?? 1}
         />
-        <span className="text-xs leading-5 text-muted-foreground">
-          Se asignará al horario cuando apliques la plantilla.
-        </span>
       </label>
 
-      <label className="grid gap-2 lg:col-span-6">
+      <label className="grid min-w-0 gap-2 lg:col-span-6">
         <span className="text-sm font-medium">Notas</span>
         <Textarea
           defaultValue={block?.notes ?? ""}
@@ -1015,8 +1277,10 @@ function TemplateBlockCreateForm({
   activeCenters,
   activeClassTypes,
   assignableCoaches,
+  centers,
   organizationId,
   selectedDay,
+  templateCenterId,
   templateId,
   view,
   weekStart,
@@ -1024,13 +1288,19 @@ function TemplateBlockCreateForm({
   activeCenters: CenterRow[];
   activeClassTypes: ClassTypeRow[];
   assignableCoaches: CoachDisplay[];
+  centers: CenterRow[];
   organizationId: string;
   selectedDay: TemplateDay;
+  templateCenterId?: string | null;
   templateId: string;
   view: TemplateView;
   weekStart: string;
 }) {
-  const canCreate = activeCenters.length > 0 && activeClassTypes.length > 0;
+  const hasUsableCenter = templateCenterId
+    ? centers.some((center) => center.id === templateCenterId)
+    : activeCenters.length > 0;
+  const canCreate = hasUsableCenter && activeClassTypes.length > 0;
+  const centerOptions = templateCenterId ? centers : activeCenters;
 
   return (
     <InlineEditDetails label="Añadir bloque">
@@ -1047,10 +1317,11 @@ function TemplateBlockCreateForm({
         />
         <TemplateBlockFields
           assignableCoaches={assignableCoaches}
-          centers={activeCenters}
+          centers={centerOptions}
           classTypes={activeClassTypes}
           defaultDay={selectedDay}
           disabled={!canCreate}
+          templateCenterId={templateCenterId}
         />
         <div className="flex items-end lg:col-span-6">
           <Button disabled={!canCreate} type="submit">
@@ -1062,8 +1333,8 @@ function TemplateBlockCreateForm({
 
       {!canCreate ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Hace falta al menos un centro activo y un tipo de actividad activo
-          antes de crear bloques de plantilla.
+          Hace falta un centro disponible y un tipo de actividad activo antes de
+          crear bloques de plantilla.
         </p>
       ) : null}
     </InlineEditDetails>
@@ -1077,6 +1348,7 @@ function TemplateBlockEditForm({
   classTypes,
   organizationId,
   selectedDay,
+  templateCenterId,
   view,
   weekStart,
 }: {
@@ -1086,6 +1358,7 @@ function TemplateBlockEditForm({
   classTypes: ClassTypeRow[];
   organizationId: string;
   selectedDay: TemplateDay;
+  templateCenterId?: string | null;
   view: TemplateView;
   weekStart: string;
 }) {
@@ -1107,6 +1380,7 @@ function TemplateBlockEditForm({
         block={block}
         centers={centers}
         classTypes={classTypes}
+        templateCenterId={templateCenterId}
       />
       <div className="flex items-end lg:col-span-6">
         <Button type="submit">
@@ -1127,6 +1401,7 @@ function TemplateBlockAdminRow({
   editBlockId,
   organizationId,
   selectedDay,
+  templateCenterId,
   templateArchived,
   view,
   weekStart,
@@ -1139,6 +1414,7 @@ function TemplateBlockAdminRow({
   editBlockId?: string | null;
   organizationId: string;
   selectedDay: TemplateDay;
+  templateCenterId?: string | null;
   templateArchived: boolean;
   view: TemplateView;
   weekStart: string;
@@ -1150,6 +1426,17 @@ function TemplateBlockAdminRow({
   const classType = classTypes.find(
     (candidate) => candidate.id === block.class_type_id,
   );
+  const requiresCoach = scheduleTemplateBlockRequiresCoach(
+    block.required_coaches,
+  );
+  const defaultCoachLabel = getScheduleTemplateDefaultCoachLabel({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
+  const defaultCoachDetail = getScheduleTemplateDefaultCoachDetail({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
   const isEditing = editBlockId === block.id;
   const cancelEditHref = getScheduleTemplatesPath({
     day: String(selectedDay),
@@ -1188,14 +1475,14 @@ function TemplateBlockAdminRow({
             </span>
           </h4>
           <p className="text-sm text-muted-foreground">
-            {block.required_coaches} coach
-            {block.required_coaches === 1 ? "" : "es"} necesario
-            {block.required_coaches === 1 ? "" : "s"}
+            {getScheduleTemplateRequiredCoachesLabel(block.required_coaches)}
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          <Badge variant={block.default_coach_profile_id ? "secondary" : "outline"}>
-            {defaultCoach ? `Por defecto: ${defaultCoach.label}` : "Vacante"}
+          <Badge variant={requiresCoach && defaultCoach ? "secondary" : "outline"}>
+            {requiresCoach && defaultCoach
+              ? `Por defecto: ${defaultCoach.label}`
+              : defaultCoachLabel}
           </Badge>
           <Button asChild size="sm" variant={isEditing ? "secondary" : "outline"}>
             <Link href={isEditing ? cancelEditHref : editHref}>
@@ -1221,9 +1508,11 @@ function TemplateBlockAdminRow({
             </span>
           </span>
         </MetaItem>
-        <MetaItem label="Coach por defecto">
-          {defaultCoach?.label ?? "Vacante"}
-        </MetaItem>
+        {requiresCoach ? (
+          <MetaItem label="Entrenador por defecto">
+            {defaultCoachDetail}
+          </MetaItem>
+        ) : null}
         <MetaItem label="Notas">{block.notes || "Sin notas"}</MetaItem>
       </MetaGrid>
       {isEditing ? (
@@ -1235,6 +1524,7 @@ function TemplateBlockAdminRow({
             classTypes={classTypes}
             organizationId={organizationId}
             selectedDay={selectedDay}
+            templateCenterId={templateCenterId}
             view={view}
             weekStart={weekStart}
           />
@@ -1259,6 +1549,17 @@ function TemplateBlockReadOnlyRow({
   const classType = classTypes.find(
     (candidate) => candidate.id === block.class_type_id,
   );
+  const requiresCoach = scheduleTemplateBlockRequiresCoach(
+    block.required_coaches,
+  );
+  const defaultCoachLabel = getScheduleTemplateDefaultCoachLabel({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
+  const defaultCoachDetail = getScheduleTemplateDefaultCoachDetail({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
 
   return (
     <div className="rounded-lg border border-border p-4">
@@ -1272,13 +1573,13 @@ function TemplateBlockReadOnlyRow({
             </span>
           </h4>
           <p className="text-sm text-muted-foreground">
-            {block.required_coaches} coach
-            {block.required_coaches === 1 ? "" : "es"} necesario
-            {block.required_coaches === 1 ? "" : "s"}
+            {getScheduleTemplateRequiredCoachesLabel(block.required_coaches)}
           </p>
         </div>
-        <Badge variant={block.default_coach_profile_id ? "secondary" : "outline"}>
-          {defaultCoach ? `Por defecto: ${defaultCoach.label}` : "Vacante"}
+        <Badge variant={requiresCoach && defaultCoach ? "secondary" : "outline"}>
+          {requiresCoach && defaultCoach
+            ? `Por defecto: ${defaultCoach.label}`
+            : defaultCoachLabel}
         </Badge>
       </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -1297,12 +1598,14 @@ function TemplateBlockReadOnlyRow({
             </span>
           </dd>
         </div>
-        <div className="min-w-0">
-          <dt className="text-muted-foreground">Coach por defecto</dt>
-          <dd className="mt-1 truncate font-medium">
-            {defaultCoach?.label ?? "Vacante"}
-          </dd>
-        </div>
+        {requiresCoach ? (
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Entrenador por defecto</dt>
+            <dd className="mt-1 truncate font-medium">
+              {defaultCoachDetail}
+            </dd>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <dt className="text-muted-foreground">Notas</dt>
           <dd className="mt-1 whitespace-pre-wrap break-words">
@@ -1371,6 +1674,17 @@ function TemplateBlockWeekCard({
   const classType = classTypes.find(
     (candidate) => candidate.id === block.class_type_id,
   );
+  const requiresCoach = scheduleTemplateBlockRequiresCoach(
+    block.required_coaches,
+  );
+  const defaultCoachLabel = getScheduleTemplateDefaultCoachLabel({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
+  const defaultCoachDetail = getScheduleTemplateDefaultCoachDetail({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
   const isEditing = editBlockId === block.id;
   const canEdit = canManageTemplates && !templateArchived;
   const cancelEditHref = getScheduleTemplatesPath({
@@ -1390,29 +1704,30 @@ function TemplateBlockWeekCard({
   return (
     <div
       className={cn(
-        "min-w-0 overflow-hidden rounded-md border border-border bg-background px-2 py-2 text-xs",
+        "min-w-0 overflow-hidden rounded-md border border-border bg-background px-2.5 py-2.5 text-xs",
+        "min-h-[9.25rem] transition-colors",
         isEditing ? "ring-2 ring-ring/30" : "",
       )}
+      style={getClassTypeCardStyle(classType?.color ?? null)}
     >
-      <div className="flex min-w-0 items-start justify-between gap-1.5">
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[11px] font-medium text-muted-foreground">
-            {formatTime(block.start_time)} - {formatTime(block.end_time)}
-          </p>
-          <h4 className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-tight">
-            <ColorSwatch color={classType?.color ?? null} />
-            <span className="truncate">
-              {classType?.name ?? "Tipo no disponible"}
-            </span>
-          </h4>
-        </div>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className="min-w-0 truncate font-mono text-[11px] font-medium text-muted-foreground">
+          {formatTime(block.start_time)} - {formatTime(block.end_time)}
+        </p>
         <Badge
-          className="h-5 max-w-16 shrink-0 px-1.5 text-[11px]"
-          variant={block.default_coach_profile_id ? "secondary" : "outline"}
+          className="h-5 max-w-24 shrink-0 px-1.5 text-[11px]"
+          variant={requiresCoach && defaultCoach ? "secondary" : "outline"}
         >
-          {defaultCoach ? "Con coach" : "Vacante"}
+          {requiresCoach && defaultCoach ? "Asignado" : defaultCoachLabel}
         </Badge>
       </div>
+
+      <h4 className="mt-2 flex min-w-0 items-start gap-1.5 text-xs font-semibold leading-snug tracking-tight">
+        <ColorSwatch color={classType?.color ?? null} />
+        <span className="min-w-0 break-words">
+          {classType?.name ?? "Tipo no disponible"}
+        </span>
+      </h4>
 
       <div className="mt-1.5 grid min-w-0 gap-0.5 text-[11px] leading-5 text-muted-foreground">
         <p className="truncate">
@@ -1420,12 +1735,9 @@ function TemplateBlockWeekCard({
             {center?.name ?? "Centro no disponible"}
           </span>
         </p>
-        <p>
-          {block.required_coaches} coach
-          {block.required_coaches === 1 ? "" : "es"}
-        </p>
-        {defaultCoach ? (
-          <p className="truncate">{defaultCoach.label}</p>
+        <p>{getScheduleTemplateRequiredCoachesLabel(block.required_coaches)}</p>
+        {requiresCoach ? (
+          <p className="truncate">{defaultCoachDetail}</p>
         ) : null}
       </div>
 
@@ -1585,6 +1897,7 @@ function TemplateBlocksWeekView({
   editBlockId,
   organizationId,
   selectedDay,
+  templateCenterId,
   templateArchived,
   templateId,
   view,
@@ -1599,6 +1912,7 @@ function TemplateBlocksWeekView({
   editBlockId?: string | null;
   organizationId: string;
   selectedDay: TemplateDay;
+  templateCenterId?: string | null;
   templateArchived: boolean;
   templateId: string;
   view: TemplateView;
@@ -1658,6 +1972,7 @@ function TemplateBlocksWeekView({
             classTypes={classTypes}
             organizationId={organizationId}
             selectedDay={selectedDay}
+            templateCenterId={templateCenterId}
             view={view}
             weekStart={weekStart}
           />
@@ -1745,6 +2060,7 @@ function TemplateBlocksAgendaView({
   editBlockId,
   organizationId,
   selectedDay,
+  templateCenterId,
   templateArchived,
   view,
   weekStart,
@@ -1758,6 +2074,7 @@ function TemplateBlocksAgendaView({
   editBlockId?: string | null;
   organizationId: string;
   selectedDay: TemplateDay;
+  templateCenterId?: string | null;
   templateArchived: boolean;
   view: TemplateView;
   weekStart: string;
@@ -1776,6 +2093,7 @@ function TemplateBlocksAgendaView({
             key={block.id}
             organizationId={organizationId}
             selectedDay={selectedDay}
+            templateCenterId={templateCenterId}
             templateArchived={templateArchived}
             view={view}
             weekStart={weekStart}
@@ -1799,6 +2117,7 @@ function TemplateBlocksAgendaView({
 }
 
 function ApplyTemplateForm({
+  appliedTemplateConflict,
   assignedBlockCount,
   blockCount,
   organizationId,
@@ -1807,6 +2126,7 @@ function ApplyTemplateForm({
   view,
   weekStart,
 }: {
+  appliedTemplateConflict: AppliedTemplateConflict | null;
   assignedBlockCount: number;
   blockCount: number;
   organizationId: string;
@@ -1816,32 +2136,43 @@ function ApplyTemplateForm({
   weekStart: string;
 }) {
   const canApply = template.status === "active" && blockCount > 0;
+  const formId = `apply-template-${template.id}`;
 
   return (
     <form
       action={applyScheduleTemplateToWeek}
       className="grid gap-3 sm:grid-cols-[minmax(180px,240px)_auto]"
+      id={formId}
     >
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="day" type="hidden" value={String(selectedDay)} />
       <input name="templateId" type="hidden" value={template.id} />
       <input name="view" type="hidden" value={view} />
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Semana destino</span>
         <Input defaultValue={weekStart} name="weekStart" required type="date" />
       </label>
       <div className="flex items-end">
-        <Button disabled={!canApply} type="submit">
-          <Copy aria-hidden="true" />
-          Aplicar a semana
-        </Button>
+        <TemplateApplySubmit
+          canApply={canApply}
+          existingBlockCount={appliedTemplateConflict?.blockCount ?? 0}
+          existingTemplateName={appliedTemplateConflict?.templateName ?? null}
+          formId={formId}
+        />
       </div>
       {blockCount > 0 ? (
         <p className="text-sm text-muted-foreground sm:col-span-2">
           Creará {blockCount} bloque{blockCount === 1 ? "" : "s"} y asignará{" "}
-          {assignedBlockCount} coach
-          {assignedBlockCount === 1 ? "" : "es"} por defecto. Los bloques
-          vacantes quedarán como cobertura pendiente.
+          {assignedBlockCount} entrenador
+          {assignedBlockCount === 1 ? "" : "es"} por defecto. Los bloques sin
+          requisito no crean cobertura pendiente; los bloques con requisito y
+          sin entrenador por defecto quedan como cobertura pendiente.
+        </p>
+      ) : null}
+      {appliedTemplateConflict ? (
+        <p className="text-sm text-amber-800 sm:col-span-2">
+          Esta semana ya tiene una plantilla aplicada. Para sustituirla se
+          pedira confirmacion y solo cambiara esa semana.
         </p>
       ) : null}
       {!canApply ? (
@@ -1854,15 +2185,161 @@ function ApplyTemplateForm({
   );
 }
 
+function TemplateArchiveForm({
+  organizationId,
+  selectedDay,
+  template,
+  view,
+  weekStart,
+}: {
+  organizationId: string;
+  selectedDay: TemplateDay;
+  template: ScheduleTemplateRow;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const formId = `archive-template-${template.id}`;
+
+  return (
+    <form action={archiveScheduleTemplate} id={formId}>
+      <TemplateHiddenInputs
+        organizationId={organizationId}
+        selectedDay={selectedDay}
+        templateId={template.id}
+        view={view}
+        weekStart={weekStart}
+      />
+      <TemplateArchiveSubmit formId={formId} templateName={template.name} />
+    </form>
+  );
+}
+
+function TemplateArchiveDangerZone({
+  organizationId,
+  selectedDay,
+  template,
+  view,
+  weekStart,
+}: {
+  organizationId: string;
+  selectedDay: TemplateDay;
+  template: ScheduleTemplateRow;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  return (
+    <div className="grid gap-3 border-t border-border pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold tracking-tight">
+          Eliminar plantilla
+        </p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Archiva esta plantilla durante 30 dias. Los horarios ya generados se
+          conservan sin cambios.
+        </p>
+      </div>
+      <TemplateArchiveForm
+        organizationId={organizationId}
+        selectedDay={selectedDay}
+        template={template}
+        view={view}
+        weekStart={weekStart}
+      />
+    </div>
+  );
+}
+
+function ArchivedTemplateCard({
+  blockCount,
+  canManageTemplates,
+  organizationId,
+  selectedDay,
+  template,
+  timezone,
+  view,
+  weekStart,
+}: {
+  blockCount: number;
+  canManageTemplates: boolean;
+  organizationId: string;
+  selectedDay: TemplateDay;
+  template: ScheduleTemplateRow;
+  timezone: string;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const now = new Date();
+  const recoverable = canRecoverTemplate(template.recoverable_until, now);
+
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h3 className="truncate text-sm font-semibold tracking-tight">
+            {template.name}
+          </h3>
+          <p className="text-sm leading-5 text-muted-foreground">
+            Archivada el {formatDateTime(template.archived_at, timezone)}.
+            Horarios generados conservados.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <TemplateStatusBadge status={template.status} />
+          <Badge variant="outline">
+            {blockCount} bloque{blockCount === 1 ? "" : "s"}
+          </Badge>
+        </div>
+      </div>
+
+      <MetaGrid className="mt-4 lg:grid-cols-3">
+        <MetaItem label="Recuperable hasta">
+          {formatDateTime(template.recoverable_until, timezone)}
+        </MetaItem>
+        <MetaItem label="Válida desde">
+          {formatDate(template.valid_from)}
+        </MetaItem>
+        <MetaItem label="Válida hasta">
+          {formatDate(template.valid_until)}
+        </MetaItem>
+      </MetaGrid>
+
+      {canManageTemplates ? (
+        <form action={restoreScheduleTemplate} className="mt-4">
+          <TemplateHiddenInputs
+            organizationId={organizationId}
+            selectedDay={selectedDay}
+            templateId={template.id}
+            view={view}
+            weekStart={weekStart}
+          />
+          <Button disabled={!recoverable} type="submit" variant="outline">
+            <RotateCcw aria-hidden="true" />
+            Recuperar como borrador
+          </Button>
+          {!recoverable ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              El periodo de recuperación ha terminado. La plantilla queda fuera
+              del uso operativo y el borrado definitivo debe resolverse con la
+              lógica segura del proyecto.
+            </p>
+          ) : null}
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 function TemplateCard({
   activeCenters,
   activeClassTypes,
+  appliedTemplateConflict,
   assignableCoaches,
   blocks,
   canManageTemplates,
   centers,
   classTypes,
   coachDisplaysById,
+  defaultExpanded,
   editBlockId,
   organizationId,
   selectedDay,
@@ -1873,12 +2350,14 @@ function TemplateCard({
 }: {
   activeCenters: CenterRow[];
   activeClassTypes: ClassTypeRow[];
+  appliedTemplateConflict: AppliedTemplateConflict | null;
   assignableCoaches: CoachDisplay[];
   blocks: ScheduleTemplateBlockRow[];
   canManageTemplates: boolean;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
+  defaultExpanded: boolean;
   editBlockId?: string | null;
   organizationId: string;
   selectedDay: TemplateDay;
@@ -1891,10 +2370,14 @@ function TemplateCard({
     ? centers.find((candidate) => candidate.id === template.center_id)
     : null;
   const templateArchived = template.status === "archived";
-  const assignedBlockCount = blocks.filter(
+  const blocksRequiringCoach = blocks.filter((block) =>
+    scheduleTemplateBlockRequiresCoach(block.required_coaches),
+  );
+  const assignedBlockCount = blocksRequiringCoach.filter(
     (block) => block.default_coach_profile_id,
   ).length;
-  const vacantBlockCount = blocks.length - assignedBlockCount;
+  const vacantBlockCount = blocksRequiringCoach.length - assignedBlockCount;
+  const noRequirementBlockCount = blocks.length - blocksRequiringCoach.length;
 
   return (
     <Card>
@@ -1921,18 +2404,24 @@ function TemplateCard({
           <div className="flex flex-wrap justify-end gap-2">
             <TemplateStatusBadge status={template.status} />
             <Badge variant="secondary">
-              {assignedBlockCount} con coach
+              {assignedBlockCount} asignado
+              {assignedBlockCount === 1 ? "" : "s"}
             </Badge>
             <Badge variant="outline">
               {vacantBlockCount} vacante{vacantBlockCount === 1 ? "" : "s"}
             </Badge>
+            {noRequirementBlockCount > 0 ? (
+              <Badge variant="outline">
+                {noRequirementBlockCount} sin requisito
+              </Badge>
+            ) : null}
             <Badge variant="outline">
               {blocks.length} bloque{blocks.length === 1 ? "" : "s"}
             </Badge>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         <MetaGrid className="lg:grid-cols-3">
           <MetaItem label="Válida desde">
             {formatDate(template.valid_from)}
@@ -1941,24 +2430,57 @@ function TemplateCard({
             {formatDate(template.valid_until)}
           </MetaItem>
           <MetaItem label="Al aplicar">
-            Crea horarios y asigna coaches por defecto.
+            Crea horarios y asigna entrenadores por defecto cuando corresponde.
           </MetaItem>
         </MetaGrid>
+
+        <details
+          className="group rounded-lg border border-border bg-muted/20"
+          data-template-details
+          open={defaultExpanded}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+            <div className="min-w-0">
+              <span className="block text-sm font-semibold tracking-tight">
+                Detalle completo
+              </span>
+              <span className="mt-1 block text-sm text-muted-foreground">
+                Formularios, aplicación a semana y bloques por día.
+              </span>
+            </div>
+            <span className="shrink-0 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground">
+              <span className="group-open:hidden">Mostrar</span>
+              <span className="hidden group-open:inline">Ocultar</span>
+            </span>
+          </summary>
+          <div className="space-y-5 border-t border-border bg-background/70 px-3 py-4 sm:px-4">
 
         {canManageTemplates ? (
           <div className="grid gap-3">
             <InlineEditDetails label="Editar plantilla">
-              <TemplateMetaForm
-                centers={centers}
-                organizationId={organizationId}
-                selectedDay={selectedDay}
-                template={template}
-                view={view}
-                weekStart={weekStart}
-              />
+              <div className="grid gap-4">
+                <TemplateMetaForm
+                  centers={centers}
+                  organizationId={organizationId}
+                  selectedDay={selectedDay}
+                  template={template}
+                  view={view}
+                  weekStart={weekStart}
+                />
+                {!templateArchived ? (
+                  <TemplateArchiveDangerZone
+                    organizationId={organizationId}
+                    selectedDay={selectedDay}
+                    template={template}
+                    view={view}
+                    weekStart={weekStart}
+                  />
+                ) : null}
+              </div>
             </InlineEditDetails>
             <InlineEditDetails label="Aplicar a semana">
               <ApplyTemplateForm
+                appliedTemplateConflict={appliedTemplateConflict}
                 assignedBlockCount={assignedBlockCount}
                 blockCount={blocks.length}
                 organizationId={organizationId}
@@ -1979,8 +2501,8 @@ function TemplateCard({
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 {view === "week"
-                  ? "Distribuidos por dia para editar con menos scroll."
-                  : "Lista completa ordenada por dia y hora."}
+                  ? "Distribuidos por día para editar con menos scroll."
+                  : "Lista completa ordenada por día y hora."}
               </p>
             </div>
             <Badge variant="outline">{blocks.length} total</Badge>
@@ -2004,6 +2526,7 @@ function TemplateCard({
               initialSelectedDay={selectedDay}
               mode={view}
               organizationId={organizationId}
+              templateCenterId={template.center_id}
               view={view}
               weekStart={weekStart}
             />
@@ -2018,6 +2541,7 @@ function TemplateCard({
               editBlockId={editBlockId}
               organizationId={organizationId}
               selectedDay={selectedDay}
+              templateCenterId={template.center_id}
               templateArchived={templateArchived}
               templateId={template.id}
               view={view}
@@ -2034,6 +2558,7 @@ function TemplateCard({
               editBlockId={editBlockId}
               organizationId={organizationId}
               selectedDay={selectedDay}
+              templateCenterId={template.center_id}
               templateArchived={templateArchived}
               view={view}
               weekStart={weekStart}
@@ -2046,13 +2571,17 @@ function TemplateCard({
             activeCenters={activeCenters}
             activeClassTypes={activeClassTypes}
             assignableCoaches={assignableCoaches}
+            centers={centers}
             organizationId={organizationId}
             selectedDay={selectedDay}
+            templateCenterId={template.center_id}
             templateId={template.id}
             view={view}
             weekStart={weekStart}
           />
         ) : null}
+          </div>
+        </details>
       </CardContent>
     </Card>
   );
@@ -2091,11 +2620,66 @@ export default async function TemplatesPage({
 
   const week = resolveWeek(weekParam, resolution.organization.timezone);
   const selectedDay = resolveTemplateDay(params.day);
-  const [templates, centers, classTypes, coachContext] = await Promise.all([
+  const canManageTemplates = canManageOperationalData(
+    resolution.membership.role,
+  );
+
+  if (!canManageTemplates) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          organizationId={resolution.organization.id}
+          organizationName={resolution.organization.name}
+          role={resolution.membership.role}
+          weekEnd={week.weekEnd}
+          weekStart={week.weekStart}
+        />
+
+        <Alert>
+          <ShieldCheck aria-hidden="true" className="size-4" />
+          <AlertTitle>Plantillas reservadas para gestión</AlertTitle>
+          <AlertDescription>
+            Propietario, Administrador y Responsable crean, editan o aplican
+            plantillas. Para consultar tus clases, usa Horario.
+          </AlertDescription>
+        </Alert>
+
+        <Button asChild variant="outline">
+          <Link
+            href={getSchedulePath({
+              mineOnly: true,
+              organizationId: resolution.organization.id,
+              week: week.weekStart,
+            })}
+          >
+            <CalendarDays aria-hidden="true" />
+            Abrir horario
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const supabase = await createClient();
+  await ensureActiveScheduleTemplatesForWindow({
+    organizationId: resolution.organization.id,
+    supabase,
+    timezone: resolution.organization.timezone,
+    windowEnd: week.weekEnd,
+    windowStart: week.weekStart,
+  });
+
+  const [templates, centers, classTypes, coachContext, appliedWeekTemplates] =
+    await Promise.all([
     getScheduleTemplates(resolution.organization.id),
     getCenters(resolution.organization.id),
     getClassTypes(resolution.organization.id),
     getScheduleCoachContext(resolution.organization.id),
+    getAppliedWeekTemplateSummaries({
+      organizationId: resolution.organization.id,
+      weekEnd: week.weekEnd,
+      weekStart: week.weekStart,
+    }),
   ]);
   const templateBlocks = await getScheduleTemplateBlocks({
     organizationId: resolution.organization.id,
@@ -2113,12 +2697,15 @@ export default async function TemplatesPage({
     },
     new Map<string, ScheduleTemplateBlockRow[]>(),
   );
-  const canManageTemplates = canManageOperationalData(
-    resolution.membership.role,
-  );
   const activeCenters = centers.filter((center) => center.status === "active");
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
+  );
+  const activeTemplates = templates.filter(
+    (template) => template.status !== "archived",
+  );
+  const archivedTemplates = templates.filter(
+    (template) => template.status === "archived",
   );
 
   return (
@@ -2127,7 +2714,7 @@ export default async function TemplatesPage({
         organizationId={resolution.organization.id}
         organizationName={resolution.organization.name}
         role={resolution.membership.role}
-        templateCount={templates.length}
+        templateCount={activeTemplates.length}
         weekEnd={week.weekEnd}
         weekStart={week.weekStart}
       />
@@ -2161,7 +2748,7 @@ export default async function TemplatesPage({
       {canManageTemplates ? (
         <CollapsibleActionPanel
           actionLabel="Crear"
-          description="Define una semana base con horarios, vacantes y coaches por defecto."
+          description="Define una semana base con horarios, vacantes y entrenadores por defecto."
           icon={Plus}
           title="Crear plantilla semanal"
         >
@@ -2187,6 +2774,9 @@ export default async function TemplatesPage({
         <SectionHeader
           action={
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <TemplateExpansionControls
+                templateCount={activeTemplates.length}
+              />
               <TemplateViewTabs
                 editBlockId={editBlockId}
                 organizationId={resolution.organization.id}
@@ -2194,35 +2784,83 @@ export default async function TemplatesPage({
                 view={templateView}
                 weekStart={week.weekStart}
               />
-              <Badge variant="outline">{templates.length} plantillas</Badge>
+              <Badge variant="outline">
+                {activeTemplates.length} activa
+                {activeTemplates.length === 1 ? "" : "s"}
+              </Badge>
+              {archivedTemplates.length > 0 ? (
+                <Badge variant="outline">
+                  {archivedTemplates.length} archivada
+                  {archivedTemplates.length === 1 ? "" : "s"}
+                </Badge>
+              ) : null}
             </div>
           }
-          description="Patrones semanales reutilizables con horarios y coaches por defecto."
+          description="Patrones semanales reutilizables con horarios y entrenadores por defecto."
           title="Plantillas semanales"
         />
 
-        {templates.length === 0 ? (
+        {activeTemplates.length === 0 ? (
           <EmptyState
             description={
               canManageTemplates
                 ? "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
                 : "Un rol operativo debe crear plantillas antes de que aparezcan aquí."
             }
-            title="No hay plantillas todavía"
+            title="No hay plantillas activas"
           />
         ) : (
           <div className="grid gap-3">
-            {templates.map((template) => (
-              <TemplateCard
-                activeCenters={activeCenters}
-                activeClassTypes={activeClassTypes}
-                assignableCoaches={assignableCoaches}
-                blocks={blocksByTemplateId.get(template.id) ?? []}
+            {activeTemplates.map((template) => {
+              const blocks = blocksByTemplateId.get(template.id) ?? [];
+              const hasEditingBlock = Boolean(
+                editBlockId &&
+                  blocks.some((block) => block.id === editBlockId),
+              );
+
+              return (
+                <TemplateCard
+                  activeCenters={activeCenters}
+                  activeClassTypes={activeClassTypes}
+                  appliedTemplateConflict={getAppliedTemplateConflict({
+                    appliedTemplates: appliedWeekTemplates,
+                    template,
+                  })}
+                  assignableCoaches={assignableCoaches}
+                  blocks={blocks}
+                  canManageTemplates={canManageTemplates}
+                  centers={centers}
+                  classTypes={classTypes}
+                  coachDisplaysById={coachDisplaysById}
+                  defaultExpanded={
+                    activeTemplates.length === 1 || hasEditingBlock
+                  }
+                  editBlockId={editBlockId}
+                  key={template.id}
+                  organizationId={resolution.organization.id}
+                  selectedDay={selectedDay}
+                  template={template}
+                  timezone={resolution.organization.timezone}
+                  view={templateView}
+                  weekStart={week.weekStart}
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {archivedTemplates.length > 0 ? (
+        <section className="space-y-3">
+          <SectionHeader
+            description="Fuera de uso operativo. Se pueden recuperar durante la ventana de retención sin tocar horarios ya generados."
+            title="Plantillas archivadas"
+          />
+          <div className="grid gap-3">
+            {archivedTemplates.map((template) => (
+              <ArchivedTemplateCard
+                blockCount={blocksByTemplateId.get(template.id)?.length ?? 0}
                 canManageTemplates={canManageTemplates}
-                centers={centers}
-                classTypes={classTypes}
-                coachDisplaysById={coachDisplaysById}
-                editBlockId={editBlockId}
                 key={template.id}
                 organizationId={resolution.organization.id}
                 selectedDay={selectedDay}
@@ -2233,18 +2871,9 @@ export default async function TemplatesPage({
               />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      <Alert>
-        <CircleOff aria-hidden="true" className="size-4" />
-        <AlertTitle>Fuera de este corte</AlertTitle>
-        <AlertDescription>
-          Las plantillas son semanales y la aplicación evita duplicar bloques
-          ya creados para la misma semana. Los coaches por defecto se pueden
-          ajustar después desde Horario o Cobertura.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }
@@ -2283,36 +2912,47 @@ function PageHeader({
           <CalendarRange aria-hidden="true" className="size-6" />
           Plantillas semanales
         </h1>
-        <p className="hidden text-sm leading-6 text-muted-foreground md:block md:text-base">
-          Crea semanas base con horarios, bloques vacantes y coaches por
-          defecto que se reutilizan al aplicar la plantilla.
-        </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:max-w-3xl">
-        <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <details className="group max-w-3xl">
+        <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
           <span>
-            Owner, admin compatible y manager operativo pueden crear, editar o
-            aplicar plantillas.
+            Crea semanas base con horarios, bloques vacantes y entrenadores por
+            defecto que se reutilizan al aplicar la plantilla.
+          </span>{" "}
+          <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
+            Más
           </span>
-        </div>
-        <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
-          <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Semana destino:{" "}
-            {weekStart && weekEnd ? (
-              <Link
-                className="-mx-1 inline-flex min-h-11 items-center rounded-md px-1 underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0"
-                href={getSchedulePath({ organizationId, week: weekStart })}
-              >
-                {formatDate(weekStart)} - {formatDate(weekEnd)}
-              </Link>
-            ) : (
-              "elige una semana destino."
-            )}
+          <span className="hidden font-medium text-foreground underline underline-offset-4 group-open:inline-flex">
+            Menos
           </span>
+        </summary>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
+            <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span>
+              Propietario, Administrador y Responsable pueden crear, editar o
+              aplicar plantillas.
+            </span>
+          </div>
+          <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
+            <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span>
+              Semana destino:{" "}
+              {weekStart && weekEnd ? (
+                <Link
+                  className="-mx-1 inline-flex min-h-11 items-center rounded-md px-1 underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0"
+                  href={getSchedulePath({ organizationId, week: weekStart })}
+                >
+                  {formatDate(weekStart)} - {formatDate(weekEnd)}
+                </Link>
+              ) : (
+                "elige una semana destino."
+              )}
+            </span>
+          </div>
         </div>
-      </div>
+      </details>
     </section>
   );
 }

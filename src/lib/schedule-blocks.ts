@@ -37,6 +37,11 @@ export const SCHEDULE_RISK_COVERAGE_STATES = [
   "conflict",
 ] as const;
 
+export const SCHEDULE_ABSENCE_IMPACT_STATUSES = [
+  "potential",
+  "coverage_needed",
+] as const;
+
 export type ScheduleBlockStatus = (typeof SCHEDULE_BLOCK_STATUSES)[number];
 export type ScheduleAssignmentStatus =
   (typeof SCHEDULE_ASSIGNMENT_STATUSES)[number];
@@ -44,6 +49,8 @@ export type ScheduleCoverageState =
   (typeof SCHEDULE_COVERAGE_STATES)[number];
 export type ScheduleFilterCoverageState =
   (typeof SCHEDULE_FILTER_COVERAGE_STATES)[number];
+export type ScheduleAbsenceImpactStatus =
+  (typeof SCHEDULE_ABSENCE_IMPACT_STATUSES)[number];
 
 export type ScheduleBlockFormValues = {
   centerId: string;
@@ -119,7 +126,28 @@ export type CoverageBlockInput = {
 export type CoverageAssignmentInput = {
   assignment_status: string;
   coach_profile_id: string;
+  id?: string | null;
   schedule_block_id: string;
+};
+
+export type CoverageAbsenceImpactInput = {
+  impact_status: string;
+  schedule_block_assignment_id: string;
+  schedule_block_id: string;
+  subject_coach_profile_id: string | null;
+};
+
+export type ScheduleAvailabilityAssignmentInput = CoverageAssignmentInput & {
+  id?: string | null;
+};
+
+export type ScheduleCoachUnavailableAssignment = {
+  assignmentId: string | null;
+  coachProfileId: string;
+  endTime: string;
+  scheduleBlockId: string;
+  serviceDate: string;
+  startTime: string;
 };
 
 export type CoverageCoachInput = {
@@ -141,12 +169,29 @@ export type CoverageMembershipInput = {
 };
 
 export type ScheduleBlockCoverage = {
+  absenceImpact: ScheduleBlockAbsenceImpact;
   conflictCoachProfileIds: string[];
   pendingAssignmentCount: number;
   requiredCoaches: number;
   state: ScheduleCoverageState;
   validAssignmentCount: number;
   validCoachProfileIds: string[];
+};
+
+export type ScheduleBlockAbsenceImpact = {
+  affectedAssignmentIds: string[];
+  affectedCoachProfileIds: string[];
+  coverageNeededCount: number;
+  potentialCount: number;
+};
+
+type ScheduleBlockAbsenceImpactBucket = {
+  coverageNeededAssignmentIds: Set<string>;
+  coverageNeededBlockCoachKeys: Set<string>;
+  coverageNeededCoachProfileIds: Set<string>;
+  potentialAssignmentIds: Set<string>;
+  potentialBlockCoachKeys: Set<string>;
+  potentialCoachProfileIds: Set<string>;
 };
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -181,6 +226,166 @@ export function isScheduleRiskCoverageState(value: ScheduleCoverageState) {
   return SCHEDULE_RISK_COVERAGE_STATES.includes(
     value as (typeof SCHEDULE_RISK_COVERAGE_STATES)[number],
   );
+}
+
+export function hasScheduleAbsenceImpact(coverage: ScheduleBlockCoverage) {
+  return (
+    coverage.absenceImpact.coverageNeededCount > 0 ||
+    coverage.absenceImpact.potentialCount > 0
+  );
+}
+
+export function isScheduleCoverageRisk(coverage: ScheduleBlockCoverage) {
+  return (
+    isScheduleRiskCoverageState(coverage.state) ||
+    hasScheduleAbsenceImpact(coverage)
+  );
+}
+
+function createEmptyAbsenceImpact(): ScheduleBlockAbsenceImpact {
+  return {
+    affectedAssignmentIds: [],
+    affectedCoachProfileIds: [],
+    coverageNeededCount: 0,
+    potentialCount: 0,
+  };
+}
+
+function createAbsenceImpactBucket(): ScheduleBlockAbsenceImpactBucket {
+  return {
+    coverageNeededAssignmentIds: new Set<string>(),
+    coverageNeededBlockCoachKeys: new Set<string>(),
+    coverageNeededCoachProfileIds: new Set<string>(),
+    potentialAssignmentIds: new Set<string>(),
+    potentialBlockCoachKeys: new Set<string>(),
+    potentialCoachProfileIds: new Set<string>(),
+  };
+}
+
+function getBlockCoachKey({
+  coachProfileId,
+  scheduleBlockId,
+}: {
+  coachProfileId: string | null;
+  scheduleBlockId: string;
+}) {
+  return coachProfileId ? `${scheduleBlockId}:${coachProfileId}` : null;
+}
+
+function isAbsenceImpactStatus(
+  value: string,
+): value is ScheduleAbsenceImpactStatus {
+  return SCHEDULE_ABSENCE_IMPACT_STATUSES.includes(
+    value as ScheduleAbsenceImpactStatus,
+  );
+}
+
+function buildAbsenceImpactBuckets(
+  absenceImpacts: CoverageAbsenceImpactInput[],
+) {
+  const impactsByBlock = new Map<string, ScheduleBlockAbsenceImpactBucket>();
+
+  for (const impact of absenceImpacts) {
+    if (!isAbsenceImpactStatus(impact.impact_status)) {
+      continue;
+    }
+
+    const bucket =
+      impactsByBlock.get(impact.schedule_block_id) ??
+      createAbsenceImpactBucket();
+    const blockCoachKey = getBlockCoachKey({
+      coachProfileId: impact.subject_coach_profile_id,
+      scheduleBlockId: impact.schedule_block_id,
+    });
+    const assignmentId = impact.schedule_block_assignment_id;
+    const assignmentIds =
+      impact.impact_status === "coverage_needed"
+        ? bucket.coverageNeededAssignmentIds
+        : bucket.potentialAssignmentIds;
+    const blockCoachKeys =
+      impact.impact_status === "coverage_needed"
+        ? bucket.coverageNeededBlockCoachKeys
+        : bucket.potentialBlockCoachKeys;
+    const coachProfileIds =
+      impact.impact_status === "coverage_needed"
+        ? bucket.coverageNeededCoachProfileIds
+        : bucket.potentialCoachProfileIds;
+
+    if (assignmentId) {
+      assignmentIds.add(assignmentId);
+    }
+
+    if (blockCoachKey) {
+      blockCoachKeys.add(blockCoachKey);
+    }
+
+    if (impact.subject_coach_profile_id) {
+      coachProfileIds.add(impact.subject_coach_profile_id);
+    }
+
+    impactsByBlock.set(impact.schedule_block_id, bucket);
+  }
+
+  return impactsByBlock;
+}
+
+function hasCoverageNeededAbsenceImpact({
+  assignment,
+  bucket,
+}: {
+  assignment: CoverageAssignmentInput;
+  bucket: ScheduleBlockAbsenceImpactBucket | undefined;
+}) {
+  if (!bucket) {
+    return false;
+  }
+
+  if (
+    assignment.id &&
+    bucket.coverageNeededAssignmentIds.has(assignment.id)
+  ) {
+    return true;
+  }
+
+  const blockCoachKey = getBlockCoachKey({
+    coachProfileId: assignment.coach_profile_id,
+    scheduleBlockId: assignment.schedule_block_id,
+  });
+
+  return Boolean(
+    blockCoachKey && bucket.coverageNeededBlockCoachKeys.has(blockCoachKey),
+  );
+}
+
+function getAbsenceImpactForBlock(
+  bucket: ScheduleBlockAbsenceImpactBucket | undefined,
+): ScheduleBlockAbsenceImpact {
+  if (!bucket) {
+    return createEmptyAbsenceImpact();
+  }
+
+  return {
+    affectedAssignmentIds: [
+      ...new Set([
+        ...bucket.coverageNeededAssignmentIds,
+        ...bucket.potentialAssignmentIds,
+      ]),
+    ],
+    affectedCoachProfileIds: [
+      ...new Set([
+        ...bucket.coverageNeededCoachProfileIds,
+        ...bucket.potentialCoachProfileIds,
+      ]),
+    ],
+    coverageNeededCount: Math.max(
+      bucket.coverageNeededAssignmentIds.size,
+      bucket.coverageNeededCoachProfileIds.size,
+    ),
+    potentialCount: Math.max(
+      bucket.potentialAssignmentIds.size,
+      bucket.potentialCoachProfileIds.size,
+    ),
+  };
 }
 
 export function getScheduleBlockStatusLabel(status: string) {
@@ -395,6 +600,58 @@ function timeRangesOverlap(
     timeToMinutes(firstStart) < timeToMinutes(secondEnd) &&
     timeToMinutes(secondStart) < timeToMinutes(firstEnd)
   );
+}
+
+export function getUnavailableScheduleCoachAssignments({
+  assignments,
+  blocks,
+  targetBlock,
+}: {
+  assignments: ScheduleAvailabilityAssignmentInput[];
+  blocks: CoverageBlockInput[];
+  targetBlock: CoverageBlockInput;
+}) {
+  if (!isCoverageActiveBlock(targetBlock.status)) {
+    return [];
+  }
+
+  const blocksById = new Map(blocks.map((block) => [block.id, block]));
+
+  return assignments.flatMap((assignment) => {
+    if (
+      assignment.assignment_status !== "assigned" ||
+      assignment.schedule_block_id === targetBlock.id
+    ) {
+      return [];
+    }
+
+    const assignedBlock = blocksById.get(assignment.schedule_block_id);
+
+    if (
+      !assignedBlock ||
+      !isCoverageActiveBlock(assignedBlock.status) ||
+      assignedBlock.service_date !== targetBlock.service_date ||
+      !timeRangesOverlap(
+        assignedBlock.start_time,
+        assignedBlock.end_time,
+        targetBlock.start_time,
+        targetBlock.end_time,
+      )
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        assignmentId: assignment.id ?? null,
+        coachProfileId: assignment.coach_profile_id,
+        endTime: assignedBlock.end_time,
+        scheduleBlockId: assignedBlock.id,
+        serviceDate: assignedBlock.service_date,
+        startTime: assignedBlock.start_time,
+      } satisfies ScheduleCoachUnavailableAssignment,
+    ];
+  });
 }
 
 function parseRequiredCoaches(value: string) {
@@ -614,18 +871,21 @@ function isValidCoverageCoach({
 
 export function calculateScheduleCoverageByBlock({
   assignments,
+  absenceImpacts = [],
   blocks,
   coaches,
   memberships,
   persons,
 }: {
   assignments: CoverageAssignmentInput[];
+  absenceImpacts?: CoverageAbsenceImpactInput[];
   blocks: CoverageBlockInput[];
   coaches: CoverageCoachInput[];
   memberships: CoverageMembershipInput[];
   persons: CoveragePersonInput[];
 }) {
   const blocksById = new Map(blocks.map((block) => [block.id, block]));
+  const absenceImpactsByBlock = buildAbsenceImpactBuckets(absenceImpacts);
   const coachesById = new Map(coaches.map((coach) => [coach.id, coach]));
   const personsById = new Map(persons.map((person) => [person.id, person]));
   const membershipsByUserId = new Map(
@@ -636,10 +896,18 @@ export function calculateScheduleCoverageByBlock({
 
   for (const assignment of assignments) {
     if (assignment.assignment_status === "pending") {
-      pendingAssignmentCountByBlock.set(
-        assignment.schedule_block_id,
-        (pendingAssignmentCountByBlock.get(assignment.schedule_block_id) ?? 0) + 1,
-      );
+      const block = blocksById.get(assignment.schedule_block_id);
+
+      if (
+        block &&
+        isCoverageActiveBlock(block.status) &&
+        block.required_coaches > 0
+      ) {
+        pendingAssignmentCountByBlock.set(
+          assignment.schedule_block_id,
+          (pendingAssignmentCountByBlock.get(assignment.schedule_block_id) ?? 0) + 1,
+        );
+      }
     }
 
     if (assignment.assignment_status !== "assigned") {
@@ -647,8 +915,24 @@ export function calculateScheduleCoverageByBlock({
     }
 
     const block = blocksById.get(assignment.schedule_block_id);
+    const absenceImpactBucket = absenceImpactsByBlock.get(
+      assignment.schedule_block_id,
+    );
 
     if (!block || !isCoverageActiveBlock(block.status)) {
+      continue;
+    }
+
+    if (block.required_coaches <= 0) {
+      continue;
+    }
+
+    if (
+      hasCoverageNeededAbsenceImpact({
+        assignment,
+        bucket: absenceImpactBucket,
+      })
+    ) {
       continue;
     }
 
@@ -728,6 +1012,10 @@ export function calculateScheduleCoverageByBlock({
   return new Map(
     blocks.map((block) => {
       const validAssignments = validAssignmentsByBlock.get(block.id) ?? [];
+      const absenceImpact =
+        block.required_coaches > 0
+          ? getAbsenceImpactForBlock(absenceImpactsByBlock.get(block.id))
+          : createEmptyAbsenceImpact();
       const conflictCoachProfileIds = [
         ...(conflictCoachProfileIdsByBlock.get(block.id) ?? new Set<string>()),
       ];
@@ -736,10 +1024,10 @@ export function calculateScheduleCoverageByBlock({
 
       if (!isCoverageActiveBlock(block.status)) {
         state = "inactive";
-      } else if (conflictCoachProfileIds.length > 0) {
-        state = "conflict";
       } else if (block.required_coaches <= 0) {
         state = "not_required";
+      } else if (conflictCoachProfileIds.length > 0) {
+        state = "conflict";
       } else if (validAssignmentCount === 0) {
         state = "uncovered";
       } else if (validAssignmentCount < block.required_coaches) {
@@ -749,6 +1037,7 @@ export function calculateScheduleCoverageByBlock({
       return [
         block.id,
         {
+          absenceImpact,
           conflictCoachProfileIds,
           pendingAssignmentCount:
             pendingAssignmentCountByBlock.get(block.id) ?? 0,

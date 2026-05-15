@@ -19,8 +19,27 @@ import {
   validateCoachProfileUpdateForm,
   validateMembershipForm,
 } from "@/lib/coaches";
+import { sendTransactionalEmail } from "@/lib/email/resend";
 import { getCoachesPath } from "@/lib/navigation/app-paths";
+import {
+  addAuditFieldChange,
+  auditFieldSet,
+  auditFieldTouched,
+  recordOperationalAuditEvent,
+  type OperationalAuditChangedFields,
+} from "@/lib/operational-audit";
 import { createClient } from "@/lib/supabase/server";
+import {
+  buildTeamInvitationEmail,
+  generateInvitationToken,
+  getInvitationAcceptUrl,
+  getInvitationExpiryDate,
+  hashInvitationToken,
+  isValidInvitationEmail,
+  normalizeInvitationEmail,
+  TEAM_INVITATION_INITIAL_ACCESS_STATUSES,
+} from "@/lib/team-invitations";
+import { isPostgresUuid } from "@/lib/uuid";
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -64,9 +83,134 @@ async function getCoachActionContext(
   }
 
   return {
+    membership: resolution.membership,
     organization: resolution.organization,
     user,
   };
+}
+
+function getOptionalFormUuid(formData: FormData, key: string) {
+  const value = getRequiredFormString(formData, key);
+
+  if (!value || value === "none") {
+    return null;
+  }
+
+  return isPostgresUuid(value) ? value : undefined;
+}
+
+function parseWeeklyHours(value: string) {
+  const normalizedValue = value.replace(",", ".");
+  const hours = Number(normalizedValue);
+
+  if (!Number.isFinite(hours) || hours < 0 || hours > 168) {
+    return null;
+  }
+
+  return Math.round(hours * 100) / 100;
+}
+
+function isInitialAccessStatus(value: string) {
+  return TEAM_INVITATION_INITIAL_ACCESS_STATUSES.includes(
+    value as (typeof TEAM_INVITATION_INITIAL_ACCESS_STATUSES)[number],
+  );
+}
+
+function getTeamInvitationMutationError(errorCode?: string) {
+  if (errorCode === "23505") {
+    return "duplicate-invitation";
+  }
+
+  if (errorCode === "23503") {
+    return "invalid-profile-reference";
+  }
+
+  return "save-failed";
+}
+
+function validateTeamInvitationForm(formData: FormData) {
+  const rawEmail = getRequiredFormString(formData, "email");
+  const email = normalizeInvitationEmail(rawEmail);
+  const rawRole = getRequiredFormString(formData, "role") || "coach";
+  const rawInitialAccessStatus =
+    getRequiredFormString(formData, "initialAccessStatus") || "active";
+  const rawCoachProfileId = getRequiredFormString(formData, "coachProfileId");
+  const displayName = getRequiredFormString(formData, "displayName");
+  const primaryCenterId = getOptionalFormUuid(formData, "primaryCenterId");
+  const weeklyContractedHours = parseWeeklyHours(
+    getRequiredFormString(formData, "weeklyContractedHours") || "0",
+  );
+  const notes = getRequiredFormString(formData, "notes");
+
+  if (!email || !rawRole || !rawInitialAccessStatus || !rawCoachProfileId) {
+    return { error: "missing-fields" as const, ok: false as const };
+  }
+
+  if (!isValidInvitationEmail(email)) {
+    return { error: "invalid-email" as const, ok: false as const };
+  }
+
+  if (!isMembershipRole(rawRole)) {
+    return { error: "invalid-role" as const, ok: false as const };
+  }
+
+  if (!isInitialAccessStatus(rawInitialAccessStatus)) {
+    return { error: "invalid-status" as const, ok: false as const };
+  }
+
+  if (primaryCenterId === undefined) {
+    return { error: "invalid-center" as const, ok: false as const };
+  }
+
+  if (weeklyContractedHours === null) {
+    return { error: "invalid-hours" as const, ok: false as const };
+  }
+
+  if (notes.length > 1000) {
+    return { error: "notes-too-long" as const, ok: false as const };
+  }
+
+  if (rawCoachProfileId === "new" && !displayName) {
+    return { error: "missing-fields" as const, ok: false as const };
+  }
+
+  if (rawCoachProfileId !== "new" && !isPostgresUuid(rawCoachProfileId)) {
+    return { error: "invalid-profile-id" as const, ok: false as const };
+  }
+
+  return {
+    ok: true as const,
+    values: {
+      coachProfileId:
+        rawCoachProfileId === "new" ? null : rawCoachProfileId,
+      displayName,
+      email,
+      initialAccessStatus: rawInitialAccessStatus,
+      notes: notes || null,
+      primaryCenterId,
+      role: rawRole,
+      weeklyContractedHours,
+    },
+  };
+}
+
+async function ensureCenterBelongsToOrganization(
+  organizationId: string,
+  centerId: string | null,
+) {
+  if (!centerId) {
+    return true;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("centers")
+    .select("id")
+    .eq("id", centerId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  return !error && Boolean(data);
 }
 
 function getMembershipMutationError(errorCode?: string) {
@@ -119,6 +263,502 @@ function getMembershipTimestamps(status: string, existing?: {
   };
 }
 
+function getCoachProfileAuditFields({
+  notesChanged,
+  primaryCenterId,
+  status,
+  weeklyContractedHours,
+}: {
+  notesChanged?: boolean;
+  primaryCenterId: string | null;
+  status: string;
+  weeklyContractedHours: number;
+}): OperationalAuditChangedFields {
+  return {
+    ...(notesChanged ? { notes: auditFieldTouched() } : {}),
+    primary_center_id: auditFieldSet(primaryCenterId),
+    status: auditFieldSet(status),
+    weekly_contracted_hours: auditFieldSet(weeklyContractedHours),
+  };
+}
+
+async function sendInvitationEmailAndMarkSent({
+  email,
+  invitationId,
+  invitedByName,
+  organizationId,
+  organizationName,
+  recipientName,
+  token,
+}: {
+  email: string;
+  invitationId: string;
+  invitedByName: string;
+  organizationId: string;
+  organizationName: string;
+  recipientName: string;
+  token: string;
+}) {
+  const acceptUrl = await getInvitationAcceptUrl(invitationId, token);
+  const emailContent = buildTeamInvitationEmail({
+    acceptUrl,
+    invitedByName,
+    organizationName,
+    recipientName,
+  });
+  const sendResult = await sendTransactionalEmail({
+    html: emailContent.html,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    to: email,
+  });
+  const supabase = await createClient();
+
+  if (!sendResult.ok) {
+    await supabase
+      .from("team_invitations")
+      .update({
+        last_error: sendResult.message.slice(0, 1000),
+        status: "failed",
+      })
+      .eq("id", invitationId)
+      .eq("organization_id", organizationId);
+
+    return sendResult.code;
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("team_invitations")
+    .update({
+      last_error: null,
+      last_sent_at: now,
+      provider_message_id: sendResult.id,
+      send_count: 1,
+      sent_at: now,
+      status: "sent",
+    })
+    .eq("id", invitationId)
+    .eq("organization_id", organizationId)
+    .select("id")
+    .single();
+
+  return error ? "save-failed" : null;
+}
+
+export async function createTeamInvitation(formData: FormData) {
+  const context = await getCoachActionContext(formData, "team-access");
+  const validation = validateTeamInvitationForm(formData);
+
+  if (!validation.ok) {
+    redirect(getErrorPath(context.organization.id, validation.error));
+  }
+
+  const centerIsValid = await ensureCenterBelongsToOrganization(
+    context.organization.id,
+    validation.values.primaryCenterId,
+  );
+
+  if (!centerIsValid) {
+    redirect(getErrorPath(context.organization.id, "invalid-center"));
+  }
+
+  const supabase = await createClient();
+  const { data: existingInvitation, error: existingInvitationError } =
+    await supabase
+      .from("team_invitations")
+      .select("id")
+      .eq("organization_id", context.organization.id)
+      .eq("email_normalized", validation.values.email)
+      .in("status", ["pending", "sent"])
+      .maybeSingle();
+
+  if (existingInvitationError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  if (existingInvitation) {
+    redirect(getErrorPath(context.organization.id, "duplicate-invitation"));
+  }
+
+  let personProfileId: string;
+  let coachProfileId: string | null;
+  let recipientName: string;
+
+  if (validation.values.coachProfileId) {
+    const { data: coachProfile, error: coachProfileError } = await supabase
+      .from("coach_profiles")
+      .select(
+        "id, organization_id, notes, person_profile_id, primary_center_id, status, user_id, weekly_contracted_hours",
+      )
+      .eq("id", validation.values.coachProfileId)
+      .eq("organization_id", context.organization.id)
+      .maybeSingle();
+
+    if (coachProfileError || !coachProfile) {
+      redirect(getErrorPath(context.organization.id, "profile-required"));
+    }
+
+    if (coachProfile.status !== "active") {
+      redirect(getErrorPath(context.organization.id, "profile-inactive"));
+    }
+
+    if (coachProfile.user_id || !coachProfile.person_profile_id) {
+      redirect(getErrorPath(context.organization.id, "account-link-conflict"));
+    }
+
+    const { data: personProfile, error: personProfileError } = await supabase
+      .from("person_profiles")
+      .select("id, display_name, status, user_id, visibility_status")
+      .eq("id", coachProfile.person_profile_id)
+      .eq("organization_id", context.organization.id)
+      .maybeSingle();
+
+    if (personProfileError || !personProfile) {
+      redirect(getErrorPath(context.organization.id, "invalid-person-profile"));
+    }
+
+    if (personProfile.user_id) {
+      redirect(getErrorPath(context.organization.id, "person-user-conflict"));
+    }
+
+    if (personProfile.status !== "active") {
+      redirect(getErrorPath(context.organization.id, "person-profile-inactive"));
+    }
+
+    if (personProfile.visibility_status !== "visible") {
+      redirect(getErrorPath(context.organization.id, "person-profile-internal"));
+    }
+
+    const { error: coachUpdateError } = await supabase
+      .from("coach_profiles")
+      .update({
+        notes: validation.values.notes,
+        primary_center_id: validation.values.primaryCenterId,
+        weekly_contracted_hours: validation.values.weeklyContractedHours,
+      })
+      .eq("id", coachProfile.id)
+      .eq("organization_id", context.organization.id)
+      .select("id")
+      .single();
+
+    if (coachUpdateError) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          getCoachProfileMutationError(coachUpdateError.code),
+        ),
+      );
+    }
+
+    const changedFields: OperationalAuditChangedFields = {};
+    addAuditFieldChange(
+      changedFields,
+      "primary_center_id",
+      coachProfile.primary_center_id,
+      validation.values.primaryCenterId,
+    );
+    addAuditFieldChange(
+      changedFields,
+      "weekly_contracted_hours",
+      Number(coachProfile.weekly_contracted_hours ?? 0),
+      validation.values.weeklyContractedHours,
+    );
+
+    if ((coachProfile.notes ?? null) !== validation.values.notes) {
+      changedFields.notes = auditFieldTouched();
+    }
+
+    if (Object.keys(changedFields).length > 0) {
+      await recordOperationalAuditEvent({
+        action: "updated",
+        changedFields,
+        entityId: coachProfile.id,
+        entityType: "coach_profiles",
+        organizationId: context.organization.id,
+        supabase,
+      });
+    }
+
+    personProfileId = personProfile.id;
+    coachProfileId = coachProfile.id;
+    recipientName = personProfile.display_name;
+  } else {
+    const { data: personProfile, error: personProfileError } = await supabase
+      .from("person_profiles")
+      .insert({
+        display_name: validation.values.displayName,
+        organization_id: context.organization.id,
+        status: "active",
+        visibility_status: "visible",
+      })
+      .select("id, display_name")
+      .single();
+
+    if (personProfileError || !personProfile) {
+      redirect(getErrorPath(context.organization.id, "save-failed"));
+    }
+
+    const { data: coachProfile, error: coachProfileError } = await supabase
+      .from("coach_profiles")
+      .insert({
+        notes: validation.values.notes,
+        organization_id: context.organization.id,
+        person_profile_id: personProfile.id,
+        primary_center_id: validation.values.primaryCenterId,
+        status: "active",
+        weekly_contracted_hours: validation.values.weeklyContractedHours,
+      })
+      .select("id")
+      .single();
+
+    if (coachProfileError || !coachProfile) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          getCoachProfileMutationError(coachProfileError?.code),
+        ),
+      );
+    }
+
+    personProfileId = personProfile.id;
+    coachProfileId = coachProfile.id;
+    recipientName = personProfile.display_name;
+
+    await recordOperationalAuditEvent({
+      action: "created",
+      changedFields: {
+        display_name: auditFieldTouched(),
+        status: auditFieldSet("active"),
+        visibility_status: auditFieldSet("visible"),
+      },
+      entityId: personProfile.id,
+      entityType: "person_profiles",
+      organizationId: context.organization.id,
+      supabase,
+    });
+
+    await recordOperationalAuditEvent({
+      action: "created",
+      changedFields: getCoachProfileAuditFields({
+        notesChanged: Boolean(validation.values.notes),
+        primaryCenterId: validation.values.primaryCenterId,
+        status: "active",
+        weeklyContractedHours: validation.values.weeklyContractedHours,
+      }),
+      entityId: coachProfile.id,
+      entityType: "coach_profiles",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  }
+
+  const token = generateInvitationToken();
+  const { data: invitation, error: invitationError } = await supabase
+    .from("team_invitations")
+    .insert({
+      coach_profile_id: coachProfileId,
+      email: validation.values.email,
+      email_normalized: validation.values.email,
+      expires_at: getInvitationExpiryDate().toISOString(),
+      initial_access_status: validation.values.initialAccessStatus,
+      invited_by_membership_id: context.membership.id,
+      invited_by_user_id: context.user.id,
+      organization_id: context.organization.id,
+      person_profile_id: personProfileId,
+      role: validation.values.role,
+      status: "pending",
+      token_hash: hashInvitationToken(token),
+    })
+    .select("id")
+    .single();
+
+  if (invitationError || !invitation) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        getTeamInvitationMutationError(invitationError?.code),
+      ),
+    );
+  }
+
+  const emailError = await sendInvitationEmailAndMarkSent({
+    email: validation.values.email,
+    invitationId: invitation.id,
+    invitedByName: context.user.email ?? "BoxOps",
+    organizationId: context.organization.id,
+    organizationName: context.organization.name,
+    recipientName,
+    token,
+  });
+
+  if (emailError) {
+    redirect(getErrorPath(context.organization.id, emailError));
+  }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      coach_profile_id: auditFieldSet(coachProfileId),
+      initial_access_status: auditFieldSet(
+        validation.values.initialAccessStatus,
+      ),
+      person_profile_id: auditFieldSet(personProfileId),
+      role: auditFieldSet(validation.values.role),
+      status: auditFieldSet("sent"),
+    },
+    entityId: invitation.id,
+    entityType: "team_invitations",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getCoachesPath({
+      organizationId: context.organization.id,
+      status: "invitation-sent",
+    }),
+  );
+}
+
+export async function resendTeamInvitation(formData: FormData) {
+  const context = await getCoachActionContext(formData, "team-access");
+  const invitationId = getRequiredFormString(formData, "invitationId");
+
+  if (!isPostgresUuid(invitationId)) {
+    redirect(getErrorPath(context.organization.id, "invalid-invitation-id"));
+  }
+
+  const supabase = await createClient();
+  const { data: invitation, error: invitationError } = await supabase
+    .from("team_invitations")
+    .select(
+      "id, organization_id, email_normalized, person_profile_id, status, last_sent_at",
+    )
+    .eq("id", invitationId)
+    .eq("organization_id", context.organization.id)
+    .maybeSingle();
+
+  if (invitationError || !invitation) {
+    redirect(getErrorPath(context.organization.id, "invitation-required"));
+  }
+
+  if (invitation.status === "accepted" || invitation.status === "cancelled") {
+    redirect(getErrorPath(context.organization.id, "invitation-closed"));
+  }
+
+  if (
+    invitation.last_sent_at &&
+    Date.now() - new Date(invitation.last_sent_at).getTime() < 60_000
+  ) {
+    redirect(getErrorPath(context.organization.id, "invitation-rate-limited"));
+  }
+
+  const { data: personProfile, error: personProfileError } = await supabase
+    .from("person_profiles")
+    .select("display_name")
+    .eq("id", invitation.person_profile_id)
+    .eq("organization_id", context.organization.id)
+    .maybeSingle();
+
+  if (personProfileError || !personProfile) {
+    redirect(getErrorPath(context.organization.id, "invalid-person-profile"));
+  }
+
+  const token = generateInvitationToken();
+  const { error: tokenUpdateError } = await supabase
+    .from("team_invitations")
+    .update({
+      expires_at: getInvitationExpiryDate().toISOString(),
+      last_error: null,
+      status: "pending",
+      token_hash: hashInvitationToken(token),
+    })
+    .eq("id", invitation.id)
+    .eq("organization_id", context.organization.id)
+    .select("id")
+    .single();
+
+  if (tokenUpdateError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  const emailError = await sendInvitationEmailAndMarkSent({
+    email: invitation.email_normalized,
+    invitationId: invitation.id,
+    invitedByName: context.user.email ?? "BoxOps",
+    organizationId: context.organization.id,
+    organizationName: context.organization.name,
+    recipientName: personProfile.display_name,
+    token,
+  });
+
+  if (emailError) {
+    redirect(getErrorPath(context.organization.id, emailError));
+  }
+
+  await recordOperationalAuditEvent({
+    action: "resent",
+    changedFields: {
+      expires_at: auditFieldTouched(),
+      last_sent_at: auditFieldTouched(),
+      status: auditFieldSet("sent"),
+    },
+    entityId: invitation.id,
+    entityType: "team_invitations",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getCoachesPath({
+      organizationId: context.organization.id,
+      status: "invitation-resent",
+    }),
+  );
+}
+
+export async function cancelTeamInvitation(formData: FormData) {
+  const context = await getCoachActionContext(formData, "team-access");
+  const invitationId = getRequiredFormString(formData, "invitationId");
+
+  if (!isPostgresUuid(invitationId)) {
+    redirect(getErrorPath(context.organization.id, "invalid-invitation-id"));
+  }
+
+  const supabase = await createClient();
+  const { data: invitation, error } = await supabase
+    .from("team_invitations")
+    .update({ status: "cancelled" })
+    .eq("id", invitationId)
+    .eq("organization_id", context.organization.id)
+    .neq("status", "accepted")
+    .select("id")
+    .single();
+
+  if (error || !invitation) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  await recordOperationalAuditEvent({
+    action: "cancelled",
+    changedFields: {
+      status: auditFieldSet("cancelled"),
+    },
+    entityId: invitation.id,
+    entityType: "team_invitations",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getCoachesPath({
+      organizationId: context.organization.id,
+      status: "invitation-cancelled",
+    }),
+  );
+}
+
 export async function createMembership(formData: FormData) {
   const context = await getCoachActionContext(formData, "team-access");
   const validation = validateMembershipForm(formData);
@@ -128,22 +768,38 @@ export async function createMembership(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("organization_memberships").insert({
-    organization_id: context.organization.id,
-    user_id: validation.values.userId,
-    role: validation.values.role,
-    status: validation.values.status,
-    ...getMembershipTimestamps(validation.values.status),
-  });
+  const { data: membership, error } = await supabase
+    .from("organization_memberships")
+    .insert({
+      organization_id: context.organization.id,
+      user_id: validation.values.userId,
+      role: validation.values.role,
+      status: validation.values.status,
+      ...getMembershipTimestamps(validation.values.status),
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !membership) {
     redirect(
       getErrorPath(
         context.organization.id,
-        getMembershipMutationError(error.code),
+        getMembershipMutationError(error?.code),
       ),
     );
   }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      role: auditFieldSet(validation.values.role),
+      status: auditFieldSet(validation.values.status),
+    },
+    entityId: membership.id,
+    entityType: "organization_memberships",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCoachesPath({
@@ -169,7 +825,7 @@ export async function updateMembership(formData: FormData) {
   const supabase = await createClient();
   const { data: existingMembership, error: existingError } = await supabase
     .from("organization_memberships")
-    .select("id, user_id, invited_at, joined_at")
+    .select("id, user_id, role, status, invited_at, joined_at")
     .eq("id", membershipId)
     .eq("organization_id", context.organization.id)
     .single();
@@ -203,6 +859,29 @@ export async function updateMembership(formData: FormData) {
     );
   }
 
+  const membershipChangedFields: OperationalAuditChangedFields = {};
+  addAuditFieldChange(
+    membershipChangedFields,
+    "role",
+    existingMembership.role,
+    validation.values.role,
+  );
+  addAuditFieldChange(
+    membershipChangedFields,
+    "status",
+    existingMembership.status,
+    validation.values.status,
+  );
+
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields: membershipChangedFields,
+    entityId: existingMembership.id,
+    entityType: "organization_memberships",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
   redirect(
     getCoachesPath({
       organizationId: context.organization.id,
@@ -235,23 +914,41 @@ export async function createCoachProfile(formData: FormData) {
     redirect(getErrorPath(context.organization.id, "invalid-role"));
   }
 
-  const { error } = await supabase.from("coach_profiles").insert({
-    organization_id: context.organization.id,
-    user_id: validation.values.userId,
-    primary_center_id: validation.values.primaryCenterId,
-    weekly_contracted_hours: validation.values.weeklyContractedHours,
-    status: validation.values.status,
-    notes: validation.values.notes,
-  });
+  const { data: coachProfile, error } = await supabase
+    .from("coach_profiles")
+    .insert({
+      organization_id: context.organization.id,
+      user_id: validation.values.userId,
+      primary_center_id: validation.values.primaryCenterId,
+      weekly_contracted_hours: validation.values.weeklyContractedHours,
+      status: validation.values.status,
+      notes: validation.values.notes,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !coachProfile) {
     redirect(
       getErrorPath(
         context.organization.id,
-        getCoachProfileMutationError(error.code),
+        getCoachProfileMutationError(error?.code),
       ),
     );
   }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: getCoachProfileAuditFields({
+      notesChanged: Boolean(validation.values.notes),
+      primaryCenterId: validation.values.primaryCenterId,
+      status: validation.values.status,
+      weeklyContractedHours: validation.values.weeklyContractedHours,
+    }),
+    entityId: coachProfile.id,
+    entityType: "coach_profiles",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCoachesPath({
@@ -275,6 +972,18 @@ export async function updateCoachProfile(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const { data: existingCoachProfile, error: existingCoachProfileError } =
+    await supabase
+      .from("coach_profiles")
+      .select("id, notes, primary_center_id, status, weekly_contracted_hours")
+      .eq("id", coachProfileId)
+      .eq("organization_id", context.organization.id)
+      .maybeSingle();
+
+  if (existingCoachProfileError || !existingCoachProfile) {
+    redirect(getErrorPath(context.organization.id, "profile-required"));
+  }
+
   const { error } = await supabase
     .from("coach_profiles")
     .update({
@@ -296,6 +1005,39 @@ export async function updateCoachProfile(formData: FormData) {
       ),
     );
   }
+
+  const changedFields: OperationalAuditChangedFields = {};
+  addAuditFieldChange(
+    changedFields,
+    "primary_center_id",
+    existingCoachProfile.primary_center_id,
+    validation.values.primaryCenterId,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "weekly_contracted_hours",
+    Number(existingCoachProfile.weekly_contracted_hours ?? 0),
+    validation.values.weeklyContractedHours,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "status",
+    existingCoachProfile.status,
+    validation.values.status,
+  );
+
+  if ((existingCoachProfile.notes ?? null) !== validation.values.notes) {
+    changedFields.notes = auditFieldTouched();
+  }
+
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields,
+    entityId: coachProfileId,
+    entityType: "coach_profiles",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCoachesPath({
@@ -415,14 +1157,17 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
   }
 
   const existingMembership = existingMembershipResult.data;
+  let linkedMembershipId = existingMembership?.id ?? null;
+  let membershipAuditAction: "created" | "updated" | null = null;
+  const membershipChangedFields: OperationalAuditChangedFields = {};
 
   if (existingMembership) {
     const protectsCurrentAdmin = existingMembership.user_id === context.user.id;
-    const wouldChangeOwnMembership =
+    const wouldChangeMembership =
       existingMembership.role !== validation.values.role ||
       existingMembership.status !== validation.values.status;
 
-    if (protectsCurrentAdmin && wouldChangeOwnMembership) {
+    if (protectsCurrentAdmin && wouldChangeMembership) {
       redirect(getErrorPath(context.organization.id, "self-membership"));
     }
 
@@ -450,9 +1195,25 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
           ),
         );
       }
+
+      if (wouldChangeMembership) {
+        membershipAuditAction = "updated";
+        addAuditFieldChange(
+          membershipChangedFields,
+          "role",
+          existingMembership.role,
+          validation.values.role,
+        );
+        addAuditFieldChange(
+          membershipChangedFields,
+          "status",
+          existingMembership.status,
+          validation.values.status,
+        );
+      }
     }
   } else {
-    const { error: membershipInsertError } = await supabase
+    const { data: insertedMembership, error: membershipInsertError } = await supabase
       .from("organization_memberships")
       .insert({
         organization_id: context.organization.id,
@@ -460,16 +1221,23 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
         role: validation.values.role,
         status: validation.values.status,
         ...getMembershipTimestamps(validation.values.status),
-      });
+      })
+      .select("id")
+      .single();
 
-    if (membershipInsertError) {
+    if (membershipInsertError || !insertedMembership) {
       redirect(
         getErrorPath(
           context.organization.id,
-          getCoachAccountLinkMutationError(membershipInsertError.code),
+          getCoachAccountLinkMutationError(membershipInsertError?.code),
         ),
       );
     }
+
+    linkedMembershipId = insertedMembership.id;
+    membershipAuditAction = "created";
+    membershipChangedFields.role = auditFieldSet(validation.values.role);
+    membershipChangedFields.status = auditFieldSet(validation.values.status);
   }
 
   if (personProfile.user_id !== validation.values.userId) {
@@ -508,6 +1276,44 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
         ),
       );
     }
+  }
+
+  if (membershipAuditAction && linkedMembershipId) {
+    await recordOperationalAuditEvent({
+      action: membershipAuditAction,
+      changedFields: membershipChangedFields,
+      entityId: linkedMembershipId,
+      entityType: "organization_memberships",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  }
+
+  if (personProfile.user_id !== validation.values.userId) {
+    await recordOperationalAuditEvent({
+      action: "linked_account",
+      changedFields: {
+        user_id: auditFieldTouched(),
+      },
+      entityId: personProfile.id,
+      entityType: "person_profiles",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  }
+
+  if (coachProfile.user_id !== validation.values.userId) {
+    await recordOperationalAuditEvent({
+      action: "linked_account",
+      changedFields: {
+        person_profile_id: auditFieldSet(personProfile.id),
+        user_id: auditFieldTouched(),
+      },
+      entityId: coachProfile.id,
+      entityType: "coach_profiles",
+      organizationId: context.organization.id,
+      supabase,
+    });
   }
 
   redirect(

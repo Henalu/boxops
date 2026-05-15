@@ -1,10 +1,27 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  applicationName: "BoxOps",
   title: "BoxOps",
-  description: "Operational scheduling foundation for boxes.",
+  description:
+    "Operacion semanal, cobertura y fichaje web para boxes multi-centro.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "BoxOps",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0f6f7a",
 };
 
 const geistSans = Geist({

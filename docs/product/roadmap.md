@@ -9,10 +9,177 @@ MVP 1 visual/operativo ya esta avanzado:
 - auth Supabase SSR, multi-tenant por membership y rutas protegidas bajo `/app`;
 - centros, equipo/coaches, perfiles visibles/personas operativas y tipos de actividad;
 - horario semanal, asignaciones coach-bloque, cobertura basica, filtros, "Mi horario" y riesgos;
-- plantillas semanales basicas, dashboard, `/app/coverage`, `/app/more`;
+- plantillas semanales basicas con rango de validez, retirada confirmada de bloques de plantilla, excepciones semanales confirmadas, dashboard, `/app/coverage`, `/app/more`;
 - navegacion mobile-first, onboarding local, smoke tests y audit visual/responsive de Task 017.
 
-No existen todavia cambios, ausencias, documentos firmables, fichaje, RRHH completo ni app movil nativa. Roles avanzados compatibles, area personal minima, matriz documental de permisos personales, modelo documental de avatar privado, primer avatar privado propio y "Mi firma" privada propia ya existen como cortes B.2, D.1, D.2, D.3, D.4 y D.5.
+Ya existe un primer workflow minimo de solicitudes/ofertas de cambio/cobertura en I.1-I.8, sin swap, y una base interna DB/RLS/RPC de ausencias en I.10 con capa server/app interna en I.11. I.12 abre una primera bandeja visible protegida en `/app/absences`, I.13 anade creacion minima de solicitud propia, I.14 endurece esa superficie con filtros por query string, validacion visible y estados no accionables, I.15 anade QA/smoke de regresion sin abrir calendario ni creacion para otra persona, e I.16 integra el impacto de ausencias aprobadas o en revision en la lectura de cobertura de `/app/schedule`, `/app/coverage`, Inicio y `/app/stats`. El impacto sigue calculado al vuelo, no persiste `absence_schedule_impacts`, no modifica `schedule_blocks` ni `schedule_block_assignments` y no resuelve cobertura automaticamente. No existen todavia calendario completo de ausencias, documentos firmables, fichaje geolocalizado activo, RRHH completo ni app movil nativa. Roles avanzados compatibles, area personal minima, matriz documental de permisos personales, modelo documental de avatar privado, primer avatar privado propio, "Mi firma" privada propia, fichaje manual propio con correcciones trazadas, vista semanal de fichaje, historial visible de cambios, fichaje automatico web por planificacion, base backend de cierre semanal/aprobacion firmada, primer corte de avisos in-app en Inicio y exporte interno revisable CSV ya existen como cortes B.2, D.1, D.2, D.3, D.4, D.5 y F.4-F.14. G.1 deja documentado el primer modelo seguro de ubicacion asistida, G.2 cierra la decision tecnica/legal previa, G.3 crea una base tecnica interna de schema/RPC/RLS y G.4 crea una capa server/app interna. G.3/G.4 no crean UI visible, no leen `navigator.geolocation`, no activan geofencing ni fichaje automatico por ubicacion.
+
+Decision de producto 2026-05-13: BoxOps no pedira ubicacion desde la webapp. La web evolucionara hacia fichaje manual + automatico por planificacion, cierre semanal enviado cada domingo a las 23:59, aprobacion firmada o rechazo con nota, notificaciones in-app y reenvio tras correcciones. La geolocalizacion real queda para app nativa/wrapper futuro si el negocio exige background/geofencing.
+
+## Carril Transversal S - Seguridad, Privacidad Y Tenant Safety
+
+Objetivo: mantener ciberseguridad como calidad transversal durante todo el desarrollo, no como una fase tardia ni como un recordatorio generico.
+
+Estado 2026-05-10: el proyecto ya tenia decisiones solidas repartidas por fases: tenant por `organization_memberships`, `organization_id` obligatorio, RLS, reset anti-enumeracion, permisos por capacidad, Storage privado para avatar/firma y grants para documentos. Se anade `docs/architecture/security-baseline.md` como baseline explicito y gate de roadmap.
+
+Revision 2026-05-12: se incorpora al roadmap una auditoria operativa de aplicacion, tenant-scoped y de retencion corta, para accesos/usuarios y cambios relevantes de horario/plantillas. S.1.1 anade verificacion SQL/RLS con rollback y una funcion acotada de purga de eventos expirados, sin exponerla a la UI normal. Debe ayudar a admins a revisar "quien cambio que" sin convertir logs operativos en historico eterno ni sustituir backups/PITR/logs administrados de Supabase.
+
+Revision S.2 2026-05-12: se ejecuta cierre tecnico pre-QA sin abrir modulos nuevos. Quedan typecheck, lint, build, smoke local, Supabase lint/migration list y verificacion RLS de auditoria operativa en verde; el runbook minimo vive en `docs/operations/pre-qa-controlled-pilot-runbook.md`. Los bloqueos antes de QA real son configuracion Resend/Supabase Auth/SMTP, prueba controlada de invitacion y reset, job de purga S.1 y limpieza de snippets `Untitled query`.
+
+Revision S.3 2026-05-12: se ejecuta el gate controlado de email/Auth. La configuracion local de Resend existe y tiene formato plausible sin imprimir secretos, `.env.local` sigue ignorado/no trackeado y los `Untitled query` trackeados salen del indice. No se envia invitacion ni reset real porque faltan email interno permitido, credenciales E2E/admin y verificacion de configuracion Supabase Auth/SMTP del proyecto real. El mecanismo de purga S.1 queda definido como job DB/pg_cron preferente con fallback manual temporal.
+
+Revision S.4 2026-05-12: se ejecuta QA real controlado pre-piloto STL sin resetear datos ni tocar superficies operativas. La plantilla local `Semana prueba STL L-V` sigue restaurada con 165 bloques de plantilla y 165 bloques generados para 2026-05-04 a 2026-05-08; typecheck, lint, build, smoke, Supabase lint/migration list y verificacion SQL/RLS pasan. La prueba real de invitacion/reset y la activacion del job de purga siguen bloqueadas por falta de email interno permitido, credenciales E2E/admin y acceso administrativo al proyecto Supabase real/scheduler.
+
+Revision S.5 2026-05-12: se ejecuta el cierre operativo real de Auth/Email/Purga pre-piloto STL sin cambios de `src` ni datos operativos. Resend autentica localmente, pero el remitente queda limitado a `onboarding@resend.dev` y no hay dominios verificados visibles; Supabase Auth real/SMTP, email interno permitido, credenciales E2E/admin y scheduler/DB real siguen sin acceso verificable desde este entorno. La verificacion tecnica local vuelve a quedar verde, pero el piloto STL no queda desbloqueado.
+
+Revision S.6 2026-05-12: se reintenta el desbloqueo operativo tras S.5 y el resultado sigue siendo "bloqueos restantes". `.env.local` y las variables de proceso no aportan acceso Supabase real/staging, project ref, credenciales E2E/admin ni email controlado; Resend autentica pero muestra 0 dominios verificados visibles y remitente `resend.dev`; el servidor local disponible es `127.0.0.1:3003`. La verificacion tecnica local pasa de nuevo, pero no se ejecutan invitacion, aceptacion, reset ni job real de purga por falta de acceso operativo real.
+
+Revision S.7 2026-05-13: se consolida el pre-piloto sin abrir producto nuevo. `PROJECT_BRIEF.md` y este roadmap se reconcilian con `TASKS.md`/`domain-model.md` para reflejar que G.3/G.4 existen como base tecnica interna sin UI visible ni lectura real de ubicacion. El preflight de repo/env sigue limpio, Resend autentica con 0 dominios verificados visibles y remitente `resend.dev`, Supabase real/staging sigue sin acceso verificable y la verificacion local vuelve a pasar tras arrancar servidor temporal en `127.0.0.1:3003`. Invitacion, aceptacion, reset y job real de purga siguen bloqueados por falta de accesos reales.
+
+Alcance:
+
+- usar OWASP ASVS 5.0 Level 1 como baseline inicial de MVP/public beta y OWASP Top 10 2025 como mapa de riesgos;
+- exigir tenant safety, permisos, RLS, validacion servidor y pruebas negativas en cada feature con datos de tenant;
+- revisar dependencias, secretos, headers, Supabase Auth, Redirect URLs, buckets y logs antes de produccion;
+- bloquear datos reales sensibles hasta cerrar gates de Storage privado, grants, auditoria y privacidad/legal;
+- modelar auditoria operativa corta para accesos/usuarios y cambios relevantes de horario/plantillas;
+- definir limpieza automatica por retencion antes de produccion y ejecutar la purga mediante job controlado;
+- registrar deuda de seguridad aceptada cuando una mitigacion se difiera.
+
+Criterio de salida transversal:
+
+- cada modulo nuevo identifica datos, actores, capacidades y frontera de tenant antes de UI;
+- las mutaciones revalidan sesion, tenant y permiso en servidor, y RLS actua como segundo candado;
+- se prueban accesos denegados para otro tenant y roles sin permiso cuando el riesgo lo justifica;
+- documentos, firmas, RRHH, fichaje y ubicacion no pasan a datos reales sin auditoria y privacidad/legal;
+- los logs operativos tienen `retain_until`, politica de purga y datos minimizados antes de produccion;
+- antes de beta/produccion se revisa el MVP contra ASVS Level 1 y se documentan desviaciones.
+
+### S.1 - Auditoria Operativa Corta Y Retencion
+
+Estado 2026-05-12: primer corte minimo implementado y S.1.1 endurecido. `operational_audit_events` guarda eventos tenant-scoped con actor derivado de sesion, campos cambiados minimizados y `retain_until`; las actions de Equipo, invitaciones, Horario, Asignaciones y Plantillas registran los cambios principales. La lectura interna queda en RPC/RLS para `owner`/`admin`, sin dashboard nuevo. Existe verificacion SQL/RLS local con rollback y `purge_expired_operational_audit_events(...)` como primitiva de purga no concedida a roles normales.
+
+Objetivo: permitir revision administrativa de cambios relevantes sin guardar trazas eternas ni datos innecesarios.
+
+Alcance candidato:
+
+- auditoria de accesos/usuarios: altas o cambios de `organization_memberships`, roles, estado, vinculacion/desvinculacion de `person_profiles` y acciones administrativas equivalentes;
+- auditoria de horario y clases: cambios de hora, fecha, centro, tipo de actividad, estado o notas de `schedule_blocks`, cambios de coach en `schedule_block_assignments` y cambios de plantillas/bloques de plantilla;
+- datos minimos: `organization_id`, actor autenticado, membership/persona resuelta si existe, entidad objetivo, accion, resultado, campos cambiados minimizados, `created_at` y `retain_until`;
+- consulta interna para `owner`/`admin` y permisos operativos compatibles cuando proceda, siempre filtrada por tenant;
+- limpieza de eventos expirados mediante funcion SQL acotada y job/cron antes de produccion.
+
+Retencion candidata:
+
+- accesos/usuarios/admin: maximo 30 dias por defecto;
+- horario, clases, asignaciones y plantillas: 15 dias por defecto;
+- cualquier retencion mayor requiere decision legal/producto explicita, no queda implicita por ser "auditoria".
+
+Fuera de alcance:
+
+- guardar payloads completos, secretos, tokens, contrasenas, signed URLs, documentos, datos RRHH sensibles o ubicacion cruda;
+- usar auditoria operativa como fuente canonica de negocio;
+- cubrir automaticamente cambios hechos directamente en Supabase Studio/Auth: produccion necesita acceso restringido, backups, PITR y procedimientos de recuperacion.
+
+Decision aplicada:
+
+- se usa una tabla unica `operational_audit_events` con retencion por tipo de entidad: 30 dias para accesos/equipo y 15 dias para horario/asignaciones/plantillas;
+- `changed_fields` no guarda payloads completos ni texto de notas; para campos libres registra que fueron tocados;
+- la retirada confirmada de `schedule_template_blocks` se registra como `removed` antes de borrar el patron, con campos minimizados y sin convertirlo en historico legal/payroll;
+- `manager` no lee auditoria en S.1 porque la tabla tambien contiene eventos de accesos/equipo;
+- `purge_expired_operational_audit_events(batch_size)` borra filas vencidas en lotes acotados y no se concede a `authenticated`;
+- el cron/job real para invocarla queda como gate antes de produccion, preferentemente en base de datos y no desde UI normal.
+
+### S.2 - Cierre Pre-QA Y Piloto Controlado
+
+Estado 2026-05-12: revision tecnica completada. No cambia producto visible. El gate de salida exige mantener sin secretos los archivos trackeables, no commitear scratch SQL de Supabase Studio, configurar Resend y Supabase Auth antes de emails reales, y activar la purga S.1 antes de produccion.
+
+Criterio antes de probar con STL o emails reales:
+
+- Resend API key real rotada y guardada solo como secreto de entorno;
+- remitente/dominio verificado o prueba limitada con `onboarding@resend.dev`;
+- Supabase Auth Site URL, Redirect URLs, password policy y Custom SMTP revisados;
+- una invitacion y un reset probados con email controlado;
+- `purge_expired_operational_audit_events(1000)` programado como job o fallback manual temporal documentado;
+- typecheck, lint, build, smoke, Supabase lint/migration list y verificacion RLS con resultado claro;
+- snippets `Untitled query` limpiados, ignorados o convertidos a snippets nombrados y revisados.
+
+### S.3 - QA Controlado De Email/Auth Y Gate Pre-Piloto
+
+Estado 2026-05-12: ejecutado de forma local/controlada. Resend queda validado por presencia, formato y autenticacion API en `.env.local`, y la implementacion de invitaciones usa proveedor server-side sin `service_role` ni valores publicos. Supabase Auth queda revisado a nivel de rutas: reset e invitacion usan `/auth/callback` y redirigen internamente a `/reset-password` o `/invite/accept`.
+
+Resultado:
+
+- verificacion tecnica local verde: typecheck, lint, build, smoke contra `127.0.0.1:3003`, Supabase lint, migration list y verificacion SQL/RLS de auditoria;
+- `.env.local` ignorado/no trackeado y escaneo enmascarado de secretos sin hallazgos en archivos trackeables;
+- snippets scratch `Untitled query` trackeados excluidos del indice y nuevos scratch ignorados;
+- prueba end-to-end real de invitacion/reset no ejecutada por falta de destinatario interno permitido, credenciales E2E/admin y confirmacion de Auth/SMTP real; el remitente local usa `resend.dev`, asi que debe limitarse a pruebas permitidas hasta verificar dominio propio;
+- purga S.1 preparada para activacion como job de base de datos, no UI ni Server Action.
+
+Bloquea piloto STL: configurar Supabase Auth/SMTP real, verificar remitente Resend, definir destinatario interno controlado, ejecutar invitacion/aceptacion/reset completos y activar job real de purga.
+
+### S.4 - QA Real Controlado Pre-Piloto STL
+
+Estado 2026-05-12: ejecutado en local/controlado. Se verifica que STL conserva 1 plantilla activa `Semana prueba STL L-V`, 165 bloques de plantilla y 165 bloques generados para la semana 2026-05-04 a 2026-05-08. No se reaplica el snippet porque los datos esperados ya estan presentes.
+
+Resultado:
+
+- repo/env sin secretos trackeables detectados; `.env.local` ignorado/no trackeado y `.env.example` solo con valores locales/placeholders;
+- Resend autentica localmente sin imprimir valores, pero no hay dominio verificado en el entorno local;
+- rutas de Auth revisadas: `/auth/callback`, `/auth/callback?next=/reset-password` y vuelta a `/invite/accept` estan cubiertas por codigo;
+- no hay acceso administrativo al Supabase real desde este entorno para validar la allowlist real de Redirect URLs, Site URL, password policy o Custom SMTP;
+- no hay email interno permitido ni credenciales E2E/admin, asi que no se hace envio real de invitacion/reset;
+- `supabase/snippets/activate-operational-audit-purge-job.sql` queda como SQL idempotente de activacion de pg_cron para operador DB; el job real no queda ejecutado en entorno real desde esta sesion.
+
+Bloquea piloto STL: prueba real controlada de invitacion/aceptacion/reset con email interno, verificacion de Supabase Auth/SMTP real y ejecucion/registro del job de purga S.1 en el entorno real o scheduler equivalente.
+
+### S.5 - Cierre Operativo Real Auth/Email/Purga Pre-Piloto STL
+
+Estado 2026-05-12: ejecutado en local/controlado como gate de realidad operativa. No se toca Horario, Cobertura, Plantillas, asignaciones ni datos generados. El resultado es "bloqueos restantes", no "piloto STL desbloqueado".
+
+Resultado:
+
+- `.env.local` sigue ignorado/no trackeado; `.env.example` no contiene secretos reales;
+- escaneo redacted de archivos trackeables/untracked no ignorados sin hallazgos de valores tipo API key real, JWT, private key, URL firmada ni `SUPABASE_SERVICE_ROLE_KEY`;
+- STL local conserva 1 plantilla activa `Semana prueba STL L-V`, 165 bloques de plantilla y 165 bloques generados para 2026-05-04 a 2026-05-08;
+- Resend API autentica con la key local sin imprimir valores, pero hay 0 dominios verificados visibles y el remitente local queda limitado a `onboarding@resend.dev`;
+- no hay `SUPABASE_ACCESS_TOKEN`, project ref, credenciales E2E/admin ni email controlado en entorno, asi que no se puede verificar Supabase Auth real ni ejecutar invitacion/reset real;
+- la funcion de purga S.1 existe y bloquea ejecucion desde `authenticated`/`anon`; el job real sigue pendiente de operador DB o scheduler del entorno real;
+- `typecheck`, `lint`, `build`, smoke contra `127.0.0.1:3003`, Supabase lint, migration list y verificacion SQL/RLS pasan;
+- `rg -n "STL" src`, `rg -n "service_role" src` y `rg -n "navigator\.geolocation" src` sin coincidencias.
+
+Bloquea piloto STL: acceso administrativo al Supabase real/staging, remitente Resend verificado o prueba limitada permitida, email interno controlado, credenciales E2E/admin, prueba completa de invitacion/aceptacion/reset y activacion registrada del job real de purga S.1.
+
+### S.6 - Reintento Post-S.5 De Desbloqueo Operativo Piloto STL
+
+Estado 2026-05-12: ejecutado en local/controlado sin cambios de `src` ni datos operativos. El resultado vuelve a ser "bloqueos restantes".
+
+Resultado:
+
+- `.env.local` sigue ignorado/no trackeado y apunta a Supabase/Site URL local;
+- no hay `SUPABASE_ACCESS_TOKEN`, project ref, DB URL real, credenciales E2E/admin, email controlado ni `SUPABASE_SERVICE_ROLE_KEY`;
+- `npx supabase projects list --output json` no tiene acceso a proyectos, asi que Supabase Auth real no se puede verificar;
+- Resend autentica, pero hay 0 dominios verificados visibles y el remitente local sigue en `resend.dev`;
+- STL local conserva 1 plantilla activa `Semana prueba STL L-V`, 165 bloques de plantilla y 165 bloques generados desde esa plantilla para 2026-05-04 a 2026-05-08;
+- la purga S.1 mantiene permisos locales correctos, pero `pg_cron`/`cron.job` no estan instalados localmente y el job real no puede activarse sin acceso DB/scheduler real;
+- typecheck, lint, build, smoke contra `127.0.0.1:3003`, Supabase lint, migration list y busquedas `STL`/`service_role`/`navigator.geolocation` en `src` pasan o quedan sin coincidencias.
+
+Bloquea piloto STL: project ref/acceso administrativo Supabase real, acceso DB/scheduler real para la purga, remitente Resend verificado o prueba limitada permitida, email interno controlado y credenciales E2E/admin para ejecutar invitacion, aceptacion y reset reales.
+
+### S.7 - Consolidacion Pre-Piloto Y Desbloqueo Operativo Real
+
+Estado 2026-05-13: ejecutado en local/controlado sin abrir modulos nuevos ni UI nueva. El resultado vuelve a ser "bloqueos restantes", con documentacion de G.3/G.4 corregida y verificacion local verde.
+
+Resultado:
+
+- `PROJECT_BRIEF.md` y `docs/product/roadmap.md` reflejan que G.3/G.4 son base tecnica interna de schema/RPC/RLS y helpers server-side, sin `navigator.geolocation`, UI visible, geofencing, fichaje automatico ni activacion operativa de ubicacion;
+- `.env.local` sigue ignorado/no trackeado; escaneo enmascarado de secretos no detecta valores reales trackeables;
+- no hay `SUPABASE_ACCESS_TOKEN`, project ref, DB URL real, credenciales E2E/admin/owner ni email controlado; `npx supabase projects list --output json` no tiene acceso a proyectos;
+- Resend autentica, pero hay 0 dominios visibles/verificados y el remitente local sigue en `resend.dev`;
+- no se ejecutan invitacion real, aceptacion, reset ni job real de purga por falta de acceso Supabase/Auth/SMTP/DB/scheduler real, remitente permitido, email controlado y credenciales;
+- `typecheck`, `lint`, `build`, smoke contra `127.0.0.1:3003`, Supabase lint, migration list y verificacion SQL/RLS pasan; el primer smoke fallo solo porque no habia servidor local levantado y se repitio correctamente tras arrancarlo de forma temporal.
+
+Bloquea piloto STL: project ref/acceso administrativo Supabase real o dashboard, acceso DB/scheduler real u operador DB para la purga S.1, remitente Resend verificado o prueba limitada permitida, email interno controlado y credenciales E2E/admin/owner para invitacion, aceptacion y reset reales.
 
 ## Fase A - Cierre MVP 1 Real
 
@@ -50,7 +217,7 @@ Criterio de salida:
 
 Objetivo: permitir configuracion global de organizacion y marca ligera sin romper la identidad BoxOps.
 
-Estado 2026-05-07: B.1 implementada como primer corte generico y B.2 implementada como corte minimo de roles avanzados compatibles. Existe `/app/settings`, enlazada desde `/app/more`, para editar nombre visible y acento del tenant en `organizations.theme_config`. `owner` y `admin` mutan configuracion global; `manager` muta operativa MVP 1 tenant-wide sin tocar accesos ni configuracion global; `coach` queda en lectura. Logo real, colores por centro, permisos por centro y modulos RRHH sensible/documentos siguen pendientes.
+Estado 2026-05-12: B.1 implementada como primer corte generico y B.2 implementada como corte minimo de roles avanzados compatibles. Existe `/app/settings`, enlazada desde `/app/more`, para editar nombre visible y acento del tenant en `organizations.theme_config`. `owner` y `admin` mutan configuracion global y accesos; `manager` muta operativa MVP 1 tenant-wide sin tocar accesos ni configuracion global; `coach` queda en lectura. B.3 abre invitaciones por email desde Equipo con `team_invitations`, Resend y aceptacion por token/sesion, dejando UUIDs como herramienta avanzada. Desde 2026-05-11 la UI muestra etiquetas en espanol: Propietario, Administrador, Responsable y Entrenador, manteniendo IDs internos en ingles. Logo real, colores por centro, permisos por centro y modulos RRHH sensible/documentos siguen pendientes.
 
 Alcance:
 
@@ -80,6 +247,7 @@ Criterio de salida:
 - `owner` y `admin` controlan configuracion global, branding ligero y accesos compatibles;
 - `manager` y `admin` gestionan operativa diaria sin controlar todo el tenant;
 - `coach` mantiene lectura operativa y no gana mutaciones;
+- la UI no muestra "Admin compatible" ni "Manager operativo"; usa Administrador y Responsable como etiquetas visibles;
 - todos los usuarios conservan acceso a funciones personales aunque tengan rol alto.
 
 Decision recomendada:
@@ -87,6 +255,7 @@ Decision recomendada:
 - evolucionar hacia `owner`, `admin`/`manager` y `coach`, manteniendo compatibilidad con `admin` actual.
 - usar `organizations.theme_config` primero; migrar a tabla dedicada solo si hacen falta permisos, versionado o auditoria granular de tema.
 - mantener `center_manager`, `document_admin`, `payroll_manager` y `staff` como roles reconocidos/documentados, sin permisos especializados hasta que existan schema y UX propios.
+- tratar invitaciones de equipo como preautorizacion tenant-scoped: token hasheado, email normalizado, RLS/RPC y aceptacion con la cuenta Auth del mismo email; no usar UUIDs como flujo normal de admin.
 
 ## Fase C - Auth Y Security Polish
 
@@ -188,7 +357,7 @@ Decision recomendada:
 
 ## Fase E - Documentos, Permisos, Nominas, Firmas Y Certificaciones
 
-Estado 2026-05-08: E.1 queda documentada como fase de modelado seguro. Define entidades candidatas, frontera `organization_id`, buckets privados candidatos, permisos por rol/persona, separacion entre "Mi firma" y "Firmar documento", snapshot futuro y auditoria candidata. No implementa migraciones, buckets, UI, boton "Firmar", documentos firmables ni snapshots reales.
+Estado 2026-05-10: E.1 queda documentada como fase de modelado seguro. E.2 implementa el primer schema minimo privado para metadata documental tenant-scoped: `documents`, `document_versions`, `document_subjects` y `document_access_grants`, con RLS estricta y grants explicitos. E.3 implementa el bucket privado `document-files`, RPCs de subida/activacion/cancelacion y policies de Storage por `document_versions`. E.4 implementa `document_access_events` con RLS estricta, metadata minimizada y RPCs de registro/consulta. E.5 abre rutas backend de preview/descarga para `document_versions` privadas con signed URLs cortas y auditoria. No implementa UI, boton "Firmar", documentos firmables, snapshots reales, pagina documental ni subida desde app.
 
 Objetivo: centralizar documentos de empresa, documentos personales, firmas y certificaciones con permisos estrictos.
 
@@ -232,31 +401,47 @@ Criterio de salida:
 Decision recomendada:
 
 - modelar permisos con una combinacion de scope, rol y grants por persona concreta. Evitar que `admin` sea sinonimo automatico de acceso a todo documento sensible.
-- E.1 debe cerrar el modelo antes de implementar: `documents`, `document_versions`, `document_subjects`, `document_access_grants`, auditoria candidata, certificaciones y solicitudes/evidencias de firma futuras.
-- usar buckets privados candidatos (`document-files` y `document-signature-evidence`) con rutas internas tenant-scoped; no guardar URLs publicas ni rutas sin `organization_id`.
+- E.1 cierra el modelo antes de implementar, E.2 abre solo el schema minimo, E.3 conecta `document-files` a `document_versions`, E.4 crea auditoria documental minima y E.5 crea rutas controladas de preview/descarga sin superficie visible. Certificaciones y solicitudes/evidencias de firma siguen futuras.
+- usar buckets privados con rutas internas tenant-scoped; E.3 crea solo `document-files`, mientras `document-signature-evidence` sigue candidato futuro para snapshots/evidencias.
 - separar documentos de empresa, documentos privados de persona y documentos de gestion/admin; cada categoria necesita permisos explicitos y puede requerir auditoria distinta.
 - tratar certificaciones como dato operativo con adjunto potencialmente privado: el estado/caducidad puede alimentar cobertura futura, pero el archivo no debe hacerse visible por defecto.
 - mantener "Mi firma" como asset personal privado ya existente; "Firmar documento" sera una accion futura que genera evidencia inmutable y no permite firma por delegacion.
-- registrar auditoria de lectura/descarga/cambio de documentos sensibles y evidencias, no solo de subida.
+- registrar auditoria de lectura/descarga/cambio de documentos sensibles y evidencias, no solo de subida. E.5 registra `file_preview` y `file_download` desde rutas backend controladas, sin guardar signed URLs ni rutas Storage en auditoria.
 
-## Fase F - Fichaje Manual Legal Y Auditable
+## Fase F - Fichaje Web, Cierre Semanal Y Aprobacion
 
-Objetivo: registrar jornada de forma manual, exportable y auditable antes de automatizar geolocalizacion.
+Objetivo: registrar jornada en web de forma manual o automatica por planificacion, corregible, aprobable semanalmente y auditable, sin geolocalizacion web.
+
+Estado 2026-05-13: F.1 queda documentada como primer modelo seguro, F.2 implementa schema/RPC/RLS, F.3 crea capa servidor, F.4 abre la primera UI propia en `/app/time`, F.5 anade correcciones propias minimas sobre registros/punches recientes, F.6 abre la primera revision administrativa minima, F.7 permite aplicar correcciones aprobadas de forma trazable, F.8 fija la politica de producto para aplicar correcciones propias directamente por defecto, F.9 abre una vista semanal con avisos operativos frente a bloques asignados, F.10 separa los fichajes sustituidos/anulados del dia principal hacia un historial visible 30 dias, F.11 implementa el primer automatico web por planificacion con `source = schedule_auto`, flag `scheduleAutoPunchesEnabled`, snapshot minimo e idempotencia por asignacion/tipo de punch, F.12 abre la base backend de cierre semanal, F.13 abre la primera cola in-app en Inicio y F.14 anade un exporte CSV interno revisable desde `/app/time`. Una persona con membership activa y ficha de persona vinculada puede registrar entrada/salida manual propia, corregir con motivo obligatorio, navegar semanas, ver registros/punches asociados y detectar faltas, excesos o fichajes abiertos. Si la organizacion requiere aprobacion, `owner`, `admin` y `manager` pueden aprobar o rechazar solicitudes pendientes y aplicar solo correcciones `approved`, con RPC transaccional que crea punches de `source = correction`, sustituye/anula punches existentes o marca `record_update` como aplicado sin tocar campos de jornada cuando el modelo no lo permite. En Inicio, `owner`, `admin` y `manager` ven semanas enviadas/reenviadas, pueden firmar y aprobar con su propia firma interna o rechazar con nota, y todos los usuarios ven avisos propios derivados de `time_weekly_approvals` con enlace a `/app/time?week=YYYY-MM-DD`. En `/app/time`, `owner`, `admin` y `manager` pueden descargar un CSV por rango y persona opcional, registrado en `time_exports`, con datos minimos revisables y sin snapshots/texto libre sensible. No hay geolocalizacion, payroll, aprobacion legal de horas extra, exporte legal definitivo, seeds reales, emails/push de fichaje ni promesa de cumplimiento legal definitivo.
+
+Decision 2026-05-13: la webapp no pedira ubicacion al fichar. La evolucion de Fase F sera doble: fichaje manual y fichaje automatico por clases/bloques asignados. Ese automatico web reduce friccion, pero no prueba presencia real; por eso debe quedar corregible y sujeto a cierre semanal. F.12 deja preparada la primitiva DB para que cada domingo a las 23:59, segun timezone de organizacion, la semana de fichaje de cada usuario se envie automaticamente a aprobacion. `owner`, `admin` y `manager` podran ver en Inicio una cola visible de semanas pendientes, aprobar con su propia firma mediante "Firmar y aprobar" o rechazar con nota obligatoria. Aprobar cierra la semana y bloquea modificaciones normales; rechazar notifica al usuario, muestra el aviso en su Inicio, exige correcciones y permite reenviar a aprobacion. Las notificaciones iniciales son in-app; push movil queda para app nativa.
 
 Alcance:
 
 - entrada/salida manual;
+- fichaje automatico web basado solo en clases/bloques asignados, sin geolocalizacion ni prueba de presencia;
+- registros de jornada por trabajador/persona;
 - vinculacion a turno/bloque cuando exista;
 - correcciones posteriores con motivo obligatorio;
-- aprobacion semanal por gestor/admin de personal;
+- envio automatico de semana a aprobacion el domingo a las 23:59;
+- cola visible para `owner`, `admin` y `manager` en Inicio;
+- aprobacion semanal firmada por gestor/admin/responsable con snapshot/evidencia de firma propia;
+- rechazo con nota obligatoria, aviso al usuario, correccion y reenvio a aprobacion;
+- bloqueo de modificaciones normales tras aprobacion, salvo reapertura/correccion excepcional auditada;
+- notificaciones in-app de envio, aprobacion, rechazo y correccion requerida;
 - exportes y auditoria;
 - acceso del trabajador a sus registros.
 
 No incluye:
 
+- geolocalizacion desde webapp o `navigator.geolocation`;
 - fichaje automatico por ubicacion;
+- geofencing o tracking continuo;
+- push notifications moviles hasta app nativa;
 - calculo legal definitivo de horas extra;
-- payroll.
+- payroll;
+- app nativa;
+- promesa de cumplimiento legal definitivo.
 
 Dependencias:
 
@@ -268,6 +453,10 @@ Criterio de salida:
 
 - se registran inicio y fin de jornada;
 - hay historial de correcciones y aprobaciones;
+- hay cierre semanal con estados claros: abierta, enviada, aprobada, rechazada, corregida y reenviada;
+- las semanas aprobadas quedan bloqueadas frente a edicion normal;
+- los usuarios reciben aviso visible cuando su semana queda aprobada, rechazada o requiere correccion;
+- `owner`, `admin` y `manager` ven pendientes de aprobacion en Inicio sin depender de email;
 - existe exporte revisable;
 - se documenta la obligacion en Espana de conservar registros 4 anos y permitir acceso a trabajador, representantes e Inspeccion;
 - BoxOps no promete cumplimiento legal definitivo sin revision.
@@ -276,49 +465,111 @@ Decision que requiere validacion legal:
 
 - textos, retencion, acceso de representantes, formato de exporte y alcance de aprobacion semanal deben revisarse antes de usar datos reales.
 
-## Fase G - Fichaje Geolocalizado Asistido
+Decision F.1:
 
-Objetivo: usar ubicacion puntual para ayudar al fichaje, sin tracking continuo ni fichar por presencia fuera de horario.
+- modelar primero `time_records`, `time_punches`, `time_record_corrections`, `time_weekly_approvals`, `time_exports` y `time_audit_events`, todos con `organization_id` obligatorio;
+- permitir relacion opcional con `schedule_blocks` y `schedule_block_assignments`, sin hacer depender el fichaje de que exista un bloque asignado;
+- tratar trabajador/coach, `manager`, `admin`/`owner` y roles futuros (`center_manager`, `payroll_manager`, `staff`) como actores distintos antes de UI;
+- exigir motivo, autor, estado y trazabilidad en toda correccion;
+- garantizar lectura propia del trabajador;
+- exponer primero `/app/time` como superficie propia minima, sin aceptar `person_profile_id` en formularios;
+- construir snapshots de correcciones propias desde servidor/campos controlados, sin aceptar JSON libre en UI;
+- aplicar correcciones propias directamente por defecto mediante RPC trazada y permitir que solo el `owner` active aprobacion previa en Configuracion;
+- comparar la semana de fichaje contra asignaciones propias para mostrar horas asignadas, fichadas, balance y avisos, sin convertir esa comparacion en payroll ni horas extra aprobadas;
+- revisar correcciones pendientes desde `/app/time` solo para `owner`, `admin` y `manager` cuando la organizacion exige aprobacion o existan solicitudes previas, con nota obligatoria al rechazar y copy claro de que aprobar no modifica todavia el historico;
+- ocultar de la vista principal los punches `superseded`/`voided` tras aplicar correcciones y mostrarlos solo como historial visible 30 dias;
+- no borrar fisicamente registros laborales ni auditoria sin una politica legal de retencion cerrada;
+- permitir centro opcional solo desde datos de la organizacion activa; bloque/asignacion quedan para un selector seguro posterior;
+- documentar como nota pendiente de validacion legal que en Espana los registros deben conservarse 4 anos y estar disponibles para trabajador, representantes legales e Inspeccion.
+
+Decision F.11/F.12/F.13/F.14:
+
+- F.11 implementa el fichaje automatico web por planificacion: genera entrada/salida desde bloques asignados activos/no cancelados del usuario, con fuente diferenciada, snapshot minimo y ejecucion idempotente; no usa ubicacion ni prueba presencia.
+- F.12 implementa la base backend de cierre semanal: envio idempotente, primitiva DB para ejecucion cada domingo a las 23:59 por timezone de organizacion, estados de aprobacion semanal, aprobacion con firma propia, rechazo con nota, bloqueo al aprobar y base de reenvio tras correcciones.
+- F.13 implementa el primer corte de notificaciones in-app para usuarios y gestores: pendientes de aprobacion en Inicio, semana rechazada/corregir en Inicio del usuario, confirmacion de aprobacion/rechazo, navegacion a `/app/time?week=YYYY-MM-DD` y acciones de aprobar/rechazar con las RPC F.12. No crea tabla nueva de notificaciones; la fuente canonica sigue siendo `time_weekly_approvals`, preparada para alimentar una outbox/push movil futura.
+- F.14 implementa el primer exporte interno revisable: `GET /app/time/export` valida sesion, tenant, rol, rango y persona opcional; genera CSV en backend; registra `time_exports`; no guarda archivo en Storage; no incluye snapshots ni texto libre de correcciones; y se presenta como revision operativa, no payroll ni cumplimiento legal definitivo.
+- La aprobacion firmada no es firma documental ni firma electronica avanzada/cualificada; es confirmacion interna de cierre de fichajes y debe guardar snapshot/version de la firma usada.
+
+## Fase G - Geolocalizacion Nativa Futura
+
+Objetivo: preparar geolocalizacion real para una app nativa o wrapper movil, no para la webapp.
+
+Estado 2026-05-13: tras decision de producto, la webapp no pedira ubicacion ni usara `navigator.geolocation`. G.1-G.4 quedan reclasificadas como base tecnica interna para una futura app nativa o wrapper movil, donde la ubicacion en segundo plano/geofencing podria justificar fichaje automatico real. No hay UI de mapa, lectura real de ubicacion en web, geofencing activo, app nativa, tracking continuo, fichaje automatico por ubicacion ni activacion operativa de ubicacion.
 
 Alcance:
 
-- geolocalizacion opcional activable por admin;
-- ubicacion del centro configurable en mapa por roles de maximo permiso;
-- radio inicial sugerido de 100m configurable;
-- entrada asistida si el usuario esta dentro del radio y coincide con horario;
-- si llega antes, esperar a la hora y revisar si sigue dentro;
-- salida automatica a la hora prevista si hay entrada activa;
-- no fichar si esta en el box fuera de horario;
-- consentimiento/permiso claro de ubicacion.
+- geolocalizacion opcional futura activable por tenant solo cuando exista app nativa/wrapper y revision legal/privacidad;
+- configuracion por centro: latitud/longitud del centro, radio permitido, timezone, estado activo/inactivo y texto de aviso o consentimiento operativo;
+- radio inicial sugerido de 100m configurable, no universal ni hardcodeado;
+- geofencing/background location solo en app nativa si el sistema operativo, permisos y politica de privacidad lo permiten;
+- fichaje automatico por ubicacion solo si coinciden bloque/clase asignada, centro correcto y ventana temporal definida;
+- no fichar si esta en el box fuera de horario o sin asignacion aplicable;
+- consentimiento/permiso claro de ubicacion nativa;
+- fallback web/manual y correcciones Fase F cuando ubicacion falle, no se conceda permiso o haya discrepancias.
+
+Datos tecnicos implementados/candidatos:
+
+- configuracion por centro en `center_time_location_settings`, separada de `centers` para aislar permiso, version de politica, retencion y auditoria de cambios;
+- evento minimizado de intento en `time_location_events`: disponibilidad, resultado, buckets de precision/distancia, centro/politica evaluados y motivo de fallback;
+- snapshot minimizado en `time_punches.metadata` solo si se necesita explicar el fichaje: version de politica, centro y resultado; buckets solo si aportan valor, nunca coordenadas ni JSON libre;
+- coordenadas crudas del trabajador solo como dato transitorio de calculo si una implementacion futura lo necesita; no se persisten, no se loguean y no van a auditoria generica.
 
 No incluye:
 
+- guardar trayectos;
 - historial de movimientos;
-- tracking continuo;
+- tracking continuo innecesario;
+- lectura de ubicacion desde la webapp;
+- `navigator.geolocation` en `src`;
+- historial de posiciones o coordenadas crudas innecesarias del trabajador;
 - geofencing fiable con app cerrada en navegador/PWA;
-- automatismo legalmente garantizado.
+- automatismo legalmente garantizado;
+- payroll, horas extra automaticas, exportes legales ni cumplimiento legal definitivo.
 
 Dependencias:
 
 - Fase F cerrada;
 - ubicaciones de centro fiables;
 - precision real probada en interior/exterior;
-- revision legal y privacidad.
+- revision legal y privacidad;
+- retencion y acceso definidos para cualquier evidencia de ubicacion;
+- RLS/RPC tenant-safe y copy de consentimiento antes de activar datos reales.
 
 Criterio de salida:
 
-- el usuario entiende cuando se consulta su ubicacion;
-- solo se guardan eventos necesarios del fichaje, no trayectos;
-- los fallos de ubicacion se corrigen manualmente;
-- la documentacion advierte la limitacion tecnica de navegador/PWA.
+- el usuario entiende cuando una app nativa consulta ubicacion y con que finalidad;
+- solo se guardan eventos necesarios del fichaje, no trayectos ni historial de posiciones;
+- los fallos o discrepancias de ubicacion se corrigen manualmente;
+- la webapp queda explicitamente sin lectura de ubicacion;
+- queda decidido que la base G.2-G.4 usa tabla separada para evento minimizado y deja `time_punches.metadata` solo como snapshot opcional muy reducido.
 
-Decision que requiere validacion tecnica:
+Decision G.1:
 
+- preferir una tabla separada para eventos/evidencias de ubicacion con retencion y permisos propios; usar `time_punches.metadata` solo como snapshot minimizado de resultado.
+- no usar `time_audit_events.metadata` para coordenadas: la capa actual bloquea claves de ubicacion y no se debe relajar sin diseno especifico.
+- mantener el fichaje web manual/automatico por planificacion y las correcciones como via principal hasta que exista app nativa.
+
+Decision G.2:
+
+- schema candidato: `center_time_location_settings` para configuracion por centro y `time_location_events` para eventos/evidencias minimizadas, ambos con `organization_id` obligatorio.
+- dato guardado: resultado dentro/fuera/desconocido/fallback y buckets de precision/distancia relativa al radio; no distancia exacta ni coordenadas crudas persistidas del trabajador.
+- permisos: `owner` activa politica; `owner`/`admin` podran mantener configuracion si se implementa capacidad explicita; eventos propios se derivan de sesion + tenant; gestion ve solo evidencia minimizada vinculada a fichaje.
+- RLS/RPC esperadas: escritura directa revocada, RPCs acotadas para configurar centro y registrar/listar eventos, validacion servidor de tenant, centro, punch/record y persona propia.
+- retencion candidata: eventos de ubicacion 90 dias, y 30 dias para denegado/no disponible, salvo decision legal explicita o disputa/exporte; el fichaje canonico conserva su propia retencion.
 - en navegador/PWA no se debe asumir geolocalizacion fiable con app cerrada. Si el fichaje automatico en segundo plano es requisito comercial, la fase nativa sube de prioridad.
+
+Decision G.3/G.4:
+
+- G.3 crea schema, constraints, RLS y RPCs minimas para configuracion y eventos de ubicacion asistida minimizada con `organization_id` obligatorio.
+- G.4 crea helpers server-side tipados para consumir esas RPCs con sesion Supabase normal, sin `service_role` en `src`.
+- La base interna no acepta `person_profile_id` desde acciones propias, no persiste coordenadas crudas del trabajador, distancia exacta, precision exacta, payload de navegador, IP, BSSID/Wi-Fi/Bluetooth ni fingerprints.
+- La frontera sigue intacta: no hay UI visible, hooks cliente, mapa, lectura real de `navigator.geolocation`, geofencing activo, fichaje automatico por ubicacion, payroll, exportes legales ni datos STL.
 
 ## Fase H - PWA, App Movil Y Geofencing Nativo
 
 Objetivo: preparar la experiencia movil sin saltar prematuramente a app nativa.
+
+Estado H.3 2026-05-13: PWA/mobile queda auditada para las rutas criticas `/app`, `/app/time`, `/app/schedule`, `/app/coverage`, `/app/more` y `/app/account` en 390x844 y 375x812, y la estrategia movil queda cerrada documentalmente. BoxOps declara metadata movil, manifest web e icono generico para instalacion/acceso rapido, pero no registra service worker, no activa modo offline, no cachea datos autenticados o tenant-scoped, no usa push notifications reales y no pide ubicacion desde la webapp. La PWA queda como mejora online de acceso a la web responsive; no sustituye app nativa/wrapper para geofencing/background location/push con app cerrada.
 
 Alcance:
 
@@ -326,26 +577,70 @@ Alcance:
 - arquitectura preparada para futura publicacion en App Store y Google Play;
 - evaluacion posterior de Capacitor/Ionic, React Native/Expo u otra estrategia;
 - licencias Apple Developer y Google Play como dependencia futura;
-- geofencing nativo si el negocio lo exige.
+- geofencing nativo si el negocio lo exige;
+- notificaciones push nativas para avisos de aprobacion/rechazo/correcciones de fichaje y recordatorios operativos.
 
 No incluye:
 
 - publicacion nativa antes de validar web/MVP operativo;
 - promesa de automatismos con app cerrada desde web/PWA;
+- service worker/offline privado sin politica segura de cache;
+- push notifications reales desde la webapp antes de fase propia;
+- `navigator.geolocation`, mapas, geofencing, IP/Wi-Fi/Bluetooth ni ubicacion real en web/PWA;
 - reescritura movil completa sin decision de producto.
 
 Dependencias:
 
 - validacion comercial de fichaje automatico;
 - decision tecnica de wrapper/nativo;
-- cuentas developer y politica de privacidad compatible con ubicacion.
+- cuentas developer y politica de privacidad compatible con ubicacion;
+- estrategia de push notifications y permisos moviles.
 
 Criterio de salida:
 
-- hay una estrategia movil decidida;
-- la PWA cubre uso diario basico;
-- se documentan costes, licencias y riesgos de stores;
-- geofencing nativo solo entra si web/PWA no cumple el caso comercial.
+- H.1 deja estrategia minima decidida: PWA como acceso rapido, sin offline privado, push ni ubicacion web;
+- H.2 verifica que la PWA cubre uso diario basico online en las rutas criticas moviles, sin overflow horizontal de pagina, con bottom nav usable y safe areas correctas;
+- H.3 documenta costes, licencias, store review, privacidad, permisos moviles, mantenimiento y QA por plataforma;
+- geofencing nativo solo entra si web/PWA no cumple un caso comercial validado y si legal/privacidad aprueba finalidad, minimizacion y retencion;
+- las notificaciones push moviles no sustituyen los avisos in-app de la webapp;
+- Fase H queda cerrada para piloto si no aparece deuda mobile/PWA bloqueante nueva.
+
+Decision H.1:
+
+- usar Next metadata + `src/app/manifest.ts` + icono generico como primer soporte PWA;
+- declarar `Cache-Control: no-store` en `/app` y `/app/:path*` para respuestas autenticadas de la webapp;
+- no implementar service worker hasta definir una allowlist segura de assets publicos y una politica explicita que excluya respuestas autenticadas, datos privados, documentos, fichajes, firmas, signed URLs y exportes;
+- mantener avisos in-app como canal web; push queda para fase nativa/push propia;
+- evaluar wrapper/nativo solo si hay requisito comercial de geofencing fiable, background location, push del sistema o stores.
+
+Decision H.2:
+
+- auditar PWA/mobile sobre rutas criticas protegidas con usuario local demo, sin tocar datos reales STL;
+- reforzar `Cache-Control: no-store` y `Pragma: no-cache` tambien desde el proxy protegido de `/app`, ademas de `next.config.ts`;
+- aceptar que las vistas densas usen scroll interno controlado cuando corresponde, siempre que no generen overflow horizontal de pagina ni tapen el final de formularios/listas con la bottom nav;
+- no hay deuda mobile/PWA bloqueante nueva antes de piloto; las mejoras recomendables son automatizar este smoke visual, repetirlo con datos reales/anonimizados largos y anadir iconos PNG/multiples tamanos antes de polish avanzado de instalacion;
+- service worker, offline privado, push, geofencing/background location y stores siguen como deuda futura de nativo/wrapper o fase push propia, no de H.2.
+
+Decision H.3:
+
+- corto plazo: mantener web responsive + PWA online segura como salida movil recomendada;
+- medio plazo: evaluar Capacitor/Ionic wrapper, React Native/Expo, app nativa especifica o seguir web-only solo con requisito comercial claro;
+- largo plazo: geofencing/background location/push nativo exige fase propia de privacidad/legal/stores, permisos iOS/Android, QA por plataforma y presupuesto de mantenimiento;
+- costes vigentes consultados el 2026-05-13: Apple Developer Program 99 USD/ano y Google Play Console 25 USD registro unico; revalidar tarifa, moneda y condiciones al contratar;
+- deuda bloqueante mobile/PWA antes de piloto: ninguna nueva. Deuda recomendable: automatizar audit mobile, repetir con datos largos anonimizados, anadir iconos PNG y preparar store/privacy metadata si se abre fase nativa. Deuda futura: stores, signing, APNs/FCM, permisos de ubicacion/push, offline seguro, geofencing/background location y QA iOS/Android;
+- criterios para elevar nativo/wrapper: geofencing fiable con app cerrada, push del sistema obligatorio, offline real seguro, requisito comercial validado, presupuesto aceptado y revision legal/privacidad cerrada.
+
+Decision H.4 - Recordatorios Nativos De Proxima Clase:
+
+- fase futura exclusiva de app nativa/wrapper o canal push movil propio, no de la web/PWA actual;
+- fuente canonica: `schedule_blocks` + `schedule_block_assignments` con `assignment_status = 'assigned'`, excluyendo bloques `cancelled` y `completed`;
+- recordatorios candidatos: el dia anterior sobre las 21:00 y 1 hora antes del inicio del bloque;
+- los calculos deben respetar timezone del tenant y, cuando el bloque tenga centro con timezone propio, el timezone del centro;
+- permisos siempre opt-in por usuario/dispositivo; sin permiso, la app debe mantener fallback in-app visible;
+- arquitectura candidata: outbox tenant-scoped de recordatorios, workers/scheduler controlados, APNs/FCM, payloads minimizados y auditoria minima de envio/entrega/fallo;
+- no abrir Notification API, PushManager, service worker, background sync ni caches de respuestas autenticadas en la webapp;
+- no transportar datos sensibles, documentos, payroll, ubicacion, signed URLs ni detalles largos en el payload push;
+- antes de implementar, cerrar privacidad/legal, politica de retencion, bajas de dispositivo, revocacion de permisos y pruebas negativas de tenant.
 
 ## Fase I - Cambios, Ausencias, Eventos, Horas Extra E IA
 
@@ -354,6 +649,7 @@ Objetivo: ordenar los modulos ya previstos despues de cerrar la base operativa, 
 Alcance:
 
 - cambios de turno/clase y cobertura entre coaches;
+- auditoria operativa corta de cambios sobre bloques, asignaciones de coaches y plantillas;
 - ausencias, vacaciones y permisos;
 - eventos, festivos y competiciones;
 - horas extra detectadas, validadas y cerradas;
@@ -376,6 +672,189 @@ Dependencias:
 Criterio de salida:
 
 - cada submodulo tiene task propia, modelo de permisos y criterio de auditoria;
-- cambios y ausencias actualizan cobertura de forma trazable;
+- primer criterio de salida I.1: cambios/cobertura queda modelado documentalmente con actores, estados, entidades candidatas, invariantes de tenant/RLS y deuda separada antes de abrir schema o UI;
+- segundo criterio de salida I.2: cambios/cobertura tiene base DB/RLS/RPC minima para crear solicitud propia, registrar targets/ofertas, responder como coach candidato y auditar eventos minimizados, sin UI ni aplicacion al horario real;
+- tercer criterio de salida I.3: cambios/cobertura tiene primitiva DB/RLS/RPC para aprobar, rechazar, cancelar/expirar y aplicar de forma transaccional al horario real, sin UI visible;
+- cuarto criterio de salida I.4: cambios/cobertura tiene verificacion SQL/RLS negativa reejecutable con rollback para tenant safety, roles, targets, expiraciones, solapes, aplicacion y escrituras directas bloqueadas;
+- quinto criterio de salida I.5: cambios/cobertura tiene capa app/server interna tipada para consumir RPCs con sesion Supabase SSR normal, mapear errores esperados y mantener UI/inbox fuera del corte;
+- sexto criterio de salida I.6: cambios/cobertura tiene primera bandeja visible protegida en `/app/requests`, con listado, acciones por rol/actor y Server Actions seguras, sin crear solicitudes todavia;
+- septimo criterio de salida I.7: cambios/cobertura permite creacion minima segura de solicitudes/ofertas desde `/app/requests` mediante RPC atomica de solicitud + targets, sin swap, ausencias, payroll ni ubicacion;
+- octavo criterio de salida I.8: cambios/cobertura queda endurecido a nivel app/server/UX para evitar targets propios o no accionables, mostrar vencimientos/estados no accionables y cerrar vencidas con RPC existente sin scheduler ni background jobs;
+- noveno criterio de salida I.9: ausencias/vacaciones/permisos quedan modelados documentalmente con alcance minimo, entidades candidatas, estados, permisos, auditoria, retencion, datos prohibidos e impacto sobre cobertura, sin abrir schema ni UI;
+- decimo criterio de salida I.10: ausencias/vacaciones/permisos tienen foundation DB/RLS/RPC minima con `absence_requests`, periodos, eventos, impacto calculado al vuelo y verificacion negativa con rollback, sin UI ni datos reales;
+- undecimo criterio de salida I.11: la app tiene helper interno server-side `src/lib/absence-requests.ts` para leer propias, leer cola operativa, crear/cancelar propias por RPC, revisar/expirar por RPC, releer eventos e impactos al vuelo, sin UI ni escrituras directas;
+- duodecimo criterio de salida I.12: ausencias/vacaciones/permisos tienen primera bandeja visible protegida en `/app/absences`, con lectura propia, cola operativa de gestion, acciones seguras por Server Actions e impacto al vuelo, sin formulario de creacion ni calendario;
+- decimotercer criterio de salida I.13: `/app/absences` permite creacion minima de solicitud propia mediante `createOwnAbsenceRequest(...)`, con formulario acotado, validacion server-side, `organization_id` explicito, resumen minimizado y sin crear para otra persona, calendario, saldos legales ni cobertura automatica;
+- decimocuarto criterio de salida I.14: `/app/absences` queda endurecida a nivel UX/app/server con filtros simples por query string, validacion visible del formulario, botones con pending/confirmacion, estados no accionables claros y copy prudente, sin ampliar dominio ni persistir impacto;
+- decimoquinto criterio de salida I.15: `/app/absences` queda cubierto por QA tecnico de regresion posterior a I.14 con smoke/guardrails de helper/RPC, permisos por rol, filtros query string y limites de seguridad, sin abrir funcionalidades nuevas;
+- decimosexto criterio de salida I.16: las ausencias aprobadas o en revision se reflejan como impacto derivado en lectura de cobertura para gestion, sin persistir impactos, modificar horario/asignaciones ni resolver cobertura automaticamente;
+- cambios y ausencias se reflejan en cobertura de forma trazable sin saltarse el horario canonico;
+- cambios de bloque/asignacion/plantilla quedan consultables por admins durante una ventana corta con actor, accion y campos cambiados minimizados;
 - horas extra no se presentan como nomina ni calculo fiscal;
 - IA queda subordinada a programacion/documentos ya existentes.
+
+Decision I.1 2026-05-13:
+
+- empezar Fase I por cambios de bloque/clase y cobertura entre coaches, no por ausencias, payroll, horas extra ni IA;
+- tratar en I.1 `change_requests`, `change_request_targets`/offers y `change_request_events` como entidades candidatas; I.2 las convierte en primera base tecnica sin UI ni aplicacion al horario;
+- mantener `schedule_blocks` y `schedule_block_assignments` como horario real canonico; una solicitud aplicada debe cambiar asignaciones de forma transaccional y trazable;
+- exigir `organization_id`, RLS, permisos por actor, revalidacion de solapes/disponibilidad y auditoria minimizada antes de cualquier piloto de cambios/cobertura;
+- no presentar aprobaciones de cambio/cobertura como cumplimiento laboral definitivo, firma documental, payroll ni aprobacion automatica de horas extra.
+
+Decision I.2 2026-05-13:
+
+- implementar solo la base tecnica segura en `change_requests`, `change_request_targets` y `change_request_events`, con `organization_id`, FKs tenant-safe, RLS estricta y escrituras mediante RPCs;
+- permitir crear solicitud propia sobre bloque asignado, ofrecer a coach concreto/candidato y responder como coach target, revalidando bloque, tenant, perfil activo y solapes;
+- dejar `approval_required = true` por defecto y mantener la solicitud aceptada en `pending_approval`;
+- no aplicar todavia al horario real. I.3 debe implementar aprobacion/rechazo/aplicacion transaccional sobre `schedule_block_assignments` y volver a revalidar `coach-unavailable`.
+
+Decision I.3 2026-05-13:
+
+- implementar `00028_change_request_operations.sql` como primitiva DB/RLS/RPC sin UI para aprobar, rechazar, cancelar, expirar y aplicar solicitudes de cobertura/cambio ya aceptadas;
+- `owner`, `admin` y `manager` gestionan aprobacion, rechazo y aplicacion tenant-wide; `center_manager` sigue futuro;
+- la aplicacion real crea/reactiva asignacion destino con `source = 'change_request'`, retira la asignacion origen y solo despues marca la solicitud como `applied`;
+- cada aplicacion revalida tenant, bloque accionable, asignacion origen, target aceptado, coach receptor activo/asignable y solape actual antes de tocar `schedule_block_assignments`;
+- los fallos esperados de aplicacion quedan como `application_failed` minimizado y la solicitud no pasa a `applied`;
+- no se abre UI, ausencias, payroll, horas extra aprobadas/automaticas, IA, push ni ubicacion.
+
+Decision I.4 2026-05-13:
+
+- anadir `supabase/snippets/change-requests-rls-verification.sql` como verificacion local con transaccion y rollback para I.2/I.3;
+- cubrir paths positivos de gestion por `owner`/`admin`/`manager`, solicitud/cancelacion propia y aplicacion aprobada al horario real;
+- cubrir negativos de otro tenant, rol sin permiso, coach no candidato, bloque cancelado/completado, solicitud/target expirados, doble aceptacion, aplicacion sin aprobacion, solape `coach-unavailable`, trigger anti-solape y escrituras directas del workflow sin efecto;
+- no crear migracion `00029` porque la verificacion no detecta bug real en I.2/I.3;
+- mantener UI/inbox, expiracion automatica, `swap`, ausencias, payroll, horas extra, IA, push y ubicacion fuera de este corte.
+
+Decision I.5 2026-05-13:
+
+- crear `src/lib/change-requests.ts` como capa interna server-side sobre I.2/I.3/I.4, sin UI visible ni Server Actions de producto;
+- usar Supabase SSR con sesion normal, helpers de auth/tenant existentes y `canManageChangeRequests` para `owner`/`admin`/`manager`;
+- no aceptar `person_profile_id` propio desde cliente y no introducir `service_role` en `src`;
+- listar solicitudes visibles del tenant activo segun RLS y consumir RPCs de crear, ofrecer, responder, aprobar, rechazar, cancelar, expirar y aplicar;
+- mapear errores esperados como `coach-unavailable`, `not-approved`, `expired`, `not-actionable` y `permission-denied`;
+- no abrir inbox, navegacion, notificaciones, seeds, ausencias, payroll, horas extra, IA, push ni ubicacion.
+
+Decision I.6 2026-05-14:
+
+- abrir `/app/requests` como primera bandeja visible protegida para solicitudes de cambio/cobertura;
+- mantener entrada secundaria en `/app/more` y navegacion desktop, sin nuevo item principal mobile;
+- permitir lectura y acciones seguras por rol/actor sobre solicitudes existentes: responder target propio, cancelar propia, aprobar/rechazar/expirar/aplicar desde gestion;
+- no crear solicitudes desde UI en I.6 para evitar un flujo parcial de creacion + oferta sin transaccion.
+
+Decision I.7 2026-05-14:
+
+- anadir RPCs atomicas para crear solicitud y targets iniciales en una sola transaccion antes de abrir el formulario visible;
+- permitir creacion propia solo sobre asignacion `assigned` del coach autenticado y creacion gestionada solo para `owner`, `admin` y `manager`;
+- resolver origenes y targets server-side desde tenant activo, sin aceptar `person_profile_id` ni `requester_coach_profile_id` desde cliente;
+- mantener el horario canonico en `schedule_blocks` + `schedule_block_assignments`; la solicitud creada queda como workflow hasta que se apruebe/aplique;
+- excluir `swap`, ausencias, payroll, horas extra aprobadas, IA, push, service worker, ubicacion y datos reales/hardcodeados de tenant.
+
+Decision I.8 2026-05-14:
+
+- endurecer `/app/requests` sin tocar DB/RPC/RLS: la UI desactiva targets que son el coach origen, ya cubren el mismo bloque o solapan con otro bloque activo, pero la transaccion RPC sigue siendo la fuente de verdad;
+- mostrar solicitudes, targets y bloques vencidos/no accionables con copy operativo claro y ocultar acciones que ya no proceden;
+- reutilizar `expire_change_request(...)` como accion manual acotada "Cerrar vencida" cuando existe motivo objetivo; no crear job, scheduler, push, service worker ni background sync;
+- mantener todas las mutaciones por Server Actions + `src/lib/change-requests.ts`, con Supabase SSR normal y sin `service_role`;
+- mantener `center_manager`, `swap`, ausencias, vacaciones, payroll, horas extra aprobadas, IA, ubicacion y reglas hardcodeadas de tenant fuera del corte.
+
+Decision I.9 2026-05-14:
+
+- iniciar ausencias/vacaciones/permisos como modelado documental seguro, no como UI rapida ni migracion precipitada;
+- separar ausencia/no disponibilidad de solicitud de cobertura: la ausencia registra que una persona no puede estar disponible en un periodo, mientras que `change_requests` gestiona quien cubre un bloque concreto;
+- proponer como entidades futuras `absence_requests`, `absence_request_periods`, `absence_schedule_impacts` y `absence_request_events`, siempre con `organization_id` obligatorio y acciones propias derivadas de sesion + tenant;
+- usar estados candidatos `requested`, `pending_review`, `approved`, `rejected`, `cancelled` y `expired`; `applied` no es estado principal de ausencia porque aprobar una ausencia no modifica el horario por si sola;
+- una ausencia aprobada que solapa `schedule_block_assignments.assigned` puede generar impacto de cobertura (`absence_conflict`, `uncovered` o `insufficient` futuro), pero no cambia automaticamente `schedule_blocks` ni retira/asigna coaches;
+- resolver la cobertura sigue siendo accion separada: ajuste manual de asignacion o solicitud/aplicacion de `change_requests`, ocultando al coach candidato el motivo sensible de la ausencia;
+- permisos candidatos: lectura/solicitud propia para la persona vinculada; revision operativa para `owner`, `admin` y `manager`; roles especializados sin herencia automatica hasta tener RLS/capacidades explicitas;
+- retencion candidata: solicitudes cerradas/aprobadas como historico operativo durante 24 meses y eventos visibles 180 dias, pendiente de revision legal/privacidad antes de produccion;
+- datos prohibidos: diagnosticos, salud, documentos, notas extensas, salario, payroll, IP/fingerprint, ubicacion, URLs, tokens, payloads completos, bajas medicas con documentos y cualquier promesa de cumplimiento legal definitivo;
+- no se crea migracion en I.9. El siguiente corte tecnico debe confirmar nombres/estados/retencion y abrir DB/RLS/RPC/verificacion negativa como task separada.
+
+Decision transversal de UX 2026-05-14:
+
+- Inicio y el shell muestran la proxima clase asignada propia como recordatorio in-app persistente; el resumen del shell se mantiene tambien en Inicio y los recordatorios push siguen reservados a H.4 nativo/wrapper;
+- el coach conserva Inicio y Mas, pero con contenido personal y operativo, no con opciones administrativas que solo terminan en "sin permiso";
+- textos de alcance, limites legales o decisiones de roadmap deben ir detras de "Mas" cuando no son accion primaria;
+- Plantillas conserva una UI densa para 165+ bloques, con filtros colapsables, seleccion multiple, edicion multiple limitada y sincronizacion idempotente del rango activo;
+- Tipos de actividad sincroniza `required_coaches` hacia plantillas y horarios presentes/futuros accionables mediante RPC, preservando historico pasado/cerrado.
+
+Decision I.10 2026-05-14:
+
+- se abre una base DB/RLS/RPC minima de ausencias en `supabase/migrations/00035_absence_requests_foundation.sql`, sin UI visible ni Server Actions de producto;
+- el corte crea `absence_requests`, `absence_request_periods` y `absence_request_events`, con `organization_id` obligatorio, RLS estricta y escrituras normales bloqueadas;
+- no se crea `absence_schedule_impacts`: el impacto se calcula al vuelo mediante `list_absence_schedule_impacts(...)` porque en este corte es derivable desde periodos de ausencia, `schedule_blocks` y `schedule_block_assignments`;
+- las acciones propias derivan persona/coach desde `auth.uid()` + tenant en `create_own_absence_request(...)`; no aceptan `person_profile_id` propio desde cliente;
+- `review_absence_request(...)` queda para `owner`, `admin` y `manager`; `cancel_absence_request(...)` permite cancelacion propia mientras no este aprobada y cancelacion gestionada; `expire_absence_request(...)` cierra pendientes objetivamente vencidas sin scheduler;
+- estados principales: `requested`, `pending_review`, `approved`, `rejected`, `cancelled` y `expired`; `applied` sigue fuera porque aprobar una ausencia no modifica el horario;
+- una ausencia aprobada puede devolver impacto `coverage_needed`, pero no modifica `schedule_blocks`, `required_coaches`, `status` ni `schedule_block_assignments`;
+- resolver cobertura sigue siendo accion separada: ajuste manual futuro o `change_requests`, sin mostrar motivo sensible al coach candidato;
+- `absence_request_events` guarda auditoria minimizada con actor derivado y retencion candidata de 180 dias; las solicitudes guardan `retain_until` candidato de 24 meses;
+- la validacion legal/privacidad sigue siendo gate antes de produccion o datos reales, pero no bloquea esta foundation interna porque no abre UI, documentos, bajas medicas documentadas, saldos legales, payroll ni datos reales;
+- `supabase/snippets/absence-requests-rls-verification.sql` cubre rollback para tenant safety, rol sin permiso, persona ajena, periodo invalido, impacto cruzado y escrituras directas bloqueadas;
+- UI, capa app/server, saldos legales, payroll, horas extra aprobadas, bajas medicas con documentos, cumplimiento legal definitivo, push, ubicacion y app nativa siguen fuera.
+
+Decision I.11 2026-05-14:
+
+- se crea `src/lib/absence-requests.ts` como capa interna server-side sobre la foundation I.10, sin rutas, paginas, componentes, navegacion ni Server Actions visibles;
+- todos los helpers exigen `organizationId` explicito y resuelven sesion, membership activa y tenant antes de consultar o llamar RPC;
+- las acciones propias siguen sin aceptar `person_profile_id`: `createOwnAbsenceRequest(...)` delega en `create_own_absence_request(...)` y `cancelOwnAbsenceRequest(...)` solo cancela propias `requested`/`pending_review`;
+- la cola operativa y `reviewAbsenceRequest(...)` quedan reservadas a `owner`, `admin` y `manager`, alineadas con `can_manage_absence_requests(...)`;
+- `listAbsenceRequestEvents(...)` solo relee eventos minimizados; no hay helper de registro porque I.10 registra eventos dentro de RPCs acotadas y no concedio una RPC publica de auditoria;
+- `listAbsenceScheduleImpacts(...)` consume `list_absence_schedule_impacts(...)` en lectura y respeta que `absence_schedule_impacts` no existe;
+- no hay escrituras directas a tablas de ausencia, no se introduce `service_role`, no se modifica horario/asignaciones y resolver cobertura sigue separado mediante ajuste manual futuro o `change_requests`;
+- legal/privacidad sigue siendo gate antes de produccion o datos reales; I.11 solo prepara consumo interno seguro.
+
+Decision I.12 2026-05-14:
+
+- abrir `/app/absences` como primera bandeja visible protegida de ausencias/vacaciones/permisos;
+- mantener entrada secundaria desde `/app/more` y sidebar personal, sin nuevo item principal mobile;
+- listar solicitudes propias para roles con self-service permitido (`owner`, `admin`, `manager`, `coach`) mediante `listOwnAbsenceRequests(...)`;
+- mostrar cola de revision operativa solo a `owner`, `admin` y `manager` mediante `listAbsenceReviewQueue(...)`;
+- mostrar periodos, estado, tipo, resumen minimizado, ultimo evento visible e impacto calculado al vuelo con `listAbsenceScheduleImpacts(...)`;
+- exponer solo acciones seguras soportadas por helper/RPC: cancelar propia en `requested`/`pending_review`, aprobar/rechazar desde gestion y expirar manualmente solicitudes objetivamente vencidas;
+- mantener todas las mutaciones en Server Actions que revalidan sesion, membership activa, tenant, rol y `organization_id` antes de delegar en `src/lib/absence-requests.ts`;
+- no aceptar `person_profile_id` propio desde cliente, no usar `service_role`, no escribir tablas de ausencia directamente y no modificar `schedule_blocks` ni `schedule_block_assignments`;
+- mantener fuera formulario de nueva ausencia, calendario, saldos legales/devengo, payroll, bajas medicas con documentos, cobertura automatica, push, geolocalizacion, app nativa, seeds reales y reglas hardcodeadas de tenant.
+
+Decision I.13 2026-05-15:
+
+- abrir en `/app/absences` solo un formulario minimo para crear solicitud propia, posterior a la bandeja I.12;
+- reutilizar exclusivamente `createOwnAbsenceRequest(...)` de `src/lib/absence-requests.ts`, delegando en la RPC `create_own_absence_request(...)`;
+- permitir solo `vacation`, `day_off`, `partial_day`, `permission`, `personal_absence` y `unavailable`;
+- pedir tipo, inicio, fin, dia completo, zona horaria de la organizacion activa y resumen operativo corto opcional;
+- revalidar en Server Action sesion, membership activa, tenant, rol, `organization_id`, tipo, periodo, duracion maxima y resumen antes de llamar al helper;
+- no aceptar `person_profile_id` ni `coach_profile_id` desde cliente; la identidad propia se deriva en helper/RPC desde sesion + tenant;
+- tras crear, volver a la bandeja mostrando el estado devuelto por RPC, normalmente `pending_review`;
+- mantener impacto calculado al vuelo con `listAbsenceScheduleImpacts(...)`, sin persistir `absence_schedule_impacts` ni modificar horario/asignaciones;
+- bloquear resumenes largos o sensibles y usar copy prudente: aprobacion operativa, no saldos legales, devengo, payroll, bajas medicas documentadas ni cumplimiento legal definitivo;
+- mantener fuera creacion para otra persona, calendario, saldos legales/devengo, payroll, adjuntos, documentos firmables, push, geolocalizacion, app nativa, seeds reales y reglas hardcodeadas de tenant.
+
+Decision I.14 2026-05-15:
+
+- antes de endurecer, confirmar que I.13 esta completa en codigo: `/app/absences` tiene formulario propio y la Server Action llama a `createOwnAbsenceRequest(...)`;
+- no tocar DB/RLS/RPC ni abrir calendario, saldos legales, cobertura automatica o creacion para otra persona;
+- anadir filtros simples por query string (`view`, `absence_type`, `absence_status`) en la bandeja, validados en servidor y sin nueva navegacion principal mobile;
+- mantener creacion solo propia y revision operativa solo para `owner`, `admin` y `manager`;
+- mostrar por solicitud por que no procede cancelar, aprobar, rechazar o cerrar como vencida, y conservar "Cerrar vencida" solo cuando existe motivo objetivo;
+- reforzar la validacion visible del formulario con error junto al formulario, confirmacion de no incluir datos sensibles y botones con estado pendiente/confirmacion; la Server Action revalida todo y convierte `datetime-local` con la zona horaria de la organizacion activa;
+- mantener impacto calculado al vuelo con `listAbsenceScheduleImpacts(...)`, sin persistir impacto ni modificar `schedule_blocks` o `schedule_block_assignments`;
+- mantener copy prudente: aprobacion operativa, no cumplimiento legal definitivo, no saldos/devengo, payroll, bajas medicas documentadas, adjuntos, push, geolocalizacion ni app nativa.
+
+Decision I.15 2026-05-15:
+
+- ejecutar I.15 como QA/hardening tecnico de regresion, no como ampliacion funcional de ausencias;
+- confirmar en codigo que I.13/I.14 siguen presentes antes de anadir pruebas: formulario propio por `createOwnAbsenceRequest(...)`, filtros GET, validacion visible, estados no accionables y copy prudente;
+- anadir smoke/guardrails para que `/app/absences` no acepte `person_profile_id` ni `coach_profile_id` propios desde cliente, no escriba directamente tablas de ausencia y no use `service_role`;
+- cubrir query string `view`, `absence_type` y `absence_status`: `coach` no activa cola de revision por URL y `owner`/`admin`/`manager` si ven superficie de revision cuando hay credenciales E2E;
+- proteger tambien la ruta filtrada anonima en `auth-protection`;
+- mantener cerrados calendario, saldos legales/devengo, cobertura automatica, creacion para otra persona, payroll, bajas medicas con documentos, push, geolocalizacion, app nativa, seeds reales y reglas hardcodeadas de tenant.
+
+Decision I.16 2026-05-15:
+
+- iniciar la integracion de ausencias con cobertura solo como lectura derivada sobre el calculo existente;
+- `listOperationalAbsenceScheduleImpacts(...)` filtra ausencias `approved` y `pending_review` del tenant para roles de gestion y delega el cruce final en `list_absence_schedule_impacts(...)`;
+- `coverage_needed` excluye esa asignacion del conteo valido de cobertura; `potential` marca riesgo operativo sin descontar cobertura;
+- `/app/schedule`, `/app/coverage`, Inicio y `/app/stats` pueden mostrar "impacto de ausencia" o "ausencia en revision", pero no muestran motivos ni resumenes sensibles;
+- si la lectura de impacto falla, la cobertura base sigue disponible y se muestra aviso prudente;
+- no se crea `absence_schedule_impacts`, no se modifica `schedule_blocks` ni `schedule_block_assignments`, no se crean ofertas/targets y no se resuelve cobertura automaticamente;
+- se anade smoke/guardrail para proteger que la integracion siga read-only, sin `service_role`, sin `STL`, sin motivos sensibles en cobertura y sin escrituras directas a tablas de ausencia.

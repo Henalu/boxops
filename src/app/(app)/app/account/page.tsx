@@ -150,23 +150,23 @@ const errorMessages: Record<string, string> = {
   "avatar-upload-failed":
     "No se ha podido subir el avatar al almacenamiento privado.",
   "display-name-too-long": "El nombre visible no puede superar 80 caracteres.",
-  forbidden: "Tu rol no permite usar funciones personales en esta organizacion.",
-  "invalid-public-email": "Usa un email publico valido o deja el campo vacio.",
+  forbidden: "Tu rol no permite usar funciones personales en esta organización.",
+  "invalid-public-email": "Usa un email público válido o deja el campo vacío.",
   "missing-display-name": "Indica un nombre visible.",
   no_active_memberships: "No hay accesos activos para este usuario.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
-  organization_required: "Elige una organizacion antes de abrir Mi cuenta.",
+  organization_not_found: "La organización solicitada no está disponible.",
+  organization_required: "Elige una organización antes de abrir Mi cuenta.",
   "preferred-alias-too-long": "El alias no puede superar 50 caracteres.",
   "profile-missing":
-    "No hay un perfil visible vinculado a tu cuenta en esta organizacion.",
-  "public-email-too-long": "El email publico es demasiado largo.",
+    "No hay un perfil visible vinculado a tu cuenta en esta organización.",
+  "public-email-too-long": "El email público es demasiado largo.",
   "save-failed": "No se han podido guardar los cambios.",
   "signature-empty": "Dibuja tu firma antes de guardarla.",
   "signature-invalid-data": "No se ha podido leer la firma dibujada.",
   "signature-invalid-dimensions":
-    "La firma dibujada no tiene dimensiones validas.",
+    "La firma dibujada no tiene dimensiones válidas.",
   "signature-invalid-signature":
-    "La firma dibujada no parece ser una imagen PNG valida.",
+    "La firma dibujada no parece ser una imagen PNG válida.",
   "signature-save-failed": "No se ha podido guardar la metadata de la firma.",
   "signature-too-large": "La firma dibujada es demasiado grande.",
   "signature-upload-failed":
@@ -410,7 +410,7 @@ function AccountSummaryCard({
           <MetaItem label="Usuario" mono>
             {shortId(userId)}
           </MetaItem>
-          <MetaItem label="Organizacion">
+          <MetaItem label="Organización">
             {membership.organization.name}
           </MetaItem>
           <MetaItem label="Rol">
@@ -444,7 +444,7 @@ function PersonProfileForm({
           Perfil visible
         </CardTitle>
         <CardDescription>
-          Datos operativos que pueden aparecer dentro del tenant.
+          Datos operativos que pueden aparecer dentro de la organización.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -473,7 +473,7 @@ function PersonProfileForm({
             </label>
 
             <label className="grid gap-2 lg:col-span-2">
-              <span className="text-sm font-medium">Email publico</span>
+              <span className="text-sm font-medium">Email público</span>
               <Input
                 defaultValue={profile.public_email ?? ""}
                 maxLength={254}
@@ -499,7 +499,7 @@ function PersonProfileForm({
           <LockKeyhole aria-hidden="true" className="size-4" />
           <AlertTitle>Avatar privado</AlertTitle>
           <AlertDescription>
-            La imagen se guarda de forma privada para esta organizacion. No se
+            La imagen se guarda de forma privada para esta organización. No se
             publica como enlace permanente.
           </AlertDescription>
         </Alert>
@@ -576,7 +576,7 @@ function PersonProfileForm({
 function PersonProfileMissingCard() {
   return (
     <EmptyState
-      description="Tu cuenta tiene acceso al tenant, pero todavia no hay un person_profile vinculado a tu usuario. Owner o admin pueden vincularlo desde Equipo."
+      description="Tu cuenta tiene acceso a la organización, pero todavía no hay un perfil de persona vinculado a tu usuario. Propietario o Administrador pueden vincularlo desde Equipo."
       title="Perfil visible pendiente"
     />
   );
@@ -645,12 +645,12 @@ function CoachProfileSection({
       <SectionHeader
         action={<Badge variant="outline">{profiles.length} fichas</Badge>}
         description="Capacidad operativa propia, en lectura."
-        title="Perfil de coach"
+        title="Perfil de entrenador"
       />
 
       {profiles.length === 0 ? (
         <EmptyState
-          description="No tienes una ficha de coach vinculada a esta cuenta en la organizacion activa."
+          description="No tienes una ficha de entrenador vinculada a esta cuenta en la organización activa."
           title="Sin ficha operativa"
         />
       ) : (
@@ -694,16 +694,16 @@ function SignatureCard({
           Mi firma
         </CardTitle>
         <CardDescription>
-          Confirmacion interna reutilizable solo en esta organizacion.
+          Confirmación interna reutilizable solo en esta organización.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>
           <LockKeyhole aria-hidden="true" className="size-4" />
-          <AlertTitle>Firma privada de esta organizacion</AlertTitle>
+          <AlertTitle>Firma privada de esta organización</AlertTitle>
           <AlertDescription>
-            Es una confirmacion interna: no es firma electronica avanzada ni
-            cualificada, y en este corte no firma documentos.
+            Sirve para confirmar acciones internas. No sustituye una firma
+            electrónica avanzada ni cualificada, y no firma documentos.
           </AlertDescription>
         </Alert>
 
@@ -716,7 +716,7 @@ function SignatureCard({
               <p className="mt-1 text-sm text-muted-foreground">
                 {hasSignature
                   ? "Firma activa disponible solo con acceso temporal."
-                  : "Aun no tienes una firma guardada en esta organizacion."}
+                  : "Aún no tienes una firma guardada en esta organización."}
               </p>
             </div>
             {signaturePreview.signature ? (
@@ -790,8 +790,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     return (
       <div className="space-y-6">
         <PageHeader
-          badge="Area personal"
-          description="Cuenta propia, perfil visible y frontera RRHH."
+          badge="Área personal"
+          description="Cuenta propia y perfil visible dentro de la organización."
           title="Mi cuenta"
         />
         <OrganizationResolutionState
@@ -807,9 +807,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   if (!canUsePersonalArea) {
     return (
       <div className="space-y-6">
-        <PageHeader badge="Area personal" title="Mi cuenta" />
+        <PageHeader badge="Área personal" title="Mi cuenta" />
         <Alert variant="destructive">
-          <AlertTitle>No puedes abrir esta area</AlertTitle>
+          <AlertTitle>No puedes abrir esta área</AlertTitle>
           <AlertDescription>
             Tu rol actual no tiene funciones personales activas.
           </AlertDescription>
@@ -853,8 +853,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        badge="Area personal"
-        description="Tu cuenta, tu perfil visible dentro del tenant y la frontera segura antes de RRHH sensible."
+        badge="Área personal"
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
@@ -862,13 +861,38 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </>
         }
         title="Mi cuenta"
-      />
+      >
+        <details className="group max-w-3xl">
+          <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
+            <span>
+              Gestiona tu acceso, tu perfil visible, tu avatar y tu firma dentro
+              de esta organización.
+            </span>{" "}
+            <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
+              Más
+            </span>
+            <span className="hidden font-medium text-foreground underline underline-offset-4 group-open:inline-flex">
+              Menos
+            </span>
+          </summary>
+
+          <Alert className="mt-3">
+            <ShieldCheck aria-hidden="true" className="size-4" />
+            <AlertTitle>Datos personales básicos</AlertTitle>
+            <AlertDescription>
+              Aquí solo verás información de cuenta y perfil. Los datos
+              laborales sensibles se gestionarán en módulos separados con
+              permisos específicos.
+            </AlertDescription>
+          </Alert>
+        </details>
+      </PageHeader>
 
       {status && successMessages[status] ? (
         <Alert>
           <AlertTitle>{successMessages[status]}</AlertTitle>
           <AlertDescription>
-            Los cambios se aplican solo a tu perfil visible de esta organizacion.
+            Los cambios se aplican solo a tu perfil visible de esta organización.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -879,15 +903,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <AlertDescription>{errorMessages[error]}</AlertDescription>
         </Alert>
       ) : null}
-
-      <Alert>
-        <ShieldCheck aria-hidden="true" className="size-4" />
-        <AlertTitle>Corte minimo Fase D</AlertTitle>
-        <AlertDescription>
-          Esta area no expone salario, contrato, nominas, documentos, fichaje,
-          geolocalizacion, cambios ni ausencias.
-        </AlertDescription>
-      </Alert>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">
         <AccountSummaryCard
@@ -930,20 +945,20 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail aria-hidden="true" className="size-4" />
-              Datos RRHH sensibles
+              Información laboral sensible
             </CardTitle>
             <CardDescription>
-              Frontera documentada antes de abrir permisos por campo.
+              No se muestra en esta pantalla.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Alert>
               <MapPin aria-hidden="true" className="size-4" />
-              <AlertTitle>Fuera de este corte</AlertTitle>
+              <AlertTitle>No disponible aquí</AlertTitle>
               <AlertDescription>
-                Puesto legal, antiguedad laboral, jornada, salario, contrato,
-                documentos y datos bancarios necesitaran modelo y permisos
-                especificos.
+                Puesto legal, antigüedad laboral, jornada, salario, contrato,
+                documentos y datos bancarios necesitarán modelo y permisos
+                específicos.
               </AlertDescription>
             </Alert>
           </CardContent>

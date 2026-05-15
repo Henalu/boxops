@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
@@ -14,6 +15,7 @@ import {
   validateClassTypeForm,
 } from "@/lib/class-types";
 import { getClassTypesPath } from "@/lib/navigation/app-paths";
+import { getTodayDateString } from "@/lib/schedule-blocks";
 import { createClient } from "@/lib/supabase/server";
 
 function getRequiredFormString(formData: FormData, key: string) {
@@ -59,7 +61,25 @@ function getMutationError(errorCode?: string) {
     return "duplicate-slug";
   }
 
+  if (errorCode === "42501") {
+    return "forbidden";
+  }
+
+  if (errorCode === "P0002") {
+    return "class-type-required";
+  }
+
   return "save-failed";
+}
+
+function revalidateClassTypeDependants() {
+  revalidatePath("/app", "layout");
+  revalidatePath("/app");
+  revalidatePath("/app/class-types");
+  revalidatePath("/app/coverage");
+  revalidatePath("/app/schedule");
+  revalidatePath("/app/stats");
+  revalidatePath("/app/templates");
 }
 
 export async function createClassType(formData: FormData) {
@@ -86,6 +106,8 @@ export async function createClassType(formData: FormData) {
     redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
   }
 
+  revalidateClassTypeDependants();
+
   redirect(
     getClassTypesPath({
       organizationId: context.organization.id,
@@ -108,25 +130,24 @@ export async function updateClassType(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("class_types")
-    .update({
-      name: validation.values.name,
-      slug: validation.values.slug,
-      category: validation.values.category,
-      required_coaches: validation.values.requiredCoaches,
-      requires_certification: validation.values.requiresCertification,
-      color: validation.values.color,
-      status: validation.values.status,
-    })
-    .eq("id", classTypeId)
-    .eq("organization_id", context.organization.id)
-    .select("id")
-    .single();
+  const { error } = await supabase.rpc("update_class_type_and_sync_defaults", {
+    target_category: validation.values.category,
+    target_class_type_id: classTypeId,
+    target_color: validation.values.color,
+    target_effective_from: getTodayDateString(context.organization.timezone),
+    target_name: validation.values.name,
+    target_organization_id: context.organization.id,
+    target_required_coaches: validation.values.requiredCoaches,
+    target_requires_certification: validation.values.requiresCertification,
+    target_slug: validation.values.slug,
+    target_status: validation.values.status,
+  });
 
   if (error) {
     redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
   }
+
+  revalidateClassTypeDependants();
 
   redirect(
     getClassTypesPath({
@@ -161,6 +182,8 @@ export async function setClassTypeStatus(formData: FormData) {
   if (error) {
     redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
   }
+
+  revalidateClassTypeDependants();
 
   redirect(
     getClassTypesPath({

@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 
 import { AppNavigation } from "@/components/layout/app-navigation";
 import {
+  NextAssignedShellLink,
+  type NextAssignedShellItem,
+} from "@/components/layout/next-assigned-shell-link";
+import {
   OnboardingLaunchButton,
   OnboardingTour,
 } from "@/components/layout/onboarding-tour";
@@ -11,6 +15,7 @@ import { TenantThemeScope } from "@/components/layout/tenant-theme-scope";
 import { Button } from "@/components/ui/button";
 import { getLoginPath } from "@/lib/auth/redirects";
 import { getActiveMemberships, getAuthenticatedUser } from "@/lib/auth/tenant";
+import { getOwnNextAssignedScheduleBlock } from "@/lib/own-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +31,35 @@ export default async function ProtectedAppLayout({
   }
 
   const memberships = await getActiveMemberships(user.id);
+  const navigationMemberships = memberships.map((membership) => ({
+    organizationId: membership.organization.id,
+    role: membership.role,
+  }));
   const themeOrganizations = memberships.map((membership) => ({
     id: membership.organization.id,
     themeConfig: membership.organization.theme_config,
   }));
+  const nextAssignedShellItems = (
+    await Promise.all(
+      memberships.map(async (membership) => {
+        try {
+          const state = await getOwnNextAssignedScheduleBlock({
+            organizationId: membership.organization.id,
+            organizationTimezone: membership.organization.timezone,
+            userId: user.id,
+          });
+
+          return {
+            organizationId: membership.organization.id,
+            organizationName: membership.organization.name,
+            state,
+          } satisfies NextAssignedShellItem;
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).flatMap((item) => (item ? [item] : []));
 
   return (
     <TenantThemeScope organizations={themeOrganizations}>
@@ -55,13 +85,22 @@ export default async function ProtectedAppLayout({
               </Link>
             </div>
 
+            <NextAssignedShellLink
+              className="mb-5"
+              items={nextAssignedShellItems}
+              placement="sidebar"
+            />
+
             <div className="min-h-0 flex-1">
               <Suspense
                 fallback={
                   <nav aria-label="Navegación principal" className="h-40" />
                 }
               >
-                <AppNavigation placement="sidebar" />
+                <AppNavigation
+                  memberships={navigationMemberships}
+                  placement="sidebar"
+                />
               </Suspense>
             </div>
 
@@ -82,7 +121,7 @@ export default async function ProtectedAppLayout({
             <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
               <div className="flex min-h-[3.25rem] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]">
                 <Link
-                  className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="flex min-h-11 min-w-0 shrink-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                   href="/app"
                 >
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
@@ -92,7 +131,11 @@ export default async function ProtectedAppLayout({
                     BoxOps
                   </span>
                 </Link>
-                <OnboardingLaunchButton label="Guía" />
+                <NextAssignedShellLink
+                  items={nextAssignedShellItems}
+                  placement="mobile-header"
+                />
+                <OnboardingLaunchButton className="shrink-0" label="Guía" />
               </div>
             </header>
 
@@ -105,9 +148,12 @@ export default async function ProtectedAppLayout({
         <Suspense
           fallback={<nav aria-label="Navegación principal" className="h-16" />}
         >
-          <AppNavigation placement="bottom" />
+          <AppNavigation
+            memberships={navigationMemberships}
+            placement="bottom"
+          />
         </Suspense>
-        <OnboardingTour />
+        <OnboardingTour memberships={navigationMemberships} />
       </div>
     </TenantThemeScope>
   );

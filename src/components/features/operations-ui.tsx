@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RouteStateButton } from "@/components/features/route-state-link";
 import {
   Card,
   CardContent,
@@ -225,9 +226,13 @@ export function EmptyState({
 export function CoverageRiskCard({
   actionLabel = "Asignar",
   center,
+  detailTrigger,
   href,
+  leading,
   meta,
+  preserveRouteState = false,
   scroll,
+  selected = false,
   status,
   time,
   title,
@@ -235,17 +240,36 @@ export function CoverageRiskCard({
 }: {
   actionLabel?: string;
   center: string;
+  detailTrigger?: string;
   href: string;
+  leading?: React.ReactNode;
   meta: string;
+  preserveRouteState?: boolean;
   scroll?: boolean;
+  selected?: boolean;
   status: string;
   time: string;
   title: string;
   tone: Tone;
 }) {
   return (
-    <Card className={cn("ring-1", toneClasses[tone])} size="sm">
-      <CardContent className="grid gap-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-start sm:gap-4">
+    <Card
+      className={cn(
+        "ring-1",
+        toneClasses[tone],
+        selected ? "ring-2 ring-primary/45" : "",
+      )}
+      size="sm"
+    >
+      <CardContent
+        className={cn(
+          "grid gap-3 sm:items-start sm:gap-4",
+          leading
+            ? "sm:grid-cols-[auto_72px_minmax(0,1fr)_auto]"
+            : "sm:grid-cols-[72px_minmax(0,1fr)_auto]",
+        )}
+      >
+        {leading ? <div className="sm:pt-0.5">{leading}</div> : null}
         <p className="font-mono text-sm font-semibold">{time}</p>
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -266,10 +290,20 @@ export function CoverageRiskCard({
           className="w-full sm:w-auto"
           variant={tone === "critical" ? "destructive" : "outline"}
         >
-          <Link href={href} scroll={scroll}>
-            {actionLabel}
-            <ArrowRight aria-hidden="true" />
-          </Link>
+          {preserveRouteState ? (
+            <RouteStateButton
+              data-operational-detail-trigger={detailTrigger}
+              href={href}
+            >
+              {actionLabel}
+              <ArrowRight aria-hidden="true" />
+            </RouteStateButton>
+          ) : (
+            <Link href={href} scroll={scroll}>
+              {actionLabel}
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          )}
         </Button>
       </CardContent>
     </Card>

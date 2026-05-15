@@ -25,12 +25,19 @@ type SignaturePadFormProps = {
   organizationId: string;
 };
 
-function getCanvasPoint(canvas: HTMLCanvasElement, event: React.PointerEvent) {
+function getCanvasPoint(
+  canvas: HTMLCanvasElement,
+  event: Pick<React.PointerEvent, "clientX" | "clientY">,
+) {
   const rect = canvas.getBoundingClientRect();
+  const rectWidth = rect.width || canvas.width;
+  const rectHeight = rect.height || canvas.height;
+  const x = ((event.clientX - rect.left) / rectWidth) * canvas.width;
+  const y = ((event.clientY - rect.top) / rectHeight) * canvas.height;
 
   return {
-    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
-    y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+    x: Math.min(Math.max(x, 0), canvas.width),
+    y: Math.min(Math.max(y, 0), canvas.height),
   };
 }
 
@@ -55,7 +62,7 @@ function SignatureActions({
   return (
     <>
       <Button
-        disabled={!hasInk || pending}
+        disabled={pending}
         type="submit"
         variant={hasSignature ? "outline" : "default"}
       >
@@ -89,6 +96,7 @@ export function SignaturePadForm({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isDrawingRef = useRef(false);
+  const hasInkRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
   const [hasInk, setHasInk] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -109,7 +117,32 @@ export function SignaturePadForm({
     return context;
   }
 
-  function handlePointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
+  function syncSignatureInput() {
+    const canvas = canvasRef.current;
+    const input = inputRef.current;
+
+    if (!canvas || !input || !hasInkRef.current) {
+      return false;
+    }
+
+    const dataUrl = canvas.toDataURL("image/png");
+    const signatureSize = getSignatureSizeFromDataUrl(dataUrl);
+
+    if (signatureSize > SIGNATURE_MAX_SIZE_BYTES) {
+      input.value = "";
+      setMessage(
+        `La firma no puede superar ${formatSignatureFileSize(
+          SIGNATURE_MAX_SIZE_BYTES,
+        )}.`,
+      );
+      return false;
+    }
+
+    input.value = dataUrl;
+    return true;
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     const canvas = canvasRef.current;
 
     if (!canvas) {
@@ -117,7 +150,13 @@ export function SignaturePadForm({
     }
 
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    } catch {
+      // Some browsers can refuse capture when the pointer is already released.
+    }
     isDrawingRef.current = true;
 
     const point = getCanvasPoint(canvas, event);
@@ -131,11 +170,12 @@ export function SignaturePadForm({
     context.arc(point.x, point.y, 1.75, 0, Math.PI * 2);
     context.fill();
     lastPointRef.current = point;
+    hasInkRef.current = true;
     setHasInk(true);
     setMessage(null);
   }
 
-  function handlePointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const canvas = canvasRef.current;
     const lastPoint = lastPointRef.current;
 
@@ -159,9 +199,17 @@ export function SignaturePadForm({
     lastPointRef.current = point;
   }
 
-  function stopDrawing(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+  function stopDrawing(event: React.PointerEvent<HTMLDivElement>) {
+    if (isDrawingRef.current) {
+      syncSignatureInput();
+    }
+
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Capture may already be gone after touch cancellation or window changes.
     }
 
     isDrawingRef.current = false;
@@ -177,6 +225,7 @@ export function SignaturePadForm({
     }
 
     context.clearRect(0, 0, canvas.width, canvas.height);
+    hasInkRef.current = false;
     setHasInk(false);
     setMessage(null);
 
@@ -189,26 +238,17 @@ export function SignaturePadForm({
     const canvas = canvasRef.current;
     const input = inputRef.current;
 
-    if (!canvas || !input || !hasInk) {
+    if (!canvas || !input || !hasInkRef.current) {
       event.preventDefault();
       setMessage("Dibuja tu firma antes de guardarla.");
       return;
     }
 
-    const dataUrl = canvas.toDataURL("image/png");
-    const signatureSize = getSignatureSizeFromDataUrl(dataUrl);
-
-    if (signatureSize > SIGNATURE_MAX_SIZE_BYTES) {
+    if (!syncSignatureInput()) {
       event.preventDefault();
-      setMessage(
-        `La firma no puede superar ${formatSignatureFileSize(
-          SIGNATURE_MAX_SIZE_BYTES,
-        )}.`,
-      );
       return;
     }
 
-    input.value = dataUrl;
     setMessage(null);
   }
 
@@ -217,20 +257,31 @@ export function SignaturePadForm({
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="signatureDataUrl" ref={inputRef} type="hidden" />
 
-      <canvas
-        aria-label="Area para dibujar mi firma"
-        aria-describedby={message ? `${hintId} ${messageId}` : hintId}
-        className="h-auto w-full touch-none rounded-lg border border-border bg-background shadow-inner outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        height={CANVAS_HEIGHT}
+      <div
+        className="relative touch-none select-none"
         onPointerCancel={stopDrawing}
         onPointerDown={handlePointerDown}
         onPointerLeave={stopDrawing}
         onPointerMove={handlePointerMove}
         onPointerUp={stopDrawing}
-        role="img"
-        tabIndex={0}
-        width={CANVAS_WIDTH}
-      />
+        style={{ touchAction: "none" }}
+      >
+        {!hasInk ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-muted-foreground">
+            Dibuja aqui tu firma con el raton, trackpad o dedo.
+          </div>
+        ) : null}
+        <canvas
+          aria-label="Area para dibujar mi firma"
+          aria-describedby={message ? `${hintId} ${messageId}` : hintId}
+          className="h-auto w-full cursor-crosshair rounded-lg border border-border bg-background shadow-inner outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          height={CANVAS_HEIGHT}
+          ref={canvasRef}
+          role="img"
+          tabIndex={0}
+          width={CANVAS_WIDTH}
+        />
+      </div>
       <span className="sr-only" id={hintId}>
         Dibuja tu firma en el area antes de guardarla.
       </span>

@@ -404,7 +404,7 @@ Decision de datos iniciales recibida despues:
 - Los bloques del horario recibido corresponden inicialmente a STL Tremañes.
 - STL City debe tener los mismos dias y franjas horarias iniciales, pero solo con actividades CrossFit y Wellness.
 - Las asignaciones iniciales de coaches a bloques pueden generarse aleatoriamente por centro como dato de arranque editable.
-- La asignacion aleatoria debe evitar asignar el mismo coach a bloques solapados cuando sea posible.
+- La asignacion aleatoria debe respetar el guardrail anti-solape: el mismo coach no puede quedar asignado a bloques activos solapados.
 - El admin debe poder corregir despues cualquier bloque, coach, centro, hora o actividad.
 
 Pendiente para implementacion: definir si la distribucion de STL City entre CrossFit y Wellness sera alterna, aleatoria deterministica o configurada manualmente antes del seed.
@@ -414,7 +414,7 @@ Estado Fase A 2026-05-07:
 - El horario recibido sirve como semana real base para STL Tremañes.
 - STL City sigue parcial: estan validadas las mismas franjas y el limite a CrossFit/Wellness, pero falta la actividad exacta por franja.
 - No hay coach asignado validado por bloque real.
-- Para QA interno se cargo una muestra representativa editable con coaches reales del tenant, bloques vacantes, cobertura insuficiente y un conflicto deliberado.
+- Para QA interno se cargo una muestra representativa editable con coaches reales del tenant, bloques vacantes y cobertura insuficiente. No incluye conflicto deliberado porque Postgres bloquea solapes de coach.
 - La cuenta Auth E2E coach local queda vinculada a la ficha operativa de Lucas cuando existe en Supabase Auth local, para validar "Mi horario".
 - La UI y smoke E2E local admin/coach pasan contra la semana `2026-05-04`.
 - No se debe presentar esta semana como cerrada para piloto oficial hasta confirmar asignaciones reales, huecos vacantes y estado operativo por bloque con STL.
@@ -464,7 +464,7 @@ Fixture interno de asignaciones:
 
 - Archivo: `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql`.
 - Uso: QA interno y smoke tests; no es seed automatico, produccion ni validacion oficial de STL.
-- Resultado esperado sobre la semana base: 20 bloques de plantilla con coach por defecto, 20 bloques reales asignados, 145 bloques vacantes, 1 caso de cobertura insuficiente y 1 conflicto deliberado.
+- Resultado esperado sobre la semana base: 20 bloques de plantilla con coach por defecto, 20 bloques reales asignados, 145 bloques vacantes y 1 caso de cobertura insuficiente.
 - Los bloques de muestra usan coaches reales del tenant como dato editable y representativo.
 - El snippet no crea usuarios Auth ni invita por email. Si existe el usuario Auth E2E coach local, lo vincula a Lucas para validar "Mi horario".
 

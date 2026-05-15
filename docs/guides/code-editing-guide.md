@@ -14,6 +14,10 @@ La forma normal de una pantalla protegida en BoxOps deberia ser:
 
 Si una mutacion de tenant no comprueba organizacion y rol antes de escribir, algo huele raro.
 
+Para cualquier cambio con datos de tenant, datos personales, documentos, firmas, fichaje o ubicacion, revisa tambien `docs/architecture/security-baseline.md`. La guia rapida es: validar en servidor, cerrar con RLS, probar el "no puedes" y no confiar en que la UI esconda el boton.
+
+Para detalles o edicion de tarjetas operativas, no confundas URL compartible con navegacion completa. Si solo cambia `block_id` o `edit_block_id` dentro de la misma ruta, el patron actual es `RouteStateLink`/`RouteStateButton` + History API, no `Link`/`router.push` de App Router. Si rompes esto, el usuario vuelve a perder scroll y contexto.
+
 ## Si quiero tocar login
 
 Mira:
@@ -193,6 +197,7 @@ No metas aqui horarios, bloques, plantillas, dashboard ni cobertura. Esta pantal
 Mira:
 
 - `src/app/(app)/app/schedule/page.tsx`
+- `src/app/(app)/app/schedule/schedule-block-detail-panels.tsx`
 - `src/app/(app)/app/schedule/actions.ts`
 - `src/lib/schedule-blocks.ts`
 
@@ -214,6 +219,15 @@ En `page.tsx` esta:
 - modo admin para asignar o retirar coaches
 - modo coach de lectura
 - mensajes de exito/error y empty state
+- triggers de tarjetas en Semana mediante estado de ruta, no navegacion App Router.
+
+En `schedule-block-detail-panels.tsx` esta:
+
+- detalle lateral de bloque en escritorio/mobile;
+- formularios de edicion/asignacion/cancelacion;
+- cierre con `RouteStateButton`;
+- filtrado visual de coaches no disponibles usando `getUnavailableScheduleCoachAssignments`;
+- atributos `data-operational-detail-panel="schedule-block"` que usa el smoke anti-regresion.
 
 En `actions.ts` esta:
 
@@ -225,6 +239,7 @@ En `actions.ts` esta:
 - validaciones de bloque activo, coach activo, persona visible, membership activa y tenant compartido
 - conservacion de filtros saneados, incluido `mine=1`, al redirigir despues de mutaciones
 - comprobacion de admin antes de mutar
+- mapeo de `23P01` a `coach-unavailable` cuando Postgres bloquea un solape de coach.
 
 En `src/lib/schedule-blocks.ts` esta:
 
@@ -236,14 +251,51 @@ En `src/lib/schedule-blocks.ts` esta:
 - validacion de formularios de asignacion
 - calculo basico de `covered`, `uncovered`, `insufficient` y `conflict`
 - estados de cobertura filtrables y helper de "solo riesgos"
+- helper compartido `getUnavailableScheduleCoachAssignments` para no ofrecer coaches ya ocupados en bloques activos solapados.
+
+La garantia real contra solapes no vive en la UI: `supabase/migrations/00011_schedule_assignment_overlap_guard.sql` bloquea en Postgres que el mismo coach quede `assigned` en bloques activos solapados del mismo tenant/dia. No lo sustituyas por un filtro frontend.
+
+Si tocas Horario, ejecuta al menos:
+
+```bash
+npx playwright test --config=playwright.smoke.config.ts tests/smoke/operational-detail-panels.spec.ts
+npx playwright test --config=playwright.smoke.config.ts tests/smoke/schedule-coach-availability.spec.ts
+```
 
 No metas aqui gestion de plantillas, dashboard visual, cambios, invitaciones, ausencias ni fichaje. La asignacion basica, el filtro "Mi horario" y el marcado de excepciones de bloques aplicados viven aqui porque `/app/schedule` es la primera superficie semanal; cualquier permiso futuro de `manager` debe entrar como tarea explicita y no como "admin con otro nombre".
+
+## Si quiero tocar cobertura
+
+Mira:
+
+- `src/app/(app)/app/coverage/page.tsx`
+- `src/app/(app)/app/coverage/coverage-block-detail-panels.tsx`
+- `src/components/features/operations-ui.tsx`
+- `src/lib/schedule-blocks.ts`
+
+En `page.tsx` esta:
+
+- lectura server-first de bloques, asignaciones, centros, tipos y coaches;
+- cola de riesgos y lista de clases;
+- botones de riesgo que abren detalle dentro de `/app/coverage`;
+- resolucion de `block_id` inicial para URL compartible.
+
+En `coverage-block-detail-panels.tsx` esta:
+
+- panel lateral de detalle de cobertura;
+- asignar/retirar coaches reutilizando actions de horario;
+- filtrado visual de coaches ocupados en la franja;
+- cierre con `RouteStateButton`;
+- atributo `data-operational-detail-panel="coverage-block"` para el smoke.
+
+No cambies los triggers de Cobertura a `Link` de App Router para abrir `?block_id=...`; esa fue la regresion que recargaba la pagina y mandaba al usuario al principio de la lista. Si se toca esta zona, ejecuta `tests/smoke/operational-detail-panels.spec.ts`.
 
 ## Si quiero tocar plantillas semanales
 
 Mira:
 
 - `src/app/(app)/app/templates/page.tsx`
+- `src/app/(app)/app/templates/template-blocks-editor.tsx`
 - `src/app/(app)/app/templates/actions.ts`
 - `src/lib/schedule-templates.ts`
 - `src/app/(app)/app/schedule/actions.ts` para el marcado de excepciones en bloques aplicados
@@ -269,6 +321,14 @@ En `actions.ts` esta:
 - evitar duplicados por `template_block_id` y `service_date`;
 - crear asignaciones `source = 'template'` cuando hay coach por defecto;
 - revalidar usuario, membership, tenant y rol admin antes de mutar.
+- mapear `23P01` a `coach-unavailable` si aplicar una plantilla intentaria crear solapes de coach.
+
+En `template-blocks-editor.tsx` esta:
+
+- editor de bloques de plantilla en Semana/Agenda;
+- apertura/cierre por `edit_block_id` con `RouteStateLink`, sin navegacion App Router;
+- layout de campos densos con selects/inputs preparados para nombres largos, UUIDs y flecha nativa;
+- atributo de trigger que cubre el smoke de paneles operativos.
 
 En `src/lib/schedule-templates.ts` esta:
 
@@ -277,6 +337,8 @@ En `src/lib/schedule-templates.ts` esta:
 - validacion de fechas, horas, referencias, coaches necesarios, coach por defecto y notas.
 
 No metas aqui dashboard, cambios, ausencias, fichaje ni permisos de `manager`. Tampoco borres plantillas desde UI; el patron actual es archivar.
+
+Si tocas la edicion de bloques de plantilla, ejecuta `tests/smoke/operational-detail-panels.spec.ts` y revisa mobile/desktop para que los campos no queden colapsados.
 
 ## Si quiero tocar helpers de tenant/auth
 
@@ -362,10 +424,16 @@ Si falta alguno de esos pasos, no sigas. Arreglalo antes.
 - No he creado rutas, roles o permisos especificos de un tenant.
 - Las queries de datos operativos filtran por `organization_id`.
 - Las Server Actions revalidan usuario, tenant y rol.
+- Los IDs recibidos del cliente se comprueban dentro de la organizacion activa antes de usarse.
+- He probado o revisado el caso de rol sin permiso y, si aplica, otro tenant.
 - No he elegido organizacion implicita si hay varias memberships.
 - No he tocado schema sin migracion.
 - No he editado `src/types/supabase.ts` a mano.
+- No he expuesto secretos, `service_role`, rutas internas de Storage sensibles ni URLs publicas persistentes para datos privados.
 - La navegacion mantiene `organizationId`.
+- Los detalles operativos con `block_id`/`edit_block_id` conservan scroll y usan `RouteStateLink`/History API si solo cambian estado de ruta.
+- La asignacion de coach no depende solo de ocultar opciones en UI; Postgres sigue bloqueando solapes y las actions siguen mostrando `coach-unavailable`.
+- Los formularios densos en movil no colapsan texto, flecha de select ni botones.
 - `admin` y `coach` siguen comportandose diferente donde toca.
 - No he construido dashboard visual final, cambios, ausencias, fichaje ni permisos de `manager` "ya que estaba".
 

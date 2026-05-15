@@ -42,13 +42,13 @@ Ese es el hueco: operativa semanal real, multi-centro y con cobertura visible.
 
 ## Que existe hoy
 
-Estado actual tras Task 015:
+Estado actual tras los cortes S/H/I y el cierre UX del 2026-05-14:
 
 - Next.js 16 App Router con React 19.
 - TypeScript estricto.
 - Tailwind CSS 4.
 - shadcn/ui inicializado.
-- Supabase local con migracion MVP 1 y seeds.
+- Supabase local con migraciones MVP 1, documentos privados, fichaje, cierre semanal, solicitudes/cobertura y hardening operativo.
 - Supabase Auth SSR.
 - `src/proxy.ts` protegiendo `/app`.
 - Login minimo en `/login`.
@@ -57,11 +57,17 @@ Estado actual tras Task 015:
 - Shell protegido bajo `/app`.
 - Navegacion minima:
   - `/app`
+  - `/app/coverage`
+  - `/app/more`
   - `/app/centers`
   - `/app/coaches`
   - `/app/class-types`
   - `/app/schedule`
   - `/app/templates`
+  - `/app/requests`
+  - `/app/time`
+  - `/app/account`
+  - `/app/stats`
 - Resolucion de usuario y tenant con:
   - `getAuthenticatedUser`
   - `getActiveMemberships`
@@ -74,29 +80,35 @@ Estado actual tras Task 015:
 - `/app/schedule` permite listar, crear, editar y cancelar bloques operativos semanales.
 - `/app/schedule` permite asignar coaches, retirar asignaciones, calcular cobertura basica, filtrar por riesgos y usar "Mi horario".
 - `/app/templates` permite crear plantillas semanales, crear bloques de plantilla y aplicar plantillas activas a semanas reales.
-- `/app` muestra dashboard admin basico de cobertura con cola de riesgos y enlaces al bloque real.
+- `/app/templates` soporta plantillas grandes con vista Semana/Agenda, filtros colapsables, seleccion multiple, edicion multiple limitada y sincronizacion idempotente del rango activo.
+- `/app` muestra Inicio operativo por rol. Para coaches muestra proxima clase, fichaje, avisos propios y accesos personales; para gestion conserva contexto operativo y colas relevantes.
+- El shell muestra la proxima clase asignada propia tambien en Inicio, calculada server-side desde asignaciones `assigned`. No ocultarlo en `/app`: sidebar desktop y encabezado mobile son el recordatorio fijo.
+- `/app/requests` permite solicitudes/ofertas minimas de cobertura/cambio sobre bloques asignados, con targets resueltos desde la organizacion activa y mutaciones por Server Actions + RPCs.
+- `/app/time` permite fichaje propio manual, fecha/hora elegible, centro principal preseleccionado, correcciones trazadas, vista semanal, cierre/aprobacion semanal y CSV interno revisable.
+- `/app/account` contiene cuenta, perfil visible, avatar privado y firma interna propia.
 - `npm run test:smoke` valida login publico, redireccion de rutas protegidas y flujos MVP 1 autenticados opcionales.
-- `admin` gestiona centros.
-- `admin` gestiona usuarios/coaches basicos.
-- `admin` gestiona tipos de clase/actividad.
-- `admin` gestiona bloques operativos, asignaciones y plantillas semanales basicas.
-- `coach` consulta centros, coaches y tipos en modo lectura.
-- `coach` consulta bloques operativos, cobertura, "Mi horario" y plantillas en modo lectura.
+- `owner`, `admin` y `manager` gestionan operativa MVP 1: centros, equipo operativo, tipos, horario, asignaciones, plantillas, cobertura y solicitudes segun el corte actual.
+- `coach` consulta horario/equipo/tipos/centros, usa funciones propias, ve proxima clase y fichaje, pero no recibe Plantillas ni pantallas administrativas como opcion cotidiana.
 
 Esto ya no es solo scaffold. Es el primer corte real protegido. Pequeño, pero con las tuberias importantes en su sitio.
+
+Nota 2026-05-14: la frase anterior ya se queda corta. El producto tiene varias superficies reales; el guardrail importante es no mezclar esta base con payroll, geolocalizacion web o datos sensibles sin abrir fase propia.
 
 ## Que no existe todavia
 
 Todavia no hay:
 
-- dashboard visual final validado con semana real
-- cambios entre coaches
-- ausencias
-- eventos
-- horas extra
-- fichaje
-- documentos
-- IA
+- piloto oficial con datos reales validados y entorno real desbloqueado
+- ausencias, vacaciones, bajas o permisos laborales
+- swap entre dos bloques/asignaciones
+- eventos/festivos avanzados
+- horas extra aprobadas o payroll
+- documentos visibles/subida documental desde UI
+- documentos firmables con snapshot/evidencia
+- app nativa real
+- push real, service worker, offline privado o background sync
+- geolocalizacion web
+- IA sobre programacion
 
 No es una lista de verguenza. Es una lista de "no lo construyas de reojo un viernes".
 
@@ -159,7 +171,9 @@ MVP 1 es:
 7. filtros
 8. cobertura basica
 9. plantillas semanales
-10. dashboard admin minimo
+10. proxima clase propia visible
+11. solicitudes/cobertura minima
+12. fichaje propio/cierre semanal inicial
 
 El peligro natural es empezar con IA, fichaje con geolocalizacion, payroll o una app nativa porque suenan mas grandes. No. Eso es construir una nave espacial para cruzar la calle.
 
@@ -188,6 +202,14 @@ Si eso no esta claro, lo demas solo mete niebla.
 13. `src/app/(app)/app/class-types/page.tsx`
 14. `src/app/(app)/app/schedule/page.tsx`
 15. `src/app/(app)/app/templates/page.tsx`
-16. `supabase/migrations/00001_mvp1_multi_tenant_schema.sql`
+16. `src/app/(app)/app/requests/page.tsx`
+17. `src/app/(app)/app/time/page.tsx`
+18. `src/lib/own-schedule.ts`
+19. `src/lib/change-requests.ts`
+20. `src/lib/time-tracking.ts`
+21. `supabase/migrations/00001_mvp1_multi_tenant_schema.sql`
+22. `supabase/migrations/00027_change_requests_foundation.sql`
+23. `supabase/migrations/00032_class_type_update_sync_defaults.sql`
+24. `supabase/migrations/00033_class_type_sync_all_related_blocks.sql`
 
 Con eso vuelves a poner el mapa sobre la mesa.

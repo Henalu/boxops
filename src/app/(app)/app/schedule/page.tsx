@@ -1,36 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  AlertTriangle,
   CalendarDays,
   CalendarRange,
-  CheckCircle2,
-  CircleOff,
-  Clock,
-  Dumbbell,
   Filter,
   ListChecks,
-  MapPin,
   PanelRightOpen,
   Plus,
   RotateCcw,
-  Save,
-  UserMinus,
-  UserRound,
-  X,
 } from "lucide-react";
 
-import {
-  assignScheduleBlockCoach,
-  cancelScheduleBlock,
-  createScheduleBlock,
-  removeScheduleBlockAssignment,
-  updateScheduleBlock,
-} from "./actions";
+import { createScheduleBlock } from "./actions";
+import { ScheduleBlockDetailPanels } from "./schedule-block-detail-panels";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { RouteStateButton } from "@/components/features/route-state-link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageAbsenceRequests,
   canManageOperationalData,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
@@ -53,6 +39,7 @@ import {
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
+import { listOperationalAbsenceScheduleImpacts } from "@/lib/absence-requests";
 import { getSchedulePath } from "@/lib/navigation/app-paths";
 import {
   SCHEDULE_FILTER_COVERAGE_STATES,
@@ -60,24 +47,25 @@ import {
   calculateScheduleCoverageByBlock,
   formatTimeForInput,
   getAdjacentWeekStart,
-  getScheduleAssignmentStatusLabel,
   getScheduleBlockStatusLabel,
   getScheduleCoverageStateLabel,
   isCoverageActiveBlock,
   isScheduleBlockStatus,
+  isScheduleCoverageRisk,
   isScheduleFilterCoverageState,
-  isScheduleRiskCoverageState,
   isScheduleUuid,
   resolveWeek,
   type ScheduleBlockStatus,
   type ScheduleBlockCoverage,
-  type ScheduleCoverageState,
   type ScheduleFilterCoverageState,
 } from "@/lib/schedule-blocks";
+import { ensureActiveScheduleTemplatesForWindow } from "@/lib/schedule-template-application";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
+
+const SCHEDULE_ASSIGNMENT_BLOCK_ID_BATCH_SIZE = 50;
 
 type ScheduleSearchParams = {
   block_id?: string | string[];
@@ -168,6 +156,16 @@ type ScheduleFilters = {
 
 type ScheduleView = "week" | "agenda" | "month";
 
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 type MyScheduleFilterState =
   | {
       status: "off";
@@ -187,11 +185,12 @@ type MyScheduleFilterState =
 
 const successMessages: Record<string, string> = {
   "assignment-removed": "Asignación retirada.",
-  assigned: "Coach asignado.",
+  assigned: "Entrenador asignado.",
   cancelled: "Bloque cancelado.",
   created: "Bloque creado.",
   "template-already-applied": "Plantilla ya aplicada.",
-  "template-applied": "Plantilla aplicada con coaches por defecto.",
+  "template-applied": "Plantilla aplicada con entrenadores por defecto.",
+  "template-replaced": "Plantilla sustituida en esta semana.",
   updated: "Bloque actualizado.",
 };
 
@@ -199,29 +198,31 @@ const errorMessages: Record<string, string> = {
   "assignment-required": "No se ha recibido la asignación a retirar.",
   "block-required": "No se ha recibido el bloque a actualizar.",
   "block-not-assignable":
-    "No se puede asignar coach a un bloque cancelado o completado.",
-  "coach-inactive": "Ese perfil de coach no está activo.",
+    "No se puede asignar entrenador a un bloque cancelado o completado.",
+  "coach-inactive": "Ese perfil de entrenador no está activo.",
   "coach-membership-inactive":
-    "Ese coach tiene cuenta vinculada, pero su acceso no está activo.",
-  "coach-required": "Selecciona un coach para asignar.",
+    "Ese entrenador tiene cuenta vinculada, pero su acceso no está activo.",
+  "coach-required": "Selecciona un entrenador para asignar.",
+  "coach-unavailable":
+    "Ese entrenador ya tiene otro bloque asignado que se solapa con esta franja.",
   "date-out-of-week": "La fecha debe estar dentro de la semana abierta.",
   "duplicate-assignment":
-    "Ese coach ya tiene una asignación lógica en este bloque.",
+    "Ese entrenador ya tiene una asignación lógica en este bloque.",
   forbidden: "Tu rol no permite gestionar bloques operativos.",
   "invalid-assignment": "La asignación recibida no es válida.",
   "invalid-assignment-reference":
-    "La asignación ya no apunta a un bloque o coach válido.",
+    "La asignación ya no apunta a un bloque o entrenador válido.",
   "invalid-block": "El bloque recibido no es válido.",
   "invalid-class-type": "El tipo de actividad seleccionado no es válido.",
   "invalid-center": "El centro seleccionado no es válido.",
-  "invalid-coach": "El coach seleccionado no es válido.",
+  "invalid-coach": "El entrenador seleccionado no es válido.",
   "invalid-date": "La fecha del bloque no es válida.",
   "invalid-person-profile":
-    "El perfil visible del coach no pertenece a esta organización.",
+    "El perfil visible del entrenador no pertenece a esta organización.",
   "invalid-reference":
     "El centro o tipo seleccionado ya no está disponible.",
   "invalid-required-coaches":
-    "Los coaches necesarios deben ser un número entero entre 0 y 20.",
+    "Los entrenadores necesarios deben ser un número entero entre 0 y 20.",
   "invalid-status": "El estado seleccionado no es válido.",
   "invalid-time": "La hora de inicio debe ser anterior a la hora de fin.",
   "missing-fields": "Completa centro, tipo, fecha y horas.",
@@ -230,17 +231,23 @@ const errorMessages: Record<string, string> = {
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required:
     "Elige una organización antes de gestionar bloques operativos.",
-  "person-profile-inactive": "El perfil visible del coach no está activo.",
+  "person-profile-inactive": "El perfil visible del entrenador no está activo.",
   "person-profile-internal":
-    "Los perfiles internos no pueden asignarse como coaches operativos.",
+    "Los perfiles internos no pueden asignarse como entrenadores operativos.",
   "save-failed": "No se han podido guardar los cambios.",
+  "template-out-of-range":
+    "La semana seleccionada no cruza el rango de validez de esa plantilla.",
+  "template-week-has-template":
+    "Esta semana ya tiene una plantilla aplicada. Confirma la sustitución desde Plantillas.",
 };
 
 const successDescriptions: Partial<Record<keyof typeof successMessages, string>> = {
   "template-applied":
-    "Se han creado los bloques y se han asignado los coaches por defecto definidos en la plantilla.",
+    "Se han creado los bloques y se han asignado los entrenadores por defecto definidos en la plantilla.",
   "template-already-applied":
     "La semana ya tenía los bloques de esa plantilla, así que no se han duplicado.",
+  "template-replaced":
+    "Solo se ha sustituido la semana seleccionada. Las demas semanas conservan su plantilla base.",
 };
 
 const scheduleViews = [
@@ -418,7 +425,7 @@ function resolveScheduleFilters({
       }),
       coachProfileId: resolveTenantScopedId({
         key: "coach_profile_id",
-        label: "coach",
+        label: "entrenador",
         validIds: coachProfileIds,
       }),
       coverageState:
@@ -527,7 +534,7 @@ function applyScheduleFilters({
       return false;
     }
 
-    if (filters.risksOnly && !isScheduleRiskCoverageState(coverage.state)) {
+    if (filters.risksOnly && !isScheduleCoverageRisk(coverage)) {
       return false;
     }
 
@@ -607,25 +614,44 @@ async function getScheduleBlockAssignments({
   blockIds: string[];
   organizationId: string;
 }) {
-  if (blockIds.length === 0) {
+  const uniqueBlockIds = Array.from(new Set(blockIds));
+
+  if (uniqueBlockIds.length === 0) {
     return [];
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("schedule_block_assignments")
-    .select(
-      "id, schedule_block_id, coach_profile_id, assignment_status, source, updated_at",
-    )
-    .eq("organization_id", organizationId)
-    .in("schedule_block_id", blockIds)
-    .order("updated_at", { ascending: false });
+  const batches = chunkValues(
+    uniqueBlockIds,
+    SCHEDULE_ASSIGNMENT_BLOCK_ID_BATCH_SIZE,
+  );
+  const results = await Promise.all(
+    batches.map((batch) =>
+      supabase
+        .from("schedule_block_assignments")
+        .select(
+          "id, schedule_block_id, coach_profile_id, assignment_status, source, updated_at",
+        )
+        .eq("organization_id", organizationId)
+        .in("schedule_block_id", batch)
+        .order("updated_at", { ascending: false }),
+    ),
+  );
+  const failedResult = results.find((result) => result.error);
 
-  if (error) {
-    throw new Error(`Could not load schedule assignments: ${error.message}`);
+  if (failedResult?.error) {
+    throw new Error(
+      `Could not load schedule assignments: ${failedResult.error.message}`,
+    );
   }
 
-  return data satisfies ScheduleBlockAssignmentRow[];
+  const assignments = results
+    .flatMap((result) => result.data ?? [])
+    .sort((first, second) =>
+      second.updated_at.localeCompare(first.updated_at),
+    ) satisfies ScheduleBlockAssignmentRow[];
+
+  return assignments;
 }
 
 async function getScheduleCoachContext(organizationId: string) {
@@ -749,7 +775,7 @@ function resolveMyScheduleFilterState({
 
 function selectClassName(className = "") {
   return [
-    "h-11 w-full rounded-md border border-input bg-transparent px-2.5 text-sm md:h-9",
+    "h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
     "outline-none transition-colors focus-visible:border-ring",
     "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
     className,
@@ -905,7 +931,7 @@ function getBlockCoachSummary({
     .map(
       (assignment) =>
         coachDisplaysById.get(assignment.coach_profile_id)?.label ??
-        `Coach ${shortId(assignment.coach_profile_id)}`,
+        `Entrenador ${shortId(assignment.coach_profile_id)}`,
     )
     .join(", ");
 }
@@ -1007,7 +1033,7 @@ function getCoachDisplay({
       detail: `Cuenta sin persona visible (${shortId(coachProfile.user_id)})`,
       id: coachProfile.id,
       isFallback: true,
-      label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+      label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
     };
   }
 
@@ -1015,7 +1041,7 @@ function getCoachDisplay({
     detail: `Perfil técnico incompleto ${shortId(coachProfile.id)}`,
     id: coachProfile.id,
     isFallback: true,
-    label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+    label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
   };
 }
 
@@ -1108,55 +1134,6 @@ function ColorSwatch({ color }: { color: string | null }) {
   );
 }
 
-function ScheduleBlockStatusBadge({ status }: { status: string }) {
-  return (
-    <Badge
-      variant={
-        status === "cancelled"
-          ? "destructive"
-          : status === "scheduled"
-            ? "secondary"
-            : "outline"
-      }
-    >
-      {getScheduleBlockStatusLabel(status)}
-    </Badge>
-  );
-}
-
-function getCoverageBadgeVariant(state: ScheduleCoverageState) {
-  if (state === "conflict" || state === "uncovered") {
-    return "destructive";
-  }
-
-  if (state === "covered") {
-    return "secondary";
-  }
-
-  return "outline";
-}
-
-function CoverageBadge({ coverage }: { coverage: ScheduleBlockCoverage }) {
-  const icon =
-    coverage.state === "covered" ? (
-      <CheckCircle2 aria-hidden="true" />
-    ) : coverage.state === "conflict" ||
-      coverage.state === "insufficient" ||
-      coverage.state === "uncovered" ? (
-      <AlertTriangle aria-hidden="true" />
-    ) : null;
-
-  return (
-    <Badge variant={getCoverageBadgeVariant(coverage.state)}>
-      {icon}
-      {getScheduleCoverageStateLabel(coverage.state)}
-      {coverage.state !== "inactive" && coverage.state !== "not_required"
-        ? ` ${coverage.validAssignmentCount}/${coverage.requiredCoaches}`
-        : null}
-    </Badge>
-  );
-}
-
 type ScheduleBlockTone =
   | "conflict"
   | "covered"
@@ -1187,6 +1164,13 @@ function getScheduleBlockTone({
 
   if (coverage.state === "insufficient") {
     return "insufficient";
+  }
+
+  if (
+    coverage.absenceImpact.coverageNeededCount > 0 ||
+    coverage.absenceImpact.potentialCount > 0
+  ) {
+    return "pending";
   }
 
   if (coverage.pendingAssignmentCount > 0) {
@@ -1235,6 +1219,18 @@ function getScheduleBlockRailClasses(tone: ScheduleBlockTone) {
   return classes[tone];
 }
 
+function getScheduleAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
+  if (coverage.absenceImpact.coverageNeededCount > 0) {
+    return "Impacto de ausencia";
+  }
+
+  if (coverage.absenceImpact.potentialCount > 0) {
+    return "Ausencia en revision";
+  }
+
+  return null;
+}
+
 function getScheduleBlockToneLabel({
   block,
   coverage,
@@ -1248,10 +1244,19 @@ function getScheduleBlockToneLabel({
 
   if (
     coverage.state === "conflict" ||
-    coverage.state === "covered" ||
     coverage.state === "insufficient" ||
     coverage.state === "uncovered"
   ) {
+    return getScheduleCoverageStateLabel(coverage.state);
+  }
+
+  const absenceImpactLabel = getScheduleAbsenceImpactLabel(coverage);
+
+  if (absenceImpactLabel) {
+    return absenceImpactLabel;
+  }
+
+  if (coverage.state === "covered") {
     return getScheduleCoverageStateLabel(coverage.state);
   }
 
@@ -1362,7 +1367,7 @@ function ScheduleBlockFields({
 }) {
   return (
     <>
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Fecha</span>
         <Input
           defaultValue={block?.service_date ?? weekStart}
@@ -1375,7 +1380,7 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Inicio</span>
         <Input
           defaultValue={block ? formatTimeForInput(block.start_time) : ""}
@@ -1386,7 +1391,7 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Fin</span>
         <Input
           defaultValue={block ? formatTimeForInput(block.end_time) : ""}
@@ -1397,7 +1402,7 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Centro</span>
         <CenterSelect
           centers={centers}
@@ -1406,7 +1411,7 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Tipo de actividad</span>
         <ClassTypeSelect
           classTypes={classTypes}
@@ -1415,8 +1420,8 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Coaches necesarios</span>
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Entrenadores necesarios</span>
         <Input
           defaultValue={block?.required_coaches ?? 1}
           disabled={disabled}
@@ -1428,12 +1433,12 @@ function ScheduleBlockFields({
         />
       </label>
 
-      <label className="grid gap-2">
+      <label className="grid min-w-0 gap-2">
         <span className="text-sm font-medium">Estado</span>
         <StatusSelect defaultValue={block?.status} disabled={disabled} />
       </label>
 
-      <label className="grid gap-2 lg:col-span-6">
+      <label className="grid min-w-0 gap-2 lg:col-span-6">
         <span className="text-sm font-medium">Notas</span>
         <Textarea
           defaultValue={block?.notes ?? ""}
@@ -1623,7 +1628,7 @@ function MobileScheduleFilters({
             <input name="day" type="hidden" value={selectedDay} />
           ) : null}
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Centro</span>
             <select
               className={selectClassName("rounded-lg md:h-10")}
@@ -1640,8 +1645,8 @@ function MobileScheduleFilters({
             </select>
           </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coach</span>
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Entrenador</span>
             <select
               className={selectClassName("rounded-lg md:h-10")}
               defaultValue={filters.coachProfileId ?? ""}
@@ -1657,7 +1662,7 @@ function MobileScheduleFilters({
             </select>
           </label>
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Actividad</span>
             <select
               className={selectClassName("rounded-lg md:h-10")}
@@ -1675,7 +1680,7 @@ function MobileScheduleFilters({
           </label>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-2">
+            <label className="grid min-w-0 gap-2">
               <span className="text-sm font-medium">Estado</span>
               <select
                 className={selectClassName("rounded-lg md:h-10")}
@@ -1691,7 +1696,7 @@ function MobileScheduleFilters({
               </select>
             </label>
 
-            <label className="grid gap-2">
+            <label className="grid min-w-0 gap-2">
               <span className="text-sm font-medium">Cobertura</span>
               <select
                 className={selectClassName("rounded-lg md:h-10")}
@@ -1840,7 +1845,7 @@ function ScheduleFiltersCard({
             <input name="day" type="hidden" value={selectedDay} />
           ) : null}
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Centro</span>
             <select
               className={selectClassName()}
@@ -1857,8 +1862,8 @@ function ScheduleFiltersCard({
             </select>
           </label>
 
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coach</span>
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Entrenador</span>
             <select
               className={selectClassName()}
               defaultValue={filters.coachProfileId ?? ""}
@@ -1874,7 +1879,7 @@ function ScheduleFiltersCard({
             </select>
           </label>
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Actividad</span>
             <select
               className={selectClassName()}
@@ -1891,7 +1896,7 @@ function ScheduleFiltersCard({
             </select>
           </label>
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Estado</span>
             <select
               className={selectClassName()}
@@ -1907,7 +1912,7 @@ function ScheduleFiltersCard({
             </select>
           </label>
 
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2">
             <span className="text-sm font-medium">Cobertura</span>
             <select
               className={selectClassName()}
@@ -1976,17 +1981,17 @@ function getMyScheduleFilterDescription(
   if (myScheduleFilter.status === "matched") {
     const label =
       myScheduleFilter.coachDisplay?.label ??
-      `Coach ${shortId(myScheduleFilter.coachProfileId)}`;
+      `Entrenador ${shortId(myScheduleFilter.coachProfileId)}`;
 
     return `Mi horario usa la ficha de ${label} y solo muestra bloques asignados.`;
   }
 
   if (myScheduleFilter.status === "ambiguous") {
-    return `Mi horario encontró ${myScheduleFilter.profileCount} fichas de coach vinculadas a tu usuario. No se elige una automáticamente.`;
+    return `Mi horario encontró ${myScheduleFilter.profileCount} fichas de entrenador vinculadas a tu usuario. No se elige una automáticamente.`;
   }
 
   if (myScheduleFilter.status === "missing") {
-    return "Mi horario no encontró una ficha de coach vinculada a tu usuario.";
+    return "Mi horario no encontró una ficha de entrenador vinculada a tu usuario.";
   }
 
   return "Mi horario está desactivado.";
@@ -2006,16 +2011,16 @@ function MyScheduleEmptyCard({
   let title = "No hay clases en Mi horario esta semana";
 
   if (myScheduleFilter.status === "missing") {
-    title = "No hay ficha de coach vinculada";
+    title = "No hay ficha de entrenador vinculada";
     description =
-      "Tu usuario tiene acceso, pero todavía no tiene una ficha de coach asociada. Owner o admin compatible deben vincular tu persona antes de usar Mi horario.";
+      "Tu usuario tiene acceso, pero todavía no tiene una ficha de entrenador asociada. Propietario o Administrador deben vincular tu persona antes de usar Mi horario.";
   } else if (myScheduleFilter.status === "ambiguous") {
     title = "Mi horario necesita una revisión de perfiles";
-    description = `Tu usuario aparece vinculado a ${myScheduleFilter.profileCount} fichas de coach. Por seguridad no se elige una automáticamente.`;
+    description = `Tu usuario aparece vinculado a ${myScheduleFilter.profileCount} fichas de entrenador. Por seguridad no se elige una automáticamente.`;
   } else if (myScheduleFilter.status === "matched") {
     const label =
       myScheduleFilter.coachDisplay?.label ??
-      `Coach ${shortId(myScheduleFilter.coachProfileId)}`;
+      `Entrenador ${shortId(myScheduleFilter.coachProfileId)}`;
 
     description = `No hay bloques asignados a ${label} con estado Asignado dentro de la semana y filtros actuales.`;
   }
@@ -2061,146 +2066,103 @@ function WeekControls({
   const previousWeek = getAdjacentWeekStart(weekStart, -1);
   const nextWeek = getAdjacentWeekStart(weekStart, 1);
   const filterPathOptions = getScheduleFilterPathOptions(filters, view);
+  const weekLabel = formatWeekRange(weekStart, weekEnd);
 
   return (
-    <>
-      <div className="space-y-3 md:hidden">
-        <form
-          action="/app/schedule"
-          className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-xl bg-card p-2 ring-1 ring-foreground/10"
-          method="get"
-        >
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <ScheduleFilterHiddenInputs filters={filters} view={view} />
-          <Input
-            aria-label="Semana"
-            className="h-11 rounded-lg md:h-10"
-            defaultValue={weekStart}
-            name="week"
-            type="date"
-          />
-          <Button className="min-h-11 md:min-h-10" type="submit">
-            Ver
-          </Button>
-        </form>
-
-        <div className="grid grid-cols-3 gap-2">
-          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-            <Link
-              href={getSchedulePath({
-                organizationId,
-                week: previousWeek,
-                ...filterPathOptions,
-              })}
-            >
-              <ArrowLeft aria-hidden="true" />
-              Anterior
-            </Link>
-          </Button>
-          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-            <Link
-              href={getSchedulePath({
-                organizationId,
-                week: currentWeekStart,
-                ...filterPathOptions,
-              })}
-            >
-              Hoy
-            </Link>
-          </Button>
-          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-            <Link
-              href={getSchedulePath({
-                organizationId,
-                week: nextWeek,
-                ...filterPathOptions,
-              })}
-            >
-              Siguiente
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
+    <div className="sticky top-3 z-30 rounded-xl border border-border/70 bg-background/95 p-2 shadow-sm backdrop-blur md:top-4 md:p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-2 px-1 md:px-0">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CalendarDays aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">Semana</p>
+            <p className="truncate text-sm font-semibold text-foreground">
+              {weekLabel}
+            </p>
+          </div>
         </div>
-        <p className="text-center text-xs font-medium text-muted-foreground">
-          {formatWeekRange(weekStart, weekEnd)}
-        </p>
-      </div>
 
-      <Card className="hidden bg-background/80 md:flex">
-        <CardContent className="p-4">
+        <div className="grid gap-2 md:grid-cols-[minmax(220px,260px)_auto] lg:min-w-[560px] lg:grid-cols-[minmax(220px,260px)_auto_auto] lg:items-end">
           <form
             action="/app/schedule"
-            className="grid gap-3 sm:grid-cols-[minmax(180px,240px)_auto]"
+            className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:contents"
             method="get"
           >
             <input name="organizationId" type="hidden" value={organizationId} />
             <ScheduleFilterHiddenInputs filters={filters} view={view} />
-            <label className="grid gap-2">
-              <span className="text-sm font-medium">Semana</span>
-              <Input defaultValue={weekStart} name="week" type="date" />
+            <label className="grid gap-1 md:gap-2">
+              <span className="sr-only md:not-sr-only md:text-sm md:font-medium">
+                Semana
+              </span>
+              <Input
+                aria-label="Semana"
+                className="h-11 rounded-lg md:h-10"
+                defaultValue={weekStart}
+                name="week"
+                type="date"
+              />
             </label>
-            <div className="flex items-end">
-              <Button type="submit">Ver semana</Button>
-            </div>
+            <Button className="min-h-11 md:min-h-10" type="submit">
+              Ver
+              <span className="hidden md:inline"> semana</span>
+            </Button>
           </form>
-        </CardContent>
-      </Card>
-    </>
-  );
-}
 
-function ScheduleHeaderActions({
-  currentWeekStart,
-  filters,
-  organizationId,
-  view,
-  weekStart,
-}: {
-  currentWeekStart: string;
-  filters: ScheduleFilters;
-  organizationId: string;
-  view: ScheduleView;
-  weekStart: string;
-}) {
-  const filterPathOptions = getScheduleFilterPathOptions(filters, view);
-
-  return (
-    <div className="hidden flex-wrap gap-2 md:flex">
-      <Button asChild variant="outline">
-        <Link
-          href={getSchedulePath({
-            organizationId,
-            week: getAdjacentWeekStart(weekStart, -1),
-            ...filterPathOptions,
-          })}
-        >
-          <ArrowLeft aria-hidden="true" />
-          Anterior
-        </Link>
-      </Button>
-      <Button asChild variant="outline">
-        <Link
-          href={getSchedulePath({
-            organizationId,
-            week: currentWeekStart,
-            ...filterPathOptions,
-          })}
-        >
-          Hoy
-        </Link>
-      </Button>
-      <Button asChild>
-        <Link
-          href={getSchedulePath({
-            organizationId,
-            week: getAdjacentWeekStart(weekStart, 1),
-            ...filterPathOptions,
-          })}
-        >
-          Siguiente
-          <ArrowRight aria-hidden="true" />
-        </Link>
-      </Button>
+          <nav
+            aria-label="Navegación semanal"
+            className="grid grid-cols-3 gap-2 md:col-span-2 lg:col-span-1"
+          >
+            <Button
+              asChild
+              className="min-h-11 min-w-0 px-2 text-xs sm:text-sm md:min-h-10 md:px-2.5"
+              variant="outline"
+            >
+              <Link
+                href={getSchedulePath({
+                  organizationId,
+                  week: previousWeek,
+                  ...filterPathOptions,
+                })}
+              >
+                <ArrowLeft aria-hidden="true" />
+                Anterior
+              </Link>
+            </Button>
+            <Button
+              asChild
+              className="min-h-11 min-w-0 px-2 text-xs sm:text-sm md:min-h-10 md:px-2.5"
+              variant="outline"
+            >
+              <Link
+                href={getSchedulePath({
+                  organizationId,
+                  week: currentWeekStart,
+                  ...filterPathOptions,
+                })}
+              >
+                Hoy
+              </Link>
+            </Button>
+            <Button
+              asChild
+              className="min-h-11 min-w-0 px-2 text-xs sm:text-sm md:min-h-10 md:px-2.5"
+              variant="outline"
+            >
+              <Link
+                href={getSchedulePath({
+                  organizationId,
+                  week: nextWeek,
+                  ...filterPathOptions,
+                })}
+              >
+                Siguiente
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+          </nav>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2275,6 +2237,8 @@ function getDayCoverageDotClass({
     coverages.some(
       (coverage) =>
         coverage.state === "insufficient" ||
+        coverage.absenceImpact.coverageNeededCount > 0 ||
+        coverage.absenceImpact.potentialCount > 0 ||
         coverage.pendingAssignmentCount > 0,
     )
   ) {
@@ -2354,441 +2318,6 @@ function MobileWeekDayPicker({
   );
 }
 
-function AssignmentStatusBadge({ status }: { status: string }) {
-  return (
-    <Badge
-      variant={
-        status === "assigned"
-          ? "secondary"
-          : status === "declined"
-            ? "destructive"
-            : "outline"
-      }
-    >
-      {getScheduleAssignmentStatusLabel(status)}
-    </Badge>
-  );
-}
-
-function ScheduleAssignmentPanel({
-  assignableCoaches,
-  assignments,
-  block,
-  canManageSchedule,
-  coachDisplaysById,
-  coverage,
-  filters,
-  organizationId,
-  returnPath,
-  view,
-  weekStart,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: ScheduleBlockAssignmentRow[];
-  block: ScheduleBlockRow;
-  canManageSchedule: boolean;
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverage: ScheduleBlockCoverage;
-  filters?: ScheduleFilters;
-  organizationId?: string;
-  returnPath?: string;
-  view?: ScheduleView;
-  weekStart?: string;
-}) {
-  const activeAssignments = assignments.filter(
-    (assignment) => assignment.assignment_status !== "removed",
-  );
-  const removedAssignments = assignments.filter(
-    (assignment) => assignment.assignment_status === "removed",
-  );
-  const logicalCoachProfileIds = new Set(
-    activeAssignments.map((assignment) => assignment.coach_profile_id),
-  );
-  const availableCoaches = assignableCoaches.filter(
-    (coach) => !logicalCoachProfileIds.has(coach.id),
-  );
-  const assignmentMutationContext =
-    canManageSchedule && organizationId && weekStart
-      ? { organizationId, weekStart }
-      : null;
-  const canAssign =
-    Boolean(assignmentMutationContext) &&
-    isCoverageActiveBlock(block.status) &&
-    availableCoaches.length > 0;
-  const conflictCoachNames = coverage.conflictCoachProfileIds.map(
-    (coachProfileId) =>
-      coachDisplaysById.get(coachProfileId)?.label ??
-      `Coach ${shortId(coachProfileId)}`,
-  );
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <UserRound aria-hidden="true" className="size-4 shrink-0" />
-          <h4 className="text-sm font-medium">Asignaciones</h4>
-        </div>
-        <CoverageBadge coverage={coverage} />
-      </div>
-
-      {coverage.state === "conflict" && conflictCoachNames.length > 0 ? (
-        <p className="text-sm text-destructive">
-          Solapamiento detectado: {conflictCoachNames.join(", ")}.
-        </p>
-      ) : null}
-
-      {activeAssignments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No hay coaches asignados que cuenten para esta fila de trabajo.
-        </p>
-      ) : (
-        <div className="grid gap-2">
-          {activeAssignments.map((assignment) => {
-            const coachDisplay = coachDisplaysById.get(
-              assignment.coach_profile_id,
-            );
-
-            return (
-              <div
-                className="flex flex-col gap-2 rounded-md border border-border/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                key={assignment.id}
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {coachDisplay?.label ??
-                        `Coach ${shortId(assignment.coach_profile_id)}`}
-                    </span>
-                    <AssignmentStatusBadge
-                      status={assignment.assignment_status}
-                    />
-                    <Badge variant="outline">{assignment.source}</Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {coachDisplay?.detail ?? "Perfil técnico sin nombre visible"}
-                  </p>
-                </div>
-
-                {assignmentMutationContext ? (
-                  <form action={removeScheduleBlockAssignment}>
-                    <input
-                      name="organizationId"
-                      type="hidden"
-                      value={assignmentMutationContext.organizationId}
-                    />
-                    <input
-                      name="weekStart"
-                      type="hidden"
-                      value={assignmentMutationContext.weekStart}
-                    />
-                    {returnPath ? (
-                      <input name="returnPath" type="hidden" value={returnPath} />
-                    ) : null}
-                    {filters ? (
-                      <ScheduleFilterHiddenInputs filters={filters} view={view} />
-                    ) : null}
-                    <input
-                      name="assignmentId"
-                      type="hidden"
-                      value={assignment.id}
-                    />
-                    <Button size="sm" type="submit" variant="outline">
-                      <UserMinus aria-hidden="true" />
-                      Retirar
-                    </Button>
-                  </form>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {removedAssignments.length > 0 ? (
-        <details className="text-sm text-muted-foreground">
-          <summary className="cursor-pointer select-none">
-            {removedAssignments.length} retirada
-            {removedAssignments.length === 1 ? "" : "s"} conservada
-            {removedAssignments.length === 1 ? "" : "s"}
-          </summary>
-          <ul className="mt-2 grid gap-1">
-            {removedAssignments.map((assignment) => (
-              <li className="truncate" key={assignment.id}>
-                {coachDisplaysById.get(assignment.coach_profile_id)?.label ??
-                  `Coach ${shortId(assignment.coach_profile_id)}`}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      {assignmentMutationContext ? (
-        <form
-          action={assignScheduleBlockCoach}
-          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-        >
-          <input
-            name="organizationId"
-            type="hidden"
-            value={assignmentMutationContext.organizationId}
-          />
-          <input
-            name="weekStart"
-            type="hidden"
-            value={assignmentMutationContext.weekStart}
-          />
-          {returnPath ? (
-            <input name="returnPath" type="hidden" value={returnPath} />
-          ) : null}
-          {filters ? (
-            <ScheduleFilterHiddenInputs filters={filters} view={view} />
-          ) : null}
-          <input name="scheduleBlockId" type="hidden" value={block.id} />
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coach asignable</span>
-            <select
-              className={selectClassName()}
-              defaultValue={availableCoaches[0]?.id ?? ""}
-              disabled={!canAssign}
-              name="coachProfileId"
-              required
-            >
-              {availableCoaches.length === 0 ? (
-                <option value="">Sin coaches asignables disponibles</option>
-              ) : null}
-              {availableCoaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.label}
-                  {coach.isFallback ? " (sin perfil visible)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-end">
-            <Button disabled={!canAssign} type="submit">
-              <Plus aria-hidden="true" />
-              Asignar coach
-            </Button>
-          </div>
-        </form>
-      ) : null}
-
-      {assignmentMutationContext && !isCoverageActiveBlock(block.status) ? (
-        <p className="text-sm text-muted-foreground">
-          Los bloques cancelados o completados no admiten nuevas asignaciones.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function ScheduleBlockReadOnlyCard({
-  assignableCoaches,
-  assignments,
-  block,
-  center,
-  classType,
-  coachDisplaysById,
-  coverage,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: ScheduleBlockAssignmentRow[];
-  block: ScheduleBlockRow;
-  center?: CenterRow;
-  classType?: ClassTypeRow;
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverage: ScheduleBlockCoverage;
-}) {
-  return (
-    <Card className="border-0 bg-transparent shadow-none ring-0">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <Clock aria-hidden="true" className="size-4 shrink-0" />
-              <span>
-                {formatTime(block.start_time)} - {formatTime(block.end_time)}
-              </span>
-            </CardTitle>
-            <CardDescription>
-              {formatServiceDate(block.service_date)}
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {block.is_template_exception ? (
-              <Badge variant="outline">Excepción</Badge>
-            ) : null}
-            <ScheduleBlockStatusBadge status={block.status} />
-            <CoverageBadge coverage={coverage} />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Centro</dt>
-            <dd className="mt-1 truncate font-medium">
-              {center?.name ?? "Centro no disponible"}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Tipo</dt>
-            <dd className="mt-1 flex min-w-0 items-center gap-2 font-medium">
-              <ColorSwatch color={classType?.color ?? null} />
-              <span className="truncate">
-                {classType?.name ?? "Tipo no disponible"}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Coaches necesarios</dt>
-            <dd className="mt-1 font-medium">{block.required_coaches}</dd>
-          </div>
-          <div className="min-w-0 lg:col-span-2">
-            <dt className="text-muted-foreground">Notas</dt>
-            <dd className="mt-1 whitespace-pre-wrap break-words">
-              {block.notes || "Sin notas"}
-            </dd>
-          </div>
-        </dl>
-        <ScheduleAssignmentPanel
-          assignableCoaches={assignableCoaches}
-          assignments={assignments}
-          block={block}
-          canManageSchedule={false}
-          coachDisplaysById={coachDisplaysById}
-          coverage={coverage}
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
-function ScheduleBlockAdminCard({
-  assignableCoaches,
-  assignments,
-  block,
-  center,
-  centers,
-  classType,
-  classTypes,
-  coachDisplaysById,
-  coverage,
-  filters,
-  organizationId,
-  returnPath,
-  view,
-  weekEnd,
-  weekStart,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: ScheduleBlockAssignmentRow[];
-  block: ScheduleBlockRow;
-  center?: CenterRow;
-  centers: CenterRow[];
-  classType?: ClassTypeRow;
-  classTypes: ClassTypeRow[];
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverage: ScheduleBlockCoverage;
-  filters: ScheduleFilters;
-  organizationId: string;
-  returnPath: string;
-  view: ScheduleView;
-  weekEnd: string;
-  weekStart: string;
-}) {
-  return (
-    <Card className="border-0 bg-transparent shadow-none ring-0">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <Clock aria-hidden="true" className="size-4 shrink-0" />
-              <span>
-                {formatTime(block.start_time)} - {formatTime(block.end_time)}
-              </span>
-            </CardTitle>
-            <CardDescription className="flex flex-wrap items-center gap-2">
-              <span>{formatServiceDate(block.service_date)}</span>
-              <span aria-hidden="true">/</span>
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-                <span className="truncate">
-                  {center?.name ?? "Centro no disponible"}
-                </span>
-              </span>
-              <span aria-hidden="true">/</span>
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <Dumbbell aria-hidden="true" className="size-3.5 shrink-0" />
-                <span className="truncate">
-                  {classType?.name ?? "Tipo no disponible"}
-                </span>
-              </span>
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {block.is_template_exception ? (
-              <Badge variant="outline">Excepción</Badge>
-            ) : null}
-            <ScheduleBlockStatusBadge status={block.status} />
-            <CoverageBadge coverage={coverage} />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ScheduleAssignmentPanel
-          assignableCoaches={assignableCoaches}
-          assignments={assignments}
-          block={block}
-          canManageSchedule={true}
-          coachDisplaysById={coachDisplaysById}
-          coverage={coverage}
-          filters={filters}
-          organizationId={organizationId}
-          returnPath={returnPath}
-          view={view}
-          weekStart={weekStart}
-        />
-
-        <form action={updateScheduleBlock} className="grid gap-4 lg:grid-cols-6">
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <input name="weekStart" type="hidden" value={weekStart} />
-          <input name="returnPath" type="hidden" value={returnPath} />
-          <ScheduleFilterHiddenInputs filters={filters} view={view} />
-          <input name="scheduleBlockId" type="hidden" value={block.id} />
-          <ScheduleBlockFields
-            block={block}
-            centers={centers}
-            classTypes={classTypes}
-            weekEnd={weekEnd}
-            weekStart={weekStart}
-          />
-          <div className="flex flex-wrap gap-2 lg:col-span-6">
-            <Button type="submit">
-              <Save aria-hidden="true" />
-              Guardar bloque
-            </Button>
-          </div>
-        </form>
-
-        {block.status !== "cancelled" ? (
-          <form action={cancelScheduleBlock}>
-            <input name="organizationId" type="hidden" value={organizationId} />
-            <input name="weekStart" type="hidden" value={weekStart} />
-            <input name="returnPath" type="hidden" value={returnPath} />
-            <ScheduleFilterHiddenInputs filters={filters} view={view} />
-            <input name="scheduleBlockId" type="hidden" value={block.id} />
-            <Button type="submit" variant="destructive">
-              <CircleOff aria-hidden="true" />
-              Cancelar bloque
-            </Button>
-          </form>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
 function ScheduleBlockSummaryLink({
   assignments,
   basePath,
@@ -2811,19 +2340,20 @@ function ScheduleBlockSummaryLink({
   const tone = getScheduleBlockTone({ block, coverage });
   const coachSummary = getBlockCoachSummary({ assignments, coachDisplaysById });
   const stateLabel = getScheduleBlockToneLabel({ block, coverage });
+  const absenceImpactLabel = getScheduleAbsenceImpactLabel(coverage);
 
   return (
-    <Link
+    <RouteStateButton
       className={[
         "group relative flex min-h-[76px] min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-xl border p-3 text-left text-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-24 md:rounded-lg",
         compact ? "md:min-h-20 md:p-2.5" : "",
         getScheduleBlockToneClasses(tone),
       ].join(" ")}
+      data-operational-detail-trigger="schedule-block"
       href={getScheduleBlockPanelPath({
         basePath,
         blockId: block.id,
       })}
-      scroll={false}
     >
       <span
         aria-hidden="true"
@@ -2840,6 +2370,11 @@ function ScheduleBlockSummaryLink({
           <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
             {stateLabel}
           </span>
+          {absenceImpactLabel && absenceImpactLabel !== stateLabel ? (
+            <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
+              {absenceImpactLabel}
+            </span>
+          ) : null}
           {block.is_template_exception ? (
             <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
               Cambiado
@@ -2865,190 +2400,7 @@ function ScheduleBlockSummaryLink({
           className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
         />
       </span>
-    </Link>
-  );
-}
-
-function ScheduleBlockDetailPanel({
-  assignableCoaches,
-  assignments,
-  basePath,
-  block,
-  canManageSchedule,
-  center,
-  centers,
-  classType,
-  classTypes,
-  coachDisplaysById,
-  coverage,
-  filters,
-  organizationId,
-  view,
-  weekEnd,
-  weekStart,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: ScheduleBlockAssignmentRow[];
-  basePath: string;
-  block: ScheduleBlockRow;
-  canManageSchedule: boolean;
-  center?: CenterRow;
-  centers: CenterRow[];
-  classType?: ClassTypeRow;
-  classTypes: ClassTypeRow[];
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverage: ScheduleBlockCoverage;
-  filters: ScheduleFilters;
-  organizationId: string;
-  view: ScheduleView;
-  weekEnd: string;
-  weekStart: string;
-}) {
-  const closeHref = basePath;
-  const returnPath = getScheduleBlockPanelPath({
-    basePath,
-    blockId: block.id,
-  });
-
-  return (
-    <aside className="fixed inset-0 z-50">
-      <Link
-        aria-label="Cerrar detalle"
-        className="absolute inset-0 z-0 block cursor-default bg-foreground/20 backdrop-blur-sm"
-        href={closeHref}
-        scroll={false}
-      />
-      <div className="relative z-10 ml-auto flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-background shadow-xl ring-1 ring-border">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-background/95 px-4 py-4 backdrop-blur">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CoverageBadge coverage={coverage} />
-              <ScheduleBlockStatusBadge status={block.status} />
-            </div>
-            <h2 className="truncate text-lg font-semibold tracking-tight">
-              {classType?.name ?? "Actividad"}
-            </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {formatServiceDate(block.service_date)} /{" "}
-              {formatTime(block.start_time)}-{formatTime(block.end_time)}
-            </p>
-          </div>
-          <Button asChild size="icon" variant="ghost">
-            <Link aria-label="Cerrar detalle" href={closeHref} scroll={false}>
-              <X aria-hidden="true" />
-            </Link>
-          </Button>
-        </div>
-
-        <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-          {canManageSchedule ? (
-            <ScheduleBlockAdminCard
-              assignableCoaches={assignableCoaches}
-              assignments={assignments}
-              block={block}
-              center={center}
-              centers={centers}
-              classType={classType}
-              classTypes={classTypes}
-              coachDisplaysById={coachDisplaysById}
-              coverage={coverage}
-              filters={filters}
-              organizationId={organizationId}
-              returnPath={returnPath}
-              view={view}
-              weekEnd={weekEnd}
-              weekStart={weekStart}
-            />
-          ) : (
-            <ScheduleBlockReadOnlyCard
-              assignableCoaches={assignableCoaches}
-              assignments={assignments}
-              block={block}
-              center={center}
-              classType={classType}
-              coachDisplaysById={coachDisplaysById}
-              coverage={coverage}
-            />
-          )}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function ScheduleBlockDetailPanels({
-  assignableCoaches,
-  assignments,
-  basePath,
-  blocks,
-  canManageSchedule,
-  centers,
-  classTypes,
-  coachDisplaysById,
-  coverageByBlock,
-  filters,
-  organizationId,
-  selectedBlockId,
-  view,
-  weekEnd,
-  weekStart,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: ScheduleBlockAssignmentRow[];
-  basePath: string;
-  blocks: ScheduleBlockRow[];
-  canManageSchedule: boolean;
-  centers: CenterRow[];
-  classTypes: ClassTypeRow[];
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverageByBlock: Map<string, ScheduleBlockCoverage>;
-  filters: ScheduleFilters;
-  organizationId: string;
-  selectedBlockId: string | null;
-  view: ScheduleView;
-  weekEnd: string;
-  weekStart: string;
-}) {
-  if (!selectedBlockId) {
-    return null;
-  }
-
-  const selectedBlock = blocks.find((block) => block.id === selectedBlockId);
-
-  if (!selectedBlock) {
-    return null;
-  }
-
-  const centersById = new Map(centers.map((center) => [center.id, center]));
-  const classTypesById = new Map(
-    classTypes.map((classType) => [classType.id, classType]),
-  );
-  const assignmentsByBlockId = groupAssignmentsByBlockId(assignments);
-  const coverage = coverageByBlock.get(selectedBlock.id);
-
-  if (!coverage) {
-    throw new Error("Missing coverage state for schedule block.");
-  }
-
-  return (
-    <ScheduleBlockDetailPanel
-      assignableCoaches={assignableCoaches}
-      assignments={assignmentsByBlockId.get(selectedBlock.id) ?? []}
-      basePath={basePath}
-      block={selectedBlock}
-      canManageSchedule={canManageSchedule}
-      center={centersById.get(selectedBlock.center_id)}
-      centers={centers}
-      classType={classTypesById.get(selectedBlock.class_type_id)}
-      classTypes={classTypes}
-      coachDisplaysById={coachDisplaysById}
-      coverage={coverage}
-      filters={filters}
-      organizationId={organizationId}
-      view={view}
-      weekEnd={weekEnd}
-      weekStart={weekStart}
-    />
+    </RouteStateButton>
   );
 }
 
@@ -3406,7 +2758,7 @@ function MonthlyScheduleView({
             const dayRisks = dayBlocks.filter((block) => {
               const coverage = coverageByBlock.get(block.id);
 
-              return coverage ? isScheduleRiskCoverageState(coverage.state) : false;
+              return coverage ? isScheduleCoverageRisk(coverage) : false;
             });
             const hasEvent = dayBlocks.some((block) => {
               const classType = classTypesById.get(block.class_type_id);
@@ -3529,6 +2881,24 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   const selectedDay = resolveSelectedScheduleDay(params.day, week.days);
   const currentWeek = resolveWeek(undefined, resolution.organization.timezone);
   const month = getMonthResolution(week.weekStart);
+  const canManageSchedule = canManageOperationalData(
+    resolution.membership.role,
+  );
+  const canReviewAbsenceImpact = canManageAbsenceRequests(
+    resolution.membership.role,
+  );
+
+  if (canManageSchedule) {
+    const supabase = await createClient();
+    await ensureActiveScheduleTemplatesForWindow({
+      organizationId: resolution.organization.id,
+      supabase,
+      timezone: resolution.organization.timezone,
+      windowEnd: scheduleView === "month" ? month.monthEnd : week.weekEnd,
+      windowStart: scheduleView === "month" ? month.monthStart : week.weekStart,
+    });
+  }
+
   const [blocks, monthBlocks, centers, classTypes, coachContext] =
     await Promise.all([
     getScheduleBlocks({
@@ -3552,6 +2922,17 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     blockIds: coverageBlocks.map((block) => block.id),
     organizationId: resolution.organization.id,
   });
+  const absenceImpactResult =
+    canReviewAbsenceImpact && coverageBlocks.length > 0
+      ? await listOperationalAbsenceScheduleImpacts({
+          limit: 200,
+          organizationId: resolution.organization.id,
+          scheduleBlockIds: coverageBlocks.map((block) => block.id),
+          serviceDateFrom:
+            scheduleView === "month" ? month.monthStart : week.weekStart,
+          serviceDateTo: scheduleView === "month" ? month.monthEnd : week.weekEnd,
+        })
+      : { data: [], ok: true as const };
   const {
     allCoaches,
     assignableCoaches,
@@ -3565,6 +2946,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     userId: user.id,
   });
   const coverageByBlock = calculateScheduleCoverageByBlock({
+    absenceImpacts: absenceImpactResult.ok ? absenceImpactResult.data : [],
     assignments,
     blocks: coverageBlocks,
     coaches: coachContext.coachProfiles,
@@ -3597,9 +2979,6 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         ? myScheduleFilter.coachProfileId
         : null,
   });
-  const canManageSchedule = canManageOperationalData(
-    resolution.membership.role,
-  );
   const activeCenters = centers.filter((center) => center.status === "active");
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
@@ -3617,15 +2996,6 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   return (
     <div className="space-y-6">
       <PageHeader
-        actions={
-          <ScheduleHeaderActions
-            currentWeekStart={currentWeek.weekStart}
-            filters={filters}
-            organizationId={resolution.organization.id}
-            view={scheduleView}
-            weekStart={week.weekStart}
-          />
-        }
         blockCount={blocks.length}
         organizationName={resolution.organization.name}
         role={resolution.membership.role}
@@ -3710,6 +3080,15 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         <Alert variant="destructive">
           <AlertTitle>No se han guardado los cambios</AlertTitle>
           <AlertDescription>{errorMessages[error]}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!absenceImpactResult.ok ? (
+        <Alert>
+          <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
+          <AlertDescription>
+            El horario se muestra sin cruzar ausencias aprobadas o en revision.
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -3853,11 +3232,11 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
             canManageSchedule={canManageSchedule}
             centers={centers}
             classTypes={classTypes}
-            coachDisplaysById={coachDisplaysById}
-            coverageByBlock={coverageByBlock}
+            coachDisplays={[...coachDisplaysById.values()]}
+            coverageByBlock={[...coverageByBlock.entries()]}
             filters={filters}
+            initialSelectedBlockId={selectedBlockId}
             organizationId={resolution.organization.id}
-            selectedBlockId={selectedBlockId}
             view={scheduleView}
             weekEnd={week.weekEnd}
             weekStart={week.weekStart}
@@ -3865,27 +3244,17 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         ) : null}
       </section>
 
-      <Alert>
-        <CircleOff aria-hidden="true" className="size-4" />
-        <AlertTitle>Fuera de este corte</AlertTitle>
-        <AlertDescription>
-          Las plantillas se gestionan en su propia pantalla. Cambios,
-          ausencias y fichaje llegarán en fases posteriores.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }
 
 function PageHeader({
-  actions,
   blockCount,
   organizationName,
   role,
   weekEnd,
   weekStart,
 }: {
-  actions?: ReactNode;
   blockCount?: number;
   organizationName?: string;
   role?: string;
@@ -3927,7 +3296,6 @@ function PageHeader({
           </div>
         </div>
       </div>
-      {actions ? <div className="shrink-0">{actions}</div> : null}
     </section>
   );
 }

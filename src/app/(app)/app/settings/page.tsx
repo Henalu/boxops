@@ -1,12 +1,23 @@
 import { redirect } from "next/navigation";
-import { Building2, ImageOff, Palette, Save, ShieldCheck } from "lucide-react";
+import {
+  Building2,
+  FileClock,
+  ImageOff,
+  Palette,
+  Save,
+  ShieldCheck,
+} from "lucide-react";
 
-import { updateOrganizationSettings } from "./actions";
+import {
+  updateOrganizationSettings,
+  updateTimeTrackingSettings,
+} from "./actions";
 import {
   PageHeader,
   SectionHeader,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { ColorPaletteField } from "@/components/features/color-palette-field";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
   canManageTenantSettings,
+  canManageTimeTrackingSettings,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
 import {
@@ -31,7 +43,9 @@ import {
   type ActiveOrganization,
 } from "@/lib/auth/tenant";
 import {
+  resolveOrganizationTimeTrackingSettings,
   resolveOrganizationTheme,
+  type ResolvedOrganizationTimeTrackingSettings,
   type ResolvedOrganizationTheme,
 } from "@/lib/organizations";
 
@@ -46,12 +60,16 @@ type SettingsPageProps = {
 };
 
 const successMessages: Record<string, string> = {
+  "time-tracking-updated": "Configuración de fichaje guardada.",
   updated: "Configuración guardada.",
 };
 
 const errorMessages: Record<string, string> = {
-  forbidden: "Tu rol no permite editar la configuración de la organización.",
-  "invalid-accent-color": "Usa un color hexadecimal, por ejemplo #0f766e.",
+  "invalid-time-tracking-config":
+    "La configuración de fichaje no tiene un valor válido.",
+  forbidden: "Tu rol no permite editar esta configuración.",
+  "invalid-accent-color":
+    "Usa un color hexadecimal para el color principal, por ejemplo #0f766e.",
   "missing-name": "Indica un nombre visible para la organización.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
@@ -105,19 +123,13 @@ function OrganizationSettingsForm({
           />
         </label>
 
-        <label className="grid gap-2">
-          <span className="text-sm font-medium">Color de acento</span>
-          <div className="flex items-center gap-2">
-            <ColorSwatch color={theme.accentColor} />
-            <Input
-              defaultValue={theme.accentColor ?? ""}
-              maxLength={7}
-              name="accentColor"
-              pattern="#?[0-9a-fA-F]{6}"
-              placeholder="#0f766e"
-            />
-          </div>
-        </label>
+        <ColorPaletteField
+          defaultValue={theme.accentColor}
+          label="Color principal"
+          name="accentColor"
+          paletteLabel="Paleta de color principal"
+          placeholder="#0f766e"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -126,7 +138,8 @@ function OrganizationSettingsForm({
           Guardar configuración
         </Button>
         <p className="text-sm text-muted-foreground">
-          Los estados críticos, error y foco conservan los tokens de BoxOps.
+          Los colores de estados críticos, errores y foco mantienen la identidad
+          visual base de BoxOps.
         </p>
       </div>
     </form>
@@ -175,8 +188,8 @@ function ThemePreview({
           Vista de marca ligera
         </CardTitle>
         <CardDescription>
-          El acento se usa como señal secundaria de tenant, sin cambiar la
-          semántica operativa.
+          El color principal se usa como señal de marca de la organización, sin
+          cambiar la semántica operativa.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
@@ -184,7 +197,7 @@ function ThemePreview({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{organization.name}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Identidad BoxOps con acento del cliente.
+              Vista de marca con el color principal de la organización.
             </p>
           </div>
           <ColorSwatch color={theme.accentColor} />
@@ -196,6 +209,99 @@ function ThemePreview({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function TimeTrackingSettingsSummary({
+  settings,
+}: {
+  settings: ResolvedOrganizationTimeTrackingSettings;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Correcciones de fichaje</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {settings.correctionApprovalRequired
+              ? "Cada corrección queda pendiente hasta que un perfil autorizado la revise. Una aprobación válida basta antes de aplicarla."
+              : "Cada persona corrige directamente sus propios fichajes; el motivo y los cambios quedan auditados."}
+          </p>
+        </div>
+        <StatusBadge
+          tone={settings.correctionApprovalRequired ? "warning" : "success"}
+        >
+          {settings.correctionApprovalRequired
+            ? "Con aprobación"
+            : "Correcciones directas"}
+        </StatusBadge>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeTrackingSettingsForm({
+  organization,
+  settings,
+}: {
+  organization: ActiveOrganization;
+  settings: ResolvedOrganizationTimeTrackingSettings;
+}) {
+  return (
+    <form action={updateTimeTrackingSettings} className="grid gap-4">
+      <input name="organizationId" type="hidden" value={organization.id} />
+
+      <fieldset className="grid gap-3">
+        <legend className="text-sm font-medium">Modo de corrección</legend>
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+          <input
+            className="mt-1 size-4 shrink-0 accent-primary"
+            defaultChecked={!settings.correctionApprovalRequired}
+            name="correctionMode"
+            type="radio"
+            value="direct"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">
+              Correcciones directas
+            </span>
+            <span className="mt-1 block text-sm text-muted-foreground">
+              La persona corrige su propio fichaje al enviar. BoxOps guarda el
+              motivo, la auditoría y los valores antes y después del cambio.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+          <input
+            className="mt-1 size-4 shrink-0 accent-primary"
+            defaultChecked={settings.correctionApprovalRequired}
+            name="correctionMode"
+            type="radio"
+            value="approval"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">
+              Correcciones con aprobación
+            </span>
+            <span className="mt-1 block text-sm text-muted-foreground">
+              La corrección queda pendiente. Propietario, Administrador o
+              Responsable pueden aprobarla; con una aprobación válida basta
+              antes de aplicarla.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit">
+          <Save aria-hidden="true" />
+          Guardar política de fichaje
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          No activa payroll, nómina ni cumplimiento legal definitivo.
+        </p>
+      </div>
+    </form>
   );
 }
 
@@ -218,7 +324,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <div className="space-y-6">
         <PageHeader
           badge="Configuración"
-          description="Ajustes mínimos de tenant y marca ligera."
+          description="Ajustes mínimos de organización y marca ligera."
           title="Configuración"
         />
         <OrganizationResolutionState
@@ -230,14 +336,20 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   }
 
   const canManageSettings = canManageTenantSettings(resolution.membership.role);
+  const canManageTimeSettings = canManageTimeTrackingSettings(
+    resolution.membership.role,
+  );
   const theme = resolveOrganizationTheme(resolution.organization.theme_config);
+  const timeTrackingSettings = resolveOrganizationTimeTrackingSettings(
+    resolution.organization.time_tracking_config,
+  );
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
 
   return (
     <div className="space-y-6">
       <PageHeader
         badge="Configuración"
-        description="Control visual básico de la organización activa, con fallbacks de BoxOps."
+        description="Identidad visual básica y reglas de fichaje de la organización activa."
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
@@ -251,7 +363,9 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <Alert>
           <AlertTitle>{successMessages[status]}</AlertTitle>
           <AlertDescription>
-            La identidad ligera del tenant ya está aplicada en esta sesión.
+            {status === "time-tracking-updated"
+              ? "La política de correcciones ya está disponible en fichaje."
+              : "La identidad ligera de la organización ya está aplicada en esta sesión."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -266,10 +380,13 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       {!canManageSettings ? (
         <Alert>
           <ShieldCheck aria-hidden="true" className="size-4" />
-          <AlertTitle>Modo lectura</AlertTitle>
+          <AlertTitle>
+            {canManageTimeSettings ? "Identidad visual en lectura" : "Modo lectura"}
+          </AlertTitle>
           <AlertDescription>
-            Tu rol puede consultar la organización activa, pero solo owner y
-            admin compatible pueden cambiar configuración en este corte.
+            {canManageTimeSettings
+              ? "Tu rol no puede cambiar la identidad visual ni los ajustes globales de la organización, pero sí puede gestionar la política de fichaje."
+              : "Tu rol puede consultar la organización activa, pero no cambiar su configuración."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -282,7 +399,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               Organización
             </CardTitle>
             <CardDescription>
-              Nombre visible y acento principal guardados en el tenant activo.
+              Nombre visible y color principal guardados en la organización
+              activa.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -305,7 +423,36 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
       <section className="space-y-3">
         <SectionHeader
-          description="Primera decision documentada para no abrir un modulo de Storage antes de tiempo."
+          description="Política de la organización para decidir si una corrección propia se aplica al enviar o pasa por aprobación."
+          title="Fichaje"
+        />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileClock aria-hidden="true" className="size-4" />
+              Correcciones
+            </CardTitle>
+            <CardDescription>
+              El modo directo sigue siendo auditable: crea corrección, aplica
+              cambios controlados y conserva el histórico operativo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {canManageTimeSettings ? (
+              <TimeTrackingSettingsForm
+                organization={resolution.organization}
+                settings={timeTrackingSettings}
+              />
+            ) : (
+              <TimeTrackingSettingsSummary settings={timeTrackingSettings} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader
+          description="Primera decisión documentada para no abrir un módulo de Storage antes de tiempo."
           title="Logo"
         />
         <Alert>
@@ -314,7 +461,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <AlertDescription>
             No se guarda logo real en B.1 porque todavía no hay modelo de asset,
             Storage privado ni permisos de documentos. Se mantiene como
-            configuración futura del tenant.
+            configuración futura de la organización.
           </AlertDescription>
         </Alert>
       </section>

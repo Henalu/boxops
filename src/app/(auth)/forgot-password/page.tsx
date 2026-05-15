@@ -50,7 +50,7 @@ export default async function ForgotPasswordPage({
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Recuperar contrasena</CardTitle>
+            <CardTitle>Recuperar contraseña</CardTitle>
             <CardDescription>
               Escribe el email de tu cuenta y revisa tu bandeja de entrada.
             </CardDescription>
@@ -62,7 +62,7 @@ export default async function ForgotPasswordPage({
                 <AlertTitle>Revisa tu email</AlertTitle>
                 <AlertDescription>
                   Si el email corresponde a una cuenta con acceso, enviaremos
-                  instrucciones para restablecer la contrasena.
+                  instrucciones para restablecer la contraseña.
                 </AlertDescription>
               </Alert>
             ) : null}

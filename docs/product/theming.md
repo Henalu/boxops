@@ -2,7 +2,7 @@
 
 Este documento define como deberia funcionar el theming por tenant en BoxOps. Es una especificacion de producto/arquitectura visual, no una implementacion.
 
-Estado 2026-05-07: B.1 implementa el primer corte real de theming ligero y B.2 ajusta permisos compatibles. `organizations.theme_config jsonb` existe y `/app/settings` permite a `owner` y `admin` compatible editar `accentColor`; `manager`, `coach` y roles especializados quedan en lectura para configuracion global. La aplicacion solo usa el acento para tokens de marca ligera (`primary`, `secondary`, `accent` y equivalentes de sidebar), con fallback de BoxOps si falta o no valida. Logo real, colores por centro y permisos por centro siguen pendientes.
+Estado 2026-05-07: B.1 implementa el primer corte real de theming ligero y B.2 ajusta permisos compatibles. `organizations.theme_config jsonb` existe y `/app/settings` permite a `owner` y `admin` editar `accentColor`; la UI los muestra como Propietario y Administrador. `manager` (Responsable), `coach` (Entrenador) y roles especializados quedan en lectura para configuracion global. La aplicacion solo usa el acento para tokens de marca ligera (`primary`, `secondary`, `accent` y equivalentes de sidebar), con fallback de BoxOps si falta o no valida. Logo real, colores por centro y permisos por centro siguen pendientes.
 
 ## Principio
 

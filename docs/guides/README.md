@@ -24,4 +24,4 @@ La jerarquia mental sigue siendo:
 Organization/Tenant -> Centers -> Users/Coaches -> Schedules -> Classes/Blocks -> Events
 ```
 
-Ahora mismo el producto llega de verdad hasta auth, tenant activo, shell protegido, centros, gestion basica de usuarios/coaches, catalogo de tipos de clase/actividad, gestion semanal de bloques operativos, asignaciones, cobertura basica, filtros, "Mi horario" y plantillas semanales basicas. Dashboard, cambios, ausencias, fichaje y documentos siguen modelados o previstos, pero todavia no existen. No pasa nada, respiramos.
+Ahora mismo el producto llega de verdad hasta auth, organizacion activa, shell protegido, centros, equipo/coaches, tipos de actividad, horario semanal, asignaciones, cobertura, filtros, "Mi horario", plantillas semanales, proxima clase propia, solicitudes/ofertas minimas de cobertura/cambio, area personal, avatar/firma privada, fichaje propio con correcciones, cierre semanal y exporte interno revisable. Ausencias, vacaciones, swap entre dos bloques, payroll, documentos visibles/firmables, geolocalizacion web, push real, service worker/offline privado, app nativa e IA siguen fuera de la base actual.

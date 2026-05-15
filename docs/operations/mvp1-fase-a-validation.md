@@ -1,12 +1,12 @@
 # Validacion Fase A - Cierre MVP 1 Real
 
-Fecha: 2026-05-06. Actualizado: 2026-05-07.
+Fecha: 2026-05-06. Actualizado: 2026-05-11.
 
 ## Resultado
 
 Fase A queda cerrada para QA interno con una semana de prueba L-V de STL cargada en local, una muestra representativa de coaches por defecto/asignaciones/vacantes y smoke E2E admin/coach. No es validacion oficial ni produccion: centro real por bloque, asignaciones oficiales y huecos confirmados siguen pendientes del tester STL.
 
-No se tocaron permisos, migraciones ni seeds automaticos de MVP 1. La deuda de codigo resuelta fue acotada a Fase A: `/app/templates` dejo de renderizar todos los formularios de edicion de bloque a la vez, suma una vista semanal por dias para plantillas grandes, el smoke E2E evita que el onboarding local bloquee la navegacion automatizada y ahora cubre explicitamente `/app/schedule?mine=1`.
+En el cierre inicial no se tocaron permisos, migraciones ni seeds automaticos de MVP 1. El 2026-05-11 se anade la migracion acotada `00011_schedule_assignment_overlap_guard.sql` para cerrar una regla de integridad operativa: un coach no puede quedar asignado a bloques activos solapados. La deuda de codigo resuelta fue acotada a Fase A: `/app/templates` dejo de renderizar todos los formularios de edicion de bloque a la vez, suma una vista semanal por dias para plantillas grandes, el smoke E2E evita que el onboarding local bloquee la navegacion automatizada y cubre explicitamente `/app/schedule?mine=1`.
 
 ## Fase Confirmada
 
@@ -72,9 +72,9 @@ Tras aplicar `supabase/snippets/stl-internal-assignment-sample-2026-05-04.sql` e
 | Bloques reales asignados | 20 |
 | Bloques reales vacantes | 145 |
 | Bloques insuficientes | 1 |
-| Conflictos deliberados | 1 |
+| Conflictos deliberados | 0 |
 
-La muestra usa coaches reales del tenant como dato editable, no crea usuarios Auth ni envia invitaciones. Si existe la cuenta E2E coach local, se vincula a la ficha operativa de Lucas para validar "Mi horario".
+La muestra usa coaches reales del tenant como dato editable, no crea usuarios Auth ni envia invitaciones. Si existe la cuenta E2E coach local, se vincula a la ficha operativa de Lucas para validar "Mi horario". Los conflictos deliberados por solape ya no se siembran porque Postgres los rechaza; los casos de solape se cubren con smoke dedicado y SQL local.
 
 ## Deuda Pequena Resuelta
 
@@ -90,6 +90,13 @@ La pantalla `/app/templates` era funcional, pero con 165 bloques renderizaba un 
 - admin conserva la capacidad de editar bloques de plantilla;
 - coach conserva modo lectura;
 - no se introducen reglas especiales de STL ni datos hardcodeados en `src`.
+
+## Guardrails Anti-Regresion 2026-05-11
+
+- Abrir/cerrar tarjetas de `/app/schedule` Semana y `/app/coverage`, y editar bloques en `/app/templates`, debe usar estado cliente + History API para `block_id`/`edit_block_id`. No usar `Link`/`router.push` App Router para ese gesto si destruye scroll/contexto.
+- Mantener `RouteStateLink`/`RouteStateButton` y los atributos `data-operational-detail-trigger`/`data-operational-detail-panel`, porque `tests/smoke/operational-detail-panels.spec.ts` valida que no haya request RSC ni salto de scroll.
+- La disponibilidad de coach no es un filtro frontend como garantia. `00011_schedule_assignment_overlap_guard.sql` bloquea insertar o mover asignaciones `assigned` solapadas dentro del mismo tenant/dia y las actions muestran `coach-unavailable`.
+- Los campos densos de formularios operativos deben seguir siendo mobile-first: campos largos a ancho completo cuando proceda, pares cortos compactos solo si hay aire, y selects con espacio para flecha + texto.
 
 ## Pendiente Para Piloto Oficial
 
@@ -127,6 +134,9 @@ Comandos ejecutados en esta pasada:
 - `npm run build`
 - `npm run test:smoke`
 - `rg -n "STL" src`
+- `npx playwright test --config=playwright.smoke.config.ts tests/smoke/operational-detail-panels.spec.ts`
+- `npx playwright test --config=playwright.smoke.config.ts tests/smoke/schedule-coach-availability.spec.ts`
+- `npx supabase db lint --local`
 
 Resultado:
 
@@ -136,6 +146,9 @@ Resultado:
 - Validacion browser en 390x844 y 1280x800 sobre Inicio, Horario, Cobertura, Plantillas, Equipo y Mas: contenido renderizado, sin overlay de framework, sin errores de consola/pageerror y sin overflow horizontal.
 - Validacion browser adicional en 390x844 y 1280x800 sobre Equipo, Mi horario y Cobertura con la muestra interna: sin overlay de framework, sin errores de consola/pageerror y sin overflow horizontal.
 - Validacion browser adicional sobre `/app/templates?view=week` y `/app/templates?view=agenda` en 390x844 y desktop: cambio de vista, apertura de edicion por `edit_block_id`, vista semanal sin cabecera duplicada, movil con un unico dia visible, sin errores de consola/pageerror y sin overflow horizontal de pagina.
+- Smoke anti-regresion de paneles operativos: Horario, Cobertura y Plantillas abren/cierra detalle/edicion sin request RSC y conservan `scrollY`.
+- Smoke de disponibilidad: 11:15-12:15 bloquea 11:00-12:00 para el mismo coach; franjas adyacentes, retiradas y canceladas no bloquean.
+- Lint de schema local sin errores tras la migracion anti-solape.
 - Se creo acceso E2E local de admin/coach al tenant STL para validar la UI con `organizationId=00000000-0000-0000-0000-000000200001`.
 
 ## Siguiente Paso Permitido

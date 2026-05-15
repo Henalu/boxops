@@ -4,33 +4,44 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
+  CalendarOff,
   CalendarRange,
   Dumbbell,
   Home,
+  Inbox,
   LayoutGrid,
   MapPin,
   Settings,
   ShieldAlert,
+  Timer,
   UserRound,
   UsersRound,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { canManageOperationalData } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import {
   getAppPath,
+  getAbsencesPath,
   getAccountPath,
   getCentersPath,
   getClassTypesPath,
   getCoachesPath,
   getCoveragePath,
   getMorePath,
+  getRequestsPath,
   getSchedulePath,
   getScheduleTemplatesPath,
   getSettingsPath,
+  getTimePath,
 } from "@/lib/navigation/app-paths";
 
 type AppNavigationProps = {
+  memberships: {
+    organizationId: string;
+    role: string;
+  }[];
   placement: "bottom" | "sidebar";
 };
 
@@ -92,21 +103,63 @@ const managementItems = [
 
 const personalItems = [
   {
+    href: "/app/absences",
+    icon: CalendarOff,
+    label: "Ausencias",
+  },
+  {
+    href: "/app/requests",
+    icon: Inbox,
+    label: "Solicitudes",
+  },
+  {
     href: "/app/account",
     icon: UserRound,
     label: "Mi cuenta",
   },
+  {
+    href: "/app/time",
+    icon: Timer,
+    label: "Mi fichaje",
+  },
 ] as const;
 
 const mobileMorePaths = [
+  "/app/absences",
+  "/app/requests",
   "/app/account",
+  "/app/time",
   "/app/centers",
   "/app/class-types",
   "/app/templates",
+  "/app/stats",
   "/app/settings",
 ];
 
+const secondaryMorePaths = ["/app/stats"];
+
+function getNavigationRole({
+  memberships,
+  organizationId,
+}: {
+  memberships: AppNavigationProps["memberships"];
+  organizationId: string | null;
+}) {
+  const selectedMembership = organizationId
+    ? memberships.find((membership) => membership.organizationId === organizationId)
+    : null;
+
+  return selectedMembership?.role ?? memberships[0]?.role ?? null;
+}
+
 function isActivePath(pathname: string, href: string) {
+  if (href === "/app/more") {
+    return (
+      pathname === href ||
+      secondaryMorePaths.some((path) => pathname.startsWith(path))
+    );
+  }
+
   return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
 }
 
@@ -121,11 +174,29 @@ function isBottomActivePath(pathname: string, href: string) {
   return isActivePath(pathname, href);
 }
 
-export function AppNavigation({ placement }: AppNavigationProps) {
+export function AppNavigation({ memberships, placement }: AppNavigationProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const organizationId = searchParams.get("organizationId");
   const week = searchParams.get("week");
+  const currentRole = getNavigationRole({ memberships, organizationId });
+  const canManageOperational = currentRole
+    ? canManageOperationalData(currentRole)
+    : false;
+  const visibleMainItems = mainItems.filter((item) => {
+    if (item.href === "/app/coverage") {
+      return canManageOperational;
+    }
+
+    return true;
+  });
+  const visibleManagementItems = managementItems.filter((item) => {
+    if (item.href === "/app/templates" || item.href === "/app/settings") {
+      return canManageOperational;
+    }
+
+    return true;
+  });
 
   function resolveHref(href: string) {
     if (href === "/app") {
@@ -152,6 +223,18 @@ export function AppNavigation({ placement }: AppNavigationProps) {
       return getAccountPath({ organizationId });
     }
 
+    if (href === "/app/requests") {
+      return getRequestsPath({ organizationId, week });
+    }
+
+    if (href === "/app/absences") {
+      return getAbsencesPath({ organizationId });
+    }
+
+    if (href === "/app/time") {
+      return getTimePath({ organizationId });
+    }
+
     if (href === "/app/centers") {
       return getCentersPath({ organizationId });
     }
@@ -175,8 +258,13 @@ export function AppNavigation({ placement }: AppNavigationProps) {
           aria-label="Navegación principal"
           className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-border/70 bg-background/90 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 shadow-lg backdrop-blur-xl"
         >
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-            {mainItems.map((item) => {
+          <div
+            className={cn(
+              "mx-auto grid max-w-md gap-1",
+              visibleMainItems.length === 4 ? "grid-cols-4" : "grid-cols-5",
+            )}
+          >
+            {visibleMainItems.map((item) => {
               const Icon = item.icon;
               const active = isBottomActivePath(pathname, item.href);
 
@@ -229,7 +317,7 @@ export function AppNavigation({ placement }: AppNavigationProps) {
           </p>
           <Badge variant="outline">Operativa</Badge>
         </div>
-        {mainItems.map((item) => {
+        {visibleMainItems.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
 
@@ -251,30 +339,32 @@ export function AppNavigation({ placement }: AppNavigationProps) {
         })}
       </div>
 
-      <div className="grid gap-1">
-        <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">
-          Gestión
-        </p>
-        {managementItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActivePath(pathname, item.href);
+      {visibleManagementItems.length > 0 ? (
+        <div className="grid gap-1">
+          <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">
+            {canManageOperational ? "Gestión" : "Consulta"}
+          </p>
+          {visibleManagementItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href);
 
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                active && "bg-secondary text-secondary-foreground",
-              )}
-              href={resolveHref(item.href)}
-              key={item.href}
-            >
-              <Icon aria-hidden="true" className="size-4" />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
+            return (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  active && "bg-secondary text-secondary-foreground",
+                )}
+                href={resolveHref(item.href)}
+                key={item.href}
+              >
+                <Icon aria-hidden="true" className="size-4" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="grid gap-1">
         <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">

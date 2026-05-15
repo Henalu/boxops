@@ -155,11 +155,9 @@ export async function updateOwnAvatar(formData: FormData) {
     {
       target_asset_hash: assetHash,
       target_file_extension: validation.extension,
-      target_height: null,
       target_mime_type: validation.mimeType,
       target_organization_id: context.organization.id,
       target_size_bytes: validation.sizeBytes,
-      target_width: null,
     },
   );
 

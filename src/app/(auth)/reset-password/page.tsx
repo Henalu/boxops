@@ -24,12 +24,12 @@ type ResetPasswordPageProps = {
 
 const errorMessages: Record<string, string> = {
   callback: "El enlace no se ha podido validar. Solicita uno nuevo.",
-  "password-mismatch": "Las contrasenas no coinciden.",
-  "password-missing-letter": "La contrasena debe incluir al menos una letra.",
-  "password-missing-number": "La contrasena debe incluir al menos un numero.",
-  "password-too-short": "La contrasena debe tener al menos 8 caracteres.",
+  "password-mismatch": "Las contraseñas no coinciden.",
+  "password-missing-letter": "La contraseña debe incluir al menos una letra.",
+  "password-missing-number": "La contraseña debe incluir al menos un número.",
+  "password-too-short": "La contraseña debe tener al menos 8 caracteres.",
   "update-failed":
-    "No se ha podido guardar la nueva contrasena. Solicita otro enlace si ha caducado.",
+    "No se ha podido guardar la nueva contraseña. Solicita otro enlace si ha caducado.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -51,11 +51,11 @@ export default async function ResetPasswordPage({
             BoxOps
           </p>
           <h1 className="mt-4 text-3xl font-semibold tracking-normal sm:text-5xl">
-            Establece una nueva contrasena.
+            Establece una nueva contraseña.
           </h1>
           <p className="mt-5 text-base leading-7 text-muted-foreground">
-            El enlace de Supabase abre una sesion temporal para cambiar la
-            contrasena de forma segura.
+            El enlace de Supabase abre una sesión temporal para cambiar la
+            contraseña de forma segura.
           </p>
         </div>
 
@@ -63,16 +63,16 @@ export default async function ResetPasswordPage({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <KeyRound aria-hidden="true" className="size-4" />
-              Nueva contrasena
+              Nueva contraseña
             </CardTitle>
             <CardDescription>
-              Usa una contrasena que cumpla la regla minima de BoxOps.
+              Usa una contraseña que cumpla la regla mínima de BoxOps.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {error && errorMessages[error] ? (
               <Alert variant="destructive">
-                <AlertTitle>No se ha guardado la contrasena</AlertTitle>
+                <AlertTitle>No se ha guardado la contraseña</AlertTitle>
                 <AlertDescription>{errorMessages[error]}</AlertDescription>
               </Alert>
             ) : null}
@@ -83,7 +83,7 @@ export default async function ResetPasswordPage({
                   <ShieldCheck aria-hidden="true" className="size-4" />
                   <AlertTitle>Enlace validado</AlertTitle>
                   <AlertDescription>
-                    Al guardar la contrasena cerraremos esta sesion temporal y
+                    Al guardar la contraseña cerraremos esta sesión temporal y
                     volveras al login.
                   </AlertDescription>
                 </Alert>

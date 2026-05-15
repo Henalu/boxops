@@ -4,8 +4,12 @@ Guias practicas por rol. Estan incompletas a proposito: el producto ya tiene cob
 
 ## Roles actuales
 
-- `admin`: puede entrar, resolver organizacion, usar Mi cuenta propia, ver dashboard basico de cobertura y gestionar centros, memberships, perfiles basicos de coach, tipos de actividad, bloques operativos semanales, asignaciones, filtros, cobertura basica y plantillas semanales.
-- `coach`: puede entrar, resolver organizacion, usar Mi cuenta propia y consultar centros, coaches, tipos de actividad, bloques operativos, asignaciones, cobertura, "Mi horario" y plantillas en modo lectura.
+- `owner` (Propietario): puede gestionar configuracion global, accesos y operativa MVP 1.
+- `admin` (Administrador): puede entrar, resolver organizacion, usar Mi cuenta propia, ver dashboard basico de cobertura y gestionar centros, memberships, perfiles basicos de entrenador, tipos de actividad, bloques operativos semanales, asignaciones, filtros, cobertura basica y plantillas semanales.
+- `manager` (Responsable): puede gestionar operativa MVP 1 sin configuracion global ni altas/roles de memberships.
+- `coach` (Entrenador): puede entrar, resolver organizacion, usar Mi cuenta propia y consultar centros, equipo, tipos de actividad, bloques operativos, asignaciones, cobertura, "Mi horario" y plantillas en modo lectura.
+
+La app conserva los identificadores internos en ingles por compatibilidad, pero las etiquetas visibles se muestran en espanol.
 
 ## Guias
 

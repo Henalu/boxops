@@ -21,6 +21,14 @@ import {
   validateScheduleBlockForm,
   type ScheduleBlockFormValues,
 } from "@/lib/schedule-blocks";
+import {
+  addAuditFieldChange,
+  auditFieldChange,
+  auditFieldSet,
+  auditFieldTouched,
+  recordOperationalAuditEvent,
+  type OperationalAuditChangedFields,
+} from "@/lib/operational-audit";
 import { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -187,6 +195,10 @@ async function getOperationalActionContext(formData: FormData) {
 }
 
 function getMutationError(errorCode?: string) {
+  if (errorCode === "23P01") {
+    return "coach-unavailable";
+  }
+
   if (errorCode === "23503") {
     return "invalid-reference";
   }
@@ -199,6 +211,10 @@ function getMutationError(errorCode?: string) {
 }
 
 function getAssignmentMutationError(errorCode?: string) {
+  if (errorCode === "23P01") {
+    return "coach-unavailable";
+  }
+
   if (errorCode === "23505") {
     return "duplicate-assignment";
   }
@@ -283,6 +299,79 @@ function didChangeTemplateAppliedBlock({
     block.status !== values.status ||
     (block.notes ?? null) !== values.notes
   );
+}
+
+function getScheduleBlockCreatedAuditFields(
+  values: ScheduleBlockFormValues,
+): OperationalAuditChangedFields {
+  return {
+    center_id: auditFieldSet(values.centerId),
+    class_type_id: auditFieldSet(values.classTypeId),
+    end_time: auditFieldSet(values.endTime),
+    ...(values.notes ? { notes: auditFieldTouched() } : {}),
+    required_coaches: auditFieldSet(values.requiredCoaches),
+    service_date: auditFieldSet(values.serviceDate),
+    start_time: auditFieldSet(values.startTime),
+    status: auditFieldSet(values.status),
+  };
+}
+
+function getScheduleBlockChangedAuditFields({
+  block,
+  values,
+}: {
+  block: {
+    center_id: string;
+    class_type_id: string;
+    end_time: string;
+    notes: string | null;
+    required_coaches: number;
+    service_date: string;
+    start_time: string;
+    status: string;
+  };
+  values: ScheduleBlockFormValues;
+}): OperationalAuditChangedFields {
+  const changedFields: OperationalAuditChangedFields = {};
+
+  addAuditFieldChange(changedFields, "center_id", block.center_id, values.centerId);
+  addAuditFieldChange(
+    changedFields,
+    "class_type_id",
+    block.class_type_id,
+    values.classTypeId,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "service_date",
+    block.service_date,
+    values.serviceDate,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "start_time",
+    normalizeComparableTime(block.start_time),
+    values.startTime,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "end_time",
+    normalizeComparableTime(block.end_time),
+    values.endTime,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "required_coaches",
+    block.required_coaches,
+    values.requiredCoaches,
+  );
+  addAuditFieldChange(changedFields, "status", block.status, values.status);
+
+  if ((block.notes ?? null) !== values.notes) {
+    changedFields.notes = auditFieldTouched();
+  }
+
+  return changedFields;
 }
 
 async function validateAssignableBlock({
@@ -409,27 +498,40 @@ export async function createScheduleBlock(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("schedule_blocks").insert({
-    center_id: validation.values.centerId,
-    class_type_id: validation.values.classTypeId,
-    end_time: validation.values.endTime,
-    notes: validation.values.notes,
-    organization_id: context.organization.id,
-    required_coaches: validation.values.requiredCoaches,
-    service_date: validation.values.serviceDate,
-    start_time: validation.values.startTime,
-    status: validation.values.status,
-  });
+  const { data: block, error } = await supabase
+    .from("schedule_blocks")
+    .insert({
+      center_id: validation.values.centerId,
+      class_type_id: validation.values.classTypeId,
+      end_time: validation.values.endTime,
+      notes: validation.values.notes,
+      organization_id: context.organization.id,
+      required_coaches: validation.values.requiredCoaches,
+      service_date: validation.values.serviceDate,
+      start_time: validation.values.startTime,
+      status: validation.values.status,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !block) {
     redirect(
       getActionResultPath({
         key: "error",
         returnPath: context.returnPath,
-        value: getMutationError(error.code),
+        value: getMutationError(error?.code),
       }),
     );
   }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: getScheduleBlockCreatedAuditFields(validation.values),
+    entityId: block.id,
+    entityType: "schedule_blocks",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getActionResultPath({
@@ -536,24 +638,59 @@ export async function assignScheduleBlockCoach(formData: FormData) {
         }),
       );
     }
-  } else {
-    const { error } = await supabase.from("schedule_block_assignments").insert({
-      assignment_status: "assigned",
-      coach_profile_id: validation.values.coachProfileId,
-      organization_id: context.organization.id,
-      schedule_block_id: validation.values.scheduleBlockId,
-      source: "manual",
-    });
 
-    if (error) {
+    await recordOperationalAuditEvent({
+      action: "assigned",
+      changedFields: {
+        assignment_status: auditFieldChange(
+          existingAssignment.assignment_status,
+          "assigned",
+        ),
+        coach_profile_id: auditFieldSet(validation.values.coachProfileId),
+        schedule_block_id: auditFieldSet(validation.values.scheduleBlockId),
+        source: auditFieldSet("manual"),
+      },
+      entityId: existingAssignment.id,
+      entityType: "schedule_block_assignments",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  } else {
+    const { data: assignment, error } = await supabase
+      .from("schedule_block_assignments")
+      .insert({
+        assignment_status: "assigned",
+        coach_profile_id: validation.values.coachProfileId,
+        organization_id: context.organization.id,
+        schedule_block_id: validation.values.scheduleBlockId,
+        source: "manual",
+      })
+      .select("id")
+      .single();
+
+    if (error || !assignment) {
       redirect(
         getActionResultPath({
           key: "error",
           returnPath: context.returnPath,
-          value: getAssignmentMutationError(error.code),
+          value: getAssignmentMutationError(error?.code),
         }),
       );
     }
+
+    await recordOperationalAuditEvent({
+      action: "assigned",
+      changedFields: {
+        assignment_status: auditFieldSet("assigned"),
+        coach_profile_id: auditFieldSet(validation.values.coachProfileId),
+        schedule_block_id: auditFieldSet(validation.values.scheduleBlockId),
+        source: auditFieldSet("manual"),
+      },
+      entityId: assignment.id,
+      entityType: "schedule_block_assignments",
+      organizationId: context.organization.id,
+      supabase,
+    });
   }
 
   redirect(
@@ -582,7 +719,7 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
   const supabase = await createClient();
   const { data: assignment, error: assignmentError } = await supabase
     .from("schedule_block_assignments")
-    .select("id, coach_profile_id, schedule_block_id")
+    .select("id, assignment_status, coach_profile_id, schedule_block_id")
     .eq("id", validation.assignmentId)
     .eq("organization_id", context.organization.id)
     .maybeSingle();
@@ -639,6 +776,22 @@ export async function removeScheduleBlockAssignment(formData: FormData) {
       }),
     );
   }
+
+  await recordOperationalAuditEvent({
+    action: "removed",
+    changedFields: {
+      assignment_status: auditFieldChange(
+        assignment.assignment_status,
+        "removed",
+      ),
+      coach_profile_id: auditFieldSet(assignment.coach_profile_id),
+      schedule_block_id: auditFieldSet(assignment.schedule_block_id),
+    },
+    entityId: assignment.id,
+    entityType: "schedule_block_assignments",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getActionResultPath({
@@ -746,6 +899,18 @@ export async function updateScheduleBlock(formData: FormData) {
     );
   }
 
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields: getScheduleBlockChangedAuditFields({
+      block: existingBlock,
+      values: validation.values,
+    }),
+    entityId: existingBlock.id,
+    entityType: "schedule_blocks",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
   redirect(
     getActionResultPath({
       key: "status",
@@ -772,7 +937,7 @@ export async function cancelScheduleBlock(formData: FormData) {
   const supabase = await createClient();
   const { data: block, error: blockError } = await supabase
     .from("schedule_blocks")
-    .select("id, template_id, template_block_id, is_template_exception")
+    .select("id, status, template_id, template_block_id, is_template_exception")
     .eq("id", scheduleBlockId)
     .eq("organization_id", context.organization.id)
     .maybeSingle();
@@ -808,6 +973,20 @@ export async function cancelScheduleBlock(formData: FormData) {
       }),
     );
   }
+
+  await recordOperationalAuditEvent({
+    action: "cancelled",
+    changedFields: {
+      is_template_exception: auditFieldSet(
+        block.is_template_exception || isTemplateAppliedBlock(block),
+      ),
+      status: auditFieldChange(block.status, "cancelled"),
+    },
+    entityId: block.id,
+    entityType: "schedule_blocks",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getActionResultPath({

@@ -7,26 +7,23 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
-  Plus,
   ShieldAlert,
-  UserMinus,
-  UserRound,
-  X,
 } from "lucide-react";
 
 import {
-  assignScheduleBlockCoach,
-  removeScheduleBlockAssignment,
-} from "../schedule/actions";
+  CoverageBulkResolveList,
+  type CoverageBulkRiskItem,
+} from "./coverage-bulk-resolve-list";
+import { CoverageBlockDetailPanels } from "./coverage-block-detail-panels";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
-  CoverageRiskCard,
   EmptyState,
   PageHeader,
   SectionHeader,
   StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { RouteStateButton } from "@/components/features/route-state-link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +36,7 @@ import {
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageAbsenceRequests,
   canManageOperationalData,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
@@ -47,14 +45,14 @@ import {
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
+import { listOperationalAbsenceScheduleImpacts } from "@/lib/absence-requests";
 import { getCoveragePath, getSchedulePath } from "@/lib/navigation/app-paths";
 import {
   calculateScheduleCoverageByBlock,
   formatTimeForInput,
   getAdjacentWeekStart,
-  getScheduleAssignmentStatusLabel,
   getScheduleCoverageStateLabel,
-  isCoverageActiveBlock,
+  isScheduleCoverageRisk,
   isScheduleRiskCoverageState,
   isScheduleUuid,
   resolveWeek,
@@ -115,6 +113,7 @@ type MembershipStatusRow = Pick<
 type CoverageData = {
   assignments: AssignmentRow[];
   assignableCoaches: CoachDisplay[];
+  absenceImpactLoadError: string | null;
   blocks: ScheduleBlockRow[];
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
@@ -145,31 +144,37 @@ const riskPriority: Record<ScheduleCoverageState, number> = {
 
 const successMessages: Record<string, string> = {
   "assignment-removed": "Asignación retirada.",
-  assigned: "Coach asignado.",
+  assigned: "Entrenador asignado.",
+  "bulk-assigned": "Entrenador asignado a los bloques seleccionados.",
 };
 
 const errorMessages: Record<string, string> = {
   "assignment-required": "No se ha recibido la asignación a retirar.",
   "block-not-assignable":
-    "No se puede asignar coach a un bloque cancelado o completado.",
+    "No se puede asignar entrenador a un bloque cancelado o completado.",
   "block-required": "No se ha recibido el bloque a actualizar.",
-  "coach-inactive": "Ese perfil de coach no está activo.",
+  "coach-inactive": "Ese perfil de entrenador no está activo.",
   "coach-membership-inactive":
-    "Ese coach tiene cuenta vinculada, pero su acceso no está activo.",
-  "coach-required": "Selecciona un coach para asignar.",
+    "Ese entrenador tiene cuenta vinculada, pero su acceso no está activo.",
+  "coach-required": "Selecciona un entrenador para asignar.",
+  "coach-unavailable":
+    "Ese entrenador ya tiene otro bloque asignado que se solapa con esta franja.",
+  "bulk-selection-required": "Selecciona al menos un riesgo para resolver en lote.",
+  "bulk-selection-too-large":
+    "Selecciona menos bloques para resolverlos en lote.",
   "duplicate-assignment":
-    "Ese coach ya tiene una asignación lógica en este bloque.",
+    "Ese entrenador ya tiene una asignación lógica en este bloque.",
   forbidden: "Tu rol no permite gestionar la cobertura.",
   "invalid-assignment": "La asignación recibida no es válida.",
   "invalid-assignment-reference":
-    "La asignación ya no apunta a un bloque o coach válido.",
+    "La asignación ya no apunta a un bloque o entrenador válido.",
   "invalid-block": "El bloque recibido no es válido.",
-  "invalid-coach": "El coach seleccionado no es válido.",
+  "invalid-coach": "El entrenador seleccionado no es válido.",
   "invalid-person-profile":
-    "El perfil visible del coach no pertenece a esta organización.",
-  "person-profile-inactive": "El perfil visible del coach no está activo.",
+    "El perfil visible del entrenador no pertenece a esta organización.",
+  "person-profile-inactive": "El perfil visible del entrenador no está activo.",
   "person-profile-internal":
-    "Los perfiles internos no pueden asignarse como coaches operativos.",
+    "Los perfiles internos no pueden asignarse como entrenadores operativos.",
   "save-failed": "No se han podido guardar los cambios.",
 };
 
@@ -215,26 +220,6 @@ function getCoverageBlockHref({
   return `${url.pathname}${url.search}`;
 }
 
-function getScheduleBlockHref({
-  blockId,
-  organizationId,
-  serviceDate,
-  weekStart,
-}: {
-  blockId: string;
-  organizationId: string;
-  serviceDate: string;
-  weekStart: string;
-}) {
-  return `${getSchedulePath({
-    blockId,
-    day: serviceDate,
-    organizationId,
-    view: "week",
-    week: weekStart,
-  })}`;
-}
-
 function getCoachDisplay({
   coachProfile,
   membership,
@@ -264,7 +249,7 @@ function getCoachDisplay({
       detail: `Cuenta sin persona visible (${shortId(coachProfile.user_id)})`,
       id: coachProfile.id,
       isFallback: true,
-      label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+      label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
     };
   }
 
@@ -272,7 +257,7 @@ function getCoachDisplay({
     detail: `Perfil técnico incompleto ${shortId(coachProfile.id)}`,
     id: coachProfile.id,
     isFallback: true,
-    label: `Coach sin perfil visible ${shortId(coachProfile.id)}`,
+    label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
   };
 }
 
@@ -350,10 +335,12 @@ function buildCoachDisplays({
 }
 
 async function getCoverageData({
+  includeAbsenceImpacts,
   organizationId,
   weekEnd,
   weekStart,
 }: {
+  includeAbsenceImpacts: boolean;
   organizationId: string;
   weekEnd: string;
   weekStart: string;
@@ -476,7 +463,19 @@ async function getCoverageData({
     persons,
   });
   const assignments = assignmentsResult.data satisfies AssignmentRow[];
+  const absenceImpactResult =
+    includeAbsenceImpacts && blockIds.length > 0
+      ? await listOperationalAbsenceScheduleImpacts({
+          limit: 200,
+          organizationId,
+          scheduleBlockIds: blockIds,
+          serviceDateFrom: weekStart,
+          serviceDateTo: weekEnd,
+        })
+      : { data: [], ok: true as const };
+  const absenceImpacts = absenceImpactResult.ok ? absenceImpactResult.data : [];
   const coverageByBlock = calculateScheduleCoverageByBlock({
+    absenceImpacts,
     assignments,
     blocks,
     coaches,
@@ -487,6 +486,9 @@ async function getCoverageData({
   return {
     assignments,
     assignableCoaches,
+    absenceImpactLoadError: absenceImpactResult.ok
+      ? null
+      : absenceImpactResult.error,
     blocks,
     centers,
     classTypes,
@@ -500,7 +502,7 @@ function getRiskItems(data: CoverageData) {
     .flatMap((block) => {
       const coverage = data.coverageByBlock.get(block.id);
 
-      if (!coverage || !isScheduleRiskCoverageState(coverage.state)) {
+      if (!coverage || !isScheduleCoverageRisk(coverage)) {
         return [];
       }
 
@@ -537,8 +539,70 @@ function getTone(state: ScheduleCoverageState) {
   return "neutral" as const;
 }
 
+function getCoverageTone(coverage: ScheduleBlockCoverage | undefined) {
+  if (!coverage) {
+    return getTone("inactive");
+  }
+
+  if (coverage.state === "uncovered" || coverage.state === "conflict") {
+    return "critical" as const;
+  }
+
+  if (
+    coverage.state === "insufficient" ||
+    coverage.absenceImpact.coverageNeededCount > 0 ||
+    coverage.absenceImpact.potentialCount > 0
+  ) {
+    return "warning" as const;
+  }
+
+  if (coverage.state === "covered") {
+    return "success" as const;
+  }
+
+  return "neutral" as const;
+}
+
+function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
+  if (coverage.absenceImpact.coverageNeededCount > 0) {
+    return "Impacto de ausencia";
+  }
+
+  if (coverage.absenceImpact.potentialCount > 0) {
+    return "Ausencia en revision";
+  }
+
+  return null;
+}
+
+function getRiskStatus(coverage: ScheduleBlockCoverage) {
+  const absenceLabel = getAbsenceImpactLabel(coverage);
+
+  if (!isScheduleRiskCoverageState(coverage.state) && absenceLabel) {
+    return absenceLabel;
+  }
+
+  return getScheduleCoverageStateLabel(coverage.state);
+}
+
+function getRiskMeta(coverage: ScheduleBlockCoverage) {
+  const absenceLabel = getAbsenceImpactLabel(coverage);
+  const coachCount = `${coverage.validAssignmentCount}/${coverage.requiredCoaches} entrenadores`;
+
+  if (!absenceLabel) {
+    return coachCount;
+  }
+
+  return `${coachCount} / ${absenceLabel.toLowerCase()}`;
+}
+
 function getSummary(riskItems: RiskItem[]) {
   return {
+    absenceImpact: riskItems.filter(
+      (item) =>
+        item.coverage.absenceImpact.coverageNeededCount > 0 ||
+        item.coverage.absenceImpact.potentialCount > 0,
+    ).length,
     conflict: riskItems.filter((item) => item.coverage.state === "conflict")
       .length,
     insufficient: riskItems.filter(
@@ -547,361 +611,6 @@ function getSummary(riskItems: RiskItem[]) {
     uncovered: riskItems.filter((item) => item.coverage.state === "uncovered")
       .length,
   };
-}
-
-function selectClassName(className = "") {
-  return [
-    "h-11 w-full rounded-lg border border-input bg-background px-3 text-sm md:h-10",
-    "outline-none transition-colors focus-visible:border-ring",
-    "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function groupAssignmentsByBlockId(assignments: AssignmentRow[]) {
-  return assignments.reduce((groups, assignment) => {
-    const blockAssignments = groups.get(assignment.schedule_block_id) ?? [];
-    blockAssignments.push(assignment);
-    groups.set(assignment.schedule_block_id, blockAssignments);
-
-    return groups;
-  }, new Map<string, AssignmentRow[]>());
-}
-
-function AssignmentStatusBadge({ status }: { status: string }) {
-  return (
-    <Badge
-      variant={
-        status === "assigned"
-          ? "secondary"
-          : status === "declined"
-            ? "destructive"
-            : "outline"
-      }
-    >
-      {getScheduleAssignmentStatusLabel(status)}
-    </Badge>
-  );
-}
-
-function CoverageAssignmentPanel({
-  assignableCoaches,
-  assignments,
-  block,
-  canManageSchedule,
-  coachDisplaysById,
-  coverage,
-  organizationId,
-  returnPath,
-  weekStart,
-}: {
-  assignableCoaches: CoachDisplay[];
-  assignments: AssignmentRow[];
-  block: ScheduleBlockRow;
-  canManageSchedule: boolean;
-  coachDisplaysById: Map<string, CoachDisplay>;
-  coverage: ScheduleBlockCoverage;
-  organizationId: string;
-  returnPath: string;
-  weekStart: string;
-}) {
-  const activeAssignments = assignments.filter(
-    (assignment) => assignment.assignment_status !== "removed",
-  );
-  const removedAssignments = assignments.filter(
-    (assignment) => assignment.assignment_status === "removed",
-  );
-  const logicalCoachProfileIds = new Set(
-    activeAssignments.map((assignment) => assignment.coach_profile_id),
-  );
-  const availableCoaches = assignableCoaches.filter(
-    (coach) => !logicalCoachProfileIds.has(coach.id),
-  );
-  const canAssign =
-    canManageSchedule &&
-    isCoverageActiveBlock(block.status) &&
-    availableCoaches.length > 0;
-  const conflictCoachNames = coverage.conflictCoachProfileIds.map(
-    (coachProfileId) =>
-      coachDisplaysById.get(coachProfileId)?.label ??
-      `Coach ${shortId(coachProfileId)}`,
-  );
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <UserRound aria-hidden="true" className="size-4 shrink-0" />
-          <h3 className="text-sm font-semibold">Asignaciones</h3>
-        </div>
-        <StatusBadge tone={getTone(coverage.state)}>
-          {getScheduleCoverageStateLabel(coverage.state)}{" "}
-          {coverage.validAssignmentCount}/{coverage.requiredCoaches}
-        </StatusBadge>
-      </div>
-
-      {coverage.state === "conflict" && conflictCoachNames.length > 0 ? (
-        <p className="text-sm text-destructive">
-          Solapamiento detectado: {conflictCoachNames.join(", ")}.
-        </p>
-      ) : null}
-
-      {activeAssignments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No hay coaches asignados que cuenten para este bloque.
-        </p>
-      ) : (
-        <div className="grid gap-2">
-          {activeAssignments.map((assignment) => {
-            const coachDisplay = coachDisplaysById.get(
-              assignment.coach_profile_id,
-            );
-
-            return (
-              <div
-                className="flex flex-col gap-2 rounded-md border border-border/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                key={assignment.id}
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {coachDisplay?.label ??
-                        `Coach ${shortId(assignment.coach_profile_id)}`}
-                    </span>
-                    <AssignmentStatusBadge
-                      status={assignment.assignment_status}
-                    />
-                    <Badge variant="outline">{assignment.source}</Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {coachDisplay?.detail ?? "Perfil técnico sin nombre visible"}
-                  </p>
-                </div>
-
-                {canManageSchedule ? (
-                  <form action={removeScheduleBlockAssignment}>
-                    <input
-                      name="organizationId"
-                      type="hidden"
-                      value={organizationId}
-                    />
-                    <input name="weekStart" type="hidden" value={weekStart} />
-                    <input name="returnPath" type="hidden" value={returnPath} />
-                    <input
-                      name="assignmentId"
-                      type="hidden"
-                      value={assignment.id}
-                    />
-                    <Button size="sm" type="submit" variant="outline">
-                      <UserMinus aria-hidden="true" />
-                      Retirar
-                    </Button>
-                  </form>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {removedAssignments.length > 0 ? (
-        <details className="text-sm text-muted-foreground">
-          <summary className="cursor-pointer select-none">
-            {removedAssignments.length} retirada
-            {removedAssignments.length === 1 ? "" : "s"} conservada
-            {removedAssignments.length === 1 ? "" : "s"}
-          </summary>
-          <ul className="mt-2 grid gap-1">
-            {removedAssignments.map((assignment) => (
-              <li className="truncate" key={assignment.id}>
-                {coachDisplaysById.get(assignment.coach_profile_id)?.label ??
-                  `Coach ${shortId(assignment.coach_profile_id)}`}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      {canManageSchedule ? (
-        <form
-          action={assignScheduleBlockCoach}
-          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-        >
-          <input name="organizationId" type="hidden" value={organizationId} />
-          <input name="weekStart" type="hidden" value={weekStart} />
-          <input name="returnPath" type="hidden" value={returnPath} />
-          <input name="scheduleBlockId" type="hidden" value={block.id} />
-          <label className="grid gap-2">
-            <span className="text-sm font-medium">Coach asignable</span>
-            <select
-              className={selectClassName()}
-              defaultValue={availableCoaches[0]?.id ?? ""}
-              disabled={!canAssign}
-              name="coachProfileId"
-              required
-            >
-              {availableCoaches.length === 0 ? (
-                <option value="">Sin coaches asignables disponibles</option>
-              ) : null}
-              {availableCoaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.label}
-                  {coach.isFallback ? " (sin perfil visible)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-end">
-            <Button disabled={!canAssign} type="submit">
-              <Plus aria-hidden="true" />
-              Asignar coach
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Tu rol puede consultar cobertura, pero no modificar asignaciones.
-        </p>
-      )}
-
-      {canManageSchedule && !isCoverageActiveBlock(block.status) ? (
-        <p className="text-sm text-muted-foreground">
-          Los bloques cancelados o completados no admiten nuevas asignaciones.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function CoverageBlockDetailPanels({
-  basePath,
-  canManageSchedule,
-  centersById,
-  classTypesById,
-  data,
-  organizationId,
-  selectedBlockId,
-  weekStart,
-}: {
-  basePath: string;
-  canManageSchedule: boolean;
-  centersById: Map<string, CenterRow>;
-  classTypesById: Map<string, ClassTypeRow>;
-  data: CoverageData;
-  organizationId: string;
-  selectedBlockId: string | null;
-  weekStart: string;
-}) {
-  if (!selectedBlockId) {
-    return null;
-  }
-
-  const selectedBlock = data.blocks.find((block) => block.id === selectedBlockId);
-
-  if (!selectedBlock) {
-    return null;
-  }
-
-  const assignmentsByBlockId = groupAssignmentsByBlockId(data.assignments);
-  const coverage = data.coverageByBlock.get(selectedBlock.id);
-  const classType = classTypesById.get(selectedBlock.class_type_id);
-  const center = centersById.get(selectedBlock.center_id);
-  const returnPath = getCoverageBlockHref({
-    basePath,
-    blockId: selectedBlock.id,
-  });
-
-  if (!coverage) {
-    throw new Error("Missing coverage state for coverage block.");
-  }
-
-  return (
-    <aside className="fixed inset-0 z-50">
-      <Link
-        aria-label="Cerrar detalle"
-        className="absolute inset-0 z-0 block cursor-default bg-foreground/20 backdrop-blur-sm"
-        href={basePath}
-        scroll={false}
-      />
-      <div className="relative z-10 ml-auto flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-background shadow-xl ring-1 ring-border">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-background/95 px-4 py-4 backdrop-blur">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={getTone(coverage.state)}>
-                {getScheduleCoverageStateLabel(coverage.state)}{" "}
-                {coverage.validAssignmentCount}/{coverage.requiredCoaches}
-              </StatusBadge>
-              {selectedBlock.is_template_exception ? (
-                <Badge variant="outline">Cambiado</Badge>
-              ) : null}
-            </div>
-            <h2 className="truncate text-lg font-semibold tracking-tight">
-              {classType?.name ?? "Actividad"}
-            </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {formatServiceDate(selectedBlock.service_date)} /{" "}
-              {formatTime(selectedBlock.start_time)}-{formatTime(selectedBlock.end_time)}
-            </p>
-          </div>
-          <Button asChild size="icon" variant="ghost">
-            <Link aria-label="Cerrar detalle" href={basePath} scroll={false}>
-              <X aria-hidden="true" />
-            </Link>
-          </Button>
-        </div>
-
-        <div className="space-y-4 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-          <div className="grid gap-3 rounded-lg border border-border bg-muted/25 p-4 text-sm sm:grid-cols-2">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">
-                Centro
-              </p>
-              <p className="mt-1 truncate font-medium">
-                {center?.name ?? "Centro no disponible"}
-              </p>
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">
-                Cobertura
-              </p>
-              <p className="mt-1 font-medium">
-                {coverage.validAssignmentCount}/{coverage.requiredCoaches}{" "}
-                coaches
-              </p>
-            </div>
-          </div>
-
-          <CoverageAssignmentPanel
-            assignableCoaches={data.assignableCoaches}
-            assignments={assignmentsByBlockId.get(selectedBlock.id) ?? []}
-            block={selectedBlock}
-            canManageSchedule={canManageSchedule}
-            coachDisplaysById={data.coachDisplaysById}
-            coverage={coverage}
-            organizationId={organizationId}
-            returnPath={returnPath}
-            weekStart={weekStart}
-          />
-
-          <Button asChild variant="outline">
-            <Link
-              href={getScheduleBlockHref({
-                blockId: selectedBlock.id,
-                organizationId,
-                serviceDate: selectedBlock.service_date,
-                weekStart,
-              })}
-            >
-              Ver en horario
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
-        </div>
-      </div>
-    </aside>
-  );
 }
 
 function CoverageOverview({
@@ -914,7 +623,7 @@ function CoverageOverview({
   const summary = getSummary(riskItems);
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <StatCard
         description="Necesitan una decisión."
         icon={ShieldAlert}
@@ -923,7 +632,7 @@ function CoverageOverview({
         value={riskItems.length}
       />
       <StatCard
-        description="Sin coach asignado."
+        description="Sin entrenador asignado."
         icon={AlertTriangle}
         label="Sin cubrir"
         tone={summary.uncovered > 0 ? "critical" : "success"}
@@ -935,6 +644,13 @@ function CoverageOverview({
         label="Conflictos"
         tone={summary.conflict > 0 ? "critical" : "success"}
         value={summary.conflict}
+      />
+      <StatCard
+        description="Aprobada o en revision."
+        icon={AlertTriangle}
+        label="Impacto ausencia"
+        tone={summary.absenceImpact > 0 ? "warning" : "success"}
+        value={summary.absenceImpact}
       />
       <StatCard
         description="Bloques de la semana."
@@ -951,6 +667,7 @@ function ResolveNow({
   canManageSchedule,
   centersById,
   classTypesById,
+  coachOptions,
   organizationId,
   riskItems,
   weekStart,
@@ -959,14 +676,42 @@ function ResolveNow({
   canManageSchedule: boolean;
   centersById: Map<string, CenterRow>;
   classTypesById: Map<string, ClassTypeRow>;
+  coachOptions: CoachDisplay[];
   organizationId: string;
   riskItems: RiskItem[];
   weekStart: string;
 }) {
+  const bulkRiskItems = riskItems.map((item) => {
+    const classType = classTypesById.get(item.block.class_type_id);
+    const center = centersById.get(item.block.center_id);
+
+    return {
+      blockId: item.block.id,
+      center: center?.name ?? "Centro no disponible",
+      href: getCoverageBlockHref({
+        basePath,
+        blockId: item.block.id,
+      }),
+      meta: getRiskMeta(item.coverage),
+      status: getRiskStatus(item.coverage),
+      time: `${formatTime(item.block.start_time)} - ${formatTime(
+        item.block.end_time,
+      )}`,
+      title: `${formatServiceDate(item.block.service_date)} / ${
+        classType?.name ?? "Actividad"
+      }`,
+      tone: getCoverageTone(item.coverage),
+    } satisfies CoverageBulkRiskItem;
+  });
+
   return (
     <section className="space-y-3">
       <SectionHeader
-        description="Lo primero que debería revisar un rol operativo está arriba."
+        description={
+          canManageSchedule
+            ? "Selecciona varios riesgos si se pueden cubrir con el mismo entrenador."
+            : "Lo primero que debería revisar un rol operativo está arriba."
+        }
         title="Resolver ahora"
       />
 
@@ -980,36 +725,18 @@ function ResolveNow({
               </Link>
             </Button>
           }
-          description="No hay clases sin cubrir, insuficientes ni conflictos en esta semana."
+          description="No hay clases sin cubrir, insuficientes, conflictos ni impacto de ausencia en esta semana."
           title="Todo cubierto para esta semana"
         />
       ) : (
-        <div className="grid gap-3">
-          {riskItems.map((item) => {
-            const classType = classTypesById.get(item.block.class_type_id);
-            const center = centersById.get(item.block.center_id);
-
-            return (
-              <CoverageRiskCard
-                actionLabel={canManageSchedule ? "Resolver" : "Abrir"}
-                center={center?.name ?? "Centro no disponible"}
-                href={getCoverageBlockHref({
-                  basePath,
-                  blockId: item.block.id,
-                })}
-                scroll={false}
-                key={item.block.id}
-                meta={`${item.coverage.validAssignmentCount}/${item.coverage.requiredCoaches} coaches`}
-                status={getScheduleCoverageStateLabel(item.coverage.state)}
-                time={`${formatTime(item.block.start_time)} - ${formatTime(item.block.end_time)}`}
-                title={`${formatServiceDate(item.block.service_date)} / ${
-                  classType?.name ?? "Actividad"
-                }`}
-                tone={getTone(item.coverage.state)}
-              />
-            );
-          })}
-        </div>
+        <CoverageBulkResolveList
+          basePath={basePath}
+          canManageSchedule={canManageSchedule}
+          coachOptions={coachOptions}
+          items={bulkRiskItems}
+          organizationId={organizationId}
+          weekStart={weekStart}
+        />
       )}
     </section>
   );
@@ -1047,6 +774,9 @@ function AllClasses({
               const classType = classTypesById.get(block.class_type_id);
               const center = centersById.get(block.center_id);
               const state = coverage?.state ?? "inactive";
+              const absenceImpactLabel = coverage
+                ? getAbsenceImpactLabel(coverage)
+                : null;
 
               return (
                 <div
@@ -1061,9 +791,12 @@ function AllClasses({
                       <p className="truncate font-medium">
                         {classType?.name ?? "Actividad"}
                       </p>
-                      <StatusBadge tone={getTone(state)}>
+                      <StatusBadge tone={getCoverageTone(coverage)}>
                         {getScheduleCoverageStateLabel(state)}
                       </StatusBadge>
+                      {absenceImpactLabel ? (
+                        <Badge variant="outline">{absenceImpactLabel}</Badge>
+                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
                       {formatServiceDate(block.service_date)} /{" "}
@@ -1071,15 +804,15 @@ function AllClasses({
                     </p>
                   </div>
                   <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
-                    <Link
+                    <RouteStateButton
+                      data-operational-detail-trigger="coverage-block"
                       href={getCoverageBlockHref({
                         basePath,
                         blockId: block.id,
                       })}
-                      scroll={false}
                     >
                       Abrir
-                    </Link>
+                    </RouteStateButton>
                   </Button>
                 </div>
               );
@@ -1125,7 +858,11 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
 
   const week = resolveWeek(weekParam, resolution.organization.timezone);
   const currentWeek = resolveWeek(undefined, resolution.organization.timezone);
+  const canReviewAbsenceImpact = canManageAbsenceRequests(
+    resolution.membership.role,
+  );
   const data = await getCoverageData({
+    includeAbsenceImpacts: canReviewAbsenceImpact,
     organizationId: resolution.organization.id,
     weekEnd: week.weekEnd,
     weekStart: week.weekStart,
@@ -1184,7 +921,7 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
           </div>
         }
         badge="Cobertura"
-        description="Riesgos accionables de la semana: clases sin coach, cobertura insuficiente y conflictos."
+        description="Riesgos accionables de la semana: clases sin entrenador, cobertura insuficiente, conflictos e impacto de ausencia."
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -1258,6 +995,15 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         </Alert>
       ) : null}
 
+      {data.absenceImpactLoadError ? (
+        <Alert>
+          <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
+          <AlertDescription>
+            La cobertura se muestra sin cruzar ausencias aprobadas o en revision.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <CoverageOverview blockCount={data.blocks.length} riskItems={riskItems} />
 
       <ResolveNow
@@ -1265,6 +1011,7 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         canManageSchedule={canManageSchedule}
         centersById={centersById}
         classTypesById={classTypesById}
+        coachOptions={data.assignableCoaches}
         organizationId={resolution.organization.id}
         riskItems={riskItems}
         weekStart={week.weekStart}
@@ -1282,8 +1029,8 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
               No hay avisos adicionales
             </CardTitle>
             <CardDescription>
-              Ahora la prioridad sale del horario: clases sin coach, cobertura
-              insuficiente y conflictos.
+              Ahora la prioridad sale del horario y de ausencias aprobadas o en
+              revision, sin resolver cobertura automaticamente.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -1297,13 +1044,17 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
       />
 
       <CoverageBlockDetailPanels
+        assignableCoaches={data.assignableCoaches}
+        assignments={data.assignments}
         basePath={coverageBasePath}
+        blocks={data.blocks}
         canManageSchedule={canManageSchedule}
-        centersById={centersById}
-        classTypesById={classTypesById}
-        data={data}
+        centers={data.centers}
+        classTypes={data.classTypes}
+        coachDisplays={[...data.coachDisplaysById.values()]}
+        coverageByBlock={[...data.coverageByBlock.entries()]}
+        initialSelectedBlockId={selectedBlockId}
         organizationId={resolution.organization.id}
-        selectedBlockId={selectedBlockId}
         weekStart={week.weekStart}
       />
     </div>

@@ -18,7 +18,13 @@ const ACTIVE_ORGANIZATION_STATUSES = ["trialing", "active"] as const;
 
 export type ActiveOrganization = Pick<
   OrganizationRow,
-  "id" | "name" | "slug" | "status" | "theme_config" | "timezone"
+  | "id"
+  | "name"
+  | "slug"
+  | "status"
+  | "theme_config"
+  | "time_tracking_config"
+  | "timezone"
 >;
 
 export type ActiveMembership = Pick<
@@ -101,7 +107,7 @@ export async function getActiveMemberships(
 
   const { data: organizations, error: organizationsError } = await supabase
     .from("organizations")
-    .select("id, name, slug, status, timezone, theme_config")
+    .select("id, name, slug, status, timezone, theme_config, time_tracking_config")
     .in("id", organizationIds);
 
   if (organizationsError) {

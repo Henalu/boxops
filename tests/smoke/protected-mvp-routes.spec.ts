@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   adminCredentials,
@@ -17,6 +17,14 @@ const mvpRoutes = [
   {
     heading: /Mi cuenta/i,
     path: "/app/account",
+  },
+  {
+    heading: /Ausencias/i,
+    path: "/app/absences",
+  },
+  {
+    heading: /Mi fichaje/i,
+    path: "/app/time",
   },
   {
     heading: /Centros/i,
@@ -52,6 +60,13 @@ const mvpRoutes = [
   },
 ];
 
+const managementRoutes = [
+  {
+    heading: /Estad.sticas operativas/i,
+    path: "/app/stats",
+  },
+];
+
 test.describe("admin MVP 1 protected routes smoke", () => {
   test.setTimeout(120_000);
 
@@ -63,7 +78,7 @@ test.describe("admin MVP 1 protected routes smoke", () => {
   test("admin can reach core MVP 1 surfaces", async ({ page }) => {
     await loginAs(page, adminCredentials!);
 
-    for (const route of mvpRoutes) {
+    for (const route of [...mvpRoutes, ...managementRoutes]) {
       await openAndExpectHeading(
         page,
         buildProtectedPath(route.path),
@@ -102,6 +117,20 @@ test.describe("coach MVP 1 protected routes smoke", () => {
       /Horario/i,
     );
   });
+
+  test("coach cannot reach management stats data", async ({ page }) => {
+    await loginAs(page, coachCredentials!);
+
+    await page.goto(buildProtectedPath("/app/stats"), {
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(
+      page.getByRole("heading", { name: /Estad.sticas operativas/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/Sin permisos de gesti.n/i)).toBeVisible();
+    await expect(page.getByText(/Utilizaci.n de coaches/i)).toHaveCount(0);
+  });
 });
 
 test.describe("owner B.2 advanced role smoke", () => {
@@ -115,7 +144,7 @@ test.describe("owner B.2 advanced role smoke", () => {
   test("owner can reach MVP 1 and tenant settings surfaces", async ({ page }) => {
     await loginAs(page, ownerCredentials!);
 
-    for (const route of mvpRoutes) {
+    for (const route of [...mvpRoutes, ...managementRoutes]) {
       await openAndExpectHeading(
         page,
         buildProtectedPath(route.path),
@@ -136,7 +165,7 @@ test.describe("manager B.2 operational role smoke", () => {
   test("manager can reach operational MVP 1 surfaces", async ({ page }) => {
     await loginAs(page, managerCredentials!);
 
-    for (const route of mvpRoutes) {
+    for (const route of [...mvpRoutes, ...managementRoutes]) {
       await openAndExpectHeading(
         page,
         buildProtectedPath(route.path),
