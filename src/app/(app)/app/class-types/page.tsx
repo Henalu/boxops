@@ -19,6 +19,7 @@ import {
   SectionHeader,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -491,24 +492,26 @@ export default async function ClassTypesPage({
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Tipos de actividad"
       />
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>{successDescriptions[status]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={successDescriptions[status]}
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       {canManageClassTypes ? (

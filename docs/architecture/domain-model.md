@@ -289,6 +289,8 @@ Entidades cubiertas:
 - `schedule_block_assignments`
 - `schedule_templates`
 - `schedule_template_blocks`
+- `staff_work_windows`
+- `operational_events`
 
 Reglas:
 
@@ -296,9 +298,10 @@ Reglas:
 - La RPC valida que la entidad objetivo exista dentro del tenant antes de insertar el evento.
 - `changed_fields` es JSON pequeno y minimizado; bloquea claves/valores de contenido, URLs, rutas, tokens, secretos, IP/fingerprint, ubicacion cruda, documentos, firmas y datos RRHH/payroll. S.1.1 comprueba tambien valores con URL, IP, document/payroll/salary/geolocation y payloads largos.
 - Las notas operativas y nombres libres se registran solo como campo tocado, no como texto completo.
-- Retencion S.1: accesos/equipo 30 dias; horario, asignaciones y plantillas 15 dias.
+- Retencion S.1/I.18: accesos/equipo 30 dias; horario, asignaciones, plantillas y jornada prevista 15 dias; eventos operativos 180 dias.
 - RLS permite lectura solo a `owner`/`admin` del tenant y solo mientras `retain_until > now()`.
 - `manager` no lee esta auditoria en S.1 porque la tabla mezcla eventos operativos con accesos/equipo.
+- I.25 anade `list_coverage_trace_audit_events(...)` como lectura read-only filtrada para `owner`, `admin` y `manager`, solo sobre `schedule_blocks`, `schedule_block_assignments` y `schedule_template_blocks`, acotada por bloque y por `retain_until`.
 - Los cambios hechos directamente en Supabase Studio/Auth no quedan cubiertos por esta auditoria de aplicacion salvo proceso especifico futuro.
 - `purge_expired_operational_audit_events(batch_size)` borra eventos con `retain_until < now()` en lotes acotados. No se concede a roles normales de app ni se expone desde UI; debe programarse mediante job de base de datos antes de produccion.
 - La verificacion local `supabase/snippets/operational-audit-rls-verification.sql` cubre owner/admin, manager, coach, staff, otro tenant, intento de entidad ajena, actor forzado y `changed_fields` inseguros dentro de una transaccion con rollback.
@@ -598,6 +601,12 @@ Estados candidatos:
 - `cancelled`
 - `completed`
 
+Decision I.17 2026-05-15:
+
+- `schedule_blocks` sigue siendo el horario real canonico. Un evento, festivo o competicion puede explicar contexto operativo, pero no se convierte automaticamente en bloque ni cancela bloques existentes.
+- Si un evento requiere staffing real, el bloque operativo debe crearse de forma explicita y trazable en `schedule_blocks` en una fase futura.
+- `operational_events` no debe modificar `required_coaches`, `status` ni asignaciones como efecto automatico.
+
 ### `schedule_block_assignments`
 
 Asignacion de coach a bloque.
@@ -628,6 +637,41 @@ Decision implementada en Task 010:
 - `assignment_status = 'assigned'` es el unico estado que cuenta para cobertura.
 - `pending`, `declined` y `removed` pueden mostrarse como metadata, pero no cubren el bloque.
 
+### `staff_work_windows`
+
+Planificacion de presencia prevista del personal. Es una capa operativa adicional para entender quien deberia estar disponible en una franja, sin convertirlo en bloque, asignacion real ni fichaje.
+
+Campos implementados:
+
+- `id`
+- `organization_id`
+- `person_profile_id`
+- `center_id` opcional
+- `day_of_week`
+- `start_time`
+- `end_time`
+- `valid_from`
+- `valid_until` opcional
+- `status`
+- `notes`
+- `created_at`
+- `updated_at`
+
+Decision implementada 2026-05-15:
+
+- Vive en `staff_work_windows`, tenant-scoped desde la primera migracion.
+- `organization_id` es obligatorio y las FKs a `person_profiles` y `centers` son tenant-safe.
+- `day_of_week` usa 1-7, `start_time < end_time` y este corte no abre turnos que cruzan medianoche.
+- No genera ocurrencias semanales persistidas: la app expande las franjas al vuelo para la semana visible.
+- Varias personas pueden coincidir en la misma franja y una persona puede tener varias franjas semanales; esos solapes no son conflicto.
+- `/app/schedule` lo muestra como resumen compacto, microcopy neutral por celda y contexto en detalle de bloque.
+- El contexto de "asignado fuera de jornada prevista" es aviso suave, no bloqueo de creacion de bloques ni de asignacion de coaches.
+- Todos los miembros activos del tenant ven franjas activas como contexto compartido del dia.
+- `owner`, `admin` y `manager` gestionan todas las franjas del tenant y pueden revisar tambien inactivas.
+- `staff`, `center_manager`, `document_admin` y `payroll_manager` no reciben permisos de gestion por herencia.
+- Las notas son cortas y no sensibles. No guardar salario, contrato, payroll, saldos legales, bajas, salud, ubicacion, documentos ni datos bancarios.
+- No toca `schedule_blocks`, `schedule_block_assignments`, plantillas, fichaje real ni cobertura como restriccion dura.
+
 ## Cobertura Y Cambios
 
 ### `coverage_issues`
@@ -643,7 +687,7 @@ Tipos:
 - `certification_missing`
 - `absence_conflict`
 
-Decision I.9/I.10 2026-05-14: `absence_conflict` queda reservado para impacto derivado de ausencias aprobadas o en revision sobre asignaciones activas. No implica que `coverage_issues` exista como tabla ni que una ausencia modifique automaticamente el horario. I.10 ya permite calcular impacto al vuelo con `list_absence_schedule_impacts(...)`, partiendo de `schedule_blocks` + `schedule_block_assignments` y periodos de ausencia tenant-scoped.
+Decision I.9/I.10/I.16/I.25: `absence_conflict` queda reservado para impacto derivado de ausencias aprobadas o en revision sobre asignaciones activas. No implica que `coverage_issues` exista como tabla ni que una ausencia modifique automaticamente el horario. I.10 ya permite calcular impacto al vuelo con `list_absence_schedule_impacts(...)`, partiendo de `schedule_blocks` + `schedule_block_assignments` y periodos de ausencia tenant-scoped. I.25 anade trazabilidad de lectura para explicar el riesgo, pero no persiste incidencias ni resuelve cobertura.
 
 ### `change_requests`
 
@@ -856,13 +900,19 @@ Implementado en I.3:
 - Los fallos esperados de aplicacion registran `application_failed` con `failure_code`/`failure_stage` minimizados, sin notas largas ni payload completo.
 - La aplicacion real tambien registra en `operational_audit_events` eventos minimizados sobre las dos asignaciones afectadas: destino `assigned` y origen `removed`.
 
+Lectura de cobertura I.25:
+
+- `change_requests` y `change_request_events` pueden explicar por que un bloque tuvo solicitud, oferta, aprobacion o aplicacion, pero siguen sin ser horario canonico.
+- `src/lib/coverage-traceability.ts` lee solo campos minimizados de cambios y eventos para paneles de detalle; no lee ni expone `reason_summary`.
+- La trazabilidad visible por bloque combina cambios, auditoria operativa filtrada e impacto derivado de ausencias. No crea `coverage_issues` ni modifica asignaciones.
+
 ## Ausencias, Eventos Y Horas
 
 ### `absence_requests`
 
 Vacaciones, dias libres, permisos minimizados y cambios de disponibilidad.
 
-I.9 documenta el primer modelo seguro sin crear migracion. I.10 implementa la foundation interna en `supabase/migrations/00035_absence_requests_foundation.sql`, sin UI visible ni datos reales. I.11 anade `src/lib/absence-requests.ts` como capa interna server-side para consumir esa foundation. I.12 abre `/app/absences` como primera bandeja visible protegida, I.13 anade creacion minima de solicitud propia, I.14 endurece la superficie visible sin cambiar schema/RLS/RPC, I.15 anade QA tecnico de regresion sin cambiar campos ni visibilidad e I.16 integra impacto derivado en lectura de cobertura. Sigue sin haber calendario ni creacion para otra persona. Una ausencia/no disponibilidad es un workflow laboral-operativo propio; no es lo mismo que una solicitud de cobertura a otro coach. Puede generar impacto de cobertura, pero la cobertura se resuelve por ajuste de asignacion o por `change_requests`.
+I.9 documenta el primer modelo seguro sin crear migracion. I.10 implementa la foundation interna en `supabase/migrations/00035_absence_requests_foundation.sql`, sin UI visible ni datos reales. I.11 anade `src/lib/absence-requests.ts` como capa interna server-side para consumir esa foundation. I.12 abre `/app/absences` como primera bandeja visible protegida, I.13 anade creacion minima de solicitud propia, I.14 endurece la superficie visible sin cambiar schema/RLS/RPC, I.15 anade QA tecnico de regresion sin cambiar campos ni visibilidad, I.16 integra impacto derivado en lectura de cobertura e I.25 muestra trazabilidad operativa reciente del impacto en detalle de horario/cobertura. Sigue sin haber calendario ni creacion para otra persona. Una ausencia/no disponibilidad es un workflow laboral-operativo propio; no es lo mismo que una solicitud de cobertura a otro coach. Puede generar impacto de cobertura, pero la cobertura se resuelve por ajuste de asignacion o por `change_requests`.
 
 Campos implementados en I.10:
 
@@ -944,6 +994,13 @@ Integracion de cobertura I.16:
 - Si falla la carga del impacto, las pantallas conservan la cobertura base y muestran aviso.
 - I.16 no modifica `schedule_blocks`, `schedule_block_assignments`, plantillas ni `absence_requests`, no crea targets/ofertas y no resuelve cobertura automaticamente.
 
+Trazabilidad de cobertura I.25:
+
+- `/app/schedule` y `/app/coverage` muestran una seccion por bloque para roles `owner`, `admin` y `manager`.
+- La seccion puede indicar ausencia aprobada/en revision, solicitud de cambio/cobertura y campos operativos minimizados tocados en bloque/asignacion/plantilla.
+- Inicio y `/app/stats` siguen siendo superficies agregadas: calculan riesgo con el mismo helper de cobertura y no muestran trazas por bloque.
+- No se persiste `absence_schedule_impacts`, no se muestran motivos sensibles y no se automatiza la resolucion.
+
 Tipos implementados en I.10:
 
 - `vacation`
@@ -1009,7 +1066,7 @@ Reglas candidatas:
 
 ### `absence_schedule_impacts`
 
-Relacion candidata entre una ausencia y los bloques/asignaciones afectados. I.10 decide no crear esta tabla e I.16 mantiene esa decision: el impacto se calcula al vuelo con `list_absence_schedule_impacts(...)` porque el primer corte solo necesita una lectura derivada desde periodos de ausencia, bloques y asignaciones `assigned`.
+Relacion candidata entre una ausencia y los bloques/asignaciones afectados. I.10 decide no crear esta tabla e I.16/I.25 mantienen esa decision: el impacto se calcula al vuelo con `list_absence_schedule_impacts(...)` porque el primer corte solo necesita una lectura derivada desde periodos de ausencia, bloques y asignaciones `assigned`.
 
 Puede persistirse en una fase futura si hace falta auditoria de resolucion, rendimiento, workflow de impacto o vinculacion formal con `change_requests`.
 
@@ -1082,33 +1139,218 @@ Reglas implementadas:
 - Retencion candidata I.10: solicitudes cerradas/aprobadas como historico operativo durante 24 meses y eventos visibles 180 dias, pendiente de revision legal/privacidad antes de produccion.
 - Borrado fisico/purga automatica queda fuera de I.10; cualquier job/control DB requiere decision legal/tecnica posterior.
 
-### `box_events`
+### `operational_events`
 
-Eventos internos/externos, competiciones, seminarios, open days y festivos especiales.
+Eventos internos/externos, competiciones, seminarios, open days, mantenimientos y festivos especiales como contexto operativo del box.
 
-### `event_responses`
+Estado I.19 2026-05-15: foundation tecnica minima implementada con `operational_events`, RLS, RPCs, helper server-side y auditoria minimizada en `operational_audit_events`. I.19 abre una superficie compacta en `/app/schedule` como contexto semanal/del dia, sin UI grande, calendario avanzado, seeds ni datos reales.
 
-Respuesta de coaches a eventos:
+Nota de naming: I.17 uso `box_events` como candidato documental. I.18 fija el nombre real `operational_events` para dejar claro que son contexto operativo, no horario canonico.
+
+Campos implementados:
+
+- `id`
+- `organization_id`
+- `center_id` opcional
+- `event_type`
+- `status`
+- `visibility`
+- `title`
+- `starts_at`
+- `ends_at`
+- `all_day`
+- `timezone`
+- `impact_level`
+- `notes`
+- `created_by_membership_id`
+- `updated_by_membership_id`
+- `created_at`
+- `updated_at`
+- `cancelled_at`
+- `archived_at`
+- `retain_until`
+
+Tipos implementados:
+
+- `holiday`
+- `closure`
+- `competition`
+- `seminar`
+- `open_day`
+- `internal_event`
+- `external_event`
+- `maintenance`
+- `community_event`
+
+Estados implementados en I.18:
+
+- `active`
+- `cancelled`
+- `archived`
+
+Los estados editoriales candidatos de I.17 (`draft`, `planned`, `confirmed`, `completed`) quedan futuros hasta que exista UI/workflow.
+
+Impactos implementados:
+
+- `context_only`
+- `schedule_review_needed`
+- `coverage_review_needed`
+- `staffing_needed`
+
+Reglas I.18/I.19:
+
+- Toda fila incluye `organization_id` obligatorio y FK tenant-safe opcional a `centers`.
+- `operational_events` es contexto operativo; no es `schedule_blocks`, no es `schedule_block_assignments`, no es ausencia, no es fichaje y no es payroll.
+- Un evento puede afectar a una fecha, centro o franja y pedir revision, pero no modifica automaticamente horario, plantilla, cobertura, ausencias ni solicitudes.
+- Los festivos no se hardcodean por tenant ni region dentro de `src`; si se implementan calendarios base, deben ser configuracion/datos tenant-safe.
+- Las notas son cortas y no sensibles. La DB y el helper rechazan salud, bajas, justificantes, documentos, salario, payroll, datos familiares, sanciones, ubicacion, URLs, tokens, IP/fingerprint y datos bancarios.
+- `owner`, `admin` y `manager` gestionan por RPC/helper server-side; `coach` lee solo eventos `active` con visibilidad `staff` o `all_staff`; `center_manager`, `document_admin`, `payroll_manager` y `staff` no reciben permiso nuevo.
+- `/app/schedule` consume `listOperationalEvents(...)` para mostrar contexto y las Server Actions de I.19 delegan en los RPC/helper de I.18; no escriben `schedule_blocks` ni `schedule_block_assignments`.
+- Retencion candidata: eventos operativos 24 meses tras finalizar o archivarse, pendiente de decision legal/privacidad antes de datos reales.
+- Las escrituras directas quedan revocadas para `authenticated`; `create_operational_event`, `update_operational_event` y `set_operational_event_status` revalidan sesion, membership, tenant, rol, centro, fechas, timezone, visibilidad, impacto y notas.
+
+### `box_event_occurrences`
+
+Ventanas concretas de un evento cuando no basta una cabecera con inicio/fin.
+
+Uso candidato:
+
+- eventos multi-dia con horarios distintos;
+- festivos de dia completo;
+- eventos que afectan a varios centros con ventanas diferentes;
+- competiciones con bloques de dia, montaje, apertura o cierre separados.
+
+Reglas candidatas:
+
+- `organization_id` obligatorio;
+- FK tenant-safe a `operational_events`;
+- `center_id` opcional pero tenant-safe;
+- `all_day`, `starts_at`, `ends_at` y `timezone` cerrados por validacion servidor/RLS;
+- no crea ocurrencias de horario ni `schedule_blocks`.
+
+### `box_event_schedule_contexts`
+
+Relacion futura opcional entre eventos y bloques afectados, solo como contexto o revision.
+
+Reglas candidatas:
+
+- Puede apuntar a `schedule_blocks` del mismo tenant cuando un evento afecta a un bloque real.
+- No sustituye cobertura ni solicitudes: una fila de contexto no asigna coaches, no descuenta cobertura y no cancela el bloque.
+- El impacto sobre cobertura debe mostrarse como `event_context`, `holiday_context` o `coverage_review_needed`, no como restriccion dura.
+- Persistir esta relacion solo se justifica si hace falta auditoria, rendimiento o workflow de revision; mientras sea derivable, preferir calculo al vuelo.
+
+### `box_event_responses`
+
+Respuesta futura de coaches/personas a eventos, asistencia o disponibilidad operativa.
+
+Estados candidatos:
 
 - `interested`
 - `attending`
 - `maybe`
 - `unavailable`
 - `wants_to_work`
+- `declined`
 
-### `overtime_entries`
+Reglas candidatas:
 
-Tracking interno de horas extra, no nomina.
+- Acciones propias derivadas desde `auth.uid()` + `organization_id`; no aceptar `person_profile_id` desde cliente.
+- Una respuesta `unavailable` no es una ausencia aprobada y no debe modificar cobertura por si sola.
+- `wants_to_work` en festivo o evento no aprueba horas extra, payroll ni voluntariado legal definitivo.
+- Las respuestas son datos personales operativos y necesitan RLS, retencion y lectura minima por rol.
 
-Estados:
+### `box_event_audit_events`
+
+Auditoria propia y minimizada para cambios de eventos/respuestas si una fase futura necesita una tabla dedicada.
+
+Estado I.18: los cambios de `operational_events` se registran en `operational_audit_events` con `entity_type = operational_events`, acciones cerradas, actor derivado y `changed_fields` minimizado. No se crea una tabla dedicada `box_event_audit_events`.
+
+Eventos candidatos:
+
+- `event_created`
+- `event_updated`
+- `event_confirmed`
+- `event_cancelled`
+- `event_completed`
+- `event_archived`
+- `event_response_recorded`
+- `schedule_context_added`
+- `schedule_context_removed`
+
+Reglas candidatas:
+
+- actor derivado desde sesion/membership/persona;
+- `changed_fields` minimizado, sin payload completo ni texto libre sensible;
+- retencion candidata de 180 dias para auditoria/respuestas visibles, pendiente de revision legal/privacidad;
+- escritura directa bloqueada para usuarios normales si se implementa con RPCs.
+
+### `overtime_candidates`
+
+Modelo I.20-I.24 para posibles horas extra como contexto operativo revisable, no como nomina, compensacion, saldo legal ni aprobacion laboral definitiva. I.21 implementa la base tecnica minima en `supabase/migrations/00039_overtime_candidates_foundation.sql`, ajusta retencion con `00040_overtime_candidates_retention_guard.sql` y anade la capa interna `src/lib/overtime-candidates.ts`. I.22 anade verificacion SQL/RLS con rollback y smoke endurecido. I.23 abre una primera superficie visible minima en `/app/time` para revision operativa por `owner`, `admin` y `manager`. I.24 anade deteccion server-side prudente y manual desde contexto existente, sin calculo definitivo, automatismo legal ni payroll.
+
+Nota de naming: `overtime_entries` queda como nombre historico demasiado definitivo. El nombre implementado es `overtime_candidates`, porque la entidad representa una senal pendiente de revision, no una hora extra aprobada.
+
+Definicion I.20-I.24:
+
+- Una hora extra en BoxOps, por ahora, es solo un candidato operativo de exceso o diferencia positiva que requiere revision humana.
+- No nace automaticamente por fichar mas que lo planificado, aceptar una cobertura, trabajar un evento/festivo, tener una franja de jornada prevista o aprobar una semana de fichaje.
+- No genera payroll, nomina, importe, compensacion, saldo legal, cierre mensual legal ni cumplimiento laboral definitivo.
+
+Entidades implementadas en I.21:
+
+- `overtime_candidates`: cabecera tenant-scoped con `organization_id`, `person_profile_id`, `period_start_date`, `period_end_date`, `timezone`, `detection_source`, `planned_minutes_snapshot`, `worked_minutes_snapshot`, `candidate_minutes` generado, `status`, membership creadora/revisora y timestamps/retencion.
+- `overtime_candidate_sources`: fuentes minimizadas que explican el candidato mediante `source_type` + `source_id`, validando pertenencia al tenant y, si procede, a la persona afectada. Soporta `time_records`, `time_punches` activos, `time_weekly_approvals`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, `absence_requests`/periodos, `operational_events` y `manual_context`.
+- `overtime_candidate_events`: auditoria minimizada de deteccion, fuente anadida, inicio de revision, cambio de estado, validacion operativa, rechazo, cierre y supersesion.
+- `overtime_candidate_exports`: exporte interno revisable futuro si hiciera falta; no es exporte legal definitivo ni payroll.
+- `src/lib/overtime-candidate-detection.ts`: detector server-side I.24 que calcula snapshots desde contexto existente, crea candidatos solo con diferencia positiva clara, registra fuentes trazadas y usa `needs_review` ante fichajes abiertos, correcciones pendientes/aprobadas, semanas reabiertas o datos incompletos. No muta tablas de fichaje, horario, asignaciones, jornada prevista, ausencias ni eventos.
+
+Estados candidatos:
 
 - `detected`
-- `pending_validation`
-- `validated`
-- `compensated`
-- `paid`
-- `rejected`
+- `needs_review`
+- `under_review`
+- `operationally_validated`
+- `operationally_rejected`
+- `superseded`
 - `closed`
+
+Relaciones con modelos existentes:
+
+- `time_records`: fuente de jornada diaria y estado de registro; el candidato solo referencia snapshot/minutos, no edita registros.
+- `time_punches`: solo punches activos y pares entrada/salida cerrados pueden alimentar minutos trabajados; punches `superseded`, `voided` u abiertos no cierran horas extra.
+- `time_weekly_approvals`: puede congelar contexto para revision, pero una semana `approved` no aprueba horas extra.
+- `schedule_blocks`: planificacion operativa de bloques reales; no es contrato ni payroll.
+- `schedule_block_assignments`: asignaciones `assigned` definen planificacion por coach; aceptar o aplicar una cobertura no aprueba horas extra.
+- `staff_work_windows`: presencia prevista compartida; no es jornada legal ni saldo.
+- Ausencias: una ausencia aprobada o en revision puede explicar una diferencia, sin exponer motivos sensibles ni generar horas extra por si sola.
+- `operational_events`: eventos/festivos/competiciones son contexto; no equivalen a voluntariado legal ni hora extra aprobada.
+
+Permisos candidatos:
+
+- Persona afectada: lectura propia minimizada del candidato y su estado mediante RLS; I.23/I.24 no abren cola tenant-wide ni acciones visibles para `coach`.
+- `owner`, `admin` y `manager`: revision operativa del tenant mediante RPC/helper internos y primera cola visible minima en `/app/time`.
+- `payroll_manager`: no hereda acceso ni aprobacion en I.20-I.24; cualquier aprobacion payroll/legal futura requiere capacidad separada y revision legal.
+- `center_manager`, `document_admin` y `staff`: sin permisos por herencia.
+
+Auditoria y privacidad:
+
+- `organization_id` obligatorio desde la migracion I.21.
+- Las mutaciones pasan por RPCs acotadas: `create_overtime_candidate_signal(...)`, `add_overtime_candidate_source(...)` y `set_overtime_candidate_status(...)`; la lectura filtrada usa `list_overtime_candidates(...)`.
+- El helper server-side valida sesion, membership, tenant, rol, persona, periodo, minutos, estado y fuente antes de delegar en RPC; no usa `service_role`.
+- I.23 lista candidatos desde `listOvertimeCandidates(...)` y cambia estados desde una Server Action minima que delega en `setOvertimeCandidateStatus(...)`; la UI/actions no escriben directamente en `overtime_candidates`, `overtime_candidate_sources` ni `overtime_candidate_events`.
+- I.24 dispara deteccion solo por accion manual protegida en `/app/time`, reutiliza `createOvertimeCandidateSignal(...)` y `addOvertimeCandidateSource(...)`, mantiene idempotencia por persona/rango/fuentes/snapshots y muestra solo creados, ya existentes e ignorados por datos insuficientes.
+- Escritura directa bloqueada para `authenticated`; RLS actua como segundo candado de lectura.
+- I.22 verifica con `supabase/snippets/overtime-candidates-rls-verification.sql` que `owner`/`admin`/`manager` pueden operar, que `coach` y `payroll_manager` no revisan, que otro tenant no lee ni referencia, que las fuentes personales pertenecen a la persona afectada, que `closed`/`superseded` quedan no accionables y que `INSERT`/`UPDATE`/`DELETE` directos siguen bloqueados.
+- La verificacion I.22 captura snapshot de `schedule_blocks`, `schedule_block_assignments`, `time_records` y `time_punches` para confirmar que anadir fuentes o cambiar estados de candidatos no muta horario ni fichaje.
+- Auditoria con actor derivado, accion, resultado, estado anterior/nuevo, campos tocados, `created_at` y `retain_until`.
+- Retencion candidata: candidatos 24 meses y eventos 180 dias, pendiente de revision legal/privacidad antes de datos reales.
+- Datos prohibidos: salario, tarifa, importe, moneda, nomina, datos bancarios/fiscales, motivos sensibles de ausencias, salud, diagnosticos, documentos, ubicacion, coordenadas, IP/fingerprint, Wi-Fi/Bluetooth, signed URLs, rutas Storage, tokens, payloads completos, texto libre largo y reglas hardcodeadas de tenant/region.
+
+Futuro seguro:
+
+- definir calculo server-side prudente para planificado vs fichado, tratando fichajes abiertos/correcciones pendientes como `needs_review`;
+- abrir solo una superficie minima de alertas/revision si aporta decision operativa;
+- mantener payroll, importes, saldos legales, compensacion, cierre mensual legal y exporte legal definitivo fuera de la foundation.
 
 ## Fichaje
 
@@ -1621,7 +1863,7 @@ Reglas:
 
 ## Documentos Y Certificaciones
 
-E.1 queda documentada el 2026-05-08 como modelado seguro. E.2 implementa el primer schema minimo privado para metadata documental: `documents`, `document_versions`, `document_subjects` y `document_access_grants`. E.3 implementa Storage documental privado minimo con `document-files`, RPCs de version y policies de Storage. E.4 implementa auditoria documental minima con `document_access_events`, RLS estricta y RPCs de registro/consulta. E.5 implementa rutas backend controladas para preview/descarga de versiones privadas con signed URLs cortas y auditoria. No crea UI, documentos firmables, boton "Firmar", snapshots reales, pagina documental ni subida desde app.
+E.1 queda documentada el 2026-05-08 como modelado seguro. E.2 implementa el primer schema minimo privado para metadata documental: `documents`, `document_versions`, `document_subjects` y `document_access_grants`. E.3 implementa Storage documental privado minimo con `document-files`, RPCs de version y policies de Storage. E.4 implementa auditoria documental minima con `document_access_events`, RLS estricta y RPCs de registro/consulta. E.5 implementa rutas backend controladas para preview/descarga de versiones privadas con signed URLs cortas y auditoria. E.6/I.27 documenta programacion util asociada a documentos y horario como base previa a cualquier IA. E.7/I.28 implementa `document_programming_links` como tabla puente tecnica para fecha/rango y contexto de horario, con RLS/RPC/helper. E.8/I.29 muestra una consulta minima autorizada desde detalle de bloque en `/app/schedule`. E.9/I.30 anade QA interno no visible con rollback para validar permisos, denegaciones, cross-tenant y que asignaciones no conceden permisos documentales. E.10/I.31 anade runbook operativo interno local/QA para validar manualmente esa programacion documental autorizada. No crea documentos firmables, boton "Firmar", snapshots reales, pagina documental completa, subida desde app ni IA.
 
 Principios E.1:
 
@@ -1668,7 +1910,7 @@ Valores candidatos de `document_scope`:
 - `person_private`: documento particular de una o varias personas, visible para esas personas y roles/capacidades autorizadas.
 - `management_private`: documento de gestion/admin; no visible por defecto para todo `admin`.
 - `certification`: documento asociado a certificacion, curso o titulacion.
-- `programming`: documento/enlace de programacion asociado a fecha, tipo de clase o bloque.
+- `programming`: documento/enlace de programacion asociado a fecha, tipo de clase, centro opcional o bloque; la version canonica vive en `document_versions` y la visibilidad depende de grants/capacidades.
 
 Valores candidatos de `sensitivity_level`:
 
@@ -1678,7 +1920,7 @@ Valores candidatos de `sensitivity_level`:
 - `payroll`: nomina, retribucion, dato bancario o documento salarial.
 - `signature_evidence`: documento o snapshot firmado con acceso restringido.
 
-Asociaciones candidatas:
+Asociaciones:
 
 - organizacion
 - centro
@@ -1757,6 +1999,7 @@ Reglas candidatas:
 - Los documentos privados de persona deben tener al menos un sujeto persona cuando afecten a alguien concreto.
 - Que una persona sea sujeto del documento no concede acceso a terceros.
 - Los sujetos deben pertenecer al mismo `organization_id`.
+- Para programacion, los sujetos iniciales preferentes siguen siendo `class_type`, `center` y `schedule_block` cuando se trata de sujeto/contexto simple. E.7/I.28 anade `document_programming_links` para fecha/rango sin bloque y combinaciones por tipo/centro/bloque. E.8/I.29 consume esa asociacion desde Horario sin convertirla en permiso ni copiar contenido.
 
 ### `document_access_grants`
 
@@ -1797,6 +2040,7 @@ Reglas candidatas:
 - Los grants sobre versiones especificas pueden ser utiles si una version nueva requiere nueva aprobacion o firma.
 - En E.2 la lectura se permite por sujeto persona propio o por grant explicito; `manager` no obtiene lectura documental global.
 - En E.2 la gestion queda acotada: `owner`/`admin` solo para documentos no sensibles de empresa/programacion/certificacion, `document_admin` para documentos privados/gestion/sensitive HR no payroll y `payroll_manager` para `payroll`.
+- Para programacion, una asignacion en `schedule_block_assignments` no crea permiso documental. Si el coach asignado debe ver programacion, debe existir grant, capacidad o sujeto/documento que lo autorice dentro del tenant.
 
 ### `document_access_events`
 
@@ -2010,9 +2254,95 @@ Reglas candidatas:
 - El adjunto/documento no debe ser visible por defecto para todo rol operativo.
 - Una persona podria proponer/subir una certificacion propia si se decide; la verificacion queda para capacidad especifica.
 
-### `programming_documents`
+### `document_programming_links`
 
-Documentos de programacion asociados a fecha, tipo de clase o bloque.
+Implementado en E.7/I.28 en `supabase/migrations/00042_document_programming_schedule_links.sql`.
+
+Documentos de programacion asociados a fecha/rango, tipo de actividad, centro opcional o bloque. E.7/I.28 decide que `document_subjects` sigue siendo valido para sujetos/contexto simple, pero no basta para consultar programacion por fecha/rango + tipo/centro/bloque sin esconder semantica en texto libre. E.8/I.29 consume esa foundation desde el detalle de bloque como superficie minima de consulta, no como modulo documental completo. E.9/I.30 anade verificacion local/QA reejecutable en `supabase/snippets/document-programming-schedule-qa-verification.sql`, con rollback y datos internos. E.10/I.31 anade `docs/operations/document-programming-manual-validation-runbook.md` para repetir la validacion manual con datos locales/QA controlados.
+
+Fuentes canonicas:
+
+- `documents` con `document_scope = programming` es la cabecera canonica del contenido.
+- `document_versions` es la version canonica: una UI futura debe resolver `current_version_id` o enlazar a una version concreta.
+- `document_subjects` asocia la programacion a `class_type`, `center` o `schedule_block` cuando aplique como sujeto/contexto simple.
+- `document_programming_links` asocia una version concreta a rango de fechas y contexto opcional de horario para consultas de programacion.
+- `document_access_grants` concede metadata, preview, descarga o gestion; puede ser por persona, membership, rol o capacidad.
+- `document_access_events` audita preview/descarga y, si se decide, metadata listada de programacion sensible.
+- `supabase/snippets/document-programming-schedule-qa-verification.sql` valida que los grants reales, no las asignaciones, determinan que aparece en Horario.
+- `docs/operations/document-programming-manual-validation-runbook.md` guia la seleccion de documento, version, grant, link y bloque para una validacion manual local/QA sin persistir cambios accidentales.
+
+Campos implementados:
+
+- `id`
+- `organization_id`
+- `document_id`
+- `document_version_id`
+- `starts_on`
+- `ends_on`
+- `class_type_id` opcional
+- `center_id` opcional
+- `schedule_block_id` opcional
+- `status` (`active`, `removed`)
+- `created_by_user_id`
+- `updated_by_user_id`
+- `created_at`
+- `updated_at`
+
+Asociaciones candidatas:
+
+- Fecha + tipo de actividad: E.7/I.28 lo representa con `document_programming_links.starts_on`, `ends_on` y `class_type_id`.
+- Centro opcional: E.7/I.28 lo representa con `center_id`, con unicidad parcial para no duplicar asociaciones activas equivalentes.
+- Bloque concreto: `document_subjects.subject_type = 'schedule_block'` apunta al bloque real del tenant.
+- Bloque concreto en programacion util: `document_programming_links.schedule_block_id` permite asociar una version a un bloque real y valida que la fecha del bloque quede dentro del rango.
+- Tipo de actividad: `document_subjects.subject_type = 'class_type'` apunta al catalogo del tenant.
+- Asignacion coach-bloque: `schedule_block_assignments` solo aporta contexto operativo de quien prepara o imparte; no es sujeto documental ni grant implicito.
+
+Reglas implementadas:
+
+- La relacion con fecha, centro, tipo de actividad, `schedule_blocks` o `schedule_block_assignments` debe ser tenant-safe y no convertir el horario en repositorio de contenido.
+- La lectura respeta grants/capacidades documentales mediante `can_access_document(...)` antes de metadata, preview o descarga.
+- Ver programacion desde un bloque se prepara con `list_document_programming_for_block(...)`, resolviendo documento/version autorizados y sin copiar contenido a `schedule_blocks`. E.8/I.29 lo muestra en `/app/schedule` con titulo/fuente, version/fecha, vigencia y acciones solo si `can_preview`/`can_download`.
+- Consultar por fecha/tipo se prepara con `list_document_programming_for_context(...)`, devolviendo solo links activos, documentos `active`/`archived`, versiones `active`/`archived` y permiso vigente.
+- Crear o retirar asociaciones pasa por RPCs `create_document_programming_link(...)` y `set_document_programming_link_status(...)`; no hay escritura directa de `authenticated`.
+- Los documentos de programacion no deben contener salud, disciplina, rendimiento laboral, ubicacion, payroll, nominas, sanciones, bajas ni motivos personales.
+- `schedule_blocks` y `schedule_block_assignments` solo aportan contexto operativo: cuando/donde/quien. No conceden por si solos acceso al contenido ni autorizan decisiones automaticas.
+- `programming_content_read` y `programming_content_manage` quedan como capacidades validas en grants, pero solo tienen efecto si existe una fila explicita de `document_access_grants`.
+- E.9/I.30 verifica con usuarios internos que un grant de descarga devuelve `can_preview`/`can_download`, un grant `read_metadata` devuelve solo metadata, un coach asignado sin grant recibe estado vacio, y otro tenant no lista ni enlaza contexto ajeno.
+- E.10/I.31 no anade entidades nuevas: documenta como preparar o seleccionar un caso local/QA y como confirmar en Horario los resultados esperados por permiso, con rollback o limpieza clara.
+
+### IA Futura Sobre Documentos Y Programacion
+
+I.26 no crea schema. E.6/I.27 documenta primero la base util de programacion/documentos asociada a horario, sin IA. Solo despues podria encajar una capacidad asistida futura si el producto ya tiene documentos/programacion utiles.
+
+Fuentes canonicas candidatas:
+
+- `documents` con `document_scope = programming` para cabecera, titulo, sensibilidad y estado.
+- `document_versions` para el contenido/version concreta que se puede consultar o resumir.
+- `document_subjects`, `document_programming_links` y `document_access_grants` para asociar documentos a personas, centros, tipos, fechas, bloques o capacidades sin mezclar permisos en la UI.
+- `document_access_events` o una auditoria equivalente futura para registrar accesos asistidos permitidos/denegados de forma minimizada.
+- `schedule_blocks` y `schedule_block_assignments` solo como contexto operativo de clase/bloque, no como fuente de verdad documental.
+
+Casos candidatos permitidos:
+
+- resumir programacion autorizada por fecha, bloque, tipo de actividad o documento;
+- responder preguntas sobre contenido autorizado por grants/capacidades;
+- ayudar internamente a preparar una clase con contexto de horario y fuente documental visible para ese usuario;
+- buscar o explicar contenido autorizado citando o enlazando la fuente documental cuando exista.
+
+Casos prohibidos:
+
+- decidir cobertura, asignaciones, swaps, aprobaciones de cambios, ausencias, fichaje, cierres semanales u horas extra;
+- leer documentos sin grant/capacidad, cruzar datos entre tenants o usar roles altos como comodin de acceso;
+- tratar payroll, nominas, importes, compensaciones, saldos o reglas legales definitivas;
+- inferir salud, disciplina, rendimiento laboral, ubicacion, sanciones o situacion personal;
+- entrenar, fine-tunear o evaluar modelos con datos privados del tenant sin decision explicita de producto, seguridad, privacidad y legal.
+
+Antes de cualquier migracion futura:
+
+- definir fuentes canonicas, permisos, grants, auditoria, retencion y politica de prompts/respuestas;
+- decidir si el acceso asistido reutiliza `document_access_events` o requiere evento especifico minimizado;
+- probar acceso denegado para otro tenant, rol sin permiso y documento sin grant;
+- mantener fuera embeddings, vector search, jobs, prompts runtime, SDKs y UI hasta una task tecnica explicita.
 
 ## Decisiones Pendientes De Schema
 
@@ -2020,9 +2350,10 @@ Documentos de programacion asociados a fecha, tipo de clase o bloque.
 - Para MVP 1, `coverage_issues` se calculara al vuelo; persistirlo queda pendiente si hace falta auditoria, notificaciones, rendimiento o workflow historico.
 - Si plantillas mensuales son entidad separada o variacion de `schedule_templates`.
 - E.2 implementa `document_subjects` y `document_access_grants` como primer corte; queda pendiente decidir si alguna relacion futura necesita tablas puente especificas por entidad.
+- E.6/I.27 bloquea cualquier tabla de IA hasta que programacion documental tenga uso real: fecha/tipo/centro/bloque modelados, permisos/grants probados, auditoria minimizada y politica de privacidad/legal definida.
 - Alcance legal exacto de firma documental: confirmacion interna, firma electronica simple o integracion futura con proveedor especializado.
 - La firma de perfil D.5 usa PNG privado; queda pendiente el formato final de snapshot de evidencia y, si procede, version firmada del documento.
-- Si eventos y festivos comparten tabla `box_events` con tipo.
+- I.18 decide que eventos, festivos y competiciones comparten `operational_events` con `event_type` cerrado.
 - Flujo completo de invitacion/registro por email para vincular `person_profiles.user_id` y, si procede, `coach_profiles.user_id` queda pendiente; el primer corte solo vincula cuentas Auth existentes por `user_id`.
 - Alcance final de permisos `manager` frente a `admin` para perfiles, horarios, asignaciones y aprobaciones.
 - Granularidad futura de fichaje despues de F.2: `time_records`/`time_punches` quedan como primer corte real; pausas, descansos, cierres por tramo o tablas adicionales quedan pendientes si el caso legal/producto lo exige.
@@ -2045,6 +2376,7 @@ Documentos de programacion asociados a fecha, tipo de clase o bloque.
 | Coach como capacidad operativa | `coach_profiles` puede depender de `person_profiles` pendiente de Auth o de `user_id` con membership existente. |
 | Vinculacion de ficha pendiente con Auth real | `/app/coaches` vincula `person_profiles` + `coach_profiles` a un `user_id` existente, crea/actualiza membership del tenant y no envia invitaciones por email. |
 | Asignaciones reales coach-bloque | `schedule_block_assignments` es la fuente canonica de quien cubre cada bloque real. |
+| Jornada prevista del personal | `staff_work_windows` planifica presencia prevista por persona, dia, hora y centro opcional; no crea bloques, asignaciones ni fichajes. |
 | Cobertura MVP 1 al vuelo | `covered`, `uncovered`, `insufficient` y `conflict` se calculan desde bloques, asignaciones, coaches, personas y memberships. |
 | Plantillas antes de calendario complejo | `schedule_templates` + `schedule_template_blocks` cubren el primer caso semanal/mensual. |
 | Plantillas semanales basicas | `/app/templates` crea plantillas weekly, bloques de plantilla y aplica patrones a semanas reales sin duplicar bloques. |
@@ -2472,11 +2804,11 @@ Documentos de programacion asociados a fecha, tipo de clase o bloque.
 
 | Decision | Implementacion |
 |---|---|
-| Filtros como estado de URL | `/app/schedule` conserva `organizationId`, `week`, `center_id`, `coach_profile_id`, `class_type_id`, `block_status`, `coverage_state` y `risks_only` en query string. |
+| Filtros como estado de URL | `/app/schedule` conserva `organizationId`, `week`, `center_id`, `coach_profile_id`, `class_type_id`, `coverage_state`, `risks_only` y `mine` en query string. El estado interno del bloque no se expone como filtro operativo. |
 | Sin migracion nueva | Los filtros usan `schedule_blocks`, `schedule_block_assignments`, `centers`, `class_types`, `coach_profiles` y la cobertura calculada existente. |
 | Validacion tenant-scoped | Los IDs de centro, coach y tipo recibidos por URL se aplican solo si pertenecen a la organizacion activa; si no, se ignoran. |
 | Coach asignado canonico | El filtro por coach se basa en `schedule_block_assignments.assignment_status = 'assigned'`, no en campos derivados ni en copy visible. |
-| Riesgos activos | `risks_only=1` filtra `uncovered`, `insufficient` y `conflict`; `cancelled` y `completed` quedan fuera al ser cobertura `inactive`, aunque siguen disponibles por `block_status`. |
+| Riesgos activos | `risks_only=1` filtra `uncovered`, `insufficient` y `conflict`; `cancelled` y `completed` quedan fuera al ser cobertura `inactive`. |
 | Permisos B.2 | `owner`, `admin` y `manager` usan los filtros con capacidad operativa; `coach` consulta en lectura. |
 
 ## Decisiones Implementadas En Task 012
@@ -2536,6 +2868,7 @@ Documentos de programacion asociados a fecha, tipo de clase o bloque.
 | Sin persistencia de incidencias | No se crea `coverage_issues`; la cola usa el calculo al vuelo de MVP 1. |
 | Cola accionable | Los riesgos se ordenan por `uncovered`, `conflict` e `insufficient`. |
 | Enlace al bloque real | Cada riesgo enlaza a `/app/schedule?...&block_id={id}` dentro de la semana y tenant activos. |
+| Edicion multiple de cobertura | `/app/coverage` permite editar en lote tipo de actividad, entrenadores necesarios o entrenador comun sobre bloques con riesgo; el entrenador comun se filtra contra solapes visibles y la DB conserva el guardrail final. |
 | Vistas de apoyo por centro | El dashboard crea atajos filtrados a `/app/schedule` conservando `organizationId` y `week`. |
 | Roles MVP | Tras B.2, `owner`, `admin` y `manager` ven dashboard operativo; `coach` conserva lectura segura y accesos a Mi horario/plantillas. |
 | Permisos B.2 | `manager` queda limitado a operativa MVP 1, sin configuracion global ni accesos. |

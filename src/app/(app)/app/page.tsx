@@ -26,6 +26,7 @@ import {
 } from "./actions";
 import { NextAssignedCountdown } from "@/components/features/next-assigned-countdown";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -548,11 +549,11 @@ function HomeActionFeedback({
 }) {
   if (status && homeSuccessMessages[status]) {
     return (
-      <Alert>
-        <CheckCircle2 aria-hidden="true" />
-        <AlertTitle>Acción completada</AlertTitle>
-        <AlertDescription>{homeSuccessMessages[status]}</AlertDescription>
-      </Alert>
+      <TransientFeedbackBanner
+        description={homeSuccessMessages[status]}
+        title="Accion completada"
+        tone="success"
+      />
     );
   }
 
@@ -561,23 +562,25 @@ function HomeActionFeedback({
   }
 
   return (
-    <Alert variant="destructive">
-      <AlertTriangle aria-hidden="true" />
-      <AlertTitle>No se ha completado la acción</AlertTitle>
-      <AlertDescription className="space-y-3">
-        <span>{homeErrorMessages[error]}</span>
-        {error === "signature_required" ? (
-          <span className="block">
-            <Button asChild size="sm" variant="secondary">
-              <Link href={getAccountPath({ organizationId })}>
-                Crear Mi firma
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </Button>
-          </span>
-        ) : null}
-      </AlertDescription>
-    </Alert>
+    <TransientFeedbackBanner
+      description={
+        <div className="space-y-3">
+          <span>{homeErrorMessages[error]}</span>
+          {error === "signature_required" ? (
+            <span className="block">
+              <Button asChild size="sm" variant="secondary">
+                <Link href={getAccountPath({ organizationId })}>
+                  Crear Mi firma
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+            </span>
+          ) : null}
+        </div>
+      }
+      title="No se ha completado la accion"
+      tone="error"
+    />
   );
 }
 

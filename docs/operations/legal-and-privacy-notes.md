@@ -21,9 +21,32 @@ Las plantillas semanales son patrones reutilizables para generar o aplicar horar
 - La retencion de horarios planificados debe decidirse separada de la retencion de plantillas. Como criterio funcional inicial, conservar el historico de horarios entre 2 y 4 anos y evitar limpiezas agresivas.
 - La obligacion clara de 4 anos aplica al fichaje/registro real de jornada; no asumir automaticamente ese mismo tratamiento legal para plantillas o planificacion previa.
 
+## Jornada Prevista Del Personal
+
+Estado 2026-05-15: `/app/schedule` incorpora `staff_work_windows` para planificar presencia prevista por persona, dia, hora y centro opcional. Es una ayuda operativa visual y de coordinacion, no fichaje real, no contrato laboral, no saldo legal, no payroll y no prueba definitiva de horas trabajadas.
+
+Principios:
+
+- Una franja de jornada prevista no crea `schedule_blocks` ni `schedule_block_assignments`.
+- Una franja de jornada prevista no registra presencia real ni sustituye `/app/time`.
+- Varias personas pueden coincidir en la misma franja y eso no es conflicto.
+- Una persona puede tener varias franjas semanales; la app las expande al vuelo para la semana visible y no guarda ocurrencias generadas.
+- Las franjas activas son contexto operativo compartido para miembros activos del tenant; solo `owner`, `admin` y `manager` gestionan y revisan franjas inactivas.
+- El aviso de asignacion fuera de jornada prevista es informativo y no bloquea crear bloques, asignar coaches ni resolver cobertura.
+- Las notas deben ser cortas y no sensibles. No guardar salario, contrato, nominas, saldos legales, bajas, diagnosticos, documentos, justificantes, ubicacion, URLs, tokens, IP/fingerprint ni datos bancarios.
+- Antes de usar estas franjas como base legal, contractual, payroll, horas extra o registro oficial de jornada hace falta una revision legal/laboral y un modulo especifico.
+
+No presentar BoxOps como:
+
+- sistema legal de control de jornada por tener jornada prevista;
+- calculadora de horas contratadas, saldos legales, horas extra o nomina;
+- prueba unica de presencia real;
+- sustituto del fichaje manual/auditable;
+- sistema de planificacion laboral completo con cumplimiento legal definitivo.
+
 ## Cambios De Turno/Clase Y Cobertura
 
-I.1 modela cambios de bloque/clase y cobertura entre coaches como workflow operativo sobre planificacion, no como modulo laboral completo.
+I.1-I.8 modelan cambios de bloque/clase y cobertura entre coaches como workflow operativo sobre planificacion, no como modulo laboral completo. I.25 anade trazabilidad operativa reciente de cobertura para explicar cambios sin convertirlos en decision legal, payroll ni automatismo.
 
 Principios:
 
@@ -31,6 +54,7 @@ Principios:
 - La aprobacion de `owner`, `admin` o `manager` es una aprobacion operativa de cobertura; no es firma documental, no es aprobacion legal de horas extra, no genera payroll y no garantiza cumplimiento laboral definitivo.
 - Aceptar cubrir un bloque puede afectar fichaje/horas planificadas, pero no debe convertirse automaticamente en hora extra validada ni nomina.
 - Las notas o motivos de solicitud deben minimizarse; evitar guardar informacion sensible de salud, permisos, bajas, sanciones, salario, documentos o datos familiares en un flujo de cobertura.
+- La trazabilidad I.25 puede mostrar tipo/estado de solicitud, eventos y campos operativos minimizados; no debe mostrar motivos sensibles ni `reason_summary`.
 - Si el motivo real es vacaciones, baja, permiso o ausencia laboral, debe pasar por el dominio propio de ausencias/permisos con permisos y revision legal propios, no forzarse dentro de `change_requests`.
 - El historial critico de solicitud, respuesta, aprobacion y aplicacion no debe borrarse silenciosamente; cancelaciones, rechazos y expiraciones son estados trazables.
 - Los cambios deben respetar `organization_id` y no mezclar datos entre tenants, centros o coaches de otros tenants.
@@ -45,7 +69,7 @@ No presentar BoxOps como:
 
 ## Ausencias, Vacaciones Y Permisos
 
-Estado I.16 2026-05-15: existe una base tecnica interna DB/RLS/RPC para solicitudes de ausencia en `absence_requests`, periodos en `absence_request_periods` y auditoria minimizada en `absence_request_events`, una capa server-side interna en `src/lib/absence-requests.ts`, una primera bandeja visible protegida en `/app/absences`, un formulario minimo para crear solicitud propia, hardening visible de filtros/validacion/estados no accionables, QA tecnico de regresion e impacto derivado de ausencias aprobadas o en revision sobre la lectura de cobertura. No hay creacion para otra persona, calendario de ausencias, saldos legales, devengo de vacaciones, baja medica con documentos, payroll, resolucion automatica de cobertura ni cumplimiento legal definitivo.
+Estado I.25 2026-05-16: existe una base tecnica interna DB/RLS/RPC para solicitudes de ausencia en `absence_requests`, periodos en `absence_request_periods` y auditoria minimizada en `absence_request_events`, una capa server-side interna en `src/lib/absence-requests.ts`, una primera bandeja visible protegida en `/app/absences`, un formulario minimo para crear solicitud propia, hardening visible de filtros/validacion/estados no accionables, QA tecnico de regresion, impacto derivado de ausencias aprobadas o en revision sobre la lectura de cobertura y trazabilidad operativa reciente de ese impacto en detalle de `/app/schedule` y `/app/coverage`. No hay creacion para otra persona, calendario de ausencias, saldos legales, devengo de vacaciones, baja medica con documentos, payroll, resolucion automatica de cobertura ni cumplimiento legal definitivo.
 
 Principios:
 
@@ -57,6 +81,7 @@ Principios:
 - I.14 anade filtros por query string, mensajes de no accionable, confirmacion de minimizacion del resumen, rechazo server-side de senales sensibles basicas y copy de aprobacion operativa. Los filtros no cambian permisos ni visibilidad real.
 - I.15 no cambia copy legal/privacidad visible ni permisos; anade smoke/guardrails para mantener esos limites tras I.14.
 - I.16 permite que `/app/schedule`, `/app/coverage`, Inicio y `/app/stats` digan "impacto de ausencia", "ausencia en revision" o "requiere revision de cobertura"; no deben hablar de cumplimiento legal ni mostrar motivos sensibles.
+- I.25 permite que el detalle de `/app/schedule` y `/app/coverage` explique la traza operativa reciente de ese riesgo; no persiste impactos, no muestra motivos sensibles y no resuelve cobertura automaticamente.
 - Crear una solicitud propia es una peticion operativa pendiente de revision, no una aprobacion legal, devengo de vacaciones, saldo legal ni baja medica documentada.
 - Los motivos deben mantenerse minimizados. No guardar diagnosticos, salud, justificantes, datos familiares, sanciones, salario, payroll, ubicacion, IP/fingerprint, URLs ni tokens.
 - Las bajas medicas con documentos, justificantes o anexos deben pasar por el modelo documental privado y una revision legal/privacidad especifica.
@@ -70,11 +95,34 @@ No presentar BoxOps como:
 - aprobacion automatica de horas extra o payroll por aprobar una ausencia;
 - sustituto de asesoria laboral o revision legal.
 
+## Eventos, Festivos Y Competiciones
+
+Estado I.19 2026-05-15: eventos, festivos y competiciones tienen foundation tecnica minima en `operational_events` y una superficie compacta en `/app/schedule` como contexto operativo del box. No existe UI grande, calendario avanzado, asistencia, voluntariado de festivo, datos reales ni cambios automaticos sobre horario o cobertura.
+
+Principios:
+
+- Un evento/festivo/competicion puede explicar contexto operativo, pero no es por si solo un bloque, una asignacion, una ausencia, un fichaje ni una hora extra aprobada.
+- Un festivo no cancela automaticamente `schedule_blocks` ni retira `schedule_block_assignments`.
+- Una competicion, seminario u open day puede requerir staffing real; si se decide cubrirlo, debe crearse un bloque operativo explicito y pasar por los mismos permisos y guardrails que el horario normal.
+- La respuesta futura de una persona (`unavailable`, `wants_to_work`, asistencia o interes) es dato personal operativo y no debe convertirse automaticamente en ausencia aprobada, voluntariado legal, payroll ni hora extra validada.
+- Los calendarios de festivos no deben hardcodearse en producto ni en `src`; cualquier regla regional o de tenant debe vivir como configuracion/dato tenant-safe.
+- Las notas deben ser cortas y no sensibles. La DB/helper rechaza salud, bajas, justificantes, documentos, salario, payroll, datos familiares, sanciones, ubicacion, URLs, tokens, IP/fingerprint y datos bancarios.
+- Retencion candidata: eventos 24 meses tras finalizar/archivar y auditoria de eventos 180 dias; respuestas personales siguen futuras, pendiente de revision legal/privacidad antes de datos reales.
+- `owner`, `admin` y `manager` gestionan eventos operativos desde controles colapsados; `coach` solo lee contexto compartido por visibilidad. `staff`, `center_manager`, `document_admin` y `payroll_manager` no reciben permiso nuevo en I.19.
+
+No presentar BoxOps como:
+
+- calendario laboral legal definitivo por modelar festivos;
+- sistema de voluntariado legal de festivo;
+- aprobador automatico de horas extra por marcar "quiero trabajarlo";
+- sistema de payroll o compensacion;
+- solucion de cumplimiento laboral completo para competiciones/eventos.
+
 ## Fichaje Manual
 
 El fichaje puede tener implicaciones laborales. El primer corte debe ser manual, auditable y corregible antes de automatizar ubicacion.
 
-Estado F.14/G.2 2026-05-13: ya existe schema/RPC/RLS, capa servidor y UI propia en `/app/time` para registrar entrada/salida manual, consultar registros por semana, corregir fichajes propios con motivo obligatorio, ver avisos operativos frente a bloques asignados, separar cambios de punches hacia un historial visible de 30 dias sin borrado fisico, generar fichajes automaticos web por planificacion, cerrar semanas mediante RPC/scheduler DB y descargar un CSV interno revisable para `owner`, `admin` y `manager`. Por defecto, la correccion propia se aplica directamente mediante RPC trazada; si `owner`, `admin` o `manager` activan aprobacion previa en `/app/settings`, vuelve el flujo de solicitud pendiente, revision por `owner`/`admin`/`manager` y aplicacion explicita. G.1/G.2 solo documentan el modelo y la decision tecnica/legal futura de ubicacion asistida. Sigue siendo un primer corte auditable sin geolocalizacion activa, payroll, aprobacion legal de horas extra, exporte legal definitivo ni promesa de cumplimiento legal definitivo.
+Estado F.15/G.2 2026-05-17: ya existe schema/RPC/RLS, capa servidor y UI propia en `/app/time` para registrar entrada/salida manual, consultar registros por semana, corregir fichajes propios con motivo obligatorio, ver avisos operativos frente a bloques asignados, separar cambios de punches hacia un historial visible de 30 dias sin borrado fisico, generar fichajes automaticos web por planificacion, cerrar semanas mediante RPC/scheduler DB y descargar un CSV interno revisable para `owner`, `admin` y `manager`. Por defecto, la correccion propia se aplica directamente mediante RPC trazada; si `owner`, `admin` o `manager` activan aprobacion previa en `/app/settings`, vuelve el flujo de solicitud pendiente, revision por `owner`/`admin`/`manager` y aplicacion explicita. F.15 documenta el checklist de readiness beta en `docs/operations/time-tracking-beta-readiness-runbook.md`. G.1/G.2 solo documentan el modelo y la decision tecnica/legal futura de ubicacion asistida. Sigue siendo un primer corte auditable sin geolocalizacion activa, payroll, aprobacion legal de horas extra, exporte legal definitivo ni promesa de cumplimiento legal definitivo.
 
 Principios:
 
@@ -146,6 +194,17 @@ Exporte interno F.14:
 - El contenido minimo incluye organizacion, persona, fecha local, estado de registro, entradas/salidas activas, minutos trabajados calculados por pares entrada/salida activos, estado de cierre semanal y resumenes/contadores de notas o correcciones.
 - No incluye snapshots completos de correcciones, texto libre de correcciones, ubicacion, mapas, IP, Wi-Fi, Bluetooth, rutas Storage ni documentos firmables.
 - El formato, detalle, retencion y acceso para trabajador, representantes legales o Inspeccion siguen pendientes de validacion legal antes de usar datos reales o prometer cumplimiento.
+
+Readiness beta F.15:
+
+- El cierre F.15 permite validar fichaje web en beta interna controlada, no vender cumplimiento legal definitivo.
+- La webapp actual no usa geolocalizacion y no debe pedir `navigator.geolocation`.
+- El fichaje automatico por planificacion no prueba presencia real; solo crea contexto corregible desde horario/asignaciones.
+- Jornada prevista (`staff_work_windows`) no es fichaje, contrato, payroll ni prueba definitiva de horas trabajadas.
+- Aprobar una semana con firma propia es confirmacion interna de cierre; no es firma electronica avanzada/cualificada.
+- Candidatos de posible exceso son senales de revision operativa; no son horas extra aprobadas, compensacion, saldo ni nomina.
+- El CSV actual es exporte interno revisable; no es exporte legal definitivo para representantes o Inspeccion hasta revision legal.
+- Cualquier promesa de cumplimiento laboral requiere revisar formato, retencion, acceso, evidencias, textos y responsabilidades con asesor legal/laboral.
 
 Notas Espana a validar:
 
@@ -263,34 +322,54 @@ Preguntas legales/privacidad antes de datos reales:
 
 ## Horas Extra
 
-BoxOps debe tratar las horas extra como tracking interno pendiente de validacion.
+Estado I.24 2026-05-16: horas extra tiene una foundation tecnica interna para candidatos operativos en `overtime_candidates`, `overtime_candidate_sources` y `overtime_candidate_events`, con RLS/RPC/helper server-side, verificacion SQL/RLS con rollback, smoke endurecido, primera cola visible minima en `/app/time` para `owner`, `admin` y `manager`, y deteccion server-side prudente/manual desde contexto existente. La cola permite revisar estados operativos de candidatos de posible exceso y la deteccion solo crea senales con diferencia positiva clara, pero no es calculo automatico definitivo, aprobacion real/legal, compensacion, payroll, saldo, importe ni exporte legal. BoxOps debe tratar cualquier exceso como candidato operativo pendiente de revision humana y validacion legal/laboral futura.
 
 No debe presentarse como:
 
 - generador de nominas;
 - calculadora fiscal;
-- sistema legal definitivo de payroll.
+- sistema legal definitivo de payroll;
+- aprobacion laboral de horas extra;
+- saldo de compensacion, descanso, importe o pago.
+
+Separacion obligatoria:
+
+- Horas planificadas: bloques y asignaciones (`schedule_blocks`, `schedule_block_assignments`) y presencia prevista (`staff_work_windows`) son contexto operativo. No son contrato laboral completo ni saldo legal.
+- Horas fichadas/trabajadas: registros y punches (`time_records`, `time_punches`) son la fuente de fichaje corregible/auditable. Punches abiertos, sustituidos o anulados no cierran una hora extra.
+- Diferencias/alertas: el exceso entre planificado y fichado puede ser "posible exceso" o `overtime_candidate`, nunca "hora extra aprobada".
+- Revision operativa: `owner`, `admin` o `manager` pueden revisar candidatos en `/app/time` para entender incidencias internas; cambiar el estado operativo no equivale a aprobacion laboral/legal.
+- Aprobacion legal/payroll: queda fuera y requiere modulo, permisos, retencion, exporte y asesoramiento propios.
 
 Estados recomendados:
 
 - `detected`
-- `pending_validation`
-- `validated`
-- `compensated`
-- `paid`
-- `rejected`
+- `needs_review`
+- `under_review`
+- `operationally_validated`
+- `operationally_rejected`
+- `superseded`
 - `closed`
 
 Reglas:
 
-- Separar horas planificadas, fichadas, corregidas y validadas.
-- Guardar auditoria de validaciones y rechazos.
-- Permitir exporte y revision humana.
-- Validar con asesor laboral como se comunican o usan horas extra reales.
+- No convertir automaticamente cierre semanal aprobado, cobertura aceptada, evento/festivo trabajado, ausencia, jornada prevista o fichaje con exceso en hora extra legal.
+- Separar planificacion, fichaje corregido, diferencias detectadas, revision operativa y aprobacion payroll futura.
+- Guardar auditoria minimizada de deteccion, fuente anadida, revision, rechazo, supersesion y cierre.
+- Usar `time_records`, `time_punches`, `time_weekly_approvals`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, ausencias y eventos solo como fuentes/contexto validados, sin mutarlos desde horas extra.
+- Mantener la revision I.21-I.24 como operativa: `operationally_validated` no equivale a aprobacion laboral/legal.
+- I.24 detecta candidatos solo como senal operacional: fichajes abiertos, correcciones pendientes/aprobadas, semanas reabiertas o datos incompletos deben quedar en `needs_review`, nunca en validacion automatica.
+- El boton `Detectar posibles excesos` no aprueba nada; solo registra candidatos/fuentes o informa que ya existian o que se ignoraron por datos insuficientes.
+- I.22 verifica que solo `owner`, `admin` y `manager` revisan, que `coach` y `payroll_manager` no heredan revision, que otro tenant no lee ni referencia, que las fuentes personales pertenecen a la persona afectada y que los candidatos cerrados no se modifican.
+- I.22 confirma tambien que las operaciones de candidatos no mutan `schedule_blocks`, `schedule_block_assignments`, `time_records` ni `time_punches`.
+- I.23 no abre cola tenant-wide ni acciones de revision para `coach`; `payroll_manager` sigue sin acceso por herencia de rol.
+- I.24 no introduce cron, scheduler, background job ni automatismo permanente.
+- Permitir solo exporte interno revisable de candidatos si se justifica; no exporte legal definitivo sin revision laboral.
+- No guardar salario, tarifa, importe, moneda, nomina, datos bancarios/fiscales, motivos sensibles de ausencias, documentos, ubicacion, IP/fingerprint, signed URLs, rutas Storage, tokens ni texto libre largo en candidatos.
+- Validar con asesor laboral como se comunican, conservan, exportan o usan horas extra reales antes de datos reales/produccion.
 
 ## Nominas Y Documentos Laborales
 
-Para MVP, documentos laborales son repositorio/subida/consulta con permisos estrictos. BoxOps no genera nominas.
+Para MVP, la consulta documental empieza como repositorio visible minimo con permisos estrictos. La subida, gestion completa, documentos laborales reales sensibles y validacion legal quedan separadas. BoxOps no genera nominas.
 
 Reglas:
 
@@ -304,6 +383,11 @@ Reglas:
 - Valorar confirmacion de lectura para documentos importantes.
 - Definir retencion y borrado antes de datos reales sensibles.
 - No asumir que `admin` puede ver toda nomina o contrato si se decide separar permisos.
+- E.11 permite listar solo documentos/versiones accesibles por grants/capacidades reales en `/app/documents`; no convierte la superficie en repositorio legal completo ni concede acceso global a `owner`, `admin` o `manager`.
+- Preview y descarga deben pasar por rutas backend E.5. La UI no debe construir, guardar ni presentar signed URLs o rutas Storage persistentes.
+- Excluir del primer repositorio visible documentos `sensitive_hr`, documentos que requieran firma, evidencias de firma y payroll/nominas.
+- E.12 exige validar esos limites con datos sinteticos/controlados, rollback y evidencia redacted antes de usar documentos reales o sensibles.
+- E.14 reintenta la validacion QA/staging real solo si hay acceso real, casos QA y archivo Storage controlado; E.15 actualiza el desbloqueo controlado con relectura de entorno redacted y E.16 deja handoff operativo para operador con acceso real. Si faltan project/ref, DB URL, credenciales/casos QA u objeto `document-files`, el estado correcto es bloqueo documentado sin inventar evidencia.
 
 Documentos sensibles candidatos:
 
@@ -329,9 +413,80 @@ Implicaciones tecnicas:
 - E.3 crea `document-files` como bucket privado minimo y exige rutas internas tipo `documents/{organization_id}/{document_id}/versions/{document_version_id}/{asset_id}.{ext}`; upload y lectura dependen de `document_versions` y grants/sujeto/capacidad. `document-signature-evidence` sigue futuro para snapshots/evidencias.
 - E.4 crea `document_access_events` como auditoria documental minima: registra actor, membership, documento/version, evento, resultado y metadata minimizada, sin guardar contenido documental, URLs publicas, signed URLs ni rutas Storage persistentes.
 - E.5 crea rutas backend controladas de preview/descarga para `document_versions` privadas: validan sesion, tenant, permisos y estado antes de generar signed URLs cortas, y registran auditoria de acceso o denegacion cuando aplica. No crea UI documental, subida desde app, documentos firmables ni snapshots.
+- E.11 crea el primer listado visible minimo en `/app/documents`, apoyado en `list_accessible_document_versions(...)`, grants/capacidades reales y acciones condicionadas por `can_preview`/`can_download`. Excluye `sensitive_hr`, documentos firmables, evidencias y payroll. E.12 prepara un snippet SQL con `BEGIN`/`ROLLBACK` y checklist QA/staging para grant de descarga, solo metadata, sin grant, cross-tenant, bloqueos sensibles y auditoria esperada. E.13 cierra evidencia local o bloqueo QA/staging mediante plantilla redacted, sin inventar resultados. E.14 reintenta validacion real con archivo `document-files` controlado y mantiene bloqueo si faltan project/ref, DB URL, credenciales/casos QA u objeto Storage seguro. E.15 confirma de nuevo el bloqueo con relectura de entorno sin secretos y SQL local rollback. E.16 deja handoff operativo redacted para ejecutar la validacion real solo con operador autorizado, casos controlados, archivo no sensible y evidencia segura fuera del repo. No crea subida visible, grants UI, audit UI, boton "Firmar", snapshots, IA ni cumplimiento legal documental definitivo.
 - Rutas internas candidatas pendientes de bucket: `signature-snapshots/{organization_id}/{document_id}/{request_id}/{evidence_id}.png` y `signed-documents/{organization_id}/{document_id}/{document_version_id}/{evidence_id}.{ext}`.
 - Accesos a preview, descarga, cambios de grants, cambios de sensibilidad, reemplazos de version y exportaciones masivas son candidatos fuertes a auditoria. E.5 ya registra preview/descarga desde rutas controladas; una UI futura debe reutilizar esas rutas o mantener el mismo nivel de validacion y auditoria.
 - Certificaciones pueden tener estado operativo visible, pero el adjunto/titulo/certificado puede requerir permiso privado.
+
+## Programacion Documental Util
+
+Estado E.16 2026-05-17: la programacion se modela como contenido documental util asociado a horario, no como IA. `document_programming_links` enlaza documentos/versiones de programacion con rango de fechas y contexto opcional de tipo, centro o bloque, con RLS/RPC/helper interno. `/app/schedule` muestra una consulta minima autorizada en el detalle de bloque, E.9/I.30 anade QA interno no visible con SQL rollback para validar grants, metadata limitada, denegaciones, cross-tenant y que asignaciones no conceden permiso documental, E.10/I.31 deja runbook operativo interno local/QA para repetir esa validacion manualmente con datos controlados, E.11 permite que versiones autorizadas aparezcan tambien en `/app/documents`, E.12 prepara la validacion QA/staging controlada de ese repositorio, E.13 registra evidencia local/bloqueos staging con redaction, E.14 reintenta validacion real con archivo Storage controlado dejando bloqueo honesto por falta de acceso real, E.15 actualiza ese desbloqueo controlado sin evidencia staging real y E.16 deja handoff operativo redacted para ejecutarlo solo cuando haya acceso real. No hay subida visible desde app, pagina documental completa, documentos firmables, embeddings, RAG, vector search, prompts runtime, SDKs, jobs, cron ni decisiones automaticas.
+
+Principios:
+
+- La fuente canonica debe ser `documents` con `document_scope = programming` y una version concreta en `document_versions`.
+- `document_subjects` puede asociar el documento a tipo de actividad, centro o bloque como sujeto/contexto simple.
+- `document_programming_links` asocia una version concreta a fecha/rango, tipo, centro o bloque cuando hace falta consultar programacion por horario.
+- `document_access_grants` decide quien puede leer metadata, preview o descarga. Estar asignado a un bloque en `schedule_block_assignments` no concede permiso documental por si solo.
+- `schedule_blocks` aporta contexto operativo de fecha, hora, centro y tipo; no debe contener contenido de programacion ni convertirse en repositorio documental.
+- La accion visible de E.8/I.29 usa rutas controladas de E.5 para preview/descarga y no genera signed URLs desde cliente.
+- Si `can_preview` o `can_download` no autorizan, la UI no muestra esa accion aunque el documento exista como metadata autorizada.
+- Si solo existe permiso de metadata, la superficie puede mostrar fuente/version sin preview ni descarga; si no existe grant/capacidad suficiente, debe quedar en estado vacio.
+- Estar asignado a la clase o bloque ayuda a preparar la operativa, pero no cambia permisos documentales ni autoriza acceso cross-tenant.
+- Los documentos de programacion no deben contener datos sensibles de salud, disciplina, rendimiento laboral, ubicacion, sanciones, bajas, motivos personales, payroll, nominas, importes, compensaciones ni saldos.
+- Asociar programacion a un bloque, tipo o fecha no debe crear aprobaciones, cambios de cobertura, fichajes, horas extra ni obligaciones laborales automaticas.
+- El uso cross-tenant queda prohibido: documento, version, sujetos, grants, centro, tipo, bloque y asignaciones deben pertenecer a la misma organizacion.
+
+Casos permitidos iniciales:
+
+- ver programacion autorizada desde un bloque;
+- consultar programacion por fecha/tipo/centro cuando exista asociacion canonica;
+- asociar documentos existentes a bloque/tipo/fecha desde el modelo tecnico interno;
+- mostrar fuente, version/fecha, vigencia y permiso claro desde el detalle de bloque sin copiar contenido al horario.
+- listar desde `/app/documents` solo documentos/versiones autorizados por permisos reales.
+- validar manualmente o en QA interna esos casos con snippet SQL transaccional y rollback antes de abrir datos reales.
+- repetir la validacion manual local/QA con `docs/operations/document-programming-manual-validation-runbook.md`, incluyendo usuario con grant, usuario solo metadata, usuario sin grant y usuario cross-tenant.
+
+No presentar BoxOps como:
+
+- fuente definitiva de programacion si el documento/version autorizado no existe o no esta vigente;
+- sistema de IA por modelar programacion documental;
+- motor automatico de cobertura, aprobaciones, payroll, horas extra o cumplimiento laboral por asociar contenido a horario.
+
+## IA Sobre Documentos Y Programacion
+
+Estado I.26 2026-05-16: IA queda solo documentada como capacidad futura subordinada a documentos/programacion utiles. E.6/I.27 confirma que el siguiente paso es programacion documental util, no IA, y E.7/I.28 crea una foundation interna sin IA. No hay IA funcional, llamadas a LLM, embeddings, vector search, RAG, prompts runtime, SDKs, jobs, cron, rutas ni UI.
+
+Principios:
+
+- IA no debe entrar antes de que programacion y documentos tengan fuentes canonicas utiles, permisos/grants, auditoria y privacidad/legal definidos.
+- El contenido consultable debe venir de documentos autorizados y versionados, no de texto libre sin propietario ni de datos de otro tenant.
+- `schedule_blocks` y `schedule_block_assignments` pueden aportar contexto operativo de fecha, centro, tipo, coach o bloque, pero no autorizan por si solos leer contenido privado ni decidir cobertura.
+- Cualquier lectura asistida debe respetar los mismos permisos documentales que una lectura humana: tenant activo, membership, capacidad, sujeto o grant.
+- Si una fase futura usa proveedor externo, hay que decidir antes finalidad, base legal, transferencia de datos, retencion, logging, seguridad del proveedor, prompts/respuestas y si el proveedor puede conservar datos.
+- Entrenamiento, fine-tuning o evaluacion con datos privados del tenant queda prohibido salvo decision explicita de producto, seguridad, privacidad y legal.
+
+Casos candidatos permitidos:
+
+- resumen de programacion autorizada;
+- consulta sobre documentos/programacion con permisos vigentes;
+- ayuda interna para preparar clases con contenido autorizado;
+- busqueda o explicacion de contenido autorizado, citando o enlazando la fuente documental cuando exista.
+
+Casos prohibidos:
+
+- decisiones automaticas de cobertura, asignacion o sustitucion de coaches;
+- aprobacion de cambios, ausencias, fichajes, correcciones, cierres semanales u horas extra;
+- payroll, nominas, importes, compensaciones, saldos, reglas fiscales o calculos legales definitivos;
+- inferencias sobre salud, disciplina, rendimiento laboral, ubicacion, sanciones, ausencias o situacion personal;
+- uso de datos de otro tenant, documentos sin grant o contenido privado fuera del permiso del usuario.
+
+No presentar BoxOps como:
+
+- sistema experto legal/laboral;
+- motor automatico de cobertura;
+- aprobador de horas extra o payroll;
+- fuente definitiva de programacion si el documento original no esta versionado, autorizado y vigente.
 
 ## Firmas De Documentos
 
@@ -455,6 +610,7 @@ Si fichaje automatico con app cerrada es requisito comercial innegociable, eleva
 - Consentimiento/base legal para geolocalizacion.
 - Exactitud de geolocalizacion en centros cercanos o interiores.
 - Responsabilidad si el sistema calcula mal horas extra.
+- Responsabilidad si una IA resume mal programacion, usa contenido sin permiso o sugiere decisiones operativas indebidas.
 - Permisos de managers por centro.
 - Acceso a salario/retribucion, nominas y contratos.
 - Validez legal y retencion de firmas documentales.

@@ -35,6 +35,7 @@ import {
   SectionHeader,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -195,9 +196,9 @@ const errorMessages: Record<string, string> = {
   "duplicate-profile":
     "Ese entrenador ya tiene una ficha operativa en esta organización.",
   "email-not-configured":
-    "El proveedor de email no esta configurado. Revisa RESEND_API_KEY y BOXOPS_EMAIL_FROM.",
+    "El envio de email no esta configurado para este entorno.",
   "email-send-failed":
-    "No se ha podido enviar el email. Revisa Resend, el remitente y la configuracion SMTP/API.",
+    "No se ha podido enviar el email. Revisa la configuracion segura del proveedor transaccional.",
   forbidden: "Tu rol no permite gestionar usuarios ni perfiles.",
   "invalid-center": "El centro principal seleccionado no es válido.",
   "invalid-email": "Introduce un email valido para enviar la invitacion.",
@@ -1863,26 +1864,26 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Equipo"
       />
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La lista ya muestra los accesos y fichas actuales.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="La lista ya muestra los accesos y fichas actuales."
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       {canManageAnyTeamData ? (

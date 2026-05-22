@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { ArrowRight, Plus, UserMinus, UserRound, X } from "lucide-react";
+import { ArrowRight, History, Plus, UserMinus, UserRound, X } from "lucide-react";
 
 import {
   assignScheduleBlockCoach,
@@ -26,6 +26,7 @@ import {
 } from "@/lib/schedule-blocks";
 import { getRequestsPath, getSchedulePath } from "@/lib/navigation/app-paths";
 import { cn } from "@/lib/utils";
+import type { CoverageTraceItem } from "@/lib/coverage-traceability";
 import type { Tables } from "@/types/supabase";
 
 type ScheduleBlockRow = Pick<
@@ -72,6 +73,8 @@ type CoverageBlockDetailPanelsProps = {
   classTypes: ClassTypeRow[];
   coachDisplays: CoachDisplay[];
   coverageByBlock: Array<[string, ScheduleBlockCoverage]>;
+  coverageTraceByBlock: Array<[string, CoverageTraceItem[]]>;
+  coverageTraceLoadError?: boolean;
   initialSelectedBlockId: string | null;
   organizationId: string;
   weekStart: string;
@@ -85,6 +88,19 @@ const toneClasses: Record<Tone, string> = {
     "border-emerald-300/55 bg-emerald-50 text-emerald-800 ring-emerald-200/70",
   warning:
     "border-orange-300/60 bg-orange-50 text-orange-800 ring-orange-200/70",
+};
+
+const traceToneClasses: Record<CoverageTraceItem["tone"], string> = {
+  neutral: "border-border bg-muted/25 text-foreground",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning: "border-orange-200 bg-orange-50 text-orange-800",
+};
+
+const traceSourceLabels: Record<CoverageTraceItem["source"], string> = {
+  absence_requests: "Ausencias",
+  change_request_events: "Solicitudes",
+  change_requests: "Solicitudes",
+  operational_audit_events: "Auditoria",
 };
 
 function formatServiceDate(value: string) {
@@ -102,6 +118,23 @@ function formatServiceDate(value: string) {
 
 function formatTime(value: string) {
   return value.slice(0, 5);
+}
+
+function formatTraceDate(value: string | null) {
+  if (!value) {
+    return "Impacto actual";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("es-ES", {
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      month: "short",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
 }
 
 function shortId(value: string) {
@@ -321,6 +354,61 @@ function AssignmentStatusBadge({ status }: { status: string }) {
   );
 }
 
+function CoverageTraceList({
+  loadError,
+  traceItems,
+}: {
+  loadError?: boolean;
+  traceItems: CoverageTraceItem[];
+}) {
+  if (!loadError && traceItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3"
+      data-coverage-traceability="true"
+    >
+      <div className="flex items-center gap-2">
+        <History aria-hidden="true" className="size-4 shrink-0" />
+        <h4 className="text-sm font-medium">Trazabilidad operativa</h4>
+      </div>
+      <p className="text-xs leading-5 text-muted-foreground">
+        Lectura reciente de cambios, solicitudes y ausencias. No modifica
+        horario ni resuelve cobertura.
+      </p>
+      {loadError ? (
+        <p className="text-sm text-muted-foreground">
+          No se pudo cargar la trazabilidad reciente.
+        </p>
+      ) : null}
+      {traceItems.length > 0 ? (
+        <ul className="grid gap-2">
+          {traceItems.map((item) => (
+            <li
+              className={cn(
+                "rounded-md border px-3 py-2 text-sm",
+                traceToneClasses[item.tone],
+              )}
+              key={item.id}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{item.title}</span>
+                <span className="text-xs opacity-80">
+                  {traceSourceLabels[item.source]} /{" "}
+                  {formatTraceDate(item.occurredAt)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 opacity-90">{item.detail}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function CoverageAssignmentPanel({
   assignableCoaches,
   allAssignments,
@@ -330,8 +418,10 @@ function CoverageAssignmentPanel({
   canManageSchedule,
   coachDisplaysById,
   coverage,
+  coverageTraceLoadError,
   organizationId,
   returnPath,
+  traceItems,
   weekStart,
 }: {
   assignableCoaches: CoachDisplay[];
@@ -342,8 +432,10 @@ function CoverageAssignmentPanel({
   canManageSchedule: boolean;
   coachDisplaysById: Map<string, CoachDisplay>;
   coverage: ScheduleBlockCoverage;
+  coverageTraceLoadError?: boolean;
   organizationId: string;
   returnPath: string;
+  traceItems: CoverageTraceItem[];
   weekStart: string;
 }) {
   const activeAssignments = assignments.filter(
@@ -410,6 +502,13 @@ function CoverageAssignmentPanel({
 
       {absenceImpactMessage ? (
         <p className="text-sm text-orange-700">{absenceImpactMessage}</p>
+      ) : null}
+
+      {canManageSchedule ? (
+        <CoverageTraceList
+          loadError={coverageTraceLoadError}
+          traceItems={traceItems}
+        />
       ) : null}
 
       {activeAssignments.length === 0 ? (
@@ -591,6 +690,8 @@ export function CoverageBlockDetailPanels({
   classTypes,
   coachDisplays,
   coverageByBlock,
+  coverageTraceByBlock,
+  coverageTraceLoadError,
   initialSelectedBlockId,
   organizationId,
   weekStart,
@@ -620,6 +721,10 @@ export function CoverageBlockDetailPanels({
   const coverageByBlockId = React.useMemo(
     () => new Map(coverageByBlock),
     [coverageByBlock],
+  );
+  const coverageTraceByBlockId = React.useMemo(
+    () => new Map(coverageTraceByBlock),
+    [coverageTraceByBlock],
   );
   const coachDisplaysById = React.useMemo(
     () => new Map(coachDisplays.map((coach) => [coach.id, coach])),
@@ -717,8 +822,10 @@ export function CoverageBlockDetailPanels({
             canManageSchedule={canManageSchedule}
             coachDisplaysById={coachDisplaysById}
             coverage={coverage}
+            coverageTraceLoadError={coverageTraceLoadError}
             organizationId={organizationId}
             returnPath={returnPath}
+            traceItems={coverageTraceByBlockId.get(selectedBlock.id) ?? []}
             weekStart={weekStart}
           />
 

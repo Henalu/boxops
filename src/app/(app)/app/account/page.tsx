@@ -25,6 +25,7 @@ import {
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -857,7 +858,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Mi cuenta"
@@ -889,19 +890,19 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       </PageHeader>
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            Los cambios se aplican solo a tu perfil visible de esta organización.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="Los cambios se aplican a tu perfil visible de esta organizacion."
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)]">

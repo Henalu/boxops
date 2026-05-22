@@ -19,7 +19,61 @@ Reglas para las fases nuevas:
 - [ ] No relajar la disponibilidad de coach a una solucion solo frontend; los solapes de un coach `assigned` en bloques activos se bloquean en Postgres con `coach-unavailable` y deben cubrirse con `tests/smoke/schedule-coach-availability.spec.ts` si se toca asignacion.
 - [ ] En formularios densos mobile-first, no volver a campos colapsados: UUIDs/nombres largos a ancho completo cuando haga falta, selects con padding suficiente para la flecha y truncado legible.
 
-La vista resumida de producto vive en `docs/product/roadmap.md`.
+La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cierre hacia beta/webapp v1 vive en `docs/product/webapp-completion-roadmap.md`.
+
+### Corte 2026-05-17 - Mapa De Cierre Webapp Completa / Beta / V1
+
+Estado: completado como fase documental. No cambia `src`, migraciones, seeds, rutas, UI ni permisos. Ordena el roadmap para distinguir beta operativa, webapp v1 vendible, futuro opcional e IA como ultimo extra.
+
+Decision:
+
+- [x] Crear un mapa canonico de cierre que responda que falta para considerar la webapp completa.
+- [x] Mantener `docs/product/roadmap.md` como vista principal de fases A-I y `TASKS.md` como backlog ejecutable.
+- [x] Documentar que beta operativa no equivale a "todo BoxOps": permite usar un tenant real controlado con entorno real, permisos, datos validados, smokes y runbooks.
+- [x] Documentar que webapp v1 vendible no exige app nativa, geofencing avanzado, payroll completo, CRM de alumnos ni IA.
+- [x] Colocar IA al final como extra futuro, posterior a documentos/versiones canonicos, grants, auditoria, privacidad/legal, aislamiento de tenant, programacion documental util y webapp vendible.
+- [x] Mapear las areas pendientes: realidad operativa, tenant/permisos, operativa diaria, fichaje, documentos/firma/certificaciones, hardening produccion, comercializacion SaaS, nativo opcional e IA futura.
+
+Fuera de alcance:
+
+- [x] No abrir IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs, cron ni UI de IA.
+- [x] No abrir app nativa, push, geofencing, web push, service worker ni caches privadas.
+- [x] No abrir subida visible, gestion documental completa, documentos firmables ni asociaciones visibles desde UI.
+- [x] No crear migraciones ni tocar codigo de app.
+- [x] No reordenar tareas historicas ni marcar como terminado trabajo funcional no validado.
+
+Verificacion:
+
+- [x] `docs/product/webapp-completion-roadmap.md` creado.
+- [x] `docs/product/roadmap.md` enlaza y resume el mapa de cierre.
+- [x] `PROJECT_BRIEF.md` actualizado para referenciar el mapa y mantener IA como ultimo extra.
+- [ ] Reejecutar typecheck/lint solo si un corte posterior toca codigo.
+
+### Corte 2026-05-15 - Jornada Prevista Del Personal
+
+Estado: primer corte seguro implementado como capa adicional al horario en `/app/schedule`.
+
+Decision:
+
+- [x] Crear `staff_work_windows` como tabla tenant-scoped nueva para presencia prevista del personal.
+- [x] Mantener `schedule_blocks` y `schedule_block_assignments` intactas: las franjas no son clases, no son asignaciones y no generan ocurrencias semanales persistidas.
+- [x] Expandir las franjas al vuelo para la semana visible.
+- [x] Permitir que varias personas coincidan en la misma franja sin conflicto.
+- [x] Permitir varias franjas por persona y semana.
+- [x] Bloquear turnos que cruzan medianoche con `start_time < end_time`.
+- [x] No guardar salario, contrato, payroll, saldos legales, ubicacion, documentos ni datos sensibles en notas.
+- [x] Permisos: todos los miembros activos del tenant ven franjas activas como contexto compartido; `owner`, `admin` y `manager` crean, editan, desactivan y ven tambien inactivas; `staff`, `center_manager`, `document_admin` y `payroll_manager` no reciben permisos de gestion.
+- [x] RLS actua como segundo candado y no se introduce `service_role` en `src`.
+- [x] `/app/schedule` muestra resumen compacto por dia, toggle de visibilidad y microcopy neutro `N en jornada` en la parrilla desktop.
+- [x] El detalle de bloque muestra personal previsto en esa franja y aviso suave si una asignacion queda fuera de una jornada prevista registrada.
+- [x] La gestion visible es compacta y no invasiva dentro de Horario.
+- [x] Smoke/guardrail `tests/smoke/staff-work-windows.spec.ts` protege separacion frente a bloques, asignaciones, fichaje, STL, `service_role`, geolocalizacion, push y caches.
+
+Fuera de alcance:
+
+- [x] No convertir franjas en bloques.
+- [x] No bloquear creacion de bloques ni asignacion de entrenadores por jornada prevista.
+- [x] No tocar plantillas, fichaje real, payroll, calendario mensual/anual avanzado, ubicacion, push, app nativa, seeds reales ni reglas de tenant.
 
 ### Carril S - Seguridad, Privacidad Y Tenant Safety
 
@@ -46,7 +100,10 @@ Criterio de salida transversal:
 
 - [x] Baseline de seguridad documentado en `docs/architecture/security-baseline.md`.
 - [x] Roadmap y brief reconocen seguridad como carril transversal, no solo Fase C.
-- [ ] Antes de beta/produccion con datos reales, revisar MVP contra OWASP ASVS 5.0 Level 1 y registrar desviaciones.
+- [x] Registrar revision local/documental ASVS Level 1 / beta interna 2026-05-18 sin repetir S.8/A.1, B.4 ni OD.1/I.32 y sin marcar beta como lista.
+- [x] Crear matriz trazable local/documental ASVS Level 1 / beta interna en `docs/architecture/asvs-level-1-beta-matrix.md`, enlazada desde el baseline, sin desbloquear beta.
+- [x] Crear matriz documental unica de pruebas negativas tenant/RLS/permisos en `docs/architecture/tenant-rls-negative-test-matrix.md`, sin implementar tests ni desbloquear beta.
+- [ ] Antes de beta/produccion con datos reales, completar revision MVP contra OWASP ASVS 5.0 Level 1 con entorno real/staging, evidencia y desviaciones aceptadas.
 - [ ] Anadir tests negativos de tenant/RLS/permisos para superficies criticas existentes y futuras.
 - [ ] Anadir revision recurrente de dependencias, lockfile y secretos antes de deploys relevantes.
 - [ ] Revisar headers de seguridad, CSP viable, cookies, HTTPS y configuracion real de Supabase Auth antes de produccion.
@@ -296,6 +353,4631 @@ Minimo necesario para desbloquear el piloto STL:
 - Remitente Resend verificado o confirmacion explicita de prueba limitada con `onboarding@resend.dev` y destinatario permitido.
 - Email interno controlado y credenciales E2E/admin/owner fuera del repo para crear invitacion, aceptar en `/invite/accept`, validar `organization_memberships` + `person_profiles` + `coach_profiles` + `team_invitations` y probar reset hacia `/reset-password`.
 
+#### S.8 / A.1 - Cierre de realidad operativa para beta interna controlada
+
+Estado: documentado el 2026-05-17 y revisado operativamente el 2026-05-18 como siguiente fase prudente del mapa de cierre. Es cierre operativo/pre-beta, no desarrollo funcional nuevo. No abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, migraciones ni UI nueva. Beta interna sigue bloqueada hasta completar la validacion real/staging y guardar evidencia.
+
+Decision:
+
+- [x] Ejecutar el primer bloque del mapa de cierre: realidad operativa antes de beta interna.
+- [x] Revisar S.2-S.7 y mantener como bloqueos activos el acceso real/staging, Auth/email, remitente permitido, email interno controlado, credenciales E2E por rol y job/fallback de purga.
+- [x] Crear `docs/operations/beta-operational-readiness-runbook.md` como checklist operativo interno de S.8/A.1.
+- [x] Mantener IA como ultimo extra futuro y fuera de beta/v1 inicial.
+- [x] Confirmar que el corte no requiere codigo, migraciones, seeds, rutas ni UI.
+
+Checklist operativo documentado:
+
+- [x] Validacion oficial de datos reales del primer tenant: centros, bloques, coaches, roles, tipos, plantillas, huecos y casos de cobertura.
+- [x] Entorno real/staging y `NEXT_PUBLIC_SITE_URL`.
+- [x] Supabase Auth Site URL, Redirect URLs y password policy.
+- [x] Resend/SMTP y remitente verificado o destinatario permitido si se usa `onboarding@resend.dev`.
+- [x] Email interno controlado.
+- [x] Credenciales E2E por rol: `owner`, `admin`, `manager` y `coach`.
+- [x] Invitacion real controlada y aceptacion en `/invite/accept`.
+- [x] Reset password real controlado hacia `/auth/callback?next=/reset-password`.
+- [x] Job real o fallback temporal de purga de `operational_audit_events`.
+- [x] Smoke suite minima autenticada y no autenticada.
+- [x] Evidencia minima que debe guardarse fuera del repo cuando contenga datos reales o secretos.
+- [x] Criterios de `bloqueado`, `listo para beta interna` y `no apto para produccion`.
+- [x] Distincion entre validacion local, validacion real/staging, bloqueos por falta de credenciales/email y datos reales que no deben usarse todavia.
+
+Pendiente para desbloquear beta interna real:
+
+- [ ] Validacion oficial de la semana real del primer tenant por responsable operativo.
+- [ ] Acceso administrativo al Supabase real/staging o dashboard equivalente.
+- [ ] Auth Site URL, Redirect URLs, password policy y Custom SMTP verificados en el entorno real/staging.
+- [ ] Resend/SMTP con remitente verificado o prueba limitada con destinatario permitido.
+- [ ] Email interno controlado aprobado para la prueba.
+- [ ] Credenciales E2E fuera del repo para `owner`, `admin`, `manager` y `coach`.
+- [ ] Invitacion real controlada enviada, aceptada y validada contra membership/persona/coach/invitacion.
+- [ ] Reset password real controlado probado.
+- [ ] Job real de purga activado o fallback manual temporal registrado con fecha limite.
+- [ ] Smoke anonimo y autenticado por rol ejecutado en real/staging con evidencia.
+
+Revision operativa 2026-05-18:
+
+- [x] Releido entorno sin imprimir secretos ni valores.
+- [x] `.env.local` existe, esta ignorado y no esta trackeado.
+- [x] `NEXT_PUBLIC_SITE_URL` y `NEXT_PUBLIC_SUPABASE_URL` clasifican como locales/loopback; no hay `E2E_BASE_URL`, URL QA/staging ni `VERCEL_URL`.
+- [x] No hay `SUPABASE_ACCESS_TOKEN`, project ref, DB URL real/staging, `DATABASE_URL`, `POSTGRES_URL` ni acceso CLI autenticado a proyectos Supabase; solo `npx supabase` local disponible.
+- [x] Supabase local esta disponible, pero no sustituye acceso QA/staging ni permite verificar Auth Site URL, Redirect URLs, password policy, SMTP, scheduler real o datos reales controlados.
+- [x] No hay credenciales E2E completas para `owner`, `admin`, `manager` ni `coach`; tampoco `E2E_ORGANIZATION_ID` ni `E2E_WEEK`.
+- [x] No hay tenant QA/staging ni datos operativos controlados por variables (`QA_TENANT_ID`, `QA_ORGANIZATION_ID`, `STAGING_TENANT_ID`, `STAGING_ORGANIZATION_ID`, `QA_DATASET`, `STAGING_DATASET`).
+- [x] Resend local responde con `RESEND_API_KEY`, pero no hay dominios verificados visibles; `BOXOPS_EMAIL_FROM` clasifica como `resend.dev` y no hay SMTP real (`SMTP_*`/`SUPABASE_SMTP_*`) disponible.
+- [x] No se ejecutan invitacion, aceptacion, reset, smokes autenticados, purga real ni validaciones staging porque faltan URL/app real, acceso Supabase/DB, credenciales, email interno controlado, tenant y datos QA.
+- [x] No se repite otro corte documental local: E.18 ya confirmo ausencia de acceso real completo a QA/staging para `/app/documents`, preview/download E.5 y auditoria backend real.
+
+Resultado S.8/A.1 2026-05-18: `bloqueado por acceso/entorno`, no `listo para beta interna`.
+
+Fuera de S.8/A.1:
+
+- IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs o jobs de IA.
+- App nativa, service worker, push, background sync, caches privadas, geolocalizacion web o geofencing.
+- Payroll, nomina, importes, compensaciones, aprobacion legal de horas extra o saldos.
+- Subida documental visible, pagina documental completa, asociaciones visibles, documentos firmables o firmas documentales.
+- Migraciones o cambios de `src` salvo correccion critica explicita.
+- Uso de `service_role` en `src` o hardcode de STL en producto.
+
+Verificacion documental esperada:
+
+- [x] `npm run typecheck` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `npm run lint` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `git diff --check` global pasa el 2026-05-18; solo muestra avisos de normalizacion LF/CRLF del worktree.
+- [x] `git diff --check -- TASKS.md docs\operations\beta-operational-readiness-runbook.md` pasa el 2026-05-18; solo muestra aviso LF/CRLF en `TASKS.md`.
+- [x] `git diff --check -- PROJECT_BRIEF.md TASKS.md docs\architecture\security-baseline.md docs\operations\pre-qa-controlled-pilot-runbook.md docs\product\roadmap.md docs\product\webapp-completion-roadmap.md` pasa para docs tocadas trackeadas.
+- [x] `rg -n "[ \t]+$" docs\operations\beta-operational-readiness-runbook.md PROJECT_BRIEF.md TASKS.md docs\architecture\security-baseline.md docs\operations\pre-qa-controlled-pilot-runbook.md docs\product\roadmap.md docs\product\webapp-completion-roadmap.md` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] `rg` revisado para confirmar que no se crean rutas/UI de subida documental ni pagina documental completa en este corte; los matches existentes pertenecen a avatar/firma propia, rutas backend documentales E.5 y programacion autorizada ya documentada.
+- [x] `git diff` revisado para confirmar que S.8/A.1 solo anade documentacion y no abre IA, nativo, geofencing, payroll, documentos firmables, subida visible ni UI funcional nueva.
+
+#### S.9 - Hardening beta local/documental ASVS Level 1
+
+Estado: ejecutado el 2026-05-18 como siguiente cierre prudente tras los bloqueos de S.8/A.1, B.4 y OD.1/I.32. No repite validaciones reales sin acceso nuevo, no marca beta como lista y no cambia `src`, migraciones, UI, permisos ni producto.
+
+Objetivo: revisar `docs/architecture/security-baseline.md` como gate transversal y registrar desviaciones ASVS Level 1 / beta interna evaluables solo desde codigo y documentacion.
+
+Revision local/documental:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `TASKS.md`, `docs/architecture/security-baseline.md`, runbooks `*readiness*` relevantes, `docs/operations/legal-and-privacy-notes.md` y `docs/product/webapp-completion-roadmap.md`.
+- [x] Confirmado que S.8/A.1 sigue bloqueado por falta de acceso real/staging, URL QA/staging, Supabase project/ref/DB URL, credenciales E2E por rol, tenant/datos controlados, SMTP real y evidencia.
+- [x] Confirmado que B.4 sigue bloqueado por falta de acceso/tenant real controlado.
+- [x] Confirmado que OD.1/I.32 sigue bloqueado por acceso/entorno y no debe presentarse beta como lista.
+- [x] Revisado tenant boundary: `organization_memberships`, `getActiveMemberships(...)`, `resolveActiveOrganization(...)`, filtros `organization_id`, FKs tenant-safe y RLS/RPC documentadas.
+- [x] Revisados roles `owner`, `admin`, `manager`, `coach` y roles futuros/especializados; `center_manager` sigue sin permisos por centro funcionales y no debe activarse sin frontera DB/RLS/UX.
+- [x] Revisados RLS/helpers/server actions existentes a nivel documental/codigo: doble control app + DB aparece como patron, pero falta matriz unica ASVS de pruebas negativas por ruta/rol.
+- [x] Revisados secretos/env: `.env.example` mantiene placeholders, Supabase SSR usa anon key publica, no se observa `service_role` en helpers normales; Auth/SMTP real sigue sin verificarse.
+- [x] Revisado Storage privado: avatar/firma propios usan buckets privados y signed URLs cortas; documentos usan `document-files`, grants/capacidades y rutas backend E.5; no se abre subida documental visible ni documentos firmables.
+- [x] Revisado fichaje sin geolocalizacion web: no se debe pedir `navigator.geolocation`; G.3/G.4 queda como foundation interna minimizada y debe permanecer inactiva para beta sin geolocalizacion.
+- [x] Revisada ausencia de IA funcional, payroll, push/service worker/CacheStorage, subida documental visible y documentos firmables como guardrail de diff.
+- [x] Creada `docs/architecture/asvs-level-1-beta-matrix.md` con estados `cumple-local`, `parcial`, `bloqueado-por-entorno`, `no-aplica-beta` y `futuro` por area practica.
+
+Desviaciones registradas en `docs/architecture/security-baseline.md`:
+
+- [x] ASVS L1 queda mapeado de forma practica en `docs/architecture/asvs-level-1-beta-matrix.md`, pero no es certificacion ni mapeo exhaustivo por ID ASVS.
+- [x] Headers de seguridad incompletos: existe `no-store`/`Pragma` en `/app`, pero faltan CSP/HSTS/`X-Content-Type-Options`/`Referrer-Policy`/`Permissions-Policy`/frame policy para despliegue real.
+- [x] Auth real, cookies, HTTPS, Redirect URLs, password policy y SMTP siguen bloqueados por falta de entorno.
+- [x] Dependencias/supply chain requieren revision recurrente de lockfile/vulnerabilidades antes de deploys relevantes.
+- [x] Backups/PITR/restore, observabilidad, alertas de jobs y procedimiento de incidente siguen sin evidencia real.
+- [x] Pruebas negativas de tenant/RLS/permisos existen por modulos, pero falta matriz unica para superficies criticas y roles futuros.
+- [x] Validacion QA/staging de documentos reales controlados sigue bloqueada.
+- [x] Foundation interna de ubicacion asistida debe tratarse como inactiva para beta sin geolocalizacion.
+
+Fuera de S.9:
+
+- No crear UI, rutas, migraciones, features, grants UI, permisos por centro funcionales, billing, onboarding guiado, documentos firmables, subida documental visible, payroll, IA, app nativa, push, service worker, CacheStorage ni geolocalizacion.
+- No ejecutar validaciones reales, invitacion, reset, smokes autenticados ni purga real sin entorno/credenciales.
+- No prometer cumplimiento legal, ASVS completo, beta lista ni produccion lista.
+
+Verificacion esperada:
+
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.9 solo toca documentacion y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.10 - Matriz Documental De Pruebas Negativas Tenant/RLS/Permisos
+
+Estado: ejecutado el 2026-05-18 como hardening beta documental prudente derivado de S.9. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no implementa tests, no cambia `src`, migraciones, seeds, UI ni producto, y no marca beta como lista.
+
+Objetivo: consolidar en una matriz unica los casos negativos tenant/RLS/permisos por superficie critica de BoxOps, derivados de la matriz ASVS, del baseline de seguridad, de runbooks beta y del codigo/documentacion disponible.
+
+Alcance documental:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `TASKS.md`, `docs/architecture/security-baseline.md`, `docs/architecture/asvs-level-1-beta-matrix.md`, `docs/operations/beta-operational-readiness-runbook.md`, `docs/operations/tenant-readiness-checklist.md`, `docs/operations/daily-operations-beta-readiness-runbook.md` y `docs/operations/time-tracking-beta-readiness-runbook.md`.
+- [x] Confirmado que S.8/A.1, B.4, OD.1/I.32 y F.15 siguen bloqueados por falta de acceso real/staging, URL, project/ref o DB URL, credenciales E2E por rol, tenant/datos controlados, SMTP real y evidencia.
+- [x] Revisado codigo/documentacion para mapear auth/session/reset, resolucion de tenant, roles base, roles futuros, centros/equipo/tipos, horario/plantillas/cobertura, solicitudes, ausencias/eventos/jornada prevista, fichaje, documentos, auditoria, Storage, secretos/env y exclusiones.
+- [x] Creada `docs/architecture/tenant-rls-negative-test-matrix.md` con columnas: superficie, actor/rol, caso negativo, control esperado, evidencia local/documental existente, estado y siguiente paso.
+- [x] Estados usados: `cubierto-local`, `parcial`, `bloqueado-por-entorno`, `pendiente-test` y `no-aplica-beta`.
+- [x] Enlazada la matriz desde `docs/architecture/asvs-level-1-beta-matrix.md`, `docs/architecture/security-baseline.md` y este `TASKS.md`.
+
+Fuera de S.10:
+
+- No codigo, UI, migraciones, seeds, tests nuevos ni features.
+- No permisos por centro funcionales, billing, onboarding guiado, documentos firmables, subida documental visible, grants UI, payroll, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion esperada:
+
+- [x] Solo se toca documentacion; no se ejecuta typecheck/lint.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `git diff --check -- TASKS.md docs\architecture\security-baseline.md docs\architecture\asvs-level-1-beta-matrix.md` pasa; solo muestra avisos LF/CRLF en docs trackeadas.
+- [x] `rg -n "[ \t]+$" docs\architecture\tenant-rls-negative-test-matrix.md docs\architecture\asvs-level-1-beta-matrix.md docs\architecture\security-baseline.md TASKS.md` sin coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff documental revisado para confirmar que S.10 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.11 - Plan Tecnico De Implementacion De Tests Negativos Tenant/RLS/Permisos
+
+Estado: ejecutado el 2026-05-18 como siguiente fase prudente de hardening beta documental. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no implementa tests, no cambia `src`, migraciones, seeds, UI ni producto, y no marca beta como lista.
+
+Objetivo: convertir `docs/architecture/tenant-rls-negative-test-matrix.md` en un plan tecnico priorizado de implementacion local para tests negativos de tenant/RLS/permisos, separando lo localmente abordable de lo que sigue staging-only.
+
+Alcance documental:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `TASKS.md`, `docs/architecture/security-baseline.md`, `docs/architecture/asvs-level-1-beta-matrix.md` y `docs/architecture/tenant-rls-negative-test-matrix.md`.
+- [x] Confirmado que S.8/A.1 sigue bloqueado el 2026-05-18 por falta de acceso real/staging, URL QA/staging, Supabase project/ref/DB URL, credenciales E2E por rol, tenant QA/staging, datos operativos controlados, SMTP real y evidencia.
+- [x] Confirmado que B.4 sigue bloqueado por falta de acceso/tenant real controlado.
+- [x] Confirmado que OD.1/I.32 sigue bloqueado por las mismas carencias.
+- [x] Confirmado que F.15 solo puede cerrar si fichaje entra en beta con entorno real/staging y evidencia.
+- [x] Creado `docs/architecture/tenant-rls-negative-test-implementation-plan.md` como plan tecnico priorizado.
+- [x] El plan cubre prioridad, superficie, caso negativo, tipo de test recomendado, fixtures/datos necesarios, entorno requerido, bloqueo, riesgos de tocar producto y orden recomendado de implementacion.
+- [x] Primer paquete minimo recomendado: auth/session/tenant resolution, roles `owner`/`admin`/`manager`/`coach`, IDs cross-tenant en superficies operativas basicas, y documentos/grants/Storage solo como plan cuando dependan de entorno real o Storage controlado.
+- [x] Enlazado el plan desde `docs/architecture/tenant-rls-negative-test-matrix.md`, `docs/architecture/security-baseline.md` y este `TASKS.md`.
+
+Fuera de S.11:
+
+- No validaciones reales/staging, smokes autenticados reales, SMTP real, Storage real ni evidencia nueva.
+- No codigo, UI, migraciones, seeds, tests nuevos ni features.
+- No permisos por centro funcionales, billing, onboarding guiado, documentos firmables, subida documental visible, grants UI, payroll, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion esperada:
+
+- [x] Solo se toca documentacion; no se ejecuta typecheck/lint.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff documental revisado para confirmar que S.11 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.12 - Primer Paquete Local De Tests Negativos Tenant/RLS/Permisos
+
+Estado: ejecutado el 2026-05-18 como primer paquete minimo local de S.11. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no cambia producto, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: convertir solo P0/P1 del plan tecnico en tests locales de bajo riesgo, reutilizando el patron `tests/smoke/*` y sin forzar arnes nuevo de Supabase, Server Actions ni runtime autenticado.
+
+Alcance implementado:
+
+- [x] Revisado el harness existente en `tests/smoke`, helpers E2E y smokes source guardrails.
+- [x] Revisado `src/lib/auth/tenant.ts` y confirmado que `resolveActiveOrganization(...)` se puede importar en smoke local sin refactor de producto.
+- [x] Creado `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] P0: guardrail local sobre `src` para bloquear hardcode de tenant, `service_role`, IA/embeddings/vector, geolocalizacion web, service worker, push, Background Sync y CacheStorage.
+- [x] P1: casos helper de resolucion tenant:
+  - sin memberships activas -> `no_active_memberships`;
+  - varias memberships sin `organizationId` -> `organization_required`;
+  - `organizationId` de tenant ajeno -> `organization_not_found`;
+  - `organizationId` valido -> membership/organizacion esperadas.
+- [x] P1: helper de permisos base para `owner`, `admin`, `manager` y `coach`, verificando settings, accesos de equipo, gestion operativa, revision de fichaje y autoservicio de ausencias.
+- [x] P1: guardrail para que `center_manager`, `document_admin`, `payroll_manager` y `staff` no queden activados para gestion MVP por este corte.
+
+Fuera de S.12:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No billing, onboarding guiado, documentos firmables, subida documental visible, grants UI, payroll, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 8 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.12 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.13 - Open Redirect Local Prudente En Auth Callback/Reset
+
+Estado: ejecutado el 2026-05-18 como siguiente fase prudente de tests negativos locales. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, solo endurece el helper compartido de redirects Auth, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo la parte local y anonima del caso P1 de open redirect para callback/reset, si encaja con el harness existente sin token/codigo real de Supabase ni refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `src/app/auth/callback/route.ts` y `src/lib/auth/redirects.ts`.
+- [x] Confirmado que el callback usa `getSafeRedirectPath(...)` antes de redirigir y que, sin `code`, no hace falta intercambio real de Supabase para razonar el guardrail local.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con casos helper-only:
+  - `next` externo `http(s)` -> fallback `/app`;
+  - `next` protocol-relative `//...` -> fallback `/app`;
+  - `next` con backslash tipo `/\example.test/...` -> fallback `/app`;
+  - valor no path como `javascript:...` -> fallback `/app`;
+  - `/reset-password` y `/reset-password?...` siguen como paths internos esperados;
+  - `getLoginPath(...)` sanitiza `redirectTo` externo antes de conservarlo en query string.
+- [x] Endurecido `getSafeRedirectPath(...)` para rechazar `\` antes de construir redirects con `new URL(...)`, cerrando el bypass protocol-relative por backslash sin cambiar rutas, UI ni flujos Auth.
+- [x] Actualizada la matriz negativa para marcar el caso de open redirect como `parcial`, no como beta/staging validado.
+- [x] Actualizado `docs/architecture/tenant-rls-negative-test-implementation-plan.md` con lo cubierto por S.13 y lo bloqueado.
+
+Bloqueado/no tocado por S.13:
+
+- No se prueba callback completo con `code` valido porque exige intercambio real de Supabase Auth.
+- No se introduce allowlist cerrada para todas las rutas internas. El contrato actual permite paths internos y bloquea destinos externos/protocol-relative; cambiarlo seria hardening de producto/Auth separado.
+- No se anaden tests autenticados, Server Actions, SQL rollback, Storage, SMTP, staging ni evidencia real.
+- No se abre P2 adicional porque el primer helper-only de permisos base ya quedo cubierto por S.12 y ampliar a Server Actions o credenciales por rol excede este corte.
+
+Fuera de S.13:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No billing, onboarding guiado, documentos firmables, subida documental visible, grants UI, payroll, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 11 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.13 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.14 - Roles Futuros Sensibles Helper-Only
+
+Estado: ejecutado el 2026-05-18 como fase P2 local extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: ampliar solo el smoke helper-only de permisos para roles futuros/especializados, cubriendo helpers sensibles nuevos sin abrir Server Actions, sesiones Supabase, SQL rollback ni runtime autenticado.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/auth/permissions.ts` y confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con un caso local que confirma que `center_manager`, `document_admin`, `payroll_manager` y `staff` no reciben capacidades sensibles de gestion, revision o activacion:
+  - settings tenant;
+  - settings/revision de fichaje;
+  - gestion operativa/equipo;
+  - gestion de accesos;
+  - activacion/configuracion de ubicacion asistida;
+  - gestion de solicitudes, ausencias, jornada prevista y eventos;
+  - lectura de eventos operativos;
+  - revision de candidatos de posible exceso.
+- [x] Actualizado el plan de implementacion para marcar S.14 como cobertura local helper-only y mantener bloqueados los casos que exigen credenciales, Server Actions, SQL rollback A/B, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: los roles futuros/especializados pasan de `pendiente-test` a `parcial` cuando solo hay cobertura helper-only local; `center_manager` sigue `no-aplica-beta`.
+
+Bloqueado/no tocado por S.14:
+
+- No se prueban rutas reales, Server Actions, POST directo, SQL rollback A/B, documentos, Storage, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activan permisos por centro funcionales, `center_manager`, roles documentales, payroll, grants UI, subida documental visible ni permisos nuevos.
+- No se cambia `canReadOperationalData(...)`, `canUsePersonalFeatures(...)` ni `canReadOvertimeCandidates(...)`; esos contratos quedan como lectura/personalidad reconocida y no como gestion sensible.
+
+Fuera de S.14:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No billing, onboarding guiado, documentos firmables, subida documental visible, grants UI, payroll, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 12 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree si aparecen.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.14 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.15 - Validadores Sensibles Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir el siguiente P2 viable sin refactor de producto ni exportar helpers internos: validadores y limites sensibles ya existentes en fichaje y ausencias mediante guardrail estatico dentro del smoke local.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/time-tracking.ts` y confirmado que los validadores internos de metadata/snapshots no estan expuestos como helper puro sin tocar producto.
+- [x] Revisado `src/lib/absence-requests.ts` y confirmado que el validador de `reason_summary` tampoco debe exportarse solo para testear.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para:
+  - mantener `FORBIDDEN_JSON_KEY_PATTERN` bloqueando claves como URL/path/token/secret/signature/storage/document hash/latitud/longitud/coordenadas/geolocalizacion/GPS;
+  - confirmar que `normalizeJsonObject(...)` aplica `hasForbiddenJsonKey(...)` y que metadata/snapshots pasan por errores `invalid_metadata`/`invalid_snapshot`;
+  - mantener `FORBIDDEN_REASON_SUMMARY_PATTERN` con senales sensibles de URLs, base64, tokens, secretos, signed URLs, Storage, documentos, justificantes, payroll/salario/nomina, datos bancarios/identidad, ubicacion, salud, familia y sanciones;
+  - confirmar que la creacion de ausencias usa `normalizeReasonSummary(...)`;
+  - mantener limites de exporte CSV de fichaje: 93 dias, 1000 filas, `MAX_TIME_EXPORT_ROWS + 1`, metadata `internalReviewOnly`, `legalFinal: false`, `payroll: false`, `snapshotsIncluded: false` y copy de exporte interno revisable.
+- [x] Actualizado el plan de implementacion para marcar S.15 como cobertura local source/static y mantener bloqueados los casos que exigen helper/runtime, credenciales, Server Actions, SQL rollback A/B, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: ausencias sensibles, metadata/snapshots de fichaje y limites de exporte siguen `parcial`, ahora con guardrail local estatico documentado.
+
+Bloqueado/no tocado por S.15:
+
+- No se prueban funciones internas privadas en runtime ni se exportan helpers solo para testear.
+- No se prueban Server Actions, POST directo, sesiones Supabase, SQL rollback A/B, Storage, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se valida F.15 real de fichaje, aprobacion con firma, CSV legal, datos laborales reales, payroll ni cumplimiento laboral definitivo.
+- No se activa subida documental visible, documentos firmables, grants UI, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.15:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 14 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.15 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.16 - Documentos/Storage Signed URL Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de documentos/Storage firmado que encaja en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/document-file-access.ts`, rutas E.5 de preview/download, `/app/documents`, el panel de programacion documental en Horario, `src/lib/documents.ts` y `supabase/migrations/00043_document_repository_minimal_visible.sql`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para:
+  - mantener preview/download E.5 como rutas backend `force-dynamic` que delegan en `handleDocumentVersionFileAccess(...)`;
+  - mantener `DOCUMENT_FILES_BUCKET = "document-files"` y `DOCUMENT_FILE_SIGNED_URL_TTL_SECONDS = 60`;
+  - mantener revalidacion de `can_access_document`, bloqueo por bucket distinto, estados no legibles y `requires_signature`;
+  - mantener `Cache-Control: no-store` en errores JSON y redirects a signed URL, mas `X-Robots-Tag: noindex`;
+  - mantener auditoria documental de `denied` y `allowed` antes de redirigir;
+  - confirmar que `/app/documents` y el panel documental de Horario solo construyen rutas backend condicionadas por `can_preview`/`can_download`, sin `createSignedUrl`, `signedUrl`, paths Storage ni bucket `document-files`;
+  - mantener el repositorio minimo excluyendo documentos firmables y sin devolver rutas Storage desde `src/lib/documents.ts`.
+- [x] Actualizado el plan de implementacion para marcar S.16 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: documentos/Storage siguen `parcial` o `bloqueado-por-entorno` cuando requieren prueba real; el guardrail nuevo solo anade evidencia local estatica.
+
+Bloqueado/no tocado por S.16:
+
+- No se prueba preview/download real, expiracion de signed URLs, objeto `document-files`, policies de Storage, auditoria backend real ni denegaciones runtime con sesion Supabase.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.16:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 17 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente si aparecen.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.16 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.17 - Auditoria Documental Metadata Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de auditoria documental que encaja en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00009_document_access_audit_foundation.sql`, `supabase/migrations/00007_document_metadata_private_foundation.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para:
+  - mantener `document_access_event_metadata_is_safe(...)` como filtro de metadatos documentales minimizados antes de persistir eventos;
+  - mantener bloqueo de claves y valores de riesgo en metadata de auditoria documental: contenido/raw/html/base64, URLs, rutas, tokens, secretos, firmas, `document_hash`, Storage, `storage/v1`, material tipo private key y signed URLs;
+  - mantener limite de tamano de metadata y rechazo de arrays/texto largo en auditoria documental;
+  - mantener `document_access_events` con resultados cerrados `allowed`/`denied`, version obligatoria para eventos de archivo/version y `denied` solo para lecturas/accesos;
+  - mantener `record_document_access_event(...)` derivando actor/membership/persona desde sesion y validando permisos para eventos `allowed`;
+  - mantener lectura de auditoria documental mediante `can_read_document_access_events(...)`, sin herencia automatica de `owner`, `admin` o `manager`; `document_access_audit_read` queda ligado a `document_admin` y payroll a `payroll_manager`.
+- [x] Actualizado el plan de implementacion para marcar S.17 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: auditoria documental sigue `parcial` cuando requiere prueba real; el guardrail nuevo solo anade evidencia local estatica.
+
+Bloqueado/no tocado por S.17:
+
+- No se prueba insercion runtime de `document_access_events`, lectura real por `document_admin`/`payroll_manager`, denegacion real para `owner`/`admin`/`manager`, Storage, preview/download, signed URL TTL ni auditoria backend real.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.17:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 19 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.17 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.18 - Programacion Documental Grants Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de grants documentales y separacion entre programacion documental y asignaciones de horario, encajando en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00042_document_programming_schedule_links.sql`, `src/lib/document-programming.ts`, `/app/documents`, el panel documental de Horario, `supabase/migrations/00043_document_repository_minimal_visible.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para:
+  - mantener `document_programming_links` tenant-scoped y ligado a `schedule_blocks` por FK compuesta con `organization_id`;
+  - mantener lectura RLS de links por `can_access_document(..., 'read_metadata')`;
+  - mantener gestion de links por `can_manage_document_programming_link(...)` y `can_access_document(..., 'manage')`;
+  - mantener `list_document_programming_for_block(...)` y `list_document_programming_for_context(...)` filtrando por `can_access_document(..., normalized_access_level)` y exponiendo `can_preview`/`can_download` derivados de permisos documentales;
+  - confirmar que `document_programming_links` y el helper no usan `schedule_block_assignments` como permiso documental ni escrituras directas desde helper;
+  - confirmar que `/app/documents` y el panel documental de Horario no exponen UI de grants, subida documental visible, `storage_path`, `signedUrl`/`createSignedUrl`, bucket `document-files`, `requires_signature`, `sensitive_hr`, `payroll` ni `signature_evidence`.
+- [x] Actualizado el plan de implementacion para marcar S.18 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: documentos/programacion y grants UI reciben evidencia local estatica, pero los casos runtime/Storage/staging siguen `parcial`, `no-aplica-beta` o `bloqueado-por-entorno` segun corresponda.
+
+Bloqueado/no tocado por S.18:
+
+- No se prueba runtime real de grants, usuario asignado sin grant, `document_programming_links` con sesion Supabase, preview/download real, expiracion de signed URLs, objeto `document-files`, policies de Storage, auditoria backend real ni denegaciones runtime.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.18:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 21 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente si aparecen.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.18 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.19 - Document Access Grants Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de `document_access_grants` y capacidades documentales sensibles, encajando en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00007_document_metadata_private_foundation.sql`, `supabase/migrations/00042_document_programming_schedule_links.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con un guardrail source/static para:
+  - mantener `document_access_grants` tenant-scoped con FKs compuestas por `organization_id` hacia documentos, versiones, personas y memberships;
+  - mantener un unico destinatario explicito por grant: persona, membership, rol o capacidad;
+  - mantener `manage_grants` como nivel maximo de acceso documental y las policies de grants cerradas por `can_access_document(..., 'manage_grants')`;
+  - mantener acceso por grants solo cuando el grant esta activo, no expirado, con membership activa y rank de acceso suficiente;
+  - mantener los campos sensibles del grant inmutables tras creacion y sin policy/grant de `DELETE` para `authenticated`;
+  - mantener capacidades sensibles cerradas: `document_grant_manage` y auditoria documental solo para `document_admin`, `payroll_private_manage` solo para `payroll_manager`, y firma/evidencia de firma sin activacion por rol alto.
+- [x] Actualizado el plan de implementacion para marcar S.19 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: grants documentales reciben evidencia local estatica adicional, pero los casos runtime/Storage/staging siguen `parcial`, `no-aplica-beta` o `bloqueado-por-entorno` segun corresponda.
+
+Bloqueado/no tocado por S.19:
+
+- No se prueba runtime real de grants por persona, membership, rol o capacidad; no se prueba usuario sin grant, grant expirado/revocado, `manage_grants` real, preview/download real, objeto `document-files`, policies de Storage, auditoria backend real ni denegaciones runtime.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.19:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 22 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.19 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.20 - Document Subjects Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de `document_subjects`, encajando en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00007_document_metadata_private_foundation.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con un guardrail source/static para:
+  - mantener `document_subjects` tenant-scoped y con FKs compuestas por `organization_id` hacia documento, persona, centro, coach, bloque y tipo de clase;
+  - mantener un unico objetivo coherente con `subject_type`, con metadata JSON objeto;
+  - mantener acceso por sujeto solo para la persona propia, sujeto `active` y nivel maximo `download`, sin conceder `manage` ni `manage_grants`;
+  - mantener lectura de sujetos por `can_access_document(..., 'read_metadata')`, creacion/actualizacion por `can_manage_document_by_id(...)` y sin policy/grant de `DELETE` para `authenticated`.
+- [x] Actualizado el plan de implementacion para marcar S.20 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: `document_subjects` recibe evidencia local estatica, pero los casos runtime/Storage/staging siguen `parcial` o `bloqueado-por-entorno` segun corresponda.
+
+Bloqueado/no tocado por S.20:
+
+- No se prueba runtime real de `document_subjects`, acceso propio por sujeto, sujeto removido, sujetos de centro/coach/bloque/tipo, `manage`/`manage_grants`, SQL rollback A/B ni denegaciones con sesion Supabase.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.20:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 23 tests.
+- [x] `git diff --check` pasa; muestra solo avisos LF/CRLF del worktree amplio existente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.20 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.21 - Document Version Upload Lifecycle Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de `document_versions` y del lifecycle privado `begin_document_version_upload` / `activate_document_version_upload` / `cancel_document_version_upload`, encajando en el harness existente sin servidor, sin Supabase real/local, sin Storage, sin SQL rollback, sin Server Actions y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00007_document_metadata_private_foundation.sql`, `supabase/migrations/00008_document_files_private_storage.sql`, `supabase/migrations/00009_document_access_audit_foundation.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con un guardrail source/static para:
+  - mantener `document_versions` tenant-scoped, con `storage_bucket = 'document-files'`, path exacto `documents/{organization_id}/{document_id}/versions/{version_id}/{asset_id}.{ext}`, unicidad de bucket/path y estados `pending`, `active`, `archived` y `deleted`;
+  - mantener bucket `document-files` privado, limite 10 MB, MIME permitidos cerrados y extension compatible con MIME;
+  - mantener `begin_document_version_upload(...)` con sesion, membership activa, documento `draft`/`active`, documento no firmable, permiso `can_manage_document_by_id(...)`, validacion de nombre, tamano, hash, extension/MIME, metadata objeto y creacion de version `pending`;
+  - mantener `activate_document_version_upload(...)` limitado a version `pending` del uploader, con objeto Storage exacto, tamano/MIME coincidentes, hash valido, archivo de version activa previa, activacion de la version nueva, `current_version_id` actualizado y auditoria `version_archived` / `version_activated`;
+  - mantener `cancel_document_version_upload(...)` como cancelacion metadata de version `pending` propia mediante `status = 'deleted'`; no se introduce un nuevo estado `cancelled`;
+  - mantener policies de Storage: upload solo contra metadata `pending` exacta del uploader y lectura solo de versiones `active`/`archived` accesibles por `can_access_document(..., 'preview')`;
+  - mantener revocado `INSERT`/`UPDATE` directo sobre `document_versions` para `authenticated`, dejando `SELECT` y ejecucion acotada de las RPCs.
+- [x] Actualizado el plan de implementacion para marcar S.21 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage real, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: el lifecycle de `document_versions` recibe evidencia local estatica, pero las pruebas runtime/Storage/staging siguen `parcial` o `bloqueado-por-entorno`.
+
+Bloqueado/no tocado por S.21:
+
+- No se prueba runtime real de `begin_document_version_upload`, `activate_document_version_upload`, `cancel_document_version_upload`, upload a Storage, path real, expiracion de signed URL, objeto controlado, auditoria backend real ni denegaciones con sesion Supabase.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa subida documental visible, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.21:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 24 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.21 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.22 - Profile Private Assets Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source guard extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de Storage privado propio para avatar y firma (`profile_assets` / `profile_signatures`) y Mi cuenta, encajando en el harness existente sin servidor, sin Supabase real/local, sin Storage real, sin SQL rollback, sin Server Actions runtime y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `supabase/migrations/00005_profile_assets_private_avatar.sql`, `supabase/migrations/00006_profile_signatures_private_own.sql`, `src/lib/profile-assets.ts`, `src/lib/profile-signatures.ts`, `src/app/(app)/app/account/actions.ts`, `src/app/(app)/app/account/page.tsx` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para:
+  - mantener buckets `profile-assets` y `profile-signatures` privados, con MIME permitidos cerrados y limites de tamano conservadores;
+  - mantener `profile_assets` y `profile_signatures` tenant-scoped, con FK compuesta por `organization_id` hacia `person_profiles`, unicidad bucket/path y hashes SHA-256 hex;
+  - mantener paths exactos derivados de tenant/persona/asset: `avatars/{organization_id}/{person_profile_id}/{asset_id}.{ext}` y `signatures/{organization_id}/{person_profile_id}/{signature_id}.png`;
+  - mantener `begin`/`activate`/`cancel` propios derivados de `auth.uid()` + tenant, persona activa propia y metadata `pending`, con objeto Storage exacto antes de activar;
+  - mantener policies de Storage que solo aceptan upload/lectura de la metadata propia esperada y sin `INSERT`/`UPDATE`/`DELETE` directo para `authenticated` sobre las tablas de metadata;
+  - mantener validacion local de helpers para MIME real, firma de archivo, tamano, hash y dimensiones de firma;
+  - mantener las acciones de Mi cuenta sin aceptar `person_profile_id`, `assetId` ni `signatureId` desde formulario, usando RPCs privadas y sin persistir `avatar_url`, public URLs ni signed URLs;
+  - mantener previews con signed URLs cortas desde servidor (`120` segundos), sin convertir avatar/firma en enlaces publicos persistentes.
+- [x] Actualizado el plan de implementacion para marcar S.22 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage real, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: avatar/firma propios reciben evidencia local estatica adicional, pero las pruebas runtime/Storage/staging siguen `parcial` o `bloqueado-por-entorno`.
+
+Bloqueado/no tocado por S.22:
+
+- No se prueba runtime real de `begin_own_profile_avatar_upload`, `activate_own_profile_avatar_asset`, `cancel_own_profile_avatar_upload`, `begin_own_profile_signature_upload`, `activate_own_profile_signature`, `cancel_own_profile_signature_upload`, upload a Storage, path real, expiracion efectiva de signed URLs, objeto controlado, policies reales ni denegaciones con sesion Supabase.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se activa moderacion de avatar, avatars ajenos, firma documental, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.22:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 26 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.22 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.23 - Profile Upload Validator Helper Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/helper-only extremadamente acotada, con un source guard minimo de actions. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo el guardrail local util de los validadores ya exportados para avatar/firma propios (`validateAvatarUploadFile` y `validateSignatureDataUrl`) y confirmar que Mi cuenta sigue calculando hash/metadatos validados antes de RPC/upload privado, encajando en el harness existente sin servidor, sin credenciales, sin Supabase real/local, sin Storage real, sin SQL rollback, sin Server Actions runtime y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/profile-assets.ts`, `src/lib/profile-signatures.ts`, `src/app/(app)/app/account/actions.ts` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como helper runtime puro usando objetos file-like, sin depender de File API real del navegador ni de actions autenticadas.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con casos helper-only para `validateAvatarUploadFile(...)`:
+  - rechazo de archivo ausente/vacio;
+  - rechazo de MIME declarado no permitido;
+  - rechazo por tamano maximo;
+  - rechazo cuando `bytes.byteLength` no coincide con `file.size`;
+  - rechazo cuando el MIME declarado no coincide con la firma real del archivo;
+  - aceptacion minima de PNG/JPEG/WebP por firma real, extension, MIME y tamano.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con casos helper-only para `validateSignatureDataUrl(...)`:
+  - rechazo de data URL vacia, formato no permitido y base64 invalido;
+  - rechazo de PNG truncado o estructura de chunks invalida;
+  - rechazo por dimensiones fuera de rango;
+  - rechazo por tamano/base64 excesivo;
+  - aceptacion de PNG data URL sintetico valido con MIME, bytes, tamano, width y height devueltos antes del RPC.
+- [x] Anadida comprobacion source/static minima para que `updateOwnAvatar(...)` y `updateOwnSignature(...)` sigan calculando SHA-256 sobre bytes validados y pasen extension/MIME/tamano o width/height/tamano al RPC privado antes de subir a Storage.
+- [x] Actualizado el plan de implementacion para marcar S.23 como cobertura local helper/runtime sin Storage y mantener bloqueados los casos que exigen runtime autenticado, Supabase, Storage real, archivo controlado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: avatar/firma propios reciben cobertura local adicional de validadores exportados, pero las pruebas de Server Actions, Storage, policies reales, denegaciones con sesion y expiracion efectiva siguen `parcial` o `bloqueado-por-entorno`.
+
+Bloqueado/no tocado por S.23:
+
+- No se prueba runtime real de `begin_own_profile_avatar_upload`, `activate_own_profile_avatar_asset`, `cancel_own_profile_avatar_upload`, `begin_own_profile_signature_upload`, `activate_own_profile_signature`, `cancel_own_profile_signature_upload`, upload a Storage, path real, expiracion efectiva de signed URLs, objeto controlado, policies reales ni denegaciones con sesion Supabase.
+- No se prueban Server Actions, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se fuerza validacion de dimensiones de avatar ni se exportan helpers internos: el corte prueba dimensiones de firma porque el validador exportado las devuelve; cambiar metadata de avatar seria una task de producto/schema separada.
+- No se activa moderacion de avatar, avatars ajenos, firma documental, documentos firmables, grants UI, audit UI, permisos documentales nuevos, permisos por centro funcionales, IA, geolocalizacion, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.23:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 29 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.23 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.24 - Jornada Prevista Validator Helper Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/helper-only extremadamente acotada, con un source guard minimo de actions. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo un guardrail local util sobre el contrato ya exportado de jornada prevista (`validateStaffWorkWindowForm`) y confirmar que las mutaciones de `staff_work_windows` siguen validando input, referencias tenant-scoped y auditoria minimizada antes de escribir, encajando en el harness existente sin servidor, sin credenciales, sin Supabase real/local, sin SQL rollback, sin Server Actions runtime y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/staff-work-windows.ts`, `src/app/(app)/app/schedule/actions.ts`, `tests/smoke/staff-work-windows.spec.ts` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como helper runtime puro + source guard minimo, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con casos helper-only para `validateStaffWorkWindowForm(...)`:
+  - rechazo de `personProfileId` y `centerId` malformados;
+  - rechazo de dia fuera de rango, rango horario invalido, fechas invalidas y estado no permitido;
+  - rechazo de notas demasiado largas;
+  - rechazo de notas con senales sensibles de contrato, nomina, documentos, salud, ubicacion, URLs, tokens, identidad o banca;
+  - normalizacion de centro opcional vacio y notas vacias a `null`.
+- [x] Anadido source guard minimo para que `createStaffWorkWindow(...)` y `updateStaffWorkWindow(...)` sigan validando formulario, validando referencias con `context.organization.id`, escribiendo con `organization_id` del contexto y filtrando updates por tenant.
+- [x] Anadido source guard minimo para que las notas de jornada prevista se auditen como `auditFieldTouched()`, no como contenido completo en `operational_audit_events`.
+- [x] Actualizado el plan de implementacion para marcar S.24 como cobertura local helper/runtime sin Supabase y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: jornada prevista recibe cobertura local adicional de input malformado/notas sensibles/source guard de tenant y auditoria minimizada, pero referencias reales activo/inactivo/cross-tenant, RLS, Server Actions runtime y roles autenticados siguen `parcial` o bloqueados.
+
+Bloqueado/no tocado por S.24:
+
+- No se prueba runtime real de `validateStaffWorkWindowReferences(...)` contra DB, persona interna/inactiva, centro inactivo, centro/persona de otro tenant ni RLS.
+- No se prueban Server Actions, POST directo, rutas autenticadas por rol, SQL rollback A/B, SMTP, staging, callback Auth con `code` real ni evidencia externa.
+- No se abre permisos por centro funcionales, `center_manager`, fichaje desde jornada prevista, contrato, payroll, ubicacion, documentos firmables, subida documental visible, grants UI, audit UI, IA, app nativa, push, service worker ni CacheStorage.
+
+Fuera de S.24:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 32 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.24 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.25 - Perfil Personal Propio Validator Helper Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/helper-only extremadamente acotada, con un source guard minimo de action. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo un guardrail local util sobre el contrato ya exportado de Mi cuenta (`validatePersonalProfileForm`) y confirmar que `updateOwnPersonProfile(...)` sigue derivando la persona propia desde sesion + tenant, encajando en el harness existente sin servidor, sin credenciales, sin Supabase real/local, sin Storage real, sin SQL rollback, sin Server Actions runtime y sin refactor de producto.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/personal-profile.ts`, `src/app/(app)/app/account/actions.ts`, la seccion D.1 de Mi cuenta y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como helper runtime puro + source guard minimo, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con casos helper-only para `validatePersonalProfileForm(...)`:
+  - rechazo de `displayName` ausente;
+  - rechazo de `displayName`, `preferredAlias` y `publicEmail` demasiado largos;
+  - rechazo de `publicEmail` invalido;
+  - aceptacion del limite prudente de `displayName`;
+  - normalizacion de `preferredAlias` y `publicEmail` vacios a `null`.
+- [x] Anadido source guard minimo para que `updateOwnPersonProfile(...)` siga validando formulario, buscando `person_profiles` por `organization_id` + `user_id`, actualizando solo `display_name`, `preferred_alias` y `public_email`, y filtrando el update por `id` + `organization_id` + `user_id`.
+- [x] Anadido source guard minimo para que el formulario/action de perfil propio no acepte `person_profile_id` ni toque avatar, documentos, firma, payroll, contrato, datos bancarios, metadata o RRHH sensible.
+- [x] Actualizado el plan de implementacion para marcar S.25 como cobertura local helper/runtime sin Supabase y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: perfil personal propio recibe cobertura local adicional de validador exportado/source guard de persona propia, pero las denegaciones reales por sesion, RLS, persona ajena/cross-tenant y Server Actions runtime siguen `parcial` o bloqueadas.
+
+Bloqueado/no tocado por S.25:
+
+- No se prueba runtime real de `updateOwnPersonProfile(...)` con sesion Supabase, persona ajena, persona de otro tenant, perfil inexistente, RLS, POST directo ni roles autenticados.
+- No se prueban Server Actions, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre edicion de perfiles ajenos, permisos por centro funcionales, `center_manager`, RRHH sensible, payroll, contrato, documentos firmables, subida documental visible, grants UI, audit UI, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+
+Fuera de S.25:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 35 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.25 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.26 - Operational Events Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo un guardrail local util sobre eventos operativos ya existentes, sin exportar helpers internos ni refactorizar producto. El corte confirma que `operational_events` sigue siendo contexto operativo tenant-scoped, que la lectura no gestora queda limitada, que la gestion pasa por contexto autenticado/rol/RPC y que no muta horario, fichaje, documentos ni payroll.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/operational-events.ts`, `src/app/(app)/app/schedule/operational-event-actions.ts`, `supabase/migrations/00037_operational_events_foundation.sql`, `tests/smoke/operational-events-foundation.spec.ts` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para eventos operativos:
+  - patrones de titulo/notas que bloquean URLs, base64, tokens, secretos, Storage, documentos, justificantes, payroll/salario/nomina, banca/identidad, ubicacion, IP/fingerprint, salud, familia y sanciones;
+  - lectura no gestora limitada a `status = active` y `visibility IN ('staff', 'all_staff')`;
+  - `createOperationalEvent(...)`, `updateOperationalEvent(...)` y `setOperationalEventStatus(...)` siguen exigiendo `requireManagement: true`, usando RPCs y enviando `target_organization_id` desde el contexto resuelto;
+  - las actions de formulario siguen resolviendo sesion, membership, tenant y rol antes de mutar, validando enums/centro/fechas y restringiendo `returnPath` a `/app/schedule`;
+  - `operational_events` mantiene RLS, `GRANT SELECT` sin grants directos de escritura a `authenticated`, RPCs con `can_manage_operational_events(...)` y auditoria minimizada.
+- [x] Anadido guardrail local para que los helpers/actions de eventos no hagan lecturas/mutaciones directas sobre `schedule_blocks`, `schedule_block_assignments`, fichaje ni documentos, ni introduzcan geolocalizacion web, service worker, push, CacheStorage o IA.
+- [x] Actualizado el plan de implementacion para marcar S.26 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: eventos operativos reciben cobertura local adicional de source guard, pero POST directo por rol, RLS real, cross-tenant y staging siguen `parcial` o bloqueados.
+
+Bloqueado/no tocado por S.26:
+
+- No se prueba runtime real de `createOperationalEvent(...)`, `updateOperationalEvent(...)` ni `setOperationalEventStatus(...)` con sesion Supabase, coach real, evento management/inactivo, evento de otro tenant, RLS, POST directo ni roles autenticados.
+- No se prueban Server Actions, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre calendario avanzado, UI grande de eventos, automatismos de horario/cobertura, permisos por centro funcionales, `center_manager`, RRHH sensible, payroll, contrato, documentos firmables, subida documental visible, grants UI, audit UI, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+
+Fuera de S.26:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 38 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.26 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.27 - Change Requests Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo un guardrail local util sobre solicitudes/cambios ya existentes, sin exportar helpers internos ni refactorizar producto. El corte confirma que las solicitudes conservan summaries minimizados, que la creacion propia no acepta actor/persona ajena como autoridad, que las acciones visibles revalidan sesion/tenant/coach propio o rol de gestion, y que approve/reject/apply/cancel/expire siguen delegando en helpers/RPC tenant-scoped.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/change-requests.ts`, `src/app/(app)/app/requests/actions.ts`, `supabase/migrations/00027_change_requests_foundation.sql`, `supabase/migrations/00028_change_request_operations.sql`, `supabase/migrations/00029_change_request_atomic_creation.sql`, `supabase/snippets/change-requests-rls-verification.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable puede vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para solicitudes/cambios:
+  - `reasonSummary` y `responseNoteSummary` siguen limitados por `FORBIDDEN_SUMMARY_PATTERN` y longitud maxima;
+  - las actions no aceptan `actorUserId`, `actorMembershipId`, `personProfileId`, `requesterCoachProfileId`, `requesterPersonProfileId` ni `requesterMembershipId` desde formulario;
+  - `create_own_change_request(...)` deriva usuario, membership, persona y coach desde `auth.uid()` + `target_organization_id` y comprueba que la asignacion origen pertenece al coach actual;
+  - `createChangeRequestWithTargets(...)`, `offerChangeRequestToCoach(...)` y `respondToChangeRequestTarget(...)` siguen usando validacion tenant-scoped y RPCs;
+  - las actions de creacion/respuesta/cancelacion siguen filtrando por `organizationId`, asignacion `assigned`, coach propio o `canManage`, targets activos del tenant y estado accionable;
+  - `approve`, `reject` y `apply` siguen pasando por `ensureManagementContext(...)`, y los helpers llaman RPCs con `target_organization_id` derivado del contexto;
+  - `cancel` y `expire` siguen pasando por helper/RPC tenant-scoped, sin mutaciones directas desde action.
+- [x] Anadido guardrail local para que solicitudes/cambios no hagan escrituras directas en `change_requests`, `change_request_targets`, `schedule_blocks`, `schedule_block_assignments`, fichaje ni documentos desde helpers/actions; la unica mutacion de asignaciones queda acotada a `apply_approved_change_request(...)` en DB, con solicitud aprobada y controlada.
+- [x] Actualizado el plan de implementacion para marcar S.27 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: solicitudes/cambios reciben cobertura local adicional de source guard, pero POST directo por rol, RLS real, cross-tenant y staging siguen dependiendo de harness Supabase/SQL rollback o QA/staging.
+
+Bloqueado/no tocado por S.27:
+
+- No se prueba runtime real de `createChangeRequestWithTargets(...)`, `respondToChangeRequestTarget(...)`, `cancelChangeRequest(...)`, `expireChangeRequest(...)`, `approveChangeRequest(...)`, `rejectChangeRequest(...)` ni `applyApprovedChangeRequest(...)` con sesion Supabase, coach real, solicitud de otro tenant, target de otro coach, RLS, POST directo ni roles autenticados.
+- No se prueban Server Actions, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva de solicitudes, permisos por centro funcionales, `center_manager`, automatismos de cobertura/horario fuera de `apply` aprobado, RRHH sensible, payroll, contrato, documentos firmables, subida documental visible, grants UI, audit UI, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+
+Fuera de S.27:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts` pasa con 41 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.27 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.28 - Time Tracking Own Actions Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo un guardrail local util sobre fichaje web ya existente, sin exportar helpers internos ni refactorizar producto. El corte confirma que fichajes/correcciones propias derivan persona desde sesion + tenant, que la revision/exporte/automatico siguen limitados a roles de gestion, y que la aprobacion semanal usa firma propia del aprobador autenticado, todo como source/static guard.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/time-tracking.ts`, `src/app/(app)/app/time/actions.ts`, `src/lib/time-tracking-actions.ts`, `supabase/migrations/00010_time_tracking_manual_foundation.sql`, `supabase/migrations/00025_time_schedule_auto_punches.sql`, `supabase/migrations/00026_time_weekly_closure_approval.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para fichaje:
+  - `CreateOwnTimePunchInput` y las actions de `/app/time` no aceptan `personProfileId`/`person_profile_id` ajeno como autoridad para fichaje propio;
+  - `resolveTimeTrackingContext(...)` y `resolveOwnCorrectionContext(...)` siguen derivando persona propia desde `auth.uid()` + `organization_id` + perfil activo;
+  - `createOwnTimePunch(...)`, `requestOwnTimeCorrection(...)` y `createAndApplyOwnTimeCorrection(...)` siguen filtrando registros/punches por `organization_id` y persona propia antes de persistir o aplicar;
+  - `create_own_time_punch(...)` sigue derivando membership/persona desde `auth.uid()` + tenant y escribe `time_records`/`time_punches` para `own_person_profile_id`;
+  - snapshots/metadata de correccion visibles desde action siguen acotados a schema/source y referencias operativas ya existentes.
+- [x] Anadido guardrail local para que revision, cola, automatico por planificacion y exporte sigan requiriendo `requireReviewAccess: true`, validen filtros de centro/persona dentro del tenant y no muten `schedule_blocks` ni `schedule_block_assignments`.
+- [x] Anadido guardrail local para que aprobacion/rechazo/reapertura semanal sigan detras de roles de gestion; `approve_time_weekly_approval(...)` toma firma activa desde `current_person_profile_id`, no desde firma/persona enviada por cliente, y solo actualiza `time_weekly_approvals`/`time_records`.
+- [x] Actualizado el plan de implementacion para marcar S.28 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: fichaje recibe cobertura local adicional de source guard, pero POST directo por rol, RLS real, aprobacion real con firma, cross-tenant y staging siguen dependiendo de harness Supabase/SQL rollback o QA/staging.
+
+Bloqueado/no tocado por S.28:
+
+- No se prueba runtime real de `createOwnTimePunch(...)`, `requestOwnTimeCorrection(...)`, `createAndApplyOwnTimeCorrection(...)`, `generateScheduleAutoTimePunches(...)`, `approveTimeWeeklyApproval(...)`, `rejectTimeWeeklyApproval(...)`, `reopenTimeWeeklyApproval(...)` ni `generateTimeRecordsCsvExport(...)` con sesion Supabase, persona ajena, persona de otro tenant, RLS, POST directo, firma propia real, firma ausente, firma ajena ni roles autenticados.
+- No se prueban Server Actions runtime, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva de fichaje, payroll, contrato, documentos firmables, subida documental visible, grants UI, audit UI, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni permisos por centro funcionales.
+
+Fuera de S.28:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "time tracking local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.28 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.29 - Time Tracking Audit And Closed Week Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo guardrails locales utiles sobre auditoria de fichaje y estados cerrados ya existentes, sin exportar helpers internos ni refactorizar producto. El corte confirma que `time_audit_events` conserva frontera de tenant, lectura propia o de gestion, metadata minimizada y escritura por triggers; y que `time_records`/`time_punches` no quedan abiertos a UPDATE/DELETE directo normal desde app o grants, manteniendo semanas aprobadas protegidas salvo reapertura/correccion controlada.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/time-tracking.ts`, `src/app/(app)/app/time/actions.ts`, `supabase/migrations/00010_time_tracking_manual_foundation.sql`, `supabase/migrations/00012_time_correction_application.sql`, `supabase/migrations/00026_time_weekly_closure_approval.sql`, `supabase/migrations/00030_time_punch_work_date_alignment.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para auditoria de fichaje:
+  - `time_audit_events` sigue tenant-scoped con `organization_id`, FKs compuestas hacia persona/registros/punches/correcciones/cierres/exportes y `ENABLE ROW LEVEL SECURITY`;
+  - la lectura de auditoria sigue limitada a `target_person_profile_id = get_own_person_profile_id(organization_id)` o `can_manage_time_tracking(organization_id)`;
+  - `authenticated` conserva solo `GRANT SELECT` sobre `time_audit_events`, sin grants directos de INSERT/UPDATE/DELETE;
+  - `time_audit_event_metadata_is_safe(...)` mantiene objeto JSON, tamano maximo y bloqueo de claves de contenido, URL/path, token/secreto, firma/Storage/document hash, coordenadas/geolocalizacion/GPS;
+  - `record_time_audit_event_from_trigger(...)` deriva actor/membership/persona desde `auth.uid()` + tenant y para cierre semanal solo guarda metadata de estado/semana, sin notas, snapshots, firma, Storage, documentos, ubicacion ni payroll.
+- [x] Anadido guardrail local para que `src/lib/time-tracking.ts` y `src/app/(app)/app/time/actions.ts` no hagan `.update()`/`.delete()` directo normal sobre `time_records` ni `time_punches`; las mutaciones siguen por RPCs, correcciones o cierre/reapertura controlados.
+- [x] Anadido guardrail local para que `time_records` y `time_punches` conserven `GRANT SELECT, INSERT` sin UPDATE/DELETE y sin policies directas de UPDATE/DELETE para `authenticated`.
+- [x] Anadido guardrail local para que las semanas aprobadas sigan bloqueando cambios de registros, punches y correcciones sin `boxops.time_weekly_approval_management`; `approve_time_weekly_approval(...)` y `reopen_time_weekly_approval(...)` son los flujos explicitos que abren el contexto controlado y actualizan solo registros de la persona/semana.
+- [x] Actualizado el plan de implementacion para marcar S.29 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: auditoria de fichaje y semana aprobada reciben cobertura local adicional de source guard, pero lectura real por rol, POST directo, RLS real, firma real, cross-tenant y staging siguen dependiendo de harness Supabase/SQL rollback o QA/staging.
+
+Bloqueado/no tocado por S.29:
+
+- No se prueba runtime real de lectura de `time_audit_events`, `time_records`, `time_punches`, aprobaciones/reaperturas, correcciones ni exports con sesion Supabase, persona ajena, persona de otro tenant, RLS, POST directo, firma propia real, firma ausente, firma ajena ni roles autenticados.
+- No se prueban Server Actions runtime, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva de auditoria/fichaje, payroll, contrato, documentos firmables, subida documental visible, grants UI, audit UI, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni permisos por centro funcionales.
+
+Fuera de S.29:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "time tracking local source guardrails"` pasa con 5 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.29 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.30 - Operational Audit And Coverage Trace Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto, no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir solo guardrails locales utiles sobre auditoria operativa corta, trazabilidad de cobertura y purga operativa ya existentes, sin repetir la auditoria documental de S.17 ni la auditoria de fichaje/semanas cerradas de S.29. El corte confirma contratos fuente robustos: `operational_audit_events` sigue tenant-scoped, minimizada, leida de forma general solo por `owner`/`admin`; la trazabilidad de cobertura sigue acotada a `owner`/`admin`/`manager` y entidades operativas permitidas; y la purga sigue siendo primitiva de DB/job, no app normal.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/operational-audit.ts`, `src/lib/coverage-traceability.ts`, `src/app/(app)/app/schedule/schedule-block-detail-panels.tsx`, `src/app/(app)/app/coverage/coverage-block-detail-panels.tsx`, `supabase/migrations/00020_operational_audit_events.sql`, `supabase/migrations/00021_operational_audit_hardening.sql`, `supabase/migrations/00037_operational_events_foundation.sql`, `supabase/migrations/00041_coverage_traceability_audit_read.sql` y el smoke existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para auditoria operativa:
+  - `operational_audit_events` conserva `organization_id`, FKs tenant-safe de actor/membership/persona, `UNIQUE (id, organization_id)`, RLS y policy de lectura retenida;
+  - la lectura general conserva `can_read_operational_audit_events(...)` con `owner`/`admin`, sin incluir `manager`;
+  - `authenticated` conserva solo `GRANT SELECT` sobre `operational_audit_events`, sin grants directos de INSERT/UPDATE/DELETE;
+  - `record_operational_audit_event(...)` deriva usuario, membership, persona y retencion desde `auth.uid()` + tenant, valida entidad dentro del tenant y valida `changed_fields`;
+  - `operational_audit_changed_fields_is_safe(...)` conserva objeto JSON, tamano maximo, bloqueo recursivo de arrays, claves y valores de riesgo: payloads, documentos, payroll, ubicacion, IP/fingerprint, tokens, secretos, signed URLs, Storage, cookies/sesiones y contenido largo;
+  - `purge_expired_operational_audit_events(...)` conserva batch acotado 1..5000, borra solo `retain_until < now()`, queda revocado para `PUBLIC`, `anon` y `authenticated`, y no se llama desde `src/app` ni `src/lib`;
+  - el helper de app sigue usando solo RPCs `record_operational_audit_event` y `list_operational_audit_events`, sin signed URLs, Storage documental, geolocalizacion, payroll ni `service_role`.
+- [x] Anadido guardrail local para trazabilidad de cobertura:
+  - `list_coverage_trace_audit_events(...)` conserva lectura por `owner`/`admin`/`manager`, sin `coach`, `staff`, `document_admin` ni `payroll_manager`;
+  - la RPC filtra `operational_audit_events` por `organization_id`, `retain_until > now()` y solo `schedule_blocks`, `schedule_block_assignments` y `schedule_template_blocks`;
+  - la resolucion de asignaciones y bloques de plantilla conserva filtros por tenant antes de asociar auditoria a bloques;
+  - `listCoverageTraceItems(...)` exige `canManageOperationalData`, resuelve tenant explicito y lee la RPC filtrada;
+  - los detalles visibles usan solo nombres de campos minimizados (`Object.keys(...).slice(0, 6)`), sin mostrar payloads completos, motivos sensibles ni `reason_summary`;
+  - el helper y UI de trazabilidad no mutan horario, fichaje, ausencias, cambios ni auditoria.
+- [x] Actualizado el plan de implementacion para marcar S.30 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales, scheduler real, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: auditoria operativa, trazabilidad de cobertura y purga reciben cobertura local adicional de source guard, pero lectura real por rol, RLS real, cross-tenant, job real de purga y staging siguen dependiendo de harness Supabase/SQL rollback o QA/staging.
+
+Bloqueado/no tocado por S.30:
+
+- No se prueba runtime real de `record_operational_audit_event(...)`, `list_operational_audit_events(...)`, `list_coverage_trace_audit_events(...)` ni `purge_expired_operational_audit_events(...)` con sesion Supabase, roles autenticados, otro tenant, entidad ajena, RLS real, SQL rollback ni scheduler real.
+- No se activa job real de purga, cron, pg_cron, scheduler, alerta, metricas ni evidencia de entorno.
+- No se prueban Server Actions runtime, POST directo, SQL rollback A/B, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva de auditoria, audit dashboard, payroll, documentos firmables, subida documental visible, grants UI, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni permisos por centro funcionales.
+
+Fuera de S.30:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "operational audit local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.30 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.31 - Overtime Candidate Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.15, S.28, S.29 ni S.30; no reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir guardrails locales utiles sobre candidatos operativos de posible exceso ya existentes, sin convertirlos en payroll, hora extra aprobada, saldo legal, compensacion, cierre laboral ni automatismo. El corte confirma contratos fuente robustos: `overtime_candidates` sigue tenant-scoped; lectura/revision sigue acotada a `owner`/`admin`/`manager` o lectura propia cuando aplica; la deteccion sigue protegida y manual; los estados `closed`/`superseded` siguen no accionables; y helpers/RPCs no mutan horario ni fichaje salvo por las primitivas existentes de candidatos.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/overtime-candidates.ts`, `src/lib/overtime-candidate-detection.ts`, `src/app/(app)/app/time/actions.ts`, `src/app/(app)/app/time/page.tsx`, `supabase/migrations/00039_overtime_candidates_foundation.sql`, `supabase/migrations/00040_overtime_candidates_retention_guard.sql`, `supabase/snippets/overtime-candidates-rls-verification.sql`, `tests/smoke/overtime-candidates-foundation.spec.ts` y el smoke local existente `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en `tests/smoke/tenant-rls-negative-local.spec.ts` como source/static guard, no como runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para lectura de candidatos:
+  - `overtime_candidates`, `overtime_candidate_sources` y `overtime_candidate_events` conservan `organization_id`, RLS y policies de lectura por `can_read_overtime_candidate(...)`;
+  - `can_review_overtime_candidates(...)` sigue limitado a `owner`/`admin`/`manager`;
+  - fuera de roles revisores, `can_read_overtime_candidate(...)` y `list_overtime_candidates(...)` siguen filtrando por `get_own_person_profile_id(...)` y bloquean `target_person_profile_id` ajeno;
+  - `src/lib/overtime-candidates.ts` sigue resolviendo `organizationId` contra memberships activas, validando `canReadOvertimeCandidates(...)` y exigiendo `canReviewOvertimeCandidates(...)` para mutaciones de revision;
+  - las lecturas del helper filtran `overtime_candidates` por `id` + `organization_id` y delegan listados en RPC tenant-scoped.
+- [x] Anadido guardrail local para deteccion/revision:
+  - `detectOperationalOvertimeCandidates(...)` sigue exigiendo rol revisor, rango acotado y lecturas filtradas por `organization_id` sobre fichaje, aprobaciones, horario, asignaciones y jornada prevista;
+  - la deteccion crea candidatos solo con `detectionSource: "time_difference"` cuando hay diferencia positiva clara y fuentes operativas existentes; datos insuficientes quedan contados como ignorados;
+  - `addMissingSources(...)`, `setOvertimeCandidateStatus(...)`, `addOvertimeCandidateSource(...)` y sus RPCs mantienen `closed`/`superseded` como estados no accionables;
+  - `record_overtime_candidate_event_internal(...)` deriva actor/membership/persona desde `auth.uid()` + tenant y valida `changed_fields` minimizado;
+  - `/app/time` conserva copy de candidato operativo/posible exceso, formulario manual protegido y texto de que no modifica fichajes, bloques ni asignaciones.
+- [x] Actualizado el plan de implementacion para marcar S.31 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: candidatos de posible exceso reciben cobertura local adicional de source guard, pero lectura real por rol, RLS real, persona ajena/cross-tenant, SQL rollback y staging siguen dependiendo de harness Supabase/SQL rollback o QA/staging.
+
+Bloqueado/no tocado por S.31:
+
+- No se prueba runtime real de `listOvertimeCandidates(...)`, `createOvertimeCandidateSignal(...)`, `addOvertimeCandidateSource(...)`, `setOvertimeCandidateStatus(...)`, `listOvertimeCandidateSources(...)` ni `detectOperationalOvertimeCandidates(...)` con sesion Supabase, roles autenticados, persona ajena, persona de otro tenant, RLS real, POST directo ni SQL rollback.
+- No se ejecuta `supabase/snippets/overtime-candidates-rls-verification.sql` de nuevo ni se crea fixture A/B nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva de revision, payroll, nomina, exporte legal, documentos firmables, subida documental visible, grants UI, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni permisos por centro funcionales.
+
+Fuera de S.31:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "overtime candidates local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.31 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.32 - Base Operational Admin Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.23-S.31; no reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir guardrails locales utiles sobre superficies operativas base de administracion ya existentes: centros, equipo, tipos, horario, plantillas y cobertura. El corte confirma contratos fuente robustos de sesion, tenant, rol, referencias tenant-scoped y exclusiones de producto, sin probar runtime autenticado ni abrir permisos por centro.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts` y las actions/helpers existentes de `centers`, `coaches`, `class-types`, `schedule`, `templates`, `coverage` y `settings`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para contextos de accion:
+  - centros, tipos, horario, plantillas y cobertura siguen resolviendo `getAuthenticatedUser()`, `getActiveMemberships(...)`, `resolveActiveOrganization(...)` y `canManageOperationalData(...)` antes de mutar;
+  - las actions exportadas de esas superficies siguen pasando por el contexto protegido correspondiente;
+  - equipo sigue separando `canManageTeamAccess(...)` y `canManageOperationalTeamProfiles(...)`;
+  - settings sigue usando `canManageTenantSettings(...)` o `canManageTimeTrackingSettings(...)`, no el permiso operativo diario.
+- [x] Anadido guardrail local para referencias tenant-scoped:
+  - centros actualizan con `id` + `organization_id`;
+  - equipo valida centro, membership, ficha coach y persona dentro de `context.organization.id`;
+  - horario valida `center_id`, `class_type_id`, `coach_profile_id`, `person_profile_id`, `schedule_block_id` y asignaciones con `organization_id`;
+  - plantillas validan template, centro, tipo y coach por defecto con `organization_id`;
+  - cobertura valida bloques, tipo y coach asignable con `organization_id`.
+- [x] Confirmado por source guard que `updateClassType(...)` sigue usando la RPC `update_class_type_and_sync_defaults(...)` para sincronizar `required_coaches`, sin volver a `from("class_types").update(...)` para la edicion completa.
+- [x] Confirmado por source guard SQL que la RPC de tipos sigue limitada a `owner`/`admin`/`manager`, filtra por `target_organization_id`, sincroniza plantillas y bloques actuales/futuros no `cancelled`/`completed`, y conserva revoke/grant de ejecucion acotado.
+- [x] Anadido guardrail de exclusiones: estas actions base no abren `center_manager`, documentos, fichaje, ubicacion asistida, payroll/nomina, compensacion, hora extra aprobada, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.32 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, POST directo, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: las superficies operativas base reciben cobertura local adicional de source guard, pero denegaciones reales por rol, POST directo, RLS real, cross-tenant con filas persistidas y staging siguen pendientes.
+
+Bloqueado/no tocado por S.32:
+
+- No se prueba runtime real de `createCenter(...)`, `updateCenter(...)`, equipo/coaches, `updateClassType(...)`, horario, plantillas, cobertura ni settings con sesion Supabase, roles autenticados, POST directo, persona/coach/centro/tipo/bloque de otro tenant, RLS real ni SQL rollback.
+- No se ejecuta ningun snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.32:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "base operational admin local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa con avisos CRLF del worktree, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.32 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.33 - Base Operational Listing Page Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.32 porque cubre paginas/listados de lectura, no contexts de Server Actions. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir guardrails locales utiles sobre las paginas/listados operativos base ya existentes: centros, equipo, tipos, horario, plantillas, cobertura, stats y settings. El corte confirma contratos fuente robustos de sesion, tenant, rol, filtros `organization_id`, controles visibles de gestion por rol y exclusiones de superficies sensibles, sin probar runtime autenticado ni abrir permisos por centro.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts` y las paginas existentes de `centers`, `coaches`, `class-types`, `schedule`, `templates`, `coverage`, `stats` y `settings`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para paginas/listados:
+  - todas las paginas revisadas siguen resolviendo `getAuthenticatedUser()`, redirect anonimo a login, `getActiveMemberships(...)`, `resolveActiveOrganization(...)` y `OrganizationResolutionState` antes de renderizar datos del tenant;
+  - centros, tipos, equipo, horario, plantillas, cobertura y stats siguen cargando listados con queries filtradas por `organization_id`;
+  - plantillas sigue bloqueando a roles sin `canManageOperationalData(...)` antes de cargar plantillas;
+  - stats sigue bloqueando a roles sin `canManageOperationalData(...)` antes de cargar reference data y metricas;
+  - equipo separa `canManageTeamAccess(...)` de `canManageOperationalTeamProfiles(...)`;
+  - settings separa `canManageTenantSettings(...)` de `canManageTimeTrackingSettings(...)`, sin usar permiso operativo diario ni accesos de equipo;
+  - cobertura y horario siguen pasando `canManageSchedule` a los controles de gestion visibles.
+- [x] Anadido guardrail de exclusiones para estas paginas/listados: no abren `center_manager`, `document_admin`, `payroll_manager`, grants UI, rutas Storage, signed URLs, versiones documentales, documentos sensibles, ubicacion asistida, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.33 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, POST directo, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: las paginas/listados operativos base reciben cobertura local adicional de source guard, pero denegaciones reales por rol, POST directo, RLS real, cross-tenant con filas persistidas y staging siguen pendientes.
+
+Bloqueado/no tocado por S.33:
+
+- No se prueba runtime real de paginas/listados con sesion Supabase, roles autenticados, POST directo, persona/coach/centro/tipo/bloque de otro tenant, RLS real ni SQL rollback.
+- No se ejecuta ningun snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.33:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "base operational listing page local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.33 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.34 - App Shell Navigation Source Guard Local
+
+Estado: ejecutado el 2026-05-18 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.32/S.33: cubre shell, navegacion, `/app/more` y entry points del dashboard `/app`, no actions ni paginas/listados base. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre contratos existentes de navegacion/shell por rol, sin cambiar producto. El corte confirma que la navegacion sigue derivando entry points sensibles desde helpers de rol y memberships activas, que `/app/more` separa accesos de gestion de accesos personales/consulta, y que `/app` no carga ni muestra dashboard/acciones de gestion a roles sin permiso operativo.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts`, `src/components/layout/app-navigation.tsx`, `src/app/(app)/app/layout.tsx`, `src/app/(app)/app/more/page.tsx`, `src/app/(app)/app/page.tsx` y `src/lib/navigation/app-paths.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para navegacion y shell:
+  - `ProtectedAppLayout` sigue pasando a `AppNavigation` solo `organizationId` y `role` derivados de memberships activas;
+  - `AppNavigation` sigue resolviendo rol por `organizationId` activo y usando `canManageOperationalData(...)` para entry points sensibles de Cobertura, Plantillas, Settings y estado activo de Stats bajo Mas;
+  - `AppNavigation` no activa `center_manager`, `document_admin`, `payroll_manager` ni `staff`, ni usa helpers de settings globales/accesos de equipo como atajo de navegacion;
+  - `/app/more` sigue resolviendo sesion, memberships y organizacion activa antes de renderizar, y deja Stats/Settings/Plantillas solo dentro de la rama `canManageOperational`;
+  - la rama personal/consulta de `/app/more` mantiene Mi horario, Mi fichaje, Documentos autorizados, Equipo/Centros/Tipos en lectura, sin Cobertura, Stats, Settings ni Plantillas;
+  - `/app` sigue cargando `getDashboardData(...)`, `AdminCoverageDashboard` y `SurfaceLinks` solo cuando `canManageOperationalData(...)` lo permite; `ReadOnlyHome` queda en Mi horario, Mi fichaje, Solicitudes y Mi cuenta;
+  - shell/dashboard/more no abren documentos sensibles, grants UI, rutas Storage, signed URLs, ubicacion asistida, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.34 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, POST directo, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: navegacion/shell recibe cobertura local adicional de source guard, pero denegaciones reales por rol, direct URL, POST directo, RLS real, cross-tenant con filas persistidas y staging siguen pendientes.
+
+Bloqueado/no tocado por S.34:
+
+- No se prueba runtime real de navegacion con sesion Supabase, roles autenticados, direct URL a rutas ocultas, POST directo, RLS real ni SQL rollback.
+- No se cambia la UI ni se redefine el producto: el test protege contratos existentes y no convierte navegacion en control de seguridad unico.
+- No se ejecuta ningun snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.34:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-18:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "app shell navigation local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.34 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.35 - Protected App Route Cache Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.33/S.34: cubre cache/proxy/rutas protegidas y helpers de paths, no actions, paginas/listados base ni entry points de navegacion. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre contratos existentes de rutas protegidas/cache y paths internos, sin cambiar producto. El corte confirma que `/app` mantiene `no-store` en `next.config.ts` y proxy, que los entry points protegidos siguen siendo `force-dynamic`, que no aparecen opt-ins de cache privada en rutas protegidas, y que los helpers de paths no construyen rutas de archivo/signed URL ni superficies sensibles fuera de gates.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts`, `next.config.ts`, `src/proxy.ts`, `src/lib/supabase/proxy.ts`, `src/lib/navigation/app-paths.ts` y entry points `page.tsx`/`layout.tsx`/`route.ts` bajo `src/app/(app)/app`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para rutas protegidas/cache:
+  - `next.config.ts` mantiene `Cache-Control: no-store` para `/app` y `/app/:path*`;
+  - `src/proxy.ts` mantiene matcher de `/app/:path*` y delega en `updateSession(...)`;
+  - `src/lib/supabase/proxy.ts` mantiene `Cache-Control: no-store` y `Pragma: no-cache` en respuestas protegidas, redirects anonimos y respuesta final;
+  - todos los `page.tsx`, `layout.tsx` y `route.ts` bajo `/app` exportan `dynamic = "force-dynamic"`;
+  - esos entry points protegidos no optan por `revalidate`, `fetchCache`, `unstable_cache` ni Cache Components;
+  - `src/lib/navigation/app-paths.ts` solo genera rutas `/app` de primer nivel y no construye rutas de preview/download/versiones, Storage, grants, signed URLs, ubicacion, payroll, push ni geofencing;
+  - `src/app` y `src/components` siguen sin registrar service worker, Workbox, Push API, Notification API, Background Sync ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.35 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, headers reales en despliegue, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: rutas/cache protegidas reciben cobertura local de source guard, pero headers/cookies reales, direct URLs autenticadas, expiracion efectiva de signed URLs, Storage real y staging siguen pendientes o bloqueados.
+
+Bloqueado/no tocado por S.35:
+
+- No se prueba runtime real de headers con `next start`, Vercel, HTTPS, cookies Supabase, rol autenticado, direct URL ni redireccion efectiva.
+- No se ejecuta navegador, servidor, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.35:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "protected app route cache local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.35 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.36 - Organization Resolution State Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.12 ni S.34: S.12 ya cubre el helper `resolveActiveOrganization(...)`, y S.34 cubre shell/navegacion; S.36 cubre el componente de estado de resolucion de organizacion y la conservacion explicita de `basePath` en paginas protegidas. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre contratos existentes de UI de resolucion de tenant, sin cambiar producto. El corte confirma que los estados `no_active_memberships`, `organization_required` y `organization_not_found` no ofrecen fallback automatico a tenant ajeno, que la seleccion de tenant solo ocurre con membership explicita y sobre el `basePath` recibido, y que esa UI no abre acciones o superficies sensibles.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts`, `src/components/features/organization-resolution-state.tsx` y paginas `page.tsx` bajo `src/app/(app)/app` que renderizan `OrganizationResolutionState`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para resolucion UI de tenant:
+  - `OrganizationResolutionState` sigue tipado solo para resoluciones `ok: false` y mantiene los estados `no_active_memberships`, `organization_required` y `organization_not_found`;
+  - solo `organization_required` muestra seleccion explicita de tenant;
+  - la seleccion usa `resolution.memberships` y construye el link con `getAppPath(basePath, { organizationId: membership.organization_id })`;
+  - `no_active_memberships` y `organization_not_found` quedan como estado informativo sin `Link`, `href`, `getAppPath` ni fallback a otra membership;
+  - no hay fallback a `memberships[0]`, `selectedMembership`, `router.push`, `redirect(...)`, `window.location` ni `location.href`;
+  - las paginas protegidas que renderizan `OrganizationResolutionState` pasan un `basePath` literal que coincide con su ruta `/app` de primer nivel;
+  - esos `basePath` no apuntan a preview/download/versiones, Storage, grants, signed URLs, ubicacion, payroll, geofencing ni push;
+  - el componente no abre formularios/actions, documentos sensibles, grants UI, rutas Storage, signed URLs, ubicacion asistida, IA, app nativa, geofencing, push, service worker ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.36 como cobertura local source/static y mantener bloqueados los casos que exigen runtime autenticado, ruta real, SQL rollback A/B, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: los casos Auth/session/reset de usuario sin membership, multi-membership y `organizationId` ajeno pasan de `pendiente-test` a `parcial` por cobertura helper/source guard local, pero la validacion real con sesion sigue pendiente o bloqueada.
+
+Bloqueado/no tocado por S.36:
+
+- No se prueba runtime real con sesion Supabase, usuario sin membership, usuario con multiples memberships, `organizationId` ajeno, direct URL, redireccion efectiva ni render de navegador.
+- No se ejecuta servidor, navegador, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, callback Auth con `code` real, Storage, signed URLs ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.36:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "organization resolution state local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.36 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.37 - Auth Transition Routes Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.13: S.13 cubre el helper compartido `getSafeRedirectPath(...)`; S.37 cubre que las rutas, paginas y actions publicas de transicion Auth siguen usando ese contrato y no construyen redirects externos o superficies sensibles. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre callback, login redirect, forgot/reset password y sign-out sin ejecutar runtime real de Supabase Auth. El corte confirma que los redirects siguen siendo internos/sanitizados, que reset conserva respuesta generica anti-enumeracion y que esas superficies no abren cache privada, signed URLs, tokens, Storage, service role, SMTP directo, documentos, grants UI, IA, ubicacion, push, service worker ni CacheStorage.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts` y las superficies Auth existentes:
+  - `src/app/auth/callback/route.ts`;
+  - `src/app/auth/sign-out/route.ts`;
+  - `src/app/(auth)/login/page.tsx`;
+  - `src/app/(auth)/login/actions.ts`;
+  - `src/app/(auth)/forgot-password/page.tsx`;
+  - `src/app/(auth)/forgot-password/actions.ts`;
+  - `src/app/(auth)/reset-password/page.tsx`;
+  - `src/app/(auth)/reset-password/actions.ts`;
+  - `src/app/(auth)/reset-password/reset-password-form.tsx`;
+  - `src/lib/auth/site-url.ts`;
+  - `src/lib/auth/redirects.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SMTP, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para transiciones Auth:
+  - el callback sigue leyendo `redirectTo`/`next` con `getSafeRedirectPath(...)`, intercambia `code` solo si existe y redirige con `new URL(redirectTo, requestUrl.origin)`;
+  - los errores de callback siguen acotados a `/reset-password?error=callback` o `/login?error=callback`;
+  - login page/action siguen sanitizando `redirectTo` antes de renderizar `href`, input oculto, redirects de error y redirect final;
+  - forgot password sigue usando `getAuthCallbackUrl("/reset-password")`, catch silencioso y `GENERIC_RESET_SENT_PATH`;
+  - reset password sigue validando la politica, actualizando password con Supabase Auth, cerrando la sesion temporal y volviendo a `/login?status=password-updated`;
+  - sign-out sigue haciendo `supabase.auth.signOut()` y redirigiendo internamente a `/login` con 303;
+  - login, forgot y reset siguen `force-dynamic` y sin `revalidate`, `fetchCache`, `unstable_cache` ni Cache Components;
+  - las superficies revisadas no introducen signed URLs, Storage, grants UI, documentos sensibles, `service_role`, secretos SMTP/DB, ubicacion web, IA, push, service worker ni CacheStorage.
+- [x] Actualizado el plan de implementacion para marcar S.37 como cobertura local source/static y mantener bloqueados los casos que exigen runtime Auth real, `code` valido, cookies, SMTP, credenciales, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: los casos Auth/session/reset siguen `parcial`; S.37 solo anade evidencia fuente sobre transiciones Auth publicas y no sustituye validacion real.
+
+Bloqueado/no tocado por S.37:
+
+- No se prueba callback completo con `code` valido, exchange real de Supabase Auth, login con credenciales reales, forgot/reset con SMTP real, sign-out con cookies reales ni redireccion efectiva en navegador.
+- No se ejecuta servidor, navegador, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, SMTP, staging, Storage, signed URLs ni evidencia externa.
+- No se introduce allowlist cerrada de rutas internas; el contrato actual sigue siendo helper de path interno, y cambiarlo seria hardening de producto/Auth separado.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.37:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "auth transition routes local source guardrails"` pasa con 4 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.37 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.38 - Invite Accept Public Auth Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.37: S.37 cubre callback/login/forgot/reset/sign-out; S.38 cubre la superficie publica `/invite/accept` y las RPCs existentes que aceptan una invitacion. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre aceptacion de invitaciones sin ejecutar Auth real, SMTP, token valido, Server Actions runtime ni Supabase. El corte confirma por fuente que `invitationId`/`token` se usan solo para preview/aceptacion y vuelta interna/sanitizada, que el usuario anonimo vuelve a login por `getLoginPath(...)`, y que la aceptacion real sigue revalidando sesion/email/membership/persona/coach en servidor/RPC.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts` y la superficie de invitacion existente:
+  - `src/app/(auth)/invite/accept/page.tsx`;
+  - `src/app/(auth)/invite/accept/actions.ts`;
+  - `src/lib/team-invitations.ts`;
+  - `supabase/migrations/00022_team_invitation_digest_search_path.sql`;
+  - `supabase/migrations/00024_team_invitation_accept_update_qualification.sql`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SMTP, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para `/invite/accept`:
+  - la pagina sigue `force-dynamic`, valida `invitationId` como UUID y exige token antes de llamar a `get_team_invitation_public`;
+  - la preview publica sigue pasando `raw_invitation_token` y `target_invitation_id` a la RPC y no construye rutas protegidas `/app`;
+  - la vuelta de usuario anonimo sigue usando `getInvitationAcceptPath(invitationId, token)` + `getLoginPath(invitePath)`, con ruta interna de aceptacion;
+  - los formularios solo conservan `invitationId` y `token` como inputs ocultos para aceptar la invitacion;
+  - las actions siguen validando UUID/token minimo, redirigen anonimos a login con ruta interna, usan `getSafeRedirectPath(...)` para el callback de signup y redirigen a `/app` solo tras `accept_team_invitation`;
+  - la auditoria operativa de aceptacion marca campos tocados pero no guarda token, `token_hash` ni `raw_invitation_token`;
+  - `get_team_invitation_public` sigue hasheando el token y devuelve solo campos publicos minimos de invitacion;
+  - `accept_team_invitation` sigue exigiendo `auth.uid()`, email Auth coincidente, token hasheado, estado/expiracion validos, membership tenant-scoped y enlace de `person_profiles`/`coach_profiles` por `organization_id` + `current_user_id`.
+- [x] Actualizado el plan de implementacion para marcar S.38 como cobertura local source/static y mantener bloqueados los casos que exigen invitacion real, sesion Supabase, SMTP, Server Actions runtime, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: se anade una fila parcial para Auth/session/invitaciones; S.38 solo aporta evidencia fuente local y no sustituye validacion real.
+
+Bloqueado/no tocado por S.38:
+
+- No se prueba invitacion real, token valido, login real, signup real, confirmacion Auth, callback con `code`, aceptacion con sesion Supabase, email SMTP, cookies, redirects efectivos de navegador ni auditoria persistida.
+- No se ejecuta servidor, navegador real, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, Storage, staging, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.38:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "invite accept auth local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.38 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.39 - Team Invitation Issuance Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.32: S.32 cubre gating general de actions y referencias operativas base; S.39 cubre el contrato local de creacion, reenvio, cancelacion, token, email y auditoria de invitaciones. No repite S.38: S.38 cubre `/invite/accept` y RPCs de aceptacion. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util sobre emision de invitaciones sin ejecutar Auth real, SMTP/Resend real, token valido, Server Actions runtime ni Supabase. El corte confirma por fuente que la creacion, reenvio y cancelacion siguen detras de sesion/tenant/`canManageTeamAccess(...)`, que las referencias de ficha/persona/invitacion filtran por `organization_id`, que el token crudo solo se usa para construir/enviar el enlace de aceptacion, y que auditoria/email quedan minimizados.
+
+Alcance implementado:
+
+- [x] Revisado el harness `tests/smoke/tenant-rls-negative-local.spec.ts` y la superficie existente:
+  - `src/app/(app)/app/coaches/actions.ts`;
+  - `src/app/(app)/app/coaches/page.tsx`;
+  - `src/lib/team-invitations.ts`;
+  - `src/lib/email/resend.ts`.
+- [x] Confirmado que el siguiente P2 viable podia vivir en el smoke local existente como source/static guard, sin servidor, credenciales, Supabase real/local, SMTP/Resend real, SQL rollback, Storage ni Server Actions runtime.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrails source/static para invitaciones de equipo:
+  - `createTeamInvitation`, `resendTeamInvitation` y `cancelTeamInvitation` siguen usando `getCoachActionContext(formData, "team-access")`;
+  - la creacion bloquea duplicados abiertos por `organization_id` + email normalizado y solo usa fichas/personas del tenant activas, visibles y sin `user_id`;
+  - la creacion de ficha/persona nueva inserta `organization_id`, estado activo y visibilidad visible dentro del tenant;
+  - el token se genera con `generateInvitationToken()`, se persiste como `hashInvitationToken(token)` y el valor crudo solo se pasa al helper que construye/envia el enlace;
+  - el reenvio valida UUID, invitacion del tenant, estados cerrados, rate limit local por `last_sent_at`, persona del tenant y rota el token antes de enviar;
+  - la cancelacion valida UUID, actualiza solo la invitacion del tenant y no cancela invitaciones ya aceptadas;
+  - el helper de envio marca fallo/exito filtrando por `id` + `organization_id` y no registra provider payloads completos en auditoria;
+  - los `changedFields` de `team_invitations` no guardan token, `token_hash`, raw token, accept URL, provider message, `last_error` ni secretos;
+  - el builder de email escapa HTML para destinatario, invitador, organizacion y URL antes de interpolar el HTML;
+  - el provider helper lee env server-side dentro de `getEmailConfig()`, usa Resend solo desde helper servidor y no loggea payloads.
+- [x] Actualizado el plan de implementacion para marcar S.39 como cobertura local source/static y mantener bloqueados los casos que exigen invitacion real, sesion Supabase, SMTP/Resend real, Server Actions runtime, Storage o staging.
+- [x] Actualizada la matriz negativa sin exagerar evidencia: se anade una fila parcial para emision/reenvio/cancelacion de invitaciones; S.39 solo aporta evidencia fuente local y no sustituye validacion real.
+
+Bloqueado/no tocado por S.39:
+
+- No se prueba invitacion real, envio real, token valido, login/signup real, confirmacion Auth, callback con `code`, aceptacion con sesion Supabase, SMTP/Resend real, cookies, redirects efectivos de navegador ni auditoria persistida.
+- No se ejecuta servidor, navegador real, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban Server Actions runtime, Storage, staging, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No se abre UI nueva, permisos por centro funcionales, grants UI, subida documental visible, documentos firmables, payroll, nomina, geolocalizacion web, app nativa, geofencing, push, service worker, CacheStorage, IA ni cumplimiento legal definitivo.
+
+Fuera de S.39:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "team invitation issuance local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.39 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.40 - Transactional Email Error Hardening Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada, con un parche minimo de hardening porque habia fragilidad real: el helper de Resend podia devolver `payload.message`/`payload.name` y la action de invitaciones persistia `sendResult.message` en `team_invitations.last_error`, que ademas se muestra en Equipo. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: cubrir un guardrail local util de email transaccional/Auth-email sin repetir S.37-S.39. El corte confirma que secretos/env de email quedan server-side, el proveedor no se inicializa en cliente ni en scope global sensible, las llamadas directas al proveedor quedan solo en el helper esperado, y errores visibles/persistidos no exponen secretos, payloads completos, tokens, API keys, DB URLs, internals SMTP ni respuestas completas del proveedor.
+
+Alcance implementado:
+
+- [x] Revisados `src/lib/email/resend.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/app/(app)/app/coaches/page.tsx` y `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Parche minimo en `src/lib/email/resend.ts`: `ResendEmailResponse` ya solo modela `id`; el fallo HTTP se devuelve con mensaje generico y ya no propaga `payload.message` ni `payload.name`.
+- [x] Parche minimo en `src/app/(app)/app/coaches/actions.ts`: los fallos de envio se persisten en `last_error` mediante `getSafeInvitationEmailErrorMessage(sendResult.code)`, sin guardar `sendResult.message`, raw provider payloads ni respuesta del proveedor.
+- [x] Parche minimo en `src/app/(app)/app/coaches/page.tsx`: el copy visible de errores de email deja de mencionar `RESEND_API_KEY`, `BOXOPS_EMAIL_FROM`, SMTP o API.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static para email transaccional:
+  - `RESEND_API_KEY`, `BOXOPS_EMAIL_FROM`, `BOXOPS_EMAIL_REPLY_TO` y `https://api.resend.com/emails` aparecen solo en `src/lib/email/resend.ts`;
+  - no hay SDK/cliente Resend inicializado en scope global ni import `@resend`/`resend`;
+  - el helper no usa `payload.message`/`payload.name` y solo lee `payload.id` tras `response.ok`;
+  - `last_error` se alimenta con mensaje generico por codigo, no con `sendResult.message`;
+  - auditoria de `team_invitations` no guarda `last_error`, provider message, `sendResult`, payloads, tokens ni accept URL;
+  - el copy visible de errores de email no muestra env vars, SMTP, DB URLs, service role, payloads, tokens ni API keys;
+  - no hay `console.*` de provider payloads ni apertura de Auth Admin, Storage, signed URLs, grants UI, documentos sensibles, IA, ubicacion, push, service worker ni CacheStorage en las superficies revisadas.
+- [x] Actualizado el plan de implementacion para marcar S.40 como cobertura local source/static con parche minimo de hardening.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: los casos de secretos/env e invitaciones siguen `parcial` hasta validacion real/staging.
+
+Bloqueado/no tocado por S.40:
+
+- No se prueba envio real, proveedor real, respuesta real de Resend, SMTP/Auth real, callback Auth con `code`, cookies, Server Actions runtime, RLS real, auditoria persistida ni UI en navegador.
+- No se ejecuta servidor, navegador real, snippet SQL rollback A/B ni se crea fixture nueva.
+- No se prueban credenciales E2E por rol, tenant QA/staging, Storage, signed URLs, project/ref, DB URL ni evidencia externa.
+- No se abre Supabase Auth Admin, service role, SMTP directo en UI, Storage, signed URLs, grants UI, documentos sensibles, IA, ubicacion, app nativa, push, service worker, CacheStorage, permisos por centro funcionales, payroll ni cumplimiento legal definitivo.
+
+Fuera de S.40:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "team invitation issuance local source guardrails|transactional email hardening local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.40 no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.41 - Privileged Supabase And Storage Client Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static extremadamente acotada. No repite S.35 ni S.40: S.35 cubre cache/rutas protegidas/helpers de paths y S.40 cubre hardening de errores de email transaccional; S.41 cubre clientes Supabase/Auth/Storage, llamadas privilegiadas y confinamiento de signed URLs/Storage a superficies esperadas. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca `src`, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: confirmar por source guard que la app sigue usando clientes Supabase SSR/browser con anon key publica, que no aparecen `service_role`, Auth Admin, DB URLs, SMTP directo ni clientes privilegiados en `src`, y que Storage privado/signed URLs siguen acotados a helpers/rutas esperadas ya documentadas, sin filtrarse a componentes cliente, navegacion, shell o listados visibles.
+
+Alcance implementado:
+
+- [x] Revisados `src/lib/supabase/env.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/client.ts`, `src/lib/supabase/proxy.ts`, superficies de documentos/horario/cuenta y `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static para clientes Supabase privilegiados:
+  - `getSupabasePublicEnv()` sigue leyendo solo `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`;
+  - `createServerClient`/`createBrowserClient` solo aparecen en `src/lib/supabase/server.ts`, `src/lib/supabase/proxy.ts` y `src/lib/supabase/client.ts`;
+  - `process.env` queda allowlisted en `src/lib/supabase/env.ts`, `src/lib/auth/site-url.ts` y `src/lib/email/resend.ts`;
+  - no hay imports runtime de `@supabase/supabase-js`, inicializacion de cliente Supabase en scope global, `auth.admin`, `service_role`, DB URLs ni SMTP directo en `src`.
+- [x] Ampliado el mismo smoke con guardrail de Storage/signed URLs:
+  - `supabase.storage` sigue limitado a `src/lib/document-file-access.ts` y Mi cuenta (`src/app/(app)/app/account/page.tsx`/`actions.ts`);
+  - `createSignedUrl` sigue limitado a `src/lib/document-file-access.ts` y previews propias de avatar/firma en Mi cuenta;
+  - `document-files` sigue limitado al helper backend `src/lib/document-file-access.ts`;
+  - navegacion, shell, `/app/documents` y panel documental de Horario solo construyen rutas backend condicionadas por `can_preview`/`can_download`, sin raw Storage paths, bucket names, signed URLs, grants UI ni RPCs de upload documental.
+- [x] Ampliado el mismo smoke con guardrail de componentes cliente:
+  - los archivos `"use client"` bajo `src/app` y `src/components` no importan clientes Supabase, no leen env/secrets, no llaman `auth.admin`/`supabase.storage`/`createSignedUrl` y no exponen `storage_path`, `storage_bucket`, `document-files`, `document_access_grants`, `manage_grants`, `requires_signature`, `signature_evidence`, `sensitive_hr` ni `payroll`.
+- [x] Actualizado el plan de implementacion para marcar S.41 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: secretos/env y Storage privado siguen `parcial` hasta validacion real/staging con credenciales, bucket/objeto controlado y evidencia redacted.
+
+Bloqueado/no tocado por S.41:
+
+- No se prueba Auth real, cookies HTTPS, runtime autenticado, Server Actions, SQL rollback A/B, Storage real, policies reales, expiracion efectiva de signed URLs, SMTP real, proveedor real, navegador, headers reales ni QA/staging.
+- No se prueban credenciales E2E por rol, tenant QA/staging, project/ref, DB URL, objeto `document-files` controlado ni evidencia externa.
+- No se abre Supabase Auth Admin, service role, cliente DB directo, SMTP directo, nuevas rutas Storage, grants UI, subida documental visible, documentos firmables, IA, ubicacion, app nativa, push, service worker, CacheStorage, permisos por centro funcionales, payroll ni cumplimiento legal definitivo.
+
+Fuera de S.41:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "privileged Supabase and Storage client local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.41 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.42 - Trackable Secret And Evidence Hygiene Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.40 ni S.41: S.40 cubre errores de email transaccional en invitaciones y S.41 cubre clientes Supabase/Auth/Storage en `src`; S.42 cubre higiene de secretos y evidencia en archivos trackeables de docs/tests/snippets y plantilla env, sin leer valores reales ni abrir validaciones externas. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca producto, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: confirmar por guard local que archivos que pueden acabar en repo no contienen API keys reales, service role real, DB URLs con credenciales, SMTP creds, private keys, JWTs, cookies, signed URLs activas, URLs activas de Storage Supabase ni instrucciones de guardar evidencia sensible en el repo. Confirmar tambien que `.env.example` sigue siendo placeholder/local safe, que `.env.local` sigue ignorado/no trackeado y que el corte no abre secret scanning externo, proveedor real, acceso staging ni lectura de valores reales.
+
+Alcance implementado:
+
+- [x] Revisados `tests/smoke/tenant-rls-negative-local.spec.ts`, `.env.example`, `.gitignore`, docs de arquitectura/readiness y snippets trackeables desde un smoke local.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail de archivos trackeables:
+  - usa `git ls-files --cached --others --exclude-standard` para limitarse a archivos trackeables/no ignorados;
+  - escanea docs raiz, `docs/**/*.md`, `tests/**/*.ts`, `supabase/snippets/**/*.sql` y `.env.example`;
+  - busca formatos de secretos activos en vez de palabras genericas: API keys tipo `sk-...`, `re_...`, tokens Supabase `sb_...`, JWTs, private keys completas, DB/SMTP URLs con credenciales, asignaciones env sensibles con valor, headers de cookie, signed URLs activas y URLs activas de Supabase Storage.
+- [x] Ampliado el mismo smoke con guardrail de `.env.example`/`.env.local`:
+  - `.env.example` conserva solo URL local Supabase, anon key vacia, site URL local, `RESEND_API_KEY=` vacia, remitente `onboarding@resend.dev` y reply-to vacio;
+  - `.env.example` no declara service role, access token, DB URLs, Postgres direct vars ni SMTP creds;
+  - `.env.local` se comprueba solo con `git check-ignore -v` y `git ls-files .env.local`, sin leer ni imprimir sus valores.
+- [x] Ampliado el mismo smoke con guardrail de runbooks/evidencia:
+  - los runbooks/matrices mantienen lenguaje `fuera del repo` y `redacted`;
+  - mencionan que secretos, cookies, signed URLs, rutas Storage y contenido documental no deben guardarse en repo;
+  - no instruyen guardar/commitear/pegar/subir esos materiales sensibles al repo ni abren gitleaks/trufflehog/GitHub secret scanning o secret scanning externo como dependencia del corte.
+- [x] Actualizado el plan de implementacion para marcar S.42 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: secretos/env sigue `parcial` hasta validacion real/staging, rotacion/configuracion de entorno y evidencia redacted; Storage privado sigue `parcial`/`bloqueado-por-entorno` para objeto real, policies y expiracion efectiva.
+
+Bloqueado/no tocado por S.42:
+
+- No se prueba Auth real, SMTP real, proveedor real, cookies HTTPS, runtime autenticado, Server Actions, SQL rollback A/B, Storage real, policies reales, expiracion efectiva de signed URLs, dashboard Supabase/Vercel, navegador ni QA/staging.
+- No se leen valores de `.env.local`, no se imprimen secretos, no se abre scanner externo, no se llama a Resend/Supabase real, no se usa DB URL, no se crea project/ref ni se prepara evidencia externa.
+- No se prueban credenciales E2E por rol, tenant QA/staging, archivo `document-files` controlado ni evidencia real.
+- No se abre Supabase Auth Admin, service role, cliente DB directo, SMTP directo, nuevas rutas Storage, grants UI, subida documental visible, documentos firmables, IA, ubicacion, app nativa, push, service worker, CacheStorage, permisos por centro funcionales, payroll ni cumplimiento legal definitivo.
+
+Fuera de S.42:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No SQL rollback nuevo, fixtures persistentes, datos reales, migraciones, seeds, UI, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "trackable secret and evidence hygiene local guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa; solo muestra avisos LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.42 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.43 - Package Supply Chain Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.41 ni S.42: S.41 cubre clientes Supabase/Auth/Storage en `src` y S.42 cubre higiene de secretos/evidencia trackeable; S.43 cubre `package.json`, `package-lock.json` y scripts npm sin tocar dependencias ni ejecutar auditorias externas. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no ejecuta `npm install`, no llama a red, no toca producto, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: confirmar por guard local que el manifest/lockfile no introducen dependencias directas ni scripts asociados a IA/LLM/embeddings/vector, geolocalizacion, service worker/PWA offline, push, CacheStorage, SMTP directo/nodemailer, clientes DB directos privilegiados, scanners externos de secretos como dependencia del corte, app nativa ni tooling payroll/legal; confirmar tambien que `package-lock.json` existe y sigue alineado con `package.json`, y que los scripts npm no leen `.env.local`, no imprimen secretos, no llaman proveedores reales/staging ni usan `service_role`/DB URLs.
+
+Alcance implementado:
+
+- [x] Revisados `package.json`, `package-lock.json` y `tests/smoke/tenant-rls-negative-local.spec.ts`.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail de lockfile:
+  - `package-lock.json` existe, usa `lockfileVersion = 3` y su paquete raiz coincide con `package.json`;
+  - `dependencies` y `devDependencies` del paquete raiz del lockfile coinciden con `package.json`;
+  - dependencias existentes necesarias como Next, React, Supabase SSR/JS, Playwright, Tailwind y shadcn quedan permitidas de forma explicita.
+- [x] Ampliado el mismo smoke con guardrail de dependencias directas:
+  - bloquea familias directas de IA/LLM/embeddings/vector, geolocalizacion/PWA offline/push, SMTP directo, clientes DB directos privilegiados, secret scanners externos, app nativa, payroll y legal signing tooling;
+  - no escanea dependencias transitivas con reglas genericas para evitar falsos positivos fragiles sobre toolchains existentes.
+- [x] Ampliado el mismo smoke con guardrail de scripts npm:
+  - bloquea comandos destructivos generales, lectura de `.env.local`, impresion de secretos, llamadas a URLs/proveedores reales/staging y uso de service role/DB URLs;
+  - mantiene permitido el comando local existente `supabase:reset = "supabase db reset"` como reset local documentado por el brief, sin `--db-url`, `--linked` ni entorno real;
+  - confirma que `supabase:types` sigue usando `--local`.
+- [x] Actualizado el plan de implementacion para marcar S.43 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso tenant/RLS cambia de estado: supply chain sigue `parcial` en ASVS hasta revision recurrente de vulnerabilidades/lockfile y entorno real, y no hay evidencia staging nueva.
+
+Bloqueado/no tocado por S.43:
+
+- No se ejecuta `npm install`, `npm update`, `npm audit`, `npm audit --production`, `npm outdated`, SCA externo, gitleaks/trufflehog/GitHub secret scanning, proveedor real, staging, servidor, navegador, Supabase real/local, SMTP, SQL rollback, Storage real ni Server Actions runtime.
+- No se cambia `package.json`, `package-lock.json`, dependencias, scripts, `src`, migraciones, seeds, fixtures persistentes ni configuracion de CI.
+- No se verifican vulnerabilidades reales, licencias, provenance, firmas de paquetes, registry policy, rotacion de secretos, dashboards, cookies, signed URLs reales, project/ref, DB URL, credenciales E2E ni evidencia redacted.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, secret scanners externos, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.43:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria de vulnerabilidades ni aceptacion formal de riesgo de dependencias.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "package supply-chain local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.43 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.44 - Generated Artifact And Local Evidence Hygiene Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42 ni S.43: S.42 cubre secretos activos y evidencia sensible dentro de archivos trackeables de docs/tests/snippets/.env.example; S.43 cubre package/lockfile/scripts. S.44 cubre higiene de artefactos generados y evidencia local no trackeable mediante `.gitignore`, `git ls-files` y `git ls-files --others --exclude-standard`, sin leer secretos ni contenido sensible. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no borra ni mueve evidencia, no toca producto, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: confirmar por guard local que outputs de build/test y evidencia local sensible esperable no estan trackeados ni quedan como untracked no ignorado: `.next`, `out`, `dist`, `build`, `.turbo`, `.vercel`, `coverage`, `test-results`, `playwright-report`, screenshots/videos/traces locales, dumps, logs, exports reales, documentos controlados locales y temporales de evidencia.
+
+Alcance implementado:
+
+- [x] Revisados `.gitignore`, `tests/smoke/tenant-rls-negative-local.spec.ts` y el estado por nombres con `git ls-files` / `git ls-files --others --exclude-standard`.
+- [x] Reforzado `.gitignore` para mantener fuera del repo artefactos locales de QA/evidencia: directorios raiz `.local-evidence`, `evidence`, `qa-evidence`, `screenshots`, `videos`, `traces`, `dumps`, `exports`, `controlled-documents`, `tmp`, `temp`, y extensiones de traces/HAR/video/dump/db/backups/tmp.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail local de artefactos generados/evidencia:
+  - confirma que `.gitignore` mantiene las reglas esperadas para outputs de build/test, logs, evidencia local, dumps, exports y documentos controlados locales;
+  - usa `git check-ignore -q` sobre rutas sinteticas de artefactos sin crear archivos ni leer contenido;
+  - usa `git ls-files` para confirmar que no hay artefactos generados/evidencia local trackeados bajo esos patrones;
+  - usa `git ls-files --others --exclude-standard` para confirmar que no hay artefactos generados/evidencia local no ignorados que se anadirian accidentalmente al repo.
+- [x] Actualizado el plan de implementacion para marcar S.44 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso tenant/RLS cambia de estado: secretos/env, Storage, evidencia real y entorno siguen `parcial`/`bloqueado-por-entorno` hasta validacion real con acceso y evidencia redacted.
+
+Bloqueado/no tocado por S.44:
+
+- No se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs ni exports reales.
+- No se borra, mueve, normaliza ni publica evidencia local; el guard solo mira reglas de ignore y nombres de Git.
+- No se prueba entorno real/staging, dashboards, Storage real, expiracion efectiva de signed URLs, proveedores, secret scanning externo, SCA externo, servidor, navegador, Supabase real/local, SMTP, SQL rollback, Storage real ni Server Actions runtime.
+- No se verifican artefactos historicos fuera de los patrones cubiertos, ni se decide una politica completa de retencion/evidencia; cualquier evidencia real sigue fuera del repo y redacted.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.44:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria de vulnerabilidades, escaneo externo de secretos, retention policy definitiva ni aceptacion formal de riesgo de evidencia.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "generated artifact and local evidence hygiene guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.44 solo toca `.gitignore`, smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.45 - Visible Logging And Error Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.40, S.42, S.43 ni S.44: S.40 cubre errores de email transaccional, S.42 cubre secretos/evidencia en archivos trackeables, S.43 cubre package/lockfile/scripts y S.44 cubre artefactos generados/evidencia local no trackeable. S.45 cubre higiene de logging y errores visibles en `src`, sin leer secretos ni evidencia local, sin servidor, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que `src` sigue sin `console.*` y que las superficies visibles de app/componentes no serializan errores crudos (`JSON.stringify(error)`, `String(error)`, `error.stack`, `{error.message}`, `message: error.message`, redirects con `error.message`) que puedan exponer secretos, cookies, signed URLs, rutas Storage, DB URLs, SMTP/env vars, tokens, provider payloads, documentos, payroll, ubicacion o datos sensibles.
+
+Alcance implementado:
+
+- [x] Revisado `src` con busqueda acotada de `console.*`, serializacion cruda de errores y stacks.
+- [x] Detectado ruido historico de `throw new Error(... error.message ...)` en Server Components/helpers de carga. No se convierte en regla global ni se toca producto porque seria un refactor amplio y fragil; S.45 se limita a errores visibles/client y logging en fuente.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static:
+  - bloquea `console.log`, `console.debug`, `console.info`, `console.warn`, `console.error`, `console.trace`, `console.table`, `console.dir`, `console.group` y `console.groupCollapsed` en todo `src`;
+  - bloquea serializacion visible de errores crudos en `src/app` y `src/components`: `JSON.stringify(error)`, `String(error)`, `error.stack`, JSX `{error.message}`, objetos devueltos con `error/message: error.message` y redirects con `error.message`;
+  - confirma que `src/app/(app)/app/error.tsx` mantiene copy generico y solo muestra `error.digest`, sin `error.message`, `error.stack` ni serializacion del objeto `error`.
+- [x] La matriz negativa no se actualiza porque ningun caso tenant/RLS cambia de estado: logging/errores visibles queda como source guard local y no sustituye validacion real/staging, observabilidad, logs de entorno ni evidencia redacted.
+
+Bloqueado/no tocado por S.45:
+
+- No se prueba navegador, servidor, runtime real de errores, error overlay de Next.js, logs gestionados, dashboards, alertas, cookies HTTPS, SMTP real, Resend real, Supabase real/local, Storage real, signed URLs reales, SQL rollback, Server Actions runtime ni QA/staging.
+- No se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs ni exports reales.
+- No se refactorizan los `throw new Error(... error.message ...)` server-side existentes; si se decide sanitizar logs internos de carga, debe abrirse task propia para revisar error boundaries, observabilidad y perdida de diagnostico.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.45:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria de observabilidad/logging real, SIEM, alertas, retencion de logs ni redaccion efectiva de logs gestionados.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible logging and error hygiene local source guardrails"` pasa con 1 test.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.45 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.46 - Visible Product Claim Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42, S.43, S.44 ni S.45: S.42 cubre secretos/evidencia en archivos trackeables, S.43 cubre package/lockfile/scripts, S.44 cubre artefactos generados/evidencia local no trackeable y S.45 cubre `console.*`/errores visibles crudos en `src`. S.46 cubre claims/copy visible en `src/app`, `src/components` y helpers de navegacion, sin servidor, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que superficies visibles no prometen beta lista, produccion lista, ASVS conforme, pentest, cumplimiento legal definitivo, firma electronica avanzada/cualificada, payroll/nomina legal, geolocalizacion activa, IA funcional, documentos firmables ni subida documental visible. Mantener el guard limitado a fuente visible y permitir negaciones prudentes existentes como `No es payroll...`, `sin geolocalizacion`, `pendiente`, `futuro`, `bloqueado`, `antes de beta`, `interno` o `revision`.
+
+Alcance implementado:
+
+- [x] Revisado `src/app`, `src/components` y `src/lib/navigation` con busquedas previas de claims sensibles; solo aparecieron negaciones prudentes de payroll/cumplimiento legal/geolocalizacion y no se considero bloqueo.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de claims visibles:
+  - escanea solo `src/app`, `src/components` y `src/lib/navigation`;
+  - normaliza acentos para detectar copy en espanol sin crear reglas fragiles por encoding;
+  - bloquea promesas positivas de beta/produccion lista, ASVS conforme, pentest, cumplimiento legal definitivo, firma electronica avanzada/cualificada, payroll/nomina legal, geolocalizacion activa, IA funcional, documentos firmables y subida documental visible;
+  - permite contextos defensivos o negados para no bloquear copy prudente que comunica limites reales.
+- [x] Actualizado el plan de implementacion para marcar S.46 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: las exclusiones de producto/legal siguen `no-aplica-beta` y los gates reales siguen bloqueados o parciales segun correspondan; S.46 solo anade evidencia source/static local.
+
+Bloqueado/no tocado por S.46:
+
+- No se prueba navegador, servidor, runtime real, traducciones, CMS futuro, datos de tenant, contenido generado dinamicamente, observabilidad, logs gestionados, dashboards, cookies HTTPS, SMTP real, Resend real, Supabase real/local, Storage real, signed URLs reales, SQL rollback, Server Actions runtime ni QA/staging.
+- No se reescribe copy, no se crea UI, no se amplia producto y no se validan claims comerciales o legales fuera del repo.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.46:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria legal, certificacion ASVS, pentest, revision comercial de claims, traducciones, CMS, snapshot visual ni aceptacion formal de producto.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible product claim hygiene local source guardrails"` pasa con 1 test.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.46 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.47 - Visible Browser Storage Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42, S.43, S.44, S.45 ni S.46: S.47 cubre higiene de almacenamiento cliente/browser en superficies visibles `src/app` y `src/components`, sin leer secretos, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que superficies visibles no usan `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie` ni APIs equivalentes para datos tenant-scoped, documentos, fichaje, firma, auditoria, permisos, tokens, emails, Storage paths o evidencia. Permitir solo el uso local ya existente de onboarding si queda acotado a una clave no sensible.
+
+Alcance implementado:
+
+- [x] Revisado `src/app` y `src/components` con busqueda previa de almacenamiento browser. Solo aparece `window.localStorage` en `src/components/layout/onboarding-tour.tsx`.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de almacenamiento visible:
+  - escanea solo `src/app` y `src/components`, no docs ni runbooks;
+  - bloquea usos de `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `cookieStore`, `navigator.storage`, `StorageManager` y `openDatabase` fuera del onboarding permitido;
+  - permite explicitamente el onboarding existente solo con `STORAGE_KEY` no sensible tipo `boxops_onboarding_seen_v*` (actualmente `boxops_onboarding_seen_v3`);
+  - confirma que el onboarding solo hace `setItem(STORAGE_KEY, "true")`, `getItem(STORAGE_KEY)` y `removeItem(STORAGE_KEY)`, sin guardar tenant, documentos, fichaje, firma, auditoria, permisos, tokens, emails, Storage paths ni evidencia.
+- [x] Actualizado el plan de implementacion para marcar S.47 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: almacenamiento cliente visible queda como guard local y no sustituye navegador real, headers/cache reales, ausencia runtime de CacheStorage/service worker, Storage real, credenciales ni evidencia redacted.
+
+Bloqueado/no tocado por S.47:
+
+- No se prueba navegador, servidor, runtime real, contenido persistido previo en el browser, cookies HTTPS, bundle cliente, error overlay, Supabase real/local, Storage real, signed URLs reales, SQL rollback, Server Actions runtime ni QA/staging.
+- No se lee ni borra almacenamiento local real del usuario, cookies, IndexedDB real, CacheStorage real, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se cambia el tour de onboarding, no se resetea su clave y no se abre onboarding guiado nuevo.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.47:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de almacenamiento browser, no limpieza de caches locales, no politica offline nueva, no revision completa de bundle cliente ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible browser storage hygiene local source guardrails"` pasa con 1 test.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.47 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.48 - Visible Browser Egress Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42, S.43, S.44, S.45, S.46 ni S.47: S.42 cubre secretos/evidencia en archivos trackeables, S.43 cubre package/lockfile/scripts, S.44 cubre artefactos generados/evidencia local no trackeable, S.45 cubre `console.*`/errores visibles crudos, S.46 cubre claims/copy visible y S.47 cubre almacenamiento cliente/browser. S.48 cubre higiene de egress/browser en superficies visibles `src/app` y `src/components`, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que superficies visibles no usan APIs browser para sacar datos tenant-scoped, documentos, fichaje, firma, auditoria, permisos, tokens, emails, Storage paths o evidencia: `navigator.clipboard`, `window.open`, `postMessage`, `BroadcastChannel`, `URL.createObjectURL`, `Blob`, `FileReader`, descargas client-side, file pickers, Web Share/Beacon, XHR/WebSocket/EventSource ni `fetch` desde componentes cliente. Mantener permitida la navegacion normal con `Link`/anchors a rutas internas existentes si no exponen signed URLs, Storage paths ni contenido sensible.
+
+Alcance implementado:
+
+- [x] Revisado `src/app` y `src/components` con busqueda previa de APIs de egress/browser; no hay usos actuales de clipboard, `window.open`, `postMessage`, `BroadcastChannel`, object URLs, `Blob`, `FileReader`, XHR/WebSocket/EventSource, file pickers, Web Share/Beacon ni `fetch` cliente.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de egress visible:
+  - bloquea `navigator.clipboard`, `window.open`, `postMessage`, `BroadcastChannel`, `URL.createObjectURL`, `Blob`, `FileReader`, file pickers, Web Share/Beacon, XHR, WebSocket y EventSource en `src/app` y `src/components`;
+  - bloquea anchors/Links con atributo `download`, hrefs literales externos `http(s)`, protocol-relative, `data:`, `blob:` o `file:`, y hrefs construidos desde signed URLs, Storage paths, public/file/object URLs o equivalentes;
+  - confirma que componentes `"use client"` bajo `src/app` y `src/components` no llaman `fetch(...)`;
+  - permite la navegacion normal existente por `Link`/anchors internos y confirma que `/app/documents` y el panel documental de Horario generan solo rutas backend internas E.5 condicionadas por `can_preview`/`can_download`, sin `createSignedUrl`, `signedUrl`, paths Storage, bucket `document-files`, object URLs ni `window.open`.
+- [x] Actualizado el plan de implementacion para marcar S.48 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: Storage/descarga/egress visible queda como guard local y no sustituye navegador real, CSP/Permissions-Policy, bundle cliente, Storage real, descargas reales, credenciales ni evidencia redacted.
+
+Bloqueado/no tocado por S.48:
+
+- No se prueba navegador, servidor, runtime real, apertura efectiva de pestanas, descarga efectiva por backend, red real, bundle cliente, CSP/Permissions-Policy, cookies HTTPS, Supabase real/local, Storage real, signed URLs reales, SQL rollback, Server Actions runtime ni QA/staging.
+- No se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se cambia navegacion, no se bloquean `Link`/anchors internos existentes, no se toca `RouteStateLink` y no se abre politica nueva de CSP/offline.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.48:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de egress/browser, no prueba de descargas reales, no revision completa de bundle cliente, no CSP/Permissions-Policy definitivo ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible browser egress hygiene local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.48 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.49 - Visible Form Action Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42-S.48: S.42 cubre secretos/evidencia trackeable, S.43 package/lockfile/scripts, S.44 artefactos locales, S.45 logging/errores visibles, S.46 claims/copy visible, S.47 storage browser y S.48 egress/browser general. S.49 cubre especificamente higiene de formularios visibles, `action`/`formAction` y markup de formulario en `src/app` y `src/components`, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que los formularios visibles no apuntan a acciones externas, URLs absolutas/protocol-relative, `data:`, `blob:`, `file:`, backslashes de ruta ni rutas directas sensibles; que las mutaciones visibles siguen expresadas como Server Actions/identificadores simples o rutas internas existentes; y que el markup de formulario no expone signed URLs, Storage paths/buckets, service role, payloads de auditoria, provider payloads ni evidencia.
+
+Alcance implementado:
+
+- [x] Revisado `src/app` y `src/components` con busqueda previa de formularios, `action`, `formAction`, rutas literales internas y APIs ya cubiertas por S.48.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de formularios visibles:
+  - escanea solo `src/app` y `src/components`;
+  - extrae `action` de tags `<form>` y `formAction` de botones/controles visibles;
+  - bloquea destinos literales externos o protocol-relative, esquemas `data:`, `blob:`, `file:`, backslashes, rutas directas a Storage/documentos preview/download, grants, signed URLs, service role y query params de token/cookie/signed/storage/evidencia/auditoria;
+  - exige que los `action` literales bajo `/app` sean GET y que `/auth/sign-out` siga siendo POST;
+  - exige que `action={...}` y `formAction={...}` sean identificadores simples de Server Action/prop, no expresiones que construyan URLs, usen `fetch`, `new URL`, signed URLs, Storage internals, grants, payroll, cookies, auditoria o evidencia;
+  - revisa bloques `<form>...</form>` para evitar exponer `signedUrl`, `storage_path`, buckets privados, `document_access_events`, `operational_audit_events`, `changed_fields`, payloads de proveedor/auditoria o evidencia.
+- [x] Mantiene permitidos formularios normales existentes con Server Actions, `action` prop local, `formAction` prop local, `/auth/sign-out`, filtros GET internos de `/app/schedule`, exporte interno revisable `/app/time/export` y campos operativos necesarios como `organizationId`, IDs, semana, filtros o campos de formulario.
+- [x] No convierte en regla global los tokens/campos de invitacion publica ni la data URL de firma propia porque son ruido legitimo ya cubierto por S.38/S.39 y D.5/S.23; S.49 se limita a destinos/acciones y a internals sensibles de alto riesgo dentro del markup de formularios.
+- [x] Actualizado el plan de implementacion para marcar S.49 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: formularios visibles quedan como guard local y no sustituyen runtime de Server Actions, POST directo, RLS real, navegador, bundle cliente, credenciales ni evidencia redacted.
+
+Bloqueado/no tocado por S.49:
+
+- No se prueba navegador, submit real, runtime de Server Actions, route handlers reales, POST directo, CSRF/cookies reales, bundle cliente, Supabase real/local, Storage real, signed URLs reales, SQL rollback, SMTP, QA/staging ni evidencia externa.
+- No se validan credenciales E2E por rol, tenant QA/staging, IDs cross-tenant reales, RLS de mutaciones ni denegaciones runtime.
+- No se escanean docs/migraciones con reglas genericas ni se lee `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.49:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de formularios, no prueba POST/action real, no revision completa de bundle cliente, no CSP/Permissions-Policy definitivo ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible form action hygiene local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.49 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.50 - Visible File Input And Upload Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42-S.49: S.42 cubre secretos/evidencia trackeable, S.43 package/lockfile/scripts, S.44 artefactos locales, S.45 logging/errores visibles, S.46 claims/copy visible, S.47 storage browser, S.48 egress/browser general y S.49 destinos/markup de formularios visibles. S.50 cubre especificamente higiene de inputs de archivo/subida visible en `src/app` y `src/components`, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que no hay subida documental visible, dropzones, `input type="file"` documental, `multiple`, `capture`, drag/drop de archivos, `DataTransfer`, `onDrop`, file pickers ni rutas/acciones visibles de upload documental. Mantener permitidas solo las superficies propias ya existentes de Mi cuenta para avatar/firma, acotadas a imagen/firma propia y Server Actions locales existentes, sin `person_profile_id`, `assetId`, `signatureId`, rutas Storage crudas, signed URLs persistidas ni bucket names en formularios visibles.
+
+Alcance implementado:
+
+- [x] Revisado `src/app` y `src/components` con busqueda acotada de inputs de archivo, accepts, drag/drop, APIs de archivo y primitivas documentales visibles. La unica superficie visible con `type="file"` sigue siendo `/app/account` para avatar propio.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de inputs/subida visible:
+  - escanea solo `src/app` y `src/components`;
+  - exige que el unico `input/Input type="file"` visible sea `src/app/(app)/app/account/page.tsx`, con `name="avatar"` y `accept="image/jpeg,image/png,image/webp"`;
+  - bloquea `multiple`, `capture`, accepts documentales (`PDF`, `DOC`, `DOCX`, `XLSX`, `CSV`, `TXT`), dropzones, `onDrop`/drag handlers, `DataTransfer`, `FileReader`, file pickers del navegador y object URLs;
+  - confirma que el formulario de avatar usa `action={updateOwnAvatar}` y solo `organizationId` como contexto visible, sin `person_profile_id`, `personProfileId`, `assetId`, `signatureId`, `documentId`, `documentVersionId`, rutas Storage crudas, `signedUrl`, `createSignedUrl` ni bucket names;
+  - confirma que la firma propia sigue como canvas + `signatureDataUrl` oculto, sin input de archivo, drag/drop ni identificadores ajenos;
+  - bloquea en superficies visibles las RPCs de upload documental, `document_access_grants`, `manage_grants`, `document-files`, `requires_signature` y `signature_evidence`.
+- [x] Mantiene permitidas las Server Actions propias existentes de Mi cuenta para avatar/firma y las signed URLs cortas generadas en servidor para preview personal, sin convertirlas en URL persistida ni exponerlas dentro de formularios visibles.
+- [x] Actualizado el plan de implementacion para marcar S.50 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: `Documentos/subida` sigue `no-aplica-beta` y Storage/archivo real sigue `parcial`/`bloqueado-por-entorno`; S.50 solo anade guard local visible y no sustituye navegador real, Storage real, Server Actions runtime, RLS, credenciales ni evidencia redacted.
+
+Bloqueado/no tocado por S.50:
+
+- No se prueba navegador, selector real de archivo, submit real, multipart/FormData runtime, Server Actions, route handlers, MIME real de navegador, Storage real, policies Storage, signed URLs reales, expiracion efectiva, SQL rollback, SMTP, QA/staging ni evidencia externa.
+- No se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se escanean docs, migraciones ni helpers backend con reglas genericas; las primitivas backend documentales existentes siguen fuera de UI visible y ya estan cubiertas por cortes documentales/Storage previos.
+- No se cambia Mi cuenta, no se abre subida documental visible, grants UI, documentos firmables, documentos sensibles, app nativa, geofencing, service worker, CacheStorage, IA, payroll, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Fuera de S.50:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de subida de archivo, no prueba de accept/MIME en navegador, no revision completa de bundle cliente, no validacion real de avatar/firma con objeto Storage ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible file input and upload hygiene local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.50 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.51 - Visible Downloadable Response Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.15, S.16, S.48, S.49 ni S.50: S.15 cubre limites/metadata/copy del CSV de fichaje en helper, S.16 cubre rutas E.5 documentales, S.48 egress/browser general, S.49 destinos/markup de formularios visibles y S.50 inputs/subida visible. S.51 cubre el inventario visible de entry points de descargas/exportes y las respuestas backend internas asociadas, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que las descargas/exportes visibles siguen pasando por rutas internas protegidas, especialmente `/app/time/export` y E.5 documental, sin signed URLs construidas en cliente, sin rutas Storage crudas, sin bucket names en links/forms visibles, con `no-store` cuando aplica y con copy/metadata de exporte interno revisable, no payroll, no legal definitivo, no nomina y no cumplimiento laboral definitivo.
+
+Alcance implementado:
+
+- [x] Revisado `src/app`, `src/components`, `/app/time/export`, E.5 documental y `src/lib/time-tracking.ts` con busqueda acotada de `export`, `download`, `preview`, signed URLs, Storage, bucket names y copy legal/payroll.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de respuestas descargables visibles:
+  - enumera los entry points visibles de descarga/exporte y permite solo `action="/app/time/export"` y `previewHref`/`downloadHref` documentales internos;
+  - confirma que el formulario visible de `/app/time` usa `GET`, `organizationId`, `from`, `to` y `person_profile_id`, sin signed URLs, rutas Storage crudas, buckets privados, grants, firma documental, sensibilidad documental ni `service_role`;
+  - confirma que `/app/time/export` es `force-dynamic`, delega en `generateTimeRecordsCsvExport(...)`, devuelve `Cache-Control: no-store`, `Content-Disposition: attachment`, `Content-Type: text/csv; charset=utf-8` y `X-BoxOps-Export-Scope: internal-review`;
+  - confirma que el helper de CSV exige `requireReviewAccess: true`, mantiene `internalReviewOnly: true`, `legalFinal: false`, `payroll: false`, `snapshotsIncluded: false` y la linea de CSV `exporte interno revisable; no payroll; no cumplimiento legal definitivo`;
+  - confirma que `/app/documents` y el panel documental de Horario construyen solo rutas internas E.5 condicionadas por `can_preview`/`can_download`, sin `createSignedUrl`, `signedUrl`, rutas Storage, bucket `document-files`, object URLs, `Blob`, `FileReader` ni `window.open`;
+  - confirma que las rutas E.5 `preview`/`download` siguen delegando en `handleDocumentVersionFileAccess(...)`, y que el helper backend mantiene signed URL server-side, `no-store`, `X-Robots-Tag: noindex` y auditoria requerida antes de redirigir.
+- [x] Mantiene S.51 como guard local no-runtime: no valida descarga efectiva, archivo Storage, expiracion de signed URL, cookies, Auth, RLS, auditoria persistida, navegador, red, CSP ni evidencia externa.
+- [x] Actualizado el plan de implementacion para marcar S.51 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: documentos/Storage siguen `parcial`/`bloqueado-por-entorno`, el CSV de fichaje sigue condicionado por F.15 si entra en beta, y S.51 solo anade evidencia source/static local.
+
+Bloqueado/no tocado por S.51:
+
+- No se prueba navegador, descarga efectiva, apertura real de preview/download, cabeceras runtime reales, cookies HTTPS, Auth real, Server Actions, route handlers con sesion real, RLS, SQL rollback, Storage real, objecto `document-files`, expiracion efectiva de signed URLs, auditoria persistida, SMTP, QA/staging ni evidencia externa.
+- No se leen `.env.local`, cookies, signed URLs reales, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se escanean docs, migraciones ni helpers backend con reglas genericas fuera de las rutas/helpers asociados a descargas visibles existentes.
+- No se cambia `/app/time`, `/app/documents`, Horario documental ni E.5; no se abre subida documental visible, grants UI, documentos firmables, documentos sensibles, nomina/payroll, app nativa, geofencing, service worker, CacheStorage, IA, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Fuera de S.51:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No validacion runtime de `Content-Disposition`, `Cache-Control`, redireccion E.5, auditoria documental, signed URL TTL, CSV descargado ni bundle cliente.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible downloadable response hygiene local source guardrails"` pasa con 1 test.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.51 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.52 - Visible Protected Route Query Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.35, S.36, S.48, S.49 ni S.51: S.35 cubre cache/rutas protegidas y helpers de paths sensibles, S.36 estados de resolucion de organizacion, S.48 egress/browser visible, S.49 destinos/markup de formularios visibles y S.51 descargas/exportes visibles. S.52 cubre solo higiene local de nombres de query params y formularios GET internos protegidos no exportables, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que los query params visibles de rutas protegidas `/app` siguen limitados a estado operativo no sensible (`organizationId`, `week`, filtros de horario/cobertura/ausencias/documentos, `mine`, `block_id`, `assignment_id`, `edit_block_id`, `record_id`, contadores operativos y equivalentes existentes), y que no aparecen en nombres de query tokens, cookies, signed URLs, rutas Storage, bucket names, audit/evidence ids, provider payloads, secretos, payroll/legal ids, geolocalizacion, documentos firmables, grants UI ni rutas de subida documental. Mantener fuera descargas/exportes reales y rutas E.5 ya cubiertas por S.51.
+
+Alcance implementado:
+
+- [x] Revisado `src/lib/navigation/app-paths.ts`, constructores de `URLSearchParams`/`searchParams.set(...)`/`useRouteQueryParam(...)` en `src/app/(app)/app` y `src/components`, y formularios GET internos bajo `/app` no exportables.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de query params protegidos visibles:
+  - el helper central `getAppPath(...)` mantiene un inventario acotado de parametros operativos no sensibles;
+  - los constructores protegidos visibles no usan nombres de query con token/cookie/signed/storage/bucket/path/url/audit/evidence/payload/provider/secret/payroll/legal/geolocalizacion/document IDs/grants/upload;
+  - los setters dinamicos de query quedan bloqueados salvo el patron tipado `error`/`status` de redirects internos;
+  - los formularios GET internos de rutas protegidas no exportables se limitan a estado de filtros/ruta operativo, como `organizationId`, `week`, `view`, centro, coach, tipo, cobertura, `mine` y `risks_only`;
+  - se excluye `/app/time/export` para no duplicar S.51, y no se convierte todo el repo en allowlist global de query strings.
+- [x] Actualizado `docs/architecture/tenant-rls-negative-test-implementation-plan.md` con S.52 como cobertura local source/static y sus bloqueos.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: las rutas/query visibles quedan como guard local `parcial`, y la validacion real con navegador, bundle, redirects, sesion, RLS y evidencia sigue bloqueada por entorno.
+
+Bloqueado/no tocado por S.52:
+
+- No se prueba navegador, navegacion real, `history.pushState`, render, bundle cliente, redirects efectivos de Server Actions, hidden inputs generados en runtime, direct URLs autenticadas, cookies HTTPS, CSP/Referrer-Policy, Supabase real/local, Storage real, signed URLs reales, SQL rollback, SMTP, QA/staging ni evidencia externa.
+- No se prueban credenciales E2E por rol, tenant QA/staging, IDs cross-tenant reales, RLS de mutaciones ni denegaciones runtime.
+- No se escanean docs, migraciones ni helpers backend con reglas genericas; no se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.52:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de query params visibles, no prueba de rutas en navegador, no revision completa de bundle cliente, no CSP/Referrer-Policy definitivo ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible protected route query hygiene local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.52 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.53 - Visible Terminal Action Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.42-S.52: S.49 ya cubre destinos/markup de formularios visibles, S.50 inputs de archivo, S.51 descargas/exportes y S.52 query params/rutas protegidas visibles. S.53 cubre solo higiene local de acciones destructivas o terminales visibles sobre entidades operativas existentes, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin tocar producto. No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no crea migraciones, seeds ni features y no marca beta como lista.
+
+Objetivo: confirmar por guard local que las acciones visibles que cancelan, archivan, restauran, rechazan, expiran, desactivan, eliminan, retiran, anulan o cierran entidades operativas siguen pasando por Server Actions internas, no por rutas externas; que sus formularios no exponen payloads sensibles, rutas Storage, signed URLs, IDs de auditoria/evidencia, provider payloads, payroll/legal, geolocalizacion, grants UI ni subida documental; y que los patrones explicitos ya existentes de confirmacion/nota obligatoria se mantienen sin imponer una regla global nueva a todo boton destructivo.
+
+Alcance implementado:
+
+- [x] Revisadas superficies visibles protegidas de centros, tipos, invitaciones de equipo, ausencias, solicitudes/cambios, horario, asignaciones, jornada prevista, eventos operativos, plantillas, fichaje, candidatos de posible exceso e Inicio.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de acciones terminales visibles:
+  - inventario acotado de Server Actions internas terminales existentes (`setCenterStatus`, `setClassTypeStatus`, `cancelTeamInvitation`, acciones de ausencias/solicitudes, `cancelScheduleBlock`, `removeScheduleBlockAssignment`, `deactivateStaffWorkWindow`, `setOperationalEventStatusFromForm`, acciones de plantillas, correcciones/fichaje y cierre de candidatos);
+  - bloqueo de rutas literales externas o rutas `/app` como destino de mutaciones terminales visibles;
+  - bloqueo de payloads sensibles en formularios terminales (`signedUrl`, Storage paths/buckets, auditoria/evidence, provider payloads, secretos, payroll/legal, geolocalizacion, grants, upload);
+  - validacion local de que los `Textarea` dentro de formularios terminales siguen acotados por `maxLength`;
+  - comprobacion de patrones existentes de confirmacion: dialog de archivado de plantilla, campo `confirmTemplateBlockDelete`, `window.confirm(...)` en ausencias y cierre vencido de solicitudes, y notas obligatorias para rechazos de aprobacion semanal/correccion de fichaje.
+- [x] Actualizado `docs/architecture/tenant-rls-negative-test-implementation-plan.md` con S.53 como cobertura local source/static y sus bloqueos.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: las acciones terminales visibles siguen `parcial` como guard local, y la validacion real con Server Actions runtime, roles autenticados, RLS, navegador y evidencia sigue bloqueada o pendiente segun la superficie.
+
+Bloqueado/no tocado por S.53:
+
+- No se prueba submit real de formularios, Server Actions runtime, POST directo, CSRF/cookies, RLS de mutaciones, roles autenticados, IDs cross-tenant reales, auditoria persistida, SQL rollback, navegador, bundle cliente, Supabase real/local, Storage real, SMTP, QA/staging ni evidencia externa.
+- No se fuerza una regla global nueva de confirmacion para todos los botones destructivos: S.53 conserva patrones ya existentes y documenta que endurecer confirmaciones de producto seria task propia si se decide.
+- No se escanean docs, migraciones ni helpers backend con reglas genericas; no se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.53:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No refactor de producto, no UI nueva, no cambios de permisos por centro, no nuevas confirmaciones globales, no rutas nuevas, no migraciones, no seeds.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible terminal action hygiene local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.53 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.54 - Visible Non-Actionable State Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.49 ni S.53: S.49 cubre destinos/markup de formularios visibles y S.53 cubre acciones destructivas/terminales visibles, payloads y patrones de confirmacion existentes. S.54 cubre solo higiene local de estados visibles no accionables en superficies protegidas existentes, verificando por fuente que estados cerrados/terminales no muestran acciones incompatibles o las dejan bloqueadas, y que las reaperturas visibles solo existen como acciones explicitas ya existentes (`Restaurar`/`Reactivar`). No reintenta S.8/A.1, B.4, OD.1/I.32 ni F.15 sin acceso nuevo concreto; no valida staging, no crea credenciales, no toca producto, no crea UI nueva, no toca migraciones, no crea seeds y no marca beta como lista.
+
+Objetivo: confirmar por guard local que estados como `cancelled`, `completed`, `archived`, `expired`, `rejected`, `closed`, `superseded` o equivalentes se mantienen no accionables en las superficies visibles protegidas ya implementadas cuando el propio codigo ya tiene ese contrato: ausencias, solicitudes/cambios, plantillas, eventos operativos, candidatos de posible exceso y asignacion nueva en bloques cancelados/completados. Mantener el guard en source/static, sin convertirlo en allowlist global de todo el copy, todos los botones o toda la logica de negocio.
+
+Alcance implementado:
+
+- [x] Revisado el hueco S.54 y confirmado que aun existia un guard source/static local util sin repetir S.42-S.53 ni exigir runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail de estados no accionables visibles:
+  - ausencias: `REVIEWABLE_STATUSES` queda limitado a `requested`/`pending_review`; `CLOSED_STATUSES` cubre `approved`, `cancelled`, `expired` y `rejected`; `AbsenceActions` solo renderiza cancelar/revisar/cerrar vencida cuando los helpers lo permiten y muestra `ActionGuidance` si no hay accion compatible;
+  - solicitudes/cambios: `CLOSED_REQUEST_STATUSES` cubre `rejected`, `cancelled`, `expired` y `applied`; bloque `cancelled`/`completed` se trata como no accionable; los helpers de aceptar/cancelar/aprobar/rechazar/aplicar pasan por `getActionBlockReason(...)` y la UI cae a solo lectura si no hay accion;
+  - bloques de horario: la asignacion nueva exige `isCoverageActiveBlock(block.status)` y los controles de seleccionar/asignar quedan `disabled` cuando el bloque no admite asignacion; el mensaje de bloque cancelado/completado se conserva;
+  - plantillas: `archived` oculta edicion, archivado, editor de bloques y creacion de bloques; aplicar queda bloqueado si la plantilla no esta `active`; recuperar existe solo como accion explicita de plantilla archivada y con ventana `recoverable`;
+  - candidatos de posible exceso: `closed` y `superseded` muestran `Sin acciones` y no renderizan el formulario de cambio de estado;
+  - eventos operativos: eventos `archived` quedan fuera del listado por defecto, `cancelled` solo expone `Reactivar` de forma explicita, `active` expone cancelar, y archivar sigue siendo la accion terminal existente.
+- [x] Actualizado `docs/architecture/tenant-rls-negative-test-implementation-plan.md` con S.54 como cobertura local source/static y sus bloqueos.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: S.54 anade evidencia local source/static sobre superficies parciales ya existentes, pero no cierra runtime, Server Actions, RLS, roles autenticados, navegador ni staging.
+
+Bloqueado/no tocado por S.54:
+
+- No se prueba navegador, render real, click real, submit real, Server Actions runtime, POST directo, CSRF/cookies, RLS de mutaciones, roles autenticados, IDs cross-tenant reales, auditoria persistida, SQL rollback, Supabase real/local, Storage real, SMTP, QA/staging ni evidencia externa.
+- No se define una regla global nueva de estados para todo BoxOps, no se cambia producto, no se fuerza confirmacion global nueva, no se abre UI nueva, no se agregan permisos por centro, no se crean migraciones ni seeds.
+- No se prueban estados generados por datos runtime, hidden inputs generados dinamicamente, direct URLs autenticadas, expiracion real, cierre legal de fichaje, payroll, documentos firmables, grants UI ni Storage documental real.
+- No se escanean docs, migraciones ni helpers backend con reglas genericas; no se leen `.env.local`, cookies, signed URLs, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.54:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No refactor de producto, no reglas globales nuevas de estado, no tests autenticados, no SQL rollback, no datos reales ni fixture persistente.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible non-actionable state hygiene local source guardrails"` pasa con 2 tests.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.54 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.55 - Visible Protected Identifier Exposure Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.45, S.48, S.49, S.51, S.52 ni S.54: esos cortes cubren errores/logs visibles, egress/browser, formularios, descargas/exportes, query params y estados no accionables. S.55 cubre solo higiene local de exposicion visible de identificadores tecnicos en superficies protegidas existentes, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin cambios de producto.
+
+Objetivo: confirmar por guard local que los listados/cards/tablas protegidos no empiezan a mostrar UUIDs completos ni nombres internos como `user_id`, `person_profile_id`, `coach_profile_id`, `organization_id`, rutas Storage, signed URLs, payloads de auditoria/proveedor, tokens o service role en texto renderizable. Se permiten referencias cortas ya existentes y deliberadas (`shortId(...)` / `formatShortId(...)`) cuando el copy las presenta como referencia tecnica minima, y el flujo UUID queda limitado a herramientas avanzadas/debug de Equipo.
+
+Alcance implementado:
+
+- [x] Revisado el hueco S.55 y confirmado que aun existia un guard source/static util sin repetir S.42-S.54 ni exigir runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de exposicion visible de identificadores:
+  - las menciones visibles de `UUID` quedan confinadas a `src/app/(app)/app/coaches/page.tsx`, dentro del flujo avanzado de acceso/vinculacion por cuenta Auth existente;
+  - los fallbacks visibles de equipo, cobertura, estadisticas, Inicio y fichaje siguen usando `shortId(...)` o `formatShortId(...)` antes de mostrar referencias tecnicas;
+  - los template literals visibles no renderizan directamente `user_id`, `person_profile_id`, `coach_profile_id`, `organization_id`, `time_record_id` ni `time_punch_id` sin formateo corto;
+  - el texto renderizable de superficies protegidas no muestra nombres internos de campos sensibles, rutas/buckets Storage, `document-files`, `profile-assets`, `profile-signatures`, auditorias, payloads de proveedor, hashes de token, signed URLs ni `service_role`.
+- [x] Actualizado el plan de implementacion para marcar S.55 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: S.55 anade evidencia local sobre exposicion visible de identificadores, pero no cierra runtime, navegador, Server Actions, RLS, roles autenticados, Storage real ni staging.
+
+Bloqueado/no tocado por S.55:
+
+- No se prueba navegador, DOM real, bundle cliente, screenshots, copy generado por datos runtime, `select`/`option` values, hidden inputs, POST directo, Server Actions runtime, RLS, roles autenticados, IDs cross-tenant, SQL rollback, Supabase real/local, Storage real, SMTP, QA/staging ni evidencia externa.
+- No se cambia UI, no se retira el flujo avanzado UUID existente, no se crea una allowlist global de todo el copy ni de todos los campos renderizados, y no se define una regla global nueva de display para todos los identificadores de BoxOps.
+- No se leen `.env.local`, cookies, signed URLs reales, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.55:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de contenido visible, no validacion de emails privados generados por datos reales, no revision legal/producto completa de privacidad ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible protected identifier exposure hygiene local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.55 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.56 - Visible Protected Personal Contact Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.45, S.48, S.49, S.51, S.52, S.54 ni S.55: esos cortes cubren errores/logs visibles, egress/browser, formularios, descargas/exportes, query params, estados no accionables e identificadores tecnicos visibles. S.56 cubre solo higiene local de datos personales de contacto visibles en superficies protegidas existentes, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin cambios de producto.
+
+Objetivo: confirmar por guard local que emails privados o emails de Auth no pasan a ser identidad publica por defecto en tablas/cards/listados protegidos. Se permite `public_email` solo en Mi cuenta como campo publico explicito editable por la propia persona; se permite `user.email` solo como contexto de cuenta propia/sesion propia o como invitador en invitaciones gestionadas por roles autorizados; y se mantiene el email de invitacion visible solo dentro del flujo de gestion de accesos de Equipo.
+
+Alcance implementado:
+
+- [x] Revisado el hueco S.56 y confirmado que aun existia un guard source/static util sin repetir S.42-S.55 ni exigir runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de higiene de contacto personal visible:
+  - los usos de `user.email`/`context.user.email` bajo `src/app/(app)/app` y `src/components` quedan acotados a Mi cuenta, shell de sesion propia y envio/reenvio de invitaciones de Equipo;
+  - `getMembershipIdentity(...)`, `getCoachProfileIdentity(...)`, cards/listados de memberships y cards de fichas de coach no usan emails privados, `email_normalized`, `public_email` ni `user.email` como label/detalle de identidad publica;
+  - `TeamInvitationsSection` conserva `invitation.email_normalized` solo dentro del flujo autorizado de invitaciones pendientes;
+  - `public_email`/`publicEmail` queda limitado a `src/app/(app)/app/account/page.tsx` y `src/app/(app)/app/account/actions.ts`, como campo explicito de perfil visible propio y update derivado por `context.user.id`.
+- [x] Actualizado el plan de implementacion para marcar S.56 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: S.56 anade evidencia local sobre higiene de contacto visible, pero no cierra runtime, navegador, Server Actions, RLS, roles autenticados, SMTP real, datos reales ni staging.
+
+Bloqueado/no tocado por S.56:
+
+- No se prueba navegador, DOM real, bundle cliente, copy generado por datos runtime, emails privados generados por datos reales, contenido renderizado con datos de tenant, POST directo, Server Actions runtime, RLS, roles autenticados, SQL rollback, Supabase real/local, SMTP, QA/staging ni evidencia externa.
+- No se cambia UI, no se bloquea el flujo existente de invitaciones por email en Equipo, no se crea una allowlist global de todo el copy ni de todos los campos renderizados, y no se define una regla global nueva de display para todas las identidades de BoxOps.
+- No se leen `.env.local`, cookies, signed URLs reales, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.56:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de contenido visible, no validacion de privacidad sobre datos reales, no revision legal/producto completa de privacidad ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible protected personal contact hygiene local source guardrails"` pasa con 3 tests.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.56 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.57 - Visible Protected Free-Text Field Hygiene Source Guard Local
+
+Estado: ejecutado el 2026-05-19 como siguiente fase P2 local/source-static acotada. No repite S.15, S.45, S.46, S.49, S.50, S.52, S.55 ni S.56: S.15 cubre validadores/source guard de `reason_summary`, notas sensibles de fichaje y CSV; S.45 cubre errores/logs visibles; S.46 cubre claims/copy visible general; S.49 cubre destinos/markup de formularios; S.50 cubre inputs de archivo; S.52 cubre query params; S.55 cubre identificadores tecnicos visibles; S.56 cubre emails/contacto personal visible. S.57 cubre solo higiene local de labels, placeholders y ayuda de campos libres visibles existentes, sin servidor, sin navegador real, sin staging, sin credenciales, sin Supabase real/local, sin SMTP, sin SQL rollback, sin Storage real, sin Server Actions runtime y sin cambios de producto.
+
+Objetivo: confirmar por guard local que los campos protegidos visibles `notes` y `reasonSummary` siguen presentandose como notas/resumenes operativos y minimizados, con longitud acotada, y que no invitan a introducir salario, nomina/payroll, documentos, salud, ubicacion, tokens, URLs, secretos, justificantes, contratos, identificadores personales o datos bancarios. Las menciones de esos terminos solo son aceptables cuando aparecen como aviso negativo del tipo "no incluyas", "sin datos" o "no registra".
+
+Alcance implementado:
+
+- [x] Revisado el hueco S.57 y confirmado que aun existia un guard source/static util sin repetir S.42-S.56 ni exigir runtime autenticado.
+- [x] Ampliado `tests/smoke/tenant-rls-negative-local.spec.ts` con guardrail source/static de higiene de campos libres protegidos:
+  - inventaria los controles TSX visibles actuales bajo `src/app/(app)/app` y `src/components` con `name="notes"` o `name="reasonSummary"`;
+  - confirma que `reasonSummary` queda limitado a 160 caracteres y `notes` a 1000 caracteres o menos;
+  - confirma que el contexto visible cercano mantiene senales operativas/minimizadas: operativo, interno, breve, corto, resumen, mensaje, contexto o copia/aplicacion de notas operativas;
+  - confirma que los terminos sensibles no aparecen como invitacion positiva en labels/placeholders/ayuda cercana; solo se permiten en avisos negativos existentes.
+- [x] Actualizado el plan de implementacion para marcar S.57 como cobertura local source/static.
+- [x] La matriz negativa no se actualiza porque ningun caso cambia de estado: S.57 anade evidencia local sobre higiene visible de campos libres, pero no cierra runtime, navegador, Server Actions, RLS, roles autenticados, datos reales ni staging.
+
+Bloqueado/no tocado por S.57:
+
+- No se prueba navegador, DOM real, bundle cliente, copy generado por datos runtime, contenido renderizado con datos de tenant, POST directo, Server Actions runtime, RLS, roles autenticados, SQL rollback, Supabase real/local, Storage real, SMTP, QA/staging ni evidencia externa.
+- No se cambia UI, no se crea una regla global nueva de copy, no se convierte todo el copy visible en allowlist global, no se endurecen validadores runtime y no se refactorizan formularios.
+- No se leen `.env.local`, cookies, signed URLs reales, rutas Storage activas, contenido documental, screenshots, videos, traces, dumps, logs, exports ni evidencia local.
+- No se abre IA, embeddings, vector DB, geolocalizacion, app nativa, push, service worker, CacheStorage, SMTP directo, clientes DB privilegiados, payroll, legal signing tooling, permisos por centro funcionales, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+
+Fuera de S.57:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No auditoria runtime de contenido visible, no validacion de privacidad sobre datos reales, no revision legal/producto completa de privacidad ni aceptacion formal de riesgo.
+- No hardcodear STL en `src` ni introducir `service_role`.
+- No prometer beta lista, produccion lista, certificacion ASVS, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `npx --no-install playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts -g "visible protected free-text field hygiene local source guardrails"` pasa con 1 test.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.57 solo toca smoke/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### S.58 - Cierre Prudente Del Carril Local Helper-Only Source-Static Visible
+
+Estado: evaluado y bloqueado prudentemente el 2026-05-19. No se ejecuta smoke nuevo ni se anade guardrail nuevo. Tras releer `PROJECT_BRIEF.md`, `TASKS.md`, `AGENTS.md`, `../../AGENTS.md`, `docs/architecture/security-baseline.md`, `docs/architecture/asvs-level-1-beta-matrix.md`, `docs/architecture/tenant-rls-negative-test-matrix.md` y `docs/architecture/tenant-rls-negative-test-implementation-plan.md`, y tras revisar S.42-S.57 y `tests/smoke/tenant-rls-negative-local.spec.ts`, no queda un P2 helper-only o source/static visible que sea realmente util, local, no fragil y no repetitivo. El carril local/helper-only/source-static visible queda agotado por ahora.
+
+Decision:
+
+- [x] Bloquear S.58 en vez de inventar un smoke fragil o duplicado.
+- [x] No repetir S.15 ni S.42-S.57: secretos/evidencia, supply chain, artefactos locales, logging/error visible, claims, storage browser, egress, formularios, inputs de archivo, descargas/exportes, query params, acciones terminales, estados no accionables, identificadores tecnicos, emails/contacto visible y campos libres `notes`/`reasonSummary` ya tienen cobertura local/source-static reciente.
+- [x] Mantener como pendiente lo que de verdad falta: runtime autenticado, Server Actions, SQL rollback A/B, RLS real, roles reales, Storage real, SMTP/Auth real, navegador real, QA/staging y evidencia redacted.
+- [x] No actualizar `docs/architecture/tenant-rls-negative-test-matrix.md` porque ningun caso cambia de estado; S.58 no anade evidencia nueva ni cierra runtime/staging.
+
+Motivo del bloqueo:
+
+- Los huecos restantes exigen credenciales, entorno real/local con sesion, SQL rollback, Storage real, SMTP real, navegador real o datos controlados, y por tanto quedan fuera de este corte.
+- Los candidatos solo source/static que quedan pisarian S.55, S.56 o S.57, o exigirian definir reglas globales nuevas de copy/markup que serian fragiles y no deseables.
+- Ejecutar S.58 como smoke adicional daria una falsa sensacion de avance y aumentaria coste de mantenimiento sin mejorar tenant safety de forma honesta.
+
+Bloqueado/no tocado por S.58:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados, SQL rollback, Server Actions runtime, navegador real, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.58 solo documenta bloqueo prudente y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.59 - Tenant Boundary Centers RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como primer corte tecnico fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para un caso tenant/RLS critico sobre `centers`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: tenant A no puede leer ni mutar centros de tenant B y un rol alto no puede mover un centro existente cambiando `organization_id`.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-centers-rls-rollback.sql` con tenants A/B sinteticos, usuarios locales `owner`/`coach` y RLS de `centers`.
+- [x] Confirmar que `owner` de tenant A puede leer/actualizar su centro, pero no leer ni actualizar el centro B.
+- [x] Confirmar que `owner` de tenant A no puede cambiar `organization_id` de su centro hacia tenant B.
+- [x] Confirmar que `owner` de tenant A no puede insertar un centro en tenant B.
+- [x] Confirmar que `coach` de tenant A puede leer su centro, pero no actualizarlo.
+- [x] Confirmar que `owner` de tenant B no lee ni actualiza el centro A.
+- [x] Actualizar el plan de implementacion para marcar S.59 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa sin exagerar evidencia: solo pasan a `parcial` los casos generales de lectura cross-tenant y cambio de `organization_id` porque S.59 cubre `centers`, no todas las familias.
+
+Bloqueado/no tocado por S.59:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No cobertura completa de centros/equipo/tipos, horario, plantillas, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.59 cubre solo RLS local de `centers`.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-centers-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.59 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.60 - Tenant Boundary Schedule Blocks RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como segundo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `schedule_blocks` y referencias tenant-safe a `centers` / `class_types`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin`/`manager` tenant A no puede crear ni actualizar `schedule_blocks` de tenant A usando `center_id` o `class_type_id` de tenant B.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-schedule-blocks-rls-rollback.sql` con tenants A/B sinteticos, managers locales, centros/tipos A/B y bloques A/B.
+- [x] Confirmar que `manager` de tenant A puede crear un bloque valido de tenant A.
+- [x] Confirmar que `manager` de tenant A no puede leer ni actualizar un bloque de tenant B.
+- [x] Confirmar que insertar o actualizar un bloque tenant A con `center_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que insertar o actualizar un bloque tenant A con `class_type_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que `manager` de tenant A no puede insertar directamente un bloque en tenant B.
+- [x] Confirmar que `manager` de tenant A no puede mover un bloque tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que `manager` de tenant B no lee ni actualiza el bloque tenant A.
+- [x] Actualizar el plan de implementacion para marcar S.60 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: `Horario/bloques` con referencias `center_id`/`class_type_id` cross-tenant pasa a `cubierto-local`; los casos generales de lectura cross-tenant y cambio de `organization_id` siguen `parcial` porque S.60 no cubre todas las familias.
+
+Bloqueado/no tocado por S.60:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No cobertura completa de equipo, tipos, horario completo, asignaciones, plantillas, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.60 cubre solo RLS/FK local de `schedule_blocks` frente a `centers`/`class_types`.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-schedule-blocks-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.60 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.61 - Tenant Boundary Schedule Block Assignments RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como tercer corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `schedule_block_assignments` y referencias tenant-safe a `schedule_blocks` / `coach_profiles`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin`/`manager` tenant A no puede crear ni actualizar `schedule_block_assignments` usando `schedule_block_id` o `coach_profile_id` de tenant B.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-schedule-block-assignments-rls-rollback.sql` con tenants A/B sinteticos, managers/coaches locales, centros/tipos/bloques A/B y asignaciones A/B.
+- [x] Confirmar que `manager` de tenant A puede crear y actualizar campos permitidos de una asignacion valida de tenant A.
+- [x] Confirmar que `manager` de tenant A no puede leer ni actualizar una asignacion de tenant B.
+- [x] Confirmar que insertar o actualizar una asignacion tenant A con `schedule_block_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que insertar o actualizar una asignacion tenant A con `coach_profile_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que `manager` de tenant A no puede insertar directamente una asignacion en tenant B.
+- [x] Confirmar que `manager` de tenant A no puede mover una asignacion tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que `manager` de tenant B no lee ni actualiza la asignacion tenant A.
+- [x] Documentar que el caso de coach inactivo no queda cubierto por S.61: la DB/RLS actual garantiza referencias tenant-safe, pero el estado/asignabilidad de coach vive en validacion de producto/runtime y requiere harness de Server Actions/RPC o test propio.
+- [x] Actualizar el plan de implementacion para marcar S.61 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso cross-tenant de `schedule_block_assignments` pasa a `cubierto-local`; el subcaso de coach inactivo permanece `parcial`.
+
+Bloqueado/no tocado por S.61:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No cobertura completa de equipo, tipos, horario completo, plantillas, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.61 cubre solo RLS/FK local de `schedule_block_assignments` frente a `schedule_blocks`/`coach_profiles`.
+- No validacion DB del estado `inactive` de `coach_profiles`; no se fuerza ese test porque no esta garantizado por DB/RLS y pertenece a validacion runtime de producto.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-schedule-block-assignments-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.61 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.62 - Tenant Boundary Schedule Template Blocks RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como cuarto corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `schedule_template_blocks` y referencias tenant-safe a `schedule_templates` / `centers` / `class_types` / `coach_profiles`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin`/`manager` tenant A no puede crear ni actualizar `schedule_template_blocks` usando `template_id`, `center_id`, `class_type_id` o `default_coach_profile_id` de tenant B.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-schedule-template-blocks-rls-rollback.sql` con tenants A/B sinteticos, managers/coaches locales, centros/tipos/coaches/plantillas A/B y bloques de plantilla A/B.
+- [x] Confirmar que `manager` de tenant A puede crear y actualizar campos permitidos de un bloque de plantilla valido de tenant A.
+- [x] Confirmar que `manager` de tenant A no puede leer ni actualizar un bloque de plantilla de tenant B.
+- [x] Confirmar que insertar o actualizar un bloque de plantilla tenant A con `template_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que insertar o actualizar un bloque de plantilla tenant A con `center_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que insertar o actualizar un bloque de plantilla tenant A con `class_type_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que insertar o actualizar un bloque de plantilla tenant A con `default_coach_profile_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que `manager` de tenant A no puede insertar directamente un bloque de plantilla en tenant B.
+- [x] Confirmar que `manager` de tenant A no puede mover un bloque de plantilla tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que `manager` de tenant B no lee ni actualiza el bloque de plantilla tenant A.
+- [x] Documentar que aplicar una plantilla a una semana queda fuera de S.62: ese flujo usa helpers/runtime de producto y, si se valida, necesita harness propio o entorno real/controlado.
+- [x] Actualizar el plan de implementacion para marcar S.62 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso cross-tenant de `schedule_template_blocks` pasa a `cubierto-local`; la aplicacion runtime de plantillas permanece fuera de S.62.
+
+Bloqueado/no tocado por S.62:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No aplicacion de plantillas a semanas reales ni validacion de `ensureScheduleTemplateRangeApplied(...)`, `applyScheduleTemplateToWeek(...)`, acciones de `/app/templates`, generacion de `schedule_blocks` ni asignaciones `source = 'template'`.
+- No cobertura completa de equipo, tipos, horario completo, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.62 cubre solo RLS/FK local de `schedule_template_blocks` frente a `schedule_templates`/`centers`/`class_types`/`coach_profiles`.
+- No validacion DB del estado `inactive` de `coach_profiles` como coach por defecto; no se fuerza ese test porque no esta garantizado por DB/RLS y pertenece a validacion runtime de producto.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-schedule-template-blocks-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.62 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.63 - Tenant Boundary Schedule Templates RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como quinto corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `schedule_templates` y su referencia tenant-safe opcional a `centers`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin`/`manager` tenant A no puede crear ni actualizar `schedule_templates` de tenant A usando `center_id` de tenant B.
+- [x] Confirmar que `center_id` puede ser opcional en una plantilla valida sin romper la frontera de tenant.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-schedule-templates-rls-rollback.sql` con tenants A/B sinteticos, managers locales, centros A/B y plantillas A/B.
+- [x] Confirmar que `manager` de tenant A puede crear y actualizar campos permitidos de una plantilla valida de tenant A.
+- [x] Confirmar que `manager` de tenant A no puede leer ni actualizar una plantilla de tenant B.
+- [x] Confirmar que insertar o actualizar una plantilla tenant A con `center_id` de tenant B falla cerrado por FK compuesta.
+- [x] Confirmar que `manager` de tenant A no puede insertar directamente una plantilla en tenant B.
+- [x] Confirmar que `manager` de tenant A no puede mover una plantilla tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que `manager` de tenant B no lee ni actualiza la plantilla tenant A.
+- [x] Documentar que aplicar una plantilla a una semana queda fuera de S.63: ese flujo usa helpers/runtime de producto y, si se valida, necesita harness propio o entorno real/controlado.
+- [x] Actualizar el plan de implementacion para marcar S.63 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso cross-tenant de `schedule_templates` con `center_id` pasa a `cubierto-local`; la aplicacion runtime de plantillas permanece fuera de S.63.
+
+Bloqueado/no tocado por S.63:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No aplicacion de plantillas a semanas reales ni validacion de `ensureScheduleTemplateRangeApplied(...)`, `applyScheduleTemplateToWeek(...)`, acciones de `/app/templates`, generacion de `schedule_blocks` ni asignaciones `source = 'template'`.
+- No cobertura completa de equipo, tipos, horario completo, bloques de plantilla, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.63 cubre solo RLS/FK local de `schedule_templates` frente a `centers`.
+- No validacion de roles futuros ni permisos por centro funcionales; `center_manager` sigue fuera de beta hasta tener frontera DB/RLS/helpers/UX/tests propios.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-schedule-templates-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.63 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.64 - Tenant Boundary Class Types RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como sexto corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `class_types` como catalogo operativo tenant-scoped, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin`/`manager` tenant A pueden crear/actualizar un `class_type` valido de tenant A, pero no leer ni mutar `class_types` de tenant B.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-class-types-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach` de tenant A y `manager` de tenant B.
+- [x] Confirmar que `owner`, `admin` y `manager` de tenant A pueden crear y actualizar tipos validos de tenant A.
+- [x] Confirmar que `manager` de tenant A no puede leer ni actualizar el tipo de tenant B.
+- [x] Confirmar que `manager` de tenant A no puede insertar directamente un tipo en tenant B.
+- [x] Confirmar que `manager` de tenant A no puede mover un tipo tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que los constraints DB existentes fallan cerrado para `required_coaches < 0` y `category` invalida en `class_types`.
+- [x] Confirmar que `coach` de tenant A puede leer catalogo de su tenant, pero no actualizar ni crear tipos.
+- [x] Confirmar que `manager` de tenant B no lee ni actualiza tipos de tenant A.
+- [x] Documentar que S.64 no valida `update_class_type_and_sync_defaults(...)`, sincronizacion de defaults a plantillas/horarios, Server Actions ni el limite superior `required_coaches <= 20`, que vive en app/RPC y requiere task/harness propio si se prueba.
+- [x] Actualizar el plan de implementacion para marcar S.64 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS directo de `class_types` pasa a `cubierto-local`; la validacion RPC/runtime de sincronizacion de defaults permanece `parcial`.
+
+Bloqueado/no tocado por S.64:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `update_class_type_and_sync_defaults(...)`, `updateClassType(...)`, `createClassType(...)`, `setClassTypeStatus(...)`, aplicacion de defaults a `schedule_template_blocks`/`schedule_blocks`, ni rollback de datos derivados.
+- No cobertura completa de equipo, horario completo, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.64 cubre solo RLS/constraints locales de `class_types`.
+- No validacion DB del limite superior `required_coaches <= 20`; el constraint directo solo garantiza `required_coaches >= 0` y el limite 20 sigue en validacion app/RPC.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-class-types-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.64 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.65 - Tenant Boundary Coach Profiles RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como septimo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `coach_profiles` como ficha operativa tenant-scoped de equipo/coaches, con referencias tenant-safe a `centers`, `person_profiles` y `organization_memberships` por `user_id`, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin` tenant A pueden crear/actualizar un `coach_profile` valido de tenant A, y `manager` tambien solo porque las policies DB actuales de `coach_profiles` lo permiten.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-coach-profiles-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach` de tenant A y `manager`/`coach` de tenant B.
+- [x] Confirmar que `owner`, `admin` y `manager` de tenant A pueden crear y actualizar fichas validas de tenant A bajo las policies DB actuales.
+- [x] Confirmar que `coach` de tenant A puede leer fichas de coach del tenant, pero no crearlas ni actualizarlas.
+- [x] Confirmar que tenant A no puede leer ni mutar `coach_profiles` de tenant B, y que tenant B no puede leer ni mutar `coach_profiles` de tenant A.
+- [x] Confirmar que tenant A no puede insertar directamente un `coach_profile` en tenant B ni mover una ficha de tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que tenant A no puede crear o actualizar un `coach_profile` usando `primary_center_id`, `person_profile_id` o `user_id`/membership de tenant B.
+- [x] Documentar que S.65 no valida invitaciones, aceptacion de invitacion, Auth real, email, Server Actions de `/app/coaches`, runtime de alta de membership/persona, cambios de rol, ni reglas runtime de coach activo/asignable.
+- [x] Actualizar el plan de implementacion para marcar S.65 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS directo de `coach_profiles` pasa a `cubierto-local`; equipo/invitaciones y Server Actions runtime permanecen `parcial` o bloqueados por entorno.
+
+Bloqueado/no tocado por S.65:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `/app/coaches`, `createCoachProfile(...)`, `updateCoachProfile(...)`, invitaciones, aceptacion por email, tokens, Resend/Supabase Auth, cambios de `organization_memberships`, ni vinculacion real Auth/persona/ficha.
+- No validacion DB de coach activo/asignable para asignaciones o coaches por defecto; esa regla no esta garantizada por DB/RLS directa de `coach_profiles` y pertenece a runtime/producto.
+- No cobertura completa de equipo, invitaciones, centros, tipos, horario completo, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.65 cubre solo RLS/FKs/triggers locales de `coach_profiles` frente a `centers`, `person_profiles` y membership por `user_id`.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-coach-profiles-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.65 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.66 - Tenant Boundary Person Profiles RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como octavo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `person_profiles` como perfil visible/persona operativa tenant-scoped, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `owner`/`admin` tenant A pueden crear/actualizar un `person_profile` valido de tenant A bajo las policies DB actuales.
+- [x] Confirmar que `manager` no gestiona `person_profiles` porque las policies DB actuales no lo permiten; no se inventa permiso nuevo.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-person-profiles-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach` de tenant A y `manager`/`coach` de tenant B.
+- [x] Confirmar que miembros del tenant pueden leer perfiles `visible`, y que `coach` puede leer perfiles visibles de su tenant.
+- [x] Confirmar que `coach` no puede leer perfiles `internal` de otra persona bajo las policies actuales.
+- [x] Confirmar que usuario vinculado puede leer su propio perfil `internal`.
+- [x] Confirmar que usuario vinculado puede actualizar campos propios basicos permitidos por RLS/trigger actuales (`display_name`, `preferred_alias`, `public_email`) y no puede tocar `status`, `visibility_status` ni `metadata`.
+- [x] Confirmar que tenant A no puede leer ni mutar `person_profiles` de tenant B, y que tenant B no puede leer ni mutar perfiles de tenant A.
+- [x] Confirmar que tenant A no puede insertar directamente un `person_profile` en tenant B ni mover un perfil de tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que tenant A no puede enlazar `user_id` de tenant B por la FK compuesta tenant-safe hacia `organization_memberships`.
+- [x] Documentar que S.66 no valida invitaciones, aceptacion de invitacion, Auth real, email, Server Actions de `/app/account` o `/app/coaches`, Storage-backed avatar/firma, profile assets ni limites de producto fuera de DB/RLS.
+- [x] Actualizar el plan de implementacion para marcar S.66 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS directo de `person_profiles` pasa a `cubierto-local`; `/app/account`, `/app/coaches`, invitaciones y runtime permanecen `parcial` o bloqueados por entorno.
+
+Bloqueado/no tocado por S.66:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `/app/account`, `updateOwnPersonProfile(...)` en runtime real, `/app/coaches`, invitaciones, aceptacion por email, tokens, Resend/Supabase Auth, profile assets, avatar/firma Storage ni vinculacion real Auth/persona/ficha.
+- No cobertura completa de equipo, invitaciones, centros, tipos, horario completo, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.66 cubre solo RLS/FK/trigger local de `person_profiles` frente a membership por `user_id`, visibilidad `visible/internal` y actualizacion propia acotada.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-person-profiles-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.66 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.67 - Tenant Boundary Organization Memberships RLS Rollback Local
+
+Estado: ejecutado el 2026-05-19 como noveno corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `organization_memberships` como fuente critica de tenant/rol, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Elegir un caso pequeno y critico de la matriz: `organization_memberships` como fuente directa de tenant/rol aporta cobertura nueva honesta frente a S.59-S.66.
+- [x] Inspeccionar migraciones/policies reales de `organization_memberships`, `person_profiles` y `coach_profiles` antes de escribir el snippet.
+- [x] Confirmar que las policies actuales permiten a `owner`/`admin` crear/actualizar una membership valida de tenant A.
+- [x] Confirmar que la DB actual permite a `owner`/`admin` anadir un `auth.users.id` existente a su propio tenant; no se fuerza como fallo DB y el flujo de invitacion/aceptacion/Auth/email/Server Actions queda fuera de S.67.
+- [x] Usar Supabase local ya disponible y el patron existente de snippets `BEGIN`/`ROLLBACK`.
+- [x] Crear `supabase/snippets/tenant-boundary-organization-memberships-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach` de tenant A y `owner`/`coach` de tenant B.
+- [x] Confirmar que `admin` de tenant A puede crear y actualizar una membership valida de tenant A, y que `owner` puede actualizar rol/estado dentro de tenant A bajo las policies actuales.
+- [x] Confirmar que `manager` de tenant A puede leer memberships del tenant porque la policy SELECT actual lo permite, pero no puede crear memberships ni elevar rol/cambiar estado de otra membership.
+- [x] Confirmar que `coach` de tenant A solo puede leer su propia membership y no puede crear ni actualizar role/status.
+- [x] Confirmar que tenant A no puede leer ni mutar `organization_memberships` de tenant B, y que tenant B no puede leer ni mutar memberships de tenant A.
+- [x] Confirmar que tenant A no puede insertar directamente una membership en tenant B ni mover una membership de tenant A a tenant B cambiando `organization_id`.
+- [x] Documentar que S.67 no valida invitaciones, Auth real, email, aceptacion de invitacion, Server Actions de `/app/coaches`, Resend/Supabase Auth, tokens, auditoria persistida ni UX de roles.
+- [x] Actualizar el plan de implementacion para marcar S.67 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS directo de `organization_memberships` pasa a `cubierto-local` y el subcaso `manager` no cambia roles/memberships pasa a `cubierto-local`; equipo/invitaciones y Server Actions runtime permanecen `parcial` o bloqueados por entorno.
+
+Bloqueado/no tocado por S.67:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `/app/coaches`, `createTeamInvitation(...)`, `accept_team_invitation(...)`, aceptacion por email, tokens, Resend/Supabase Auth, auditoria persistida, vinculacion real Auth/membership/persona/ficha ni flujo runtime de roles.
+- No cobertura completa de equipo, invitaciones, centros, tipos, horario completo, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.67 cubre solo RLS local directo de `organization_memberships` como fuente de rol/tenant.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-19:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-organization-memberships-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.67 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.68 - Tenant Boundary Staff Work Windows RLS Rollback Local
+
+Estado: ejecutado el 2026-05-20 como decimo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `staff_work_windows` como superficie operativa tenant-scoped de jornada prevista, distinta de `schedule_blocks`, `schedule_block_assignments`, plantillas, `person_profiles` directos y memberships, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Evaluar S.68 solo si aportaba cobertura nueva honesta; `staff_work_windows` aporta superficie propia ya existente y tenant-scoped, con FKs compuestas a `person_profiles` y `centers`.
+- [x] Inspeccionar migraciones/policies reales de `staff_work_windows`, `person_profiles`, `centers`, `organization_memberships`, `is_org_member(...)` y `has_org_role(...)` antes de escribir el snippet.
+- [x] Confirmar que la policy final de lectura permite a miembros activos leer franjas `active` del tenant y a `owner`/`admin`/`manager` leer tambien inactivas.
+- [x] Confirmar que las policies actuales permiten a `owner`, `admin` y `manager` crear, actualizar y desactivar franjas validas de tenant A.
+- [x] Confirmar que roles sin gestion (`coach` y `staff`) pueden leer franjas activas del tenant pero no crear ni actualizar bajo las policies DB actuales.
+- [x] Confirmar que tenant A no puede leer ni mutar franjas de tenant B, y que tenant B no puede leer ni mutar franjas de tenant A.
+- [x] Confirmar que tenant A no puede insertar directamente una franja en tenant B ni mover una franja de tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que tenant A no puede crear ni actualizar una franja usando `person_profile_id` o `center_id` de tenant B por FKs compuestas tenant-safe.
+- [x] No forzar como fallo DB reglas que viven en runtime/producto: persona visible/activa, centro activo, validacion de notas, Server Actions y auditoria persistida quedan fuera de S.68.
+- [x] Crear `supabase/snippets/tenant-boundary-staff-work-windows-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach`/`staff` de tenant A y `manager`/`coach` de tenant B.
+- [x] Actualizar el plan de implementacion para marcar S.68 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS directo de `staff_work_windows` pasa a `cubierto-local`; runtime de `/app/schedule`, POST directo, persona/centro inactivos, auditoria y staging permanecen `parcial` o bloqueados por entorno.
+
+Bloqueado/no tocado por S.68:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `createStaffWorkWindow(...)`, `updateStaffWorkWindow(...)`, `deactivateStaffWorkWindow(...)` en runtime real, ni auditoria persistida de `operational_audit_events`.
+- No validacion DB de persona inactiva/interna, centro inactivo ni notas sensibles: esas reglas viven en helpers/actions de producto y no se fuerzan como fallo RLS.
+- No cobertura completa de horario, asignaciones, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, eventos, auditorias ni Storage. S.68 cubre solo RLS/FKs locales de `staff_work_windows` frente a `person_profiles` y `centers`.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-staff-work-windows-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.68 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.69 - Tenant Boundary Operational Events RLS/RPC Rollback Local
+
+Estado: ejecutado el 2026-05-20 como undecimo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `operational_events` como superficie operativa tenant-scoped de eventos/festivos/competiciones, distinta de horario, asignaciones, plantillas, jornada prevista, ausencias, fichaje y overtime, sin seeds persistentes, sin migraciones, sin UI, sin features, sin refactor de producto, sin datos reales y sin staging.
+
+Decision:
+
+- [x] Evaluar S.69 solo si aportaba cobertura nueva honesta; `operational_events` aporta superficie propia ya existente, tenant-scoped, con FK compuesta opcional a `centers` y mutaciones por RPC.
+- [x] Inspeccionar migraciones/policies/RPC reales de `operational_events`, `centers`, `organization_memberships`, `has_org_role(...)`, helper server-side y actions de `/app/schedule` antes de escribir el snippet.
+- [x] Confirmar que la via actual de gestion no es escritura directa: `operational_events` concede `SELECT` a `authenticated`, y crear/actualizar/cancelar/archivar pasa por `create_operational_event(...)`, `update_operational_event(...)` y `set_operational_event_status(...)`.
+- [x] Confirmar que `owner`, `admin` y `manager` de tenant A pueden crear, actualizar, cancelar y archivar eventos validos de tenant A por RPC bajo las policies actuales.
+- [x] Confirmar que `coach` de tenant A puede leer solo eventos `active` con `visibility` `staff` o `all_staff` del tenant, y no lee eventos `management`, cancelados ni de tenant B.
+- [x] Confirmar que `staff` no lee eventos bajo la policy DB actual; no se inventa permiso de lectura si la DB no lo concede.
+- [x] Confirmar que roles sin gestion (`coach` y `staff`) no pueden crear, actualizar ni cancelar eventos por RPC.
+- [x] Confirmar que tenant A no puede leer ni mutar eventos de tenant B, y que tenant B no puede leer ni mutar eventos de tenant A.
+- [x] Confirmar que tenant A no puede insertar directamente un evento en tenant B ni mover un evento de tenant A a tenant B cambiando `organization_id`.
+- [x] Confirmar que tenant A no puede crear ni actualizar un evento usando `center_id` de tenant B por la FK/validacion tenant-safe actual.
+- [x] No forzar como fallo DB ninguna regla que vive solo en runtime/producto: Server Actions, POST directo, navegador, auditoria persistida detallada y reglas visuales de `/app/schedule` quedan fuera de S.69.
+- [x] Crear `supabase/snippets/tenant-boundary-operational-events-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach`/`staff` de tenant A y `manager`/`coach` de tenant B.
+- [x] Actualizar el plan de implementacion para marcar S.69 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado del caso: el subcaso DB/RLS/RPC directo de `operational_events` pasa a `cubierto-local`; POST directo, Server Actions, navegador, auditoria persistida y staging permanecen `parcial` o bloqueados por entorno.
+
+Bloqueado/no tocado por S.69:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos por centro funcionales ni refactors de producto.
+- No validacion de `createOperationalEvent(...)`, `updateOperationalEvent(...)`, `setOperationalEventStatus(...)` a traves de Server Actions reales ni formularios de `/app/schedule`; S.69 valida la capa DB/RPC local.
+- No validacion de auditoria persistida detallada en `operational_audit_events`; las RPCs la ejercitan como efecto local rollback, pero no se convierte en evidencia de auditoria real/staging.
+- No cobertura completa de horario, asignaciones, plantillas runtime, cobertura, documentos, fichaje, solicitudes, ausencias, jornada prevista, overtime, auditorias ni Storage. S.69 cubre solo RLS/RPC/FK local de `operational_events` frente a tenant A/B y `centers`.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-operational-events-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.69 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.70 - Tenant Boundary Document Metadata RLS/RPC Rollback Local
+
+Estado: ejecutado el 2026-05-20 como duodecimo corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para metadata documental (`documents`, `document_versions`, `document_access_grants` y `document_subjects`) como superficie tenant-scoped ya existente, distinta de Storage real, rutas E.5, preview/download efectivos, grants UI, subida visible, documentos firmables, auditoria visible y staging. No crea seeds persistentes, migraciones, UI, features, permisos nuevos, refactor de producto, datos reales ni evidencia externa.
+
+Decision:
+
+- [x] Evaluar S.70 solo si aportaba cobertura nueva honesta; E.12 ya cubria el repositorio visible, pero faltaba un rollback directo de metadata/RLS/FK para `document_subjects`, `document_access_grants` y begin/cancel de versiones sin Storage real.
+- [x] Inspeccionar migraciones/policies/RPC reales de `documents`, `document_versions`, `document_subjects`, `document_access_grants`, `can_access_document(...)`, `has_document_capability(...)`, `begin_document_version_upload(...)`, `cancel_document_version_upload(...)`, `list_accessible_document_versions(...)`, helper server-side y rutas E.5 antes de escribir el snippet.
+- [x] Confirmar que usuario con grant `read_metadata` ve metadata autorizada por `list_accessible_document_versions(...)`, sin `can_preview`, sin `can_download`, sin lectura directa de `document_versions` y sin lectura de grants.
+- [x] Confirmar que usuarios con grant `preview` y `download` obtienen capacidades correctas a nivel metadata/RPC (`can_preview`/`can_download` y `can_access_document(...)`) sin validar archivo real ni signed URL efectiva.
+- [x] Confirmar que un sujeto `person` activo obtiene acceso hasta `download` por `document_subjects`, pero no `manage` ni visibilidad de grants.
+- [x] Confirmar que un rol alto operativo (`manager`) sin grant/capacidad documental no hereda lectura documental ni gestion de grants; `owner`/`admin` siguen teniendo gestion DB para documentos no sensibles de tipo `company`/`programming` bajo las policies actuales, y no se fuerza como fallo DB.
+- [x] Confirmar que usuario sin grant no lee metadata aunque existan grants revocados o expirados.
+- [x] Confirmar que tenant A/B no leen ni mutan metadata documental del otro tenant.
+- [x] Confirmar que tenant A no inserta metadata documental, grants, subjects ni version metadata en tenant B.
+- [x] Confirmar que tenant A no mueve `organization_id` en documentos, versiones, grants ni subjects.
+- [x] Confirmar que tenant A no usa `person_profile_id`, `organization_membership_id`, `document_id` ni `document_version_id` de tenant B en grants/subjects/version metadata.
+- [x] No forzar como fallo DB ninguna regla que vive solo en runtime/producto o Storage real: activacion de upload con objeto, preview/download por E.5, auditoria backend real de archivo, navegador, Server Actions, objeto `document-files`, expiracion efectiva de signed URLs y evidencia staging quedan fuera de S.70.
+- [x] Crear `supabase/snippets/tenant-boundary-document-metadata-rls-rollback.sql` con tenants A/B sinteticos, usuarios con grants `read_metadata`/`preview`/`download`, sujeto persona, usuario sin grant, `manager` sin acceso documental y owner B.
+- [x] Actualizar el plan de implementacion para marcar S.70 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado: `Documentos/subjects` y `Documentos/grants` pasan a `cubierto-local`; `Documentos/versiones/upload` permanece `parcial` porque activacion con objeto Storage, policies reales y auditoria de activacion siguen bloqueadas por entorno.
+
+Bloqueado/no tocado por S.70:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, bucket/objeto `document-files`, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, rutas E.5 reales, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos documentales nuevos, grants UI, subida documental visible ni refactors de producto.
+- No validacion de `activate_document_version_upload(...)` porque exige objeto Storage real; S.70 solo valida begin/cancel de metadata de version.
+- No validacion de `handleDocumentVersionFileAccess(...)`, redireccion a signed URL, expiracion efectiva de signed URLs, auditoria backend real `file_preview`/`file_download` ni objeto controlado.
+- No cobertura completa de documentos sensibles/payroll/signature evidence, documentos firmables, subida documental visible, grants UI, audit UI, programacion documental runtime, auditoria documental visible, cumplimiento legal documental ni Storage.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-document-metadata-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.70 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.71 - Tenant Boundary Document Access Audit RLS/RPC Rollback Local
+
+Estado: ejecutado el 2026-05-20 como decimotercer corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para auditoria documental (`document_access_events`, `record_document_access_event`, `list_document_access_events_for_document`, `can_read_document_access_events` y metadata safe) como superficie tenant-scoped ya existente, distinta de Storage real, rutas E.5, preview/download efectivos, grants UI, subida visible, documentos firmables, audit UI y staging. No crea seeds persistentes, migraciones, UI, features, permisos nuevos, refactor de producto, datos reales ni evidencia externa.
+
+Decision:
+
+- [x] Evaluar S.71 solo si aportaba cobertura nueva honesta; S.17 cubria source guard y S.70 cubria metadata documental, pero faltaba rollback DB/RLS/RPC directo sobre `document_access_events`.
+- [x] Inspeccionar migraciones/policies/RPC reales de auditoria documental antes de escribir el snippet: `document_access_events`, `record_document_access_event(...)`, `list_document_access_events_for_document(...)`, `can_read_document_access_events(...)`, `document_access_event_metadata_is_safe(...)`, `can_access_document(...)` y `has_document_capability(...)`.
+- [x] Confirmar que eventos `allowed` se registran solo cuando el actor tiene acceso documental suficiente o capacidad requerida: grant `read_metadata` registra `metadata_read`, grant `download` registra `file_download`, `document_admin` registra `file_preview` sobre documento no payroll gestionable, y usuario sin grant no registra `allowed`.
+- [x] Confirmar que eventos `denied` quedan acotados a `metadata_read`, `file_preview` y `file_download`, se pueden registrar sin conceder acceso posterior y no permiten eventos de cambio denegados como `grant_created`.
+- [x] Confirmar que metadata insegura se rechaza por RPC antes de persistir: URLs, signed URLs, Storage paths, tokens, secretos, payload/contenido documental, firma, `document_hash`, arrays y texto largo.
+- [x] Confirmar que `owner`, `admin` y `manager` no leen auditoria documental por herencia operativa, ni por SELECT directo RLS ni por `list_document_access_events_for_document(...)`.
+- [x] Confirmar que `document_admin` lee auditoria documental no payroll bajo la DB actual, pero no auditoria payroll.
+- [x] Confirmar que `payroll_manager` lee auditoria de documentos payroll bajo la DB actual y no auditoria documental no payroll.
+- [x] Confirmar que tenant B no lee ni registra auditoria sobre documentos/versiones de tenant A, y que tenant B solo puede registrar/listar su propia auditoria tenant B.
+- [x] Confirmar que usuario sin grant/capacidad no lista auditoria documental.
+- [x] Confirmar que `authenticated` no puede insertar, actualizar ni borrar directamente en `document_access_events`; la escritura normal pasa por RPC.
+- [x] No forzar como fallo DB ninguna regla que vive solo en runtime/producto o Storage real: preview/download por E.5, objeto `document-files`, redireccion signed URL, expiracion efectiva, navegador, Server Actions, staging y evidencia externa quedan fuera de S.71.
+- [x] Crear `supabase/snippets/tenant-boundary-document-access-audit-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`document_admin`/`payroll_manager`, usuario con `read_metadata`, usuario con `download`, usuario sin grant y `document_admin` de tenant B.
+- [x] Actualizar el plan de implementacion para marcar S.71 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado: los casos de `Auditoria documental` pasan a `cubierto-local`; Storage, rutas E.5, signed URLs efectivas y auditoria backend real de archivo permanecen fuera.
+
+Bloqueado/no tocado por S.71:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, bucket/objeto `document-files`, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, rutas E.5 reales, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos documentales nuevos, grants UI, subida documental visible ni refactors de producto.
+- No validacion de `handleDocumentVersionFileAccess(...)`, redireccion a signed URL, expiracion efectiva de signed URLs, auditoria backend real por rutas E.5, objeto controlado ni policies Storage reales.
+- No validacion de `activate_document_version_upload(...)` con objeto Storage real, aunque la auditoria de activacion siga documentada en E.4/E.5 y source guard.
+- No cobertura completa de documentos sensibles fuera del caso payroll auditado localmente, documentos firmables, subida documental visible, grants UI, audit UI, programacion documental runtime, cumplimiento legal documental ni Storage.
+- No hardcodear STL en `src`, no introducir `service_role`, no abrir IA, payroll funcional, geolocalizacion, app nativa, push, service worker, CacheStorage, documentos firmables, subida documental visible, grants UI ni cumplimiento legal definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-document-access-audit-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.71 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.72 - Tenant Boundary Time Audit Events RLS/Trigger Rollback Local
+
+Estado: ejecutado el 2026-05-20 como decimocuarto corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para auditoria de fichaje (`time_audit_events`) y una lectura RLS minima de cierres semanales (`time_weekly_approvals`) como superficie tenant-scoped ya existente, distinta de `/app/time`, Server Actions, navegador, firma propia real, CSV descargable, payroll, geolocalizacion, F.15 real, staging o cumplimiento laboral definitivo. No crea seeds persistentes, migraciones, UI, features, permisos nuevos, refactor de producto, datos reales ni evidencia externa.
+
+Decision:
+
+- [x] Evaluar S.72 solo si aportaba cobertura nueva honesta; S.29 cubria source guard de `time_audit_events`, pero faltaba rollback DB/RLS/trigger directo sobre lectura propia/gestion, cross-tenant y escritura directa.
+- [x] Inspeccionar migraciones/policies/RPC/triggers reales de fichaje antes de escribir el snippet: `time_audit_events`, `time_records`, `time_punches`, `time_weekly_approvals`, `time_exports`, `create_own_time_punch(...)`, `record_time_audit_event_from_trigger(...)`, `can_manage_time_tracking(...)` y `time_audit_event_metadata_is_safe(...)`.
+- [x] Confirmar que `create_own_time_punch(...)` crea eventos de auditoria de registro y punch con actor, membership y persona derivados desde `auth.uid()` + tenant.
+- [x] Confirmar que `owner`, `admin` y `manager` leen auditoria de fichaje del tenant por `can_manage_time_tracking(...)`.
+- [x] Confirmar que `coach` lee solo sus propios eventos de auditoria y su propio cierre semanal minimo, no eventos/cierres de otra persona ni eventos tenant-wide sin `target_person_profile_id`.
+- [x] Confirmar que `payroll_manager` no hereda lectura de auditoria de fichaje ni cierres semanales por ese rol bajo la DB actual.
+- [x] Confirmar que tenant B no lee auditoria ni cierres de tenant A y que tenant A no puede crear punch/cierre en tenant B.
+- [x] Confirmar que `authenticated` no puede insertar directamente en `time_audit_events`; `UPDATE`/`DELETE` directos quedan sin efecto por RLS bajo la DB actual.
+- [x] Confirmar que metadata insegura de auditoria de fichaje se rechaza por helper/constraint para claves de URL, token, firma, ubicacion y payload demasiado grande.
+- [x] No forzar como fallo DB ninguna regla que vive solo en runtime/producto: Server Actions, POST directo, firma propia real, aprobacion/reapertura real con firma, CSV descargable, scheduler/job real, navegador, staging, evidencia externa y F.15 quedan fuera de S.72.
+- [x] Crear `supabase/snippets/tenant-boundary-time-audit-events-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach`/`payroll_manager`, `manager` y `coach` de tenant B, fixtures minimos de `person_profiles`, punches propios, cierres semanales pendientes y exporte solicitado.
+- [x] Actualizar el plan de implementacion para marcar S.72 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado: `Auditoria fichaje` pasa a `cubierto-local` para DB/RLS/trigger local; runtime de `/app/time`, F.15 real, firma propia real, CSV descargable y staging permanecen fuera.
+
+Bloqueado/no tocado por S.72:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, formularios de `/app/time`, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos nuevos ni refactors de producto.
+- No validacion de aprobacion semanal con firma propia real, firma ausente/ajena, snapshot legal, reapertura real con firma, automatico por planificacion, CSV generado/descargado, scheduler, retencion legal ni F.15.
+- No cobertura de payroll funcional, horas extra aprobadas, compensacion, saldos legales, geolocalizacion, documentos firmables, subida documental visible, grants UI, audit UI, app nativa, push, service worker, CacheStorage, IA, permisos por centro funcionales ni cumplimiento laboral definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-time-audit-events-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.72 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.73 - Tenant Boundary Time Records/Punches RLS Rollback Local
+
+Estado: ejecutado el 2026-05-20 como decimoquinto corte SQL rollback local A/B fuera del carril helper-only/source-static visible. Se anade un SQL rollback local minimo para `time_records` y `time_punches` como filas canonicas de fichaje, distinto de S.72 porque valida registros/punches y no auditoria. No crea seeds persistentes, migraciones, UI, features, permisos nuevos, refactor de producto, datos reales ni evidencia externa.
+
+Decision:
+
+- [x] Evaluar S.73 solo si aportaba cobertura nueva honesta; la matriz mantenia parcial el caso de UPDATE/DELETE directo normal sobre `time_records`/`time_punches`, y S.72 solo cubria auditoria de fichaje y lectura minima de cierres.
+- [x] Inspeccionar migraciones/policies/RPC/triggers reales de fichaje antes de escribir el snippet: `time_records`, `time_punches`, `time_weekly_approvals`, `create_own_time_punch(...)`, `validate_time_record_row(...)`, `validate_time_punch_row(...)`, `time_week_is_approved(...)`, `can_manage_time_tracking(...)`, RLS policies y grants efectivos.
+- [x] Confirmar que la DB actual permite INSERT propia de `time_records` y `time_punches` bajo RLS/policies para la persona derivada de `auth.uid()` + tenant; no se fuerza esto como fallo DB porque es comportamiento real actual.
+- [x] Confirmar que `owner`, `admin` y `manager` leen registros/punches del tenant por `can_manage_time_tracking(...)`.
+- [x] Confirmar que `coach` lee solo sus propios registros/punches, no los de otra persona del mismo tenant.
+- [x] Confirmar que `payroll_manager` no hereda lectura de registros/punches de fichaje por ese rol bajo la DB actual.
+- [x] Confirmar que tenant B no lee registros/punches de tenant A y que tenant A no puede crear registros en tenant B.
+- [x] Confirmar que referencias cross-tenant por `center_id` en registros/punches se rechazan por validacion/FK tenant-safe.
+- [x] Confirmar que UPDATE/DELETE directos normales sobre `time_records` y `time_punches` no afectan filas bajo la RLS actual.
+- [x] No forzar como fallo DB ninguna regla que vive solo en runtime/producto: Server Actions, POST directo, firma propia real, aprobacion/reapertura real con firma, CSV descargable, scheduler/job real, navegador, staging, evidencia externa y F.15 quedan fuera de S.73.
+- [x] No presentar S.73 como cierre de direct SQL grant hardening: una comprobacion exploratoria local mostro que `TRUNCATE ... CASCADE` bajo `SET ROLE authenticated` funciona en la base local por grants amplios de Supabase; no se cubre ni se corrige en este rollback y requiere task separada si entra en el threat model.
+- [x] Crear `supabase/snippets/tenant-boundary-time-records-punches-rls-rollback.sql` con tenants A/B sinteticos, roles `owner`/`admin`/`manager`/`coach`/`payroll_manager`, `manager` y `coach` de tenant B, fixtures minimos de `person_profiles`, centros A/B y registros/punches propios.
+- [x] Actualizar el plan de implementacion para marcar S.73 como cobertura SQL rollback local acotada.
+- [x] Actualizar la matriz negativa solo donde cambia el estado: el caso de UPDATE/DELETE directo normal sobre `time_records`/`time_punches` pasa a `cubierto-local` para SQL rollback local; runtime de `/app/time`, POST directo, F.15 real, firma propia real, CSV descargable, staging y direct SQL TRUNCATE/grant hardening permanecen fuera.
+
+Bloqueado/no tocado por S.73:
+
+- No validaciones reales/staging, URL QA/staging, project/ref, DB URL, SMTP real, Storage real, credenciales E2E por rol, tenant QA/staging ni evidencia externa.
+- No tests autenticados de navegador, Server Actions runtime, POST directo, formularios de `/app/time`, smokes por rol, datos reales, fixtures persistentes, migraciones, seeds, UI nueva, features, permisos nuevos ni refactors de producto.
+- No validacion de aprobacion semanal con firma propia real, firma ausente/ajena, snapshot legal, reapertura real con firma, automatico por planificacion, CSV generado/descargado, scheduler, retencion legal ni F.15.
+- No cierre de direct SQL TRUNCATE/grant hardening; S.73 cubre DML normal bajo RLS, no privilegios SQL administrativos fuera de la API/runtime.
+- No cobertura de payroll funcional, horas extra aprobadas, compensacion, saldos legales, geolocalizacion, documentos firmables, subida documental visible, grants UI, audit UI, app nativa, push, service worker, CacheStorage, IA, permisos por centro funcionales ni cumplimiento laboral definitivo.
+- No prometer beta lista, produccion lista, ASVS conforme, pentest ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-boundary-time-records-punches-rls-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.73 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.74 - Tenant Direct Grants Inventory Rollback Local
+
+Estado: ejecutado el 2026-05-20 como inventario SQL rollback local de postura real de grants directos `anon`/`authenticated` sobre tablas publicas tenant-scoped. Se anade un snippet de catalogo y confirmacion, no una migracion de hardening. No cambia grants, policies, runtime, UI, Storage, Auth ni datos persistentes.
+
+Decision:
+
+- [x] Evaluar S.74 solo si aportaba cobertura nueva honesta; S.73 detecto `TRUNCATE ... CASCADE` bajo `SET ROLE authenticated`, pero no habia inventario real de grants directos por tabla/rol ni contraste con RLS/policies.
+- [x] Inspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants`, `has_table_privilege(...)` y `pg_policies`.
+- [x] Confirmar que las 40 tablas publicas de app tienen RLS habilitado y policies para `authenticated`; `anon` no aparece como rol de policy RLS en estas tablas.
+- [x] Confirmar la postura local actual de default ACL en `public`: tablas futuras creadas por `postgres` o `supabase_admin` reciben `arwdDxt` para `anon` y `authenticated` salvo revokes explicitos.
+- [x] Confirmar postura efectiva actual: `anon` tiene privilegios directos amplios (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `REFERENCES`, `TRIGGER`) en 32 tablas publicas; `authenticated` tiene al menos un privilegio directo de riesgo en 30 tablas y `TRUNCATE` en 29 tablas.
+- [x] Confirmar que `authenticated` y `anon` tienen `TRUNCATE` sobre `time_records` y `time_punches`, y que `TRUNCATE public.time_records CASCADE` funciona para ambos roles dentro de una transaccion rollback, afectando tambien `time_punches`, `time_record_corrections`, `time_audit_events` y `time_location_events` hasta el `ROLLBACK`.
+- [x] Confirmar que algunos cortes posteriores si reducen `authenticated` a `SELECT` en tablas sensibles como ausencias, auditorias/document programming, eventos operativos y overtime; S.74 detecta tambien que las tablas de ausencias siguen con grants amplios para `anon` en la DB local actual.
+- [x] Comparar con migraciones y uso de app: varias superficies visibles siguen dependiendo de escrituras directas RLS desde Server Actions/helpers (`centers`, `organizations`, `class_types`, `schedule_*`, `staff_work_windows`, `person_profiles`, `coach_profiles`, `organization_memberships`, `team_invitations`, `time_record_corrections`, `time_exports`); otras usan RPCs y podrian endurecerse de forma separada. Por ese blast radius no se aplica migracion de hardening en S.74.
+- [x] Crear `supabase/snippets/tenant-direct-grants-inventory-rollback.sql` como inventario/confirmacion local con `BEGIN`/`ROLLBACK`.
+- [x] Actualizar el plan de implementacion para marcar S.74 como inventario local de grants, no como prueba runtime ni hardening.
+- [x] Actualizar la matriz negativa anadiendo un caso especifico de `Direct SQL grants`, con estado `parcial`, sin declarar beta lista ni runtime validado.
+
+Bloqueado/no tocado por S.74:
+
+- No se revocan grants ni default privileges.
+- No se crea migracion de hardening porque podria romper flujos que aun usan DML directo con RLS y porque falta harness runtime por Server Actions/rutas/roles.
+- No se valida `/app/time`, Server Actions, POST directo, navegador, Supabase Auth real, PostgREST real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se convierte el hallazgo de direct SQL grants en evidencia de runtime app; es postura de privilegios de base de datos.
+- No se abren IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+- No se corrige el riesgo de `TRUNCATE`; queda como deuda de hardening DB a disenar tabla por tabla.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-inventory-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.74 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.75 - Tenant Direct Grants Hardening Impact Analysis Rollback Local
+
+Estado: ejecutado el 2026-05-20 como analisis local de impacto para hardening de grants directos. Se anade `supabase/snippets/tenant-direct-grants-hardening-impact-analysis-rollback.sql` con clasificacion tabla por tabla y simulacion rollback. No aplica migracion, no revoca grants reales, no cambia runtime, UI, policies, Storage, Auth ni datos persistentes.
+
+Decision:
+
+- [x] Evaluar S.75 solo si aportaba cobertura nueva honesta frente a S.74. Aporta clasificacion de blast radius y simulacion de una candidata minima, no otro inventario con otro nombre.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants`, `has_table_privilege(...)` y `pg_policies`.
+- [x] Buscar de nuevo DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) para separar dependencia runtime de posture SQL.
+- [x] Comparar con migraciones `GRANT`/`REVOKE`: las primeras tablas MVP mantienen grants amplios; varias tablas sensibles posteriores intentan reducir a `SELECT`, pero el default ACL sigue dejando deuda en tablas existentes o futuras si no hay `REVOKE` explicito.
+- [x] Clasificar las 40 tablas publicas de app:
+  - 14 con DML directo usado hoy por `src`: `centers`, `class_types`, `coach_profiles`, `organization_memberships`, `organizations`, `person_profiles`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_exports` y `time_record_corrections`.
+  - 21 RPC-only / SELECT-only desde `src` actual: ausencias, time-location, change requests, auditorias, eventos, overtime, profile assets/signatures y tablas canonicas de fichaje/cierre que hoy se mutan por RPC o se leen directamente.
+  - 4 tablas de metadata documental (`documents`, `document_versions`, `document_subjects`, `document_access_grants`) que no tienen DML visible actual, pero cuya postura futura depende de una decision de gestion documental/grants.
+  - 1 tabla legacy/no usada por `src` actual (`coach_center_assignments`) que requiere confirmacion antes de hardening real.
+- [x] Simular dentro de `BEGIN`/`ROLLBACK` una candidata minima: `REVOKE ALL` de tablas a `anon`, `REVOKE TRUNCATE, REFERENCES, TRIGGER` a `authenticated`, y correccion de default table ACL para objetos futuros owned por `postgres`.
+- [x] Confirmar en la simulacion que los DML directos observados en `src` para `authenticated` siguen concedidos, que `anon` queda con 0 privilegios directos de tabla, que `authenticated` queda con 0 `TRUNCATE`/`REFERENCES`/`TRIGGER`, y que los RPCs publicos de invitacion (`get_team_invitation_public`, `accept_team_invitation`) conservan `EXECUTE`.
+- [x] Confirmar que el default ACL owned por `supabase_admin` no puede modificarse desde el rol local actual; queda como paso separado de owner/operador/migracion, no como falso pass local.
+- [x] Determinar que S.75 debe quedarse en documento/snippet rollback. Una migracion minima futura parece plausible para `anon` + `TRUNCATE/REFERENCES/TRIGGER`, pero no se aplica sin smoke/runtime/harness suficiente.
+- [x] Actualizar el plan de implementacion y la matriz negativa manteniendo `Direct SQL grants` en estado `parcial`.
+
+Bloqueado/no tocado por S.75:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044` ni se marca hardening DB como terminado.
+- No se reduce `authenticated` a `SELECT` tabla por tabla porque 14 tablas tienen DML directo actual y otras requieren smoke/RPC/runtime.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-hardening-impact-analysis-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.75 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.76 - Tenant Direct Grants Migration Readiness Post-Revoke Probes Rollback Local
+
+Estado: ejecutado el 2026-05-20 como readiness review local para una migracion minima futura de hardening de grants directos. Se anade `supabase/snippets/tenant-direct-grants-migration-readiness-post-revoke-probes-rollback.sql` como checklist tabla por tabla y paquete de probes post-revoke en `ROLLBACK`. No aplica migracion, no crea `00044`, no revoca grants reales, no cambia runtime, UI, policies, Storage, Auth ni datos persistentes.
+
+Decision:
+
+- [x] Evaluar S.76 solo si aportaba cobertura nueva honesta frente a S.75. Aporta contrato de readiness/post-revoke probes para una migracion futura minima; no repite el inventario ni el analisis de impacto como nuevo nombre.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants`, `has_table_privilege(...)` y `pg_policies`.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`.
+- [x] Convertir la candidata de S.75 en checklist tabla por tabla:
+  - revokes probablemente seguros para un borrador futuro: grants directos de tabla a `anon` y `authenticated TRUNCATE/REFERENCES/TRIGGER`;
+  - revokes no seguros todavia: `authenticated INSERT/UPDATE/DELETE` en las 14 tablas con DML directo actual desde `src`;
+  - tablas RPC-only / SELECT-only donde reducir `authenticated` a `SELECT` queda futuro y exige runtime/RPC/PostgREST harness;
+  - default privileges como migracion owner/operador separada, incluyendo la limitacion de `supabase_admin`.
+- [x] Distinguir explicitamente RLS behavior, direct SQL grant posture, PostgREST/runtime app behavior y SECURITY DEFINER RPC behavior en el snippet.
+- [x] Simular dentro de `BEGIN`/`ROLLBACK` solo los revokes minimos: `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon` y `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated`.
+- [x] Confirmar con probes que los revokes minimos se pueden ejecutar, que `anon` queda con 0 privilegios directos de tabla, que `authenticated` queda con 0 `TRUNCATE/REFERENCES/TRIGGER`, que el DML directo observado en `src` sigue teniendo privilegio de tabla, que los RPCs clave de invitacion conservan `EXECUTE` y que la transaccion termina en `ROLLBACK`.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: el resultado permite preparar un borrador futuro mas seguro, no marcar hardening aplicado.
+
+Bloqueado/no tocado por S.76:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044`; si se crea en el futuro debe ser borrador/aplicacion separada con smoke/runtime/harness.
+- No se reduce `authenticated` a `SELECT` tabla por tabla.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-migration-readiness-post-revoke-probes-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off` pasa y termina en `ROLLBACK`.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff revisado para confirmar que S.76 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.77 - Tenant Direct Grants Minimal Hardening Draft
+
+Estado: ejecutado el 2026-05-20 como borrador prudente de migracion minima futura para hardening de direct grants. Se anaden `supabase/snippets/tenant-direct-grants-minimal-hardening-draft.sql` y su verificador rollback `supabase/snippets/tenant-direct-grants-minimal-hardening-draft-verification-rollback.sql`. No se crea `00044`, no se aplica migracion, no se revocan grants reales, no se cambian default privileges, no se toca `src` ni se valida runtime.
+
+Decision:
+
+- [x] Evaluar S.77 solo si aportaba cobertura nueva honesta frente a S.76. Aporta un cuerpo de borrador futuro aplicable por operador/migracion posterior y un verificador rollback del borrador; no repite el inventario, impacto o readiness con otro nombre.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants`, `has_table_privilege(...)` y `pg_policies`. La postura local sigue en 40 tablas publicas con RLS; `anon` conserva grants directos amplios en 32 tablas; `authenticated` conserva `TRUNCATE` en 29; default ACL para `postgres` y `supabase_admin` sigue amplio.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`. El resultado mantiene la separacion de S.75/S.76: 14 tablas con DML directo actual no son seguras para revocar `authenticated INSERT/UPDATE/DELETE`; las RPCs y SELECT-only requieren runtime/harness propio si se reducen mas adelante.
+- [x] Crear un draft SQL no aplicado en `supabase/snippets/tenant-direct-grants-minimal-hardening-draft.sql`, no como migracion numerada.
+- [x] Limitar el borrador a dos sentencias:
+  - `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon`;
+  - `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated`.
+- [x] Documentar explicitamente en el draft que no toca `authenticated INSERT/UPDATE/DELETE`, que default privileges para `postgres` y `supabase_admin` son paso separado, y que RLS behavior, direct SQL grants, PostgREST/runtime app behavior y SECURITY DEFINER RPC behavior son capas distintas.
+- [x] Incluir en el draft una checklist de probes post-aplicacion basada en S.76: inventario de catalogo, RLS/policies, grants de `anon`, `TRUNCATE/REFERENCES/TRIGGER` de `authenticated`, DML requerido por `src`, EXECUTE de RPCs clave, runtime smoke y default privileges separado.
+- [x] Crear un companion rollback verification que ejecuta esas dos sentencias dentro de `BEGIN`/`ROLLBACK` y confirma que el borrador preserva el DML observado y deja default privileges como deuda separada.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: S.77 prepara borrador/verificador, no hardening aplicado.
+
+Bloqueado/no tocado por S.77:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044`; el archivo elegido es un snippet `draft.sql` para evitar que parezca aplicado.
+- No se reduce `authenticated` a `SELECT` tabla por tabla ni se toca `authenticated INSERT/UPDATE/DELETE`.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se toca `src`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-minimal-hardening-draft-verification-rollback.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off` pasa y termina en `ROLLBACK`.
+- [x] El verificador confirma dentro de rollback: `anon` queda con 0 privilegios directos de tabla; `authenticated` queda con 0 `TRUNCATE`, `REFERENCES` y `TRIGGER`; `authenticated SELECT/INSERT/UPDATE/DELETE` requerido por el DML observado en `src` sigue concedido; `get_team_invitation_public(uuid,text)` y `accept_team_invitation(uuid,text)` conservan `EXECUTE`; default ACL de `postgres` y `supabase_admin` queda como paso separado.
+- [x] Reinspeccion posterior confirma que el rollback no cambio grants reales: `anon` sigue con `SELECT/TRUNCATE/REFERENCES/TRIGGER` en 32 tablas y `authenticated` con `SELECT` en 40 y `TRUNCATE/REFERENCES/TRIGGER` en 29, igual que antes del probe.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] No se anaden tests smoke, por tanto no se ejecuta ningun smoke acotado nuevo.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.77 solo anade SQL/docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo. El worktree global ya tenia cambios amplios de `src` ajenos a S.77 y no se revierten.
+
+#### S.78 - Tenant Direct Grants Runtime Validation Runbook
+
+Estado: ejecutado el 2026-05-20 como runbook documental prudente para validar runtime antes de aplicar el draft S.77 en cualquier entorno objetivo. Se anade `docs/operations/tenant-direct-grants-runtime-validation-runbook.md`. No se crea `00044`, no se aplica el draft, no se revocan grants reales, no se cambian default privileges, no se toca `src`, no se valida PostgREST/Server Actions/navegador en runtime y no se reintenta staging.
+
+Decision:
+
+- [x] Evaluar S.78 solo si aportaba cobertura nueva honesta frente a S.76/S.77. Aporta una matriz/runbook de validacion runtime previa a aplicar el draft; no repite inventario, simulacion, readiness SQL ni verificador rollback.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants`, `has_table_privilege(...)` y `pg_policies`. La postura local sigue en 40 tablas publicas de app, 40 con RLS, 0 policies para `anon`, 94 policies totales, `anon` con grants directos amplios en 32 tablas, `authenticated` con algun privilegio directo de riesgo en 30 y `TRUNCATE` en 29, y default ACL amplio para `postgres` y `supabase_admin`.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`. Se mantiene la separacion de S.75-S.77: 14 tablas con DML directo actual, RPCs `SECURITY DEFINER` que requieren comportamiento runtime y default privileges como paso owner/operador separado.
+- [x] Documentar explicitamente seis capas separadas: catalogo/probes SQL ya cubiertos por rollback; PostgREST/direct table DML pendiente; Server Actions/rutas afectadas por DML directo pendientes; RPC `SECURITY DEFINER` como comportamiento separado; default privileges como migracion/operacion separada; QA/staging bloqueado por falta de acceso real.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: S.78 prepara la validacion runtime futura, no hardening aplicado ni evidencia runtime.
+
+Bloqueado/no tocado por S.78:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se toca `src`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] No se anade SQL/snippet rollback nuevo; no hay snippet que ejecutar.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.78 solo anade docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.79 - Tenant Direct Grants Runtime Scenario Manifest
+
+Estado: ejecutado el 2026-05-20 como manifiesto documental prudente de escenarios runtime para validar el draft S.77 antes de aplicarlo. Se anade `docs/operations/tenant-direct-grants-runtime-scenario-manifest.md`. No se crea `00044`, no se aplica el draft, no se revocan grants reales, no se cambian default privileges, no se toca `src`, no se valida PostgREST/Server Actions/navegador en runtime y no se reintenta staging.
+
+Decision:
+
+- [x] Evaluar S.79 solo si aportaba cobertura nueva honesta frente a S.78. Aporta un mapeo tabla-por-tabla de escenarios runtime para las 14 tablas con DML directo observado, con archivo/action/helper/ruta, rol minimo, caso feliz, negativo por rol, negativo cross-tenant/ID ajeno, evidencia esperada y bloqueo de entorno.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants` y `pg_policies`. La postura local sigue en 40 tablas publicas de app, 40 con RLS, 94 policies para `authenticated`, 0 policies para `anon`, `anon` con grants directos amplios en 32 tablas, `authenticated` con `SELECT` en 40 y `TRUNCATE/REFERENCES/TRIGGER` en 29, y default ACL amplio para `postgres` y `supabase_admin`.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`. Los matches reales de DML Supabase siguen agrupados en 14 tablas: `centers`, `class_types`, `coach_profiles`, `organization_memberships`, `organizations`, `person_profiles`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_exports` y `time_record_corrections`.
+- [x] Confirmar que S.79 aporta algo distinto de S.78: S.78 define capas/secuencia; S.79 baja esa secuencia a escenarios concretos por tabla/ruta/rol/evidencia, sin repetir inventario ni runbook general.
+- [x] Distinguir en el manifiesto pruebas locales posibles frente a bloqueos por Auth/SMTP/Storage/staging/F.15 real.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: S.79 prepara validacion runtime futura, no hardening aplicado ni evidencia runtime.
+
+Bloqueado/no tocado por S.79:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se toca `src`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] No se anade SQL/snippet rollback nuevo; no hay snippet que ejecutar.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.79 solo anade docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.80 - Tenant Direct Grants Runtime Evidence Capture Template
+
+Estado: ejecutado el 2026-05-20 como plantilla documental prudente de captura de evidencia runtime redacted para ejecutar S.79 en un entorno autorizado. Se anade `docs/operations/tenant-direct-grants-runtime-evidence-capture-template.md`. No se crea `00044`, no se aplica el draft S.77, no se revocan grants reales, no se cambian default privileges, no se toca `src`, no se valida PostgREST/Server Actions/navegador en runtime y no se reintenta staging.
+
+Decision:
+
+- [x] Evaluar S.80 solo si aportaba cobertura nueva honesta frente a S.78/S.79. Aporta la hoja de captura pass/fail/bloqueado por escenario, entorno, commit/branch, rol, tabla/action/ruta, caso feliz, negativos, resultado esperado/observado redacted y bloqueo de Auth/SMTP/Storage/staging/F.15; no repite el runbook ni el manifiesto.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants` y `pg_policies`. La postura local sigue en 40 tablas publicas de app, 40 con RLS, 94 policies para `authenticated`, 0 para `anon`, `anon` con 32 grants por privilegio directo, `authenticated` con `SELECT` en 40 y `INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` en 29, y default ACL amplio para `postgres` y `supabase_admin`.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`. Los matches reales de DML Supabase siguen agrupados en 14 tablas: `centers`, `class_types`, `coach_profiles`, `organization_memberships`, `organizations`, `person_profiles`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_exports` y `time_record_corrections`; las migraciones tempranas conservan grants amplios y varias tablas sensibles posteriores usan `REVOKE`/`SELECT`/RPC.
+- [x] Distinguir explicitamente evidencia local, entorno desechable autorizado y staging/QA real, y dejar claro que la evidencia sensible vive fuera del repo.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: S.80 prepara captura futura de evidencia, no hardening aplicado ni evidencia runtime.
+
+Bloqueado/no tocado por S.80:
+
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se toca `src`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] No se anade SQL/snippet rollback nuevo; se reejecuta `tenant-direct-grants-inventory-rollback.sql` y termina en `ROLLBACK`.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.80 solo anade docs y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.81 - Tenant Direct Grants Local Documentation Stop
+
+Estado: ejecutado el 2026-05-20 como cierre documental muy acotado del carril local de direct grants. No crea documento nuevo, no crea SQL/snippet nuevo, no crea migracion `00044`, no aplica S.77, no cambia grants reales, no cambia default privileges, no toca `src`, no valida runtime y no reintenta staging/Storage/Auth/SMTP/F.15.
+
+Decision:
+
+- [x] Evaluar S.81 solo si aportaba cobertura nueva honesta frente a S.78/S.79/S.80. Aporta solo un bloqueo explicito: no quedan cortes locales documentales utiles para `Direct SQL grants` sin harness runtime autenticado, entorno desechable autorizado o acceso real QA/staging.
+- [x] Reinspeccionar catalogo local antes de escribir: `pg_class.relacl`, `pg_default_acl`, `information_schema.role_table_grants` y `pg_policies`. La postura local sigue en 40 tablas publicas de app, 40 con RLS, 94 policies para `authenticated`, 0 policies para `anon`, `anon` con grants directos amplios en 32 tablas, `authenticated` con `SELECT` en 40 y `INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER` en 29, y default ACL amplio para `postgres` y `supabase_admin`.
+- [x] Rebuscar DML directo en `src` (`.insert`, `.update`, `.upsert`, `.delete`) y RPCs (`.rpc`) y comparar contra migraciones `GRANT`/`REVOKE`. Los matches reales de DML Supabase siguen agrupados en las mismas 14 tablas: `centers`, `class_types`, `coach_profiles`, `organization_memberships`, `organizations`, `person_profiles`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_exports` y `time_record_corrections`.
+- [x] Enumerar exactamente que falta para salir de `parcial`: PostgREST autenticado por rol antes/despues del draft, Server Actions con sesion/cookies reales, navegador/POST directo y denegaciones por rol, negativos cross-tenant por ID ajeno, comportamiento real de RPCs `SECURITY DEFINER`, entorno desechable/autorizado para aplicar/revertir S.77, default privileges tratados por owner/operador separado, y QA/staging real solo con project/ref o DB URL, URL, tenant/datos controlados, credenciales por rol y evidencia redacted.
+- [x] Distinguir el siguiente corte real por tipo de entorno:
+  - harness local autenticado: users/roles sinteticos, sesiones/cookies Supabase locales, datos A/B controlados, PostgREST/Server Actions/navegador y SQL rollback sin aplicar S.77 fuera de entorno reseteable;
+  - entorno desechable autorizado: aplicar S.77 solo con rollback/backup, comparar antes/despues, registrar pass/fail/bloqueado con S.79/S.80 y revertir si falla;
+  - staging/QA real: ejecutar solo con acceso nuevo real y operador autorizado; no guardar secretos, cookies, signed URLs, rutas Storage ni contenido documental en repo.
+- [x] Definir el siguiente paso real: runtime autorizado o no hacer nada. Sin una de esas precondiciones, otro documento local seria reempaquetar S.78/S.79/S.80.
+- [x] No actualizar `docs/architecture/tenant-rls-negative-test-matrix.md` porque S.81 no cambia evidencia ni estado; `Direct SQL grants` sigue en `parcial`.
+
+Bloqueado/no tocado por S.81:
+
+- No se crea documento nuevo ni checklist nuevo que duplique S.80.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se valida PostgREST runtime, Server Actions, POST directo, navegador, Supabase Auth real, Storage, SMTP, staging, F.15 ni cumplimiento laboral/legal definitivo.
+- No se reintenta staging/Storage/Auth/SMTP/F.15 sin acceso nuevo real.
+- No se toca `src`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] No se anade SQL/snippet rollback nuevo; no hay snippet nuevo que ejecutar.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.81 solo actualiza docs existentes y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.82 - Tenant Direct Grants Centers Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como primer harness runtime local minimo para `centers`. Se anade `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts` y se permite que `tests/smoke/helpers/env.ts` lea `.env.local` como fallback redacted para smokes locales. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Releer entorno y DB local sin imprimir secretos. `.env.local` contiene las 12 variables requeridas para este smoke (`E2E_OWNER_*`, `E2E_ADMIN_*`, `E2E_MANAGER_*`, `E2E_COACH_*`, `E2E_ORGANIZATION_ID`, `E2E_WEEK`, URL y anon key Supabase); el proceso no las tenia exportadas y por eso el helper usa fallback local.
+- [x] Confirmar capacidad local suficiente para el primer corte de `centers`: 4 usuarios Auth encontrados y confirmados, 4 memberships activas con roles esperados en `E2E_ORGANIZATION_ID`, 2 centros activos del tenant A, 4 tipos activos del tenant A y 2 centros activos de otro tenant. Los `person_profiles` vinculados siguen incompletos para otros flujos, pero no bloquean este smoke de `centers`.
+- [x] Cubrir caso feliz autorizado con `owner`: select/insert si falta el centro de smoke y update tenant-scoped sobre `centers`, confirmando que no aparece `permission denied for table centers`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `centers` denegado por RLS/rol, sin `permission denied for table centers`.
+- [x] Cubrir negativo de ID ajeno en el patron de la action: update con `centerId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la fila ajena. No se declara aislamiento RLS puro entre tenants si el mismo usuario tiene membership valida en ambos; el alcance es el guardrail app-like de `centers/actions.ts`.
+- [x] Mantener `Direct SQL grants` en estado `parcial`: S.82 prueba solo baseline runtime local de `centers` antes de S.77, no aplica el draft ni valida las otras 13 tablas DML, Server Actions, navegador, staging, RPCs ni default privileges.
+
+Bloqueado/no tocado por S.82:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime de RPCs `SECURITY DEFINER`.
+- No se tocan `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-centers-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.82 solo anade test/helper/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.83 - Tenant Direct Grants Class Types Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como segundo harness runtime local minimo para `class_types`. Se anade `tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts`, siguiendo el patron de `centers`. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/class-types/actions.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `class_types`.
+- [x] Confirmar el DML directo actual de `class_types`: `createClassType` inserta el tipo de actividad completo y `setClassTypeStatus` actualiza `status` con `id` + `organization_id`; la edicion completa pasa por RPC `update_class_type_and_sync_defaults(...)` y queda fuera de este smoke.
+- [x] Cubrir caso feliz autorizado con `owner`: select/insert si falta el tipo sintetico y update tenant-scoped de `status` sobre `class_types`, confirmando que no aparece `permission denied for table class_types`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `class_types` denegado por RLS/rol, sin `permission denied for table class_types`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `classTypeId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la fila ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-class-types-smoke...`, sin borrar filas ni tocar datos reales intencionadamente.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `class_types` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.83:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de `update_class_type_and_sync_defaults(...)`.
+- No se tocan `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.83 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.84 - Tenant Direct Grants Schedule Templates Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como tercer harness runtime local minimo para `schedule_templates`. Se anade `tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts`, siguiendo el patron de `centers` y `class_types`. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/templates/actions.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `schedule_templates`.
+- [x] Confirmar el DML directo actual de `schedule_templates`: `createScheduleTemplate` inserta `center_id`, `name`, `organization_id`, `status`, `template_type`, `valid_from` y `valid_until`; `updateScheduleTemplate` actualiza `center_id`, `name`, `status`, `valid_from` y `valid_until` con `id` + `organization_id` + `template_type`; `archiveScheduleTemplate`/`restoreScheduleTemplate` tambien actualizan cabecera, pero aplicacion a semanas reales queda fuera de este smoke.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan plantillas por `canManageOperationalData(...)` y policies; `coach` conserva lectura operativa pero no DML directo de gestion.
+- [x] Cubrir caso feliz autorizado con `owner`: select/insert si falta la plantilla sintetica y update tenant-scoped de campos usados por la app sobre `schedule_templates`, confirmando que no aparece `permission denied for table schedule_templates`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `schedule_templates` denegado por RLS/rol, sin `permission denied for table schedule_templates`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `templateId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la plantilla ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-schedule-templates-smoke...`, sin borrar filas ni tocar datos reales intencionadamente.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `schedule_templates`, el negativo `coach` sobre plantillas y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.84:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de aplicar plantillas a semanas reales.
+- No se tocan `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se tocan `schedule_blocks` ni `schedule_template_blocks` salvo inspeccion.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.84 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.85 - Tenant Direct Grants Schedule Template Blocks Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como cuarto harness runtime local minimo para `schedule_template_blocks`. Se anade `tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts`, siguiendo el patron de `centers`, `class_types` y `schedule_templates`. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/templates/actions.ts`, `src/lib/schedule-templates.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `schedule_template_blocks`.
+- [x] Confirmar el DML directo actual de `schedule_template_blocks`: `createScheduleTemplateBlock` inserta `template_id`, `center_id`, `class_type_id`, `day_of_week`, `start_time`, `end_time`, `required_coaches`, `default_coach_profile_id`, `notes` y `organization_id`; `updateScheduleTemplateBlock` actualiza esos campos de bloque con `id` + `organization_id`; bulk update cubre `center_id`, `default_coach_profile_id`, `required_coaches` y `notes`; delete queda fuera de este smoke.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan bloques de plantilla por `canManageOperationalData(...)` y policies; `coach` conserva lectura operativa pero no DML directo de gestion.
+- [x] Cubrir caso feliz autorizado con `owner`: crear/reutilizar plantilla sintetica `e2e-direct-grants-schedule-template-blocks-smoke-template`, resolver un centro y tipo del tenant local, insertar un bloque sintetico y actualizar tenant-scoped campos usados por la app sobre `schedule_template_blocks`, confirmando que no aparece `permission denied for table schedule_template_blocks`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `schedule_template_blocks` denegado por RLS/rol, sin `permission denied for table schedule_template_blocks`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `templateBlockId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia el bloque de plantilla ajeno.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-schedule-template-blocks-smoke...`, sin borrar filas ni tocar datos reales intencionadamente.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update ya validan DML runtime sobre la tabla, y el flujo real de borrado coordina limpieza/desacople de `schedule_blocks` generados. Evitarlo mantiene el smoke fuera de aplicacion de plantillas a semanas reales y fuera de mutaciones sobre `schedule_blocks`.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `schedule_template_blocks` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.85:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de aplicar plantillas a semanas reales.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se ejecuta delete sobre `schedule_template_blocks` ni se tocan `schedule_blocks`.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.85 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.86 - Tenant Direct Grants Schedule Blocks Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como quinto harness runtime local minimo para `schedule_blocks`. Se anade `tests/smoke/tenant-direct-grants-schedule-blocks-runtime.spec.ts`, siguiendo el patron de S.82-S.85 pero sobre la tabla canonica del horario real. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/schedule/actions.ts`, `src/lib/schedule-blocks.ts`, `src/lib/schedule-template-application.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `schedule_blocks`.
+- [x] Confirmar el DML directo actual de `schedule_blocks`: `createScheduleBlock` inserta `center_id`, `class_type_id`, `service_date`, `start_time`, `end_time`, `required_coaches`, `status`, `notes` y `organization_id`; `updateScheduleBlock` actualiza esos campos mas `is_template_exception` con `id` + `organization_id`; `cancelScheduleBlock` actualiza `status`/`is_template_exception`; la aplicacion de plantillas puede insertar/upsert/delete bloques generados y crear asignaciones, pero queda fuera de este smoke.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan bloques por `canManageOperationalData(...)` y policies; `coach` conserva lectura operativa pero no DML directo de gestion.
+- [x] Cubrir caso feliz autorizado con `owner`: resolver un centro y tipo activos del tenant local, insertar/reutilizar un bloque sintetico sin plantilla ni asignaciones y actualizar tenant-scoped campos usados por la app sobre `schedule_blocks`, confirmando que no aparece `permission denied for table schedule_blocks`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `schedule_blocks` denegado por RLS/rol, sin `permission denied for table schedule_blocks`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `scheduleBlockId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia el bloque ajeno.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-schedule-blocks-smoke...`, sin tocar datos reales intencionadamente, sin asignaciones nuevas y sin aplicar plantillas a semanas reales. Las lecturas sobre `schedule_block_assignments` son solo verificacion pasiva de no mutacion.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y el delete real aparece ligado a reemplazo de plantillas/limpieza de bloques generados. Evitarlo mantiene S.86 fuera de aplicacion de plantillas, fuera de asignaciones y fuera de borrado accidental de historial operativo.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `schedule_blocks`, el negativo `coach` sobre bloques y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.86:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de aplicar plantillas a semanas reales.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se crean ni mutan `schedule_block_assignments`; solo se leen conteos para confirmar que el bloque sintetico no recibe asignaciones y que el ID ajeno no cambia asignaciones.
+- No se ejecuta delete sobre `schedule_blocks` ni se tocan bloques generados por plantillas.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-schedule-blocks-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.86 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.87 - Tenant Direct Grants Schedule Block Assignments Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como sexto harness runtime local minimo para `schedule_block_assignments`. Se anade `tests/smoke/tenant-direct-grants-schedule-block-assignments-runtime.spec.ts`, siguiendo el patron de S.82-S.86 pero sobre asignaciones canonicas del horario real. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-centers-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts`, `tests/smoke/tenant-direct-grants-schedule-blocks-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/schedule/actions.ts`, `src/lib/schedule-blocks.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `schedule_block_assignments`.
+- [x] Confirmar el DML directo actual de `schedule_block_assignments`: `assignScheduleBlockCoach` busca asignacion existente por `organization_id` + `schedule_block_id` + `coach_profile_id`, inserta `assignment_status`, `coach_profile_id`, `organization_id`, `schedule_block_id` y `source`, o reactiva asignacion retirada actualizando `assignment_status` y `source`; `removeScheduleBlockAssignment` actualiza `assignment_status = 'removed'` con `id` + `organization_id`.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan asignaciones por `canManageOperationalData(...)` y policies; `coach` conserva lectura operativa pero no DML directo de gestion. Las FKs compuestas a `schedule_blocks` y `coach_profiles` mantienen frontera de tenant, y el trigger `schedule_block_assignments_prevent_overlap` conserva el guard anti-solape para asignaciones activas.
+- [x] Cubrir caso feliz autorizado con `owner`: resolver centro, tipo y `coach_profile` activos del tenant local; crear un `schedule_block` sintetico minimo sin plantilla ni semana real; insertar una asignacion sintetica `assigned/source = 'template'`; actualizar tenant-scoped `assignment_status = 'removed'` y `source = 'manual'`, confirmando que no aparece `permission denied for table schedule_block_assignments`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `schedule_block_assignments` denegado por RLS/rol, sin `permission denied for table schedule_block_assignments`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `assignmentId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la asignacion ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-schedule-block-assignments-smoke...`, sin aplicar plantillas a semanas reales y sin tocar asignaciones reales intencionadamente. El smoke deja la asignacion sintetica feliz en `removed` para no acumular solapes activos.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y la app retira asignaciones con `assignment_status = 'removed'`, no borrado fisico. Evitarlo mantiene S.87 fuera de borrado accidental de historial operativo.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `schedule_block_assignments` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.87:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de aplicar plantillas a semanas reales.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se crean ni mutan asignaciones reales; las filas nuevas son sinteticas y prefijadas.
+- No se ejecuta delete sobre `schedule_block_assignments` ni se tocan bloques/asignaciones generados por plantillas reales.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-schedule-block-assignments-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.87 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.88 - Tenant Direct Grants Staff Work Windows Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como septimo harness runtime local minimo para `staff_work_windows`. Se anade `tests/smoke/tenant-direct-grants-staff-work-windows-runtime.spec.ts`, siguiendo el patron de S.82-S.87 pero sobre jornada prevista del personal. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/schedule/actions.ts`, `src/lib/staff-work-windows.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `staff_work_windows`.
+- [x] Confirmar el DML directo actual de `staff_work_windows`: `createStaffWorkWindow` inserta `center_id`, `day_of_week`, `end_time`, `notes`, `organization_id`, `person_profile_id`, `start_time`, `status`, `valid_from` y `valid_until`; `updateStaffWorkWindow` lee primero con `id` + `organization_id` y actualiza esos mismos campos; `deactivateStaffWorkWindow` usa update de `status = 'inactive'`.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan jornada prevista por `canManageStaffWorkWindows(...)` y policies; `coach` conserva lectura de franjas activas compartidas pero no DML directo de gestion. Las FKs compuestas a `person_profiles` y `centers` mantienen frontera de tenant.
+- [x] Cubrir caso feliz autorizado con `owner`: resolver una `person_profile` activa/visible y un centro activo del tenant local, insertar una franja sintetica y actualizar tenant-scoped campos usados por la app sobre `staff_work_windows`, confirmando que no aparece `permission denied for table staff_work_windows`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `staff_work_windows` denegado por RLS/rol, sin `permission denied for table staff_work_windows`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `staffWorkWindowId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la franja ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-staff-work-windows-smoke...`, sin tocar fichajes, payroll, clases, asignaciones ni datos reales intencionadamente.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y la app desactiva franjas con `status = 'inactive'`, no borrado fisico. Evitarlo mantiene S.88 fuera de borrado accidental de contexto historico de presencia prevista.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `staff_work_windows` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.88:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo, navegador, Storage, SMTP, staging, F.15, ni comportamiento runtime completo de `/app/schedule`.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se valida DB de persona interna/inactiva, centro inactivo, notas sensibles ni auditoria persistida; esas reglas de producto quedan en helpers/actions y fuera de este smoke runtime de grants directos.
+- No se ejecuta delete sobre `staff_work_windows` ni se tocan clases, bloques, asignaciones, fichajes, documentos, ausencias, eventos, payroll o datos reales.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-staff-work-windows-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.88 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.89 - Tenant Direct Grants Person Profiles Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como octavo harness runtime local minimo para `person_profiles`. Se anade `tests/smoke/tenant-direct-grants-person-profiles-runtime.spec.ts`, siguiendo el patron de S.82-S.88 pero sobre perfiles visibles/personas operativas. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/app/(app)/app/account/page.tsx`, `src/app/(app)/app/account/actions.ts`, `src/lib/personal-profile.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `person_profiles`.
+- [x] Confirmar el DML directo actual de `person_profiles`: `/app/coaches` crea fichas operativas pendientes con `display_name`, `organization_id`, `status` y `visibility_status`; el enlace avanzado puede actualizar `user_id` con `id` + `organization_id`; `/app/account` actualiza solo perfil propio por `organization_id` + `user_id` y toca `display_name`, `preferred_alias` y `public_email`.
+- [x] Confirmar permisos actuales: las policies DB permiten gestion directa de `person_profiles` a `owner`/`admin`; miembros leen perfiles `visible`; usuarios vinculados actualizan su propio perfil basico; `coach` no crea ni gestiona perfiles ajenos por RLS/rol. La FK compuesta `(organization_id, user_id)` hacia `organization_memberships` mantiene frontera de tenant cuando se vincula una cuenta.
+- [x] Cubrir caso feliz autorizado con `owner`: insertar una persona sintetica y actualizar tenant-scoped campos usados por la app (`display_name`, `preferred_alias`, `public_email`, `status`, `visibility_status`) sobre `person_profiles`, confirmando que no aparece `permission denied for table person_profiles`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado denegado por RLS/rol y update de una persona ajena sintetica sin mutacion, sin `permission denied for table person_profiles`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `personProfileId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia el perfil ajeno.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-person-profiles-smoke...`, sin tocar intencionadamente perfiles reales ni datos sensibles.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales desactivan/vinculan perfiles antes de cualquier borrado futuro. Evitarlo mantiene S.89 fuera de eliminacion destructiva de personas, fichas, invitaciones, historial operativo, fichaje, documentos o auditorias.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `Direct SQL grants` recibe evidencia runtime local adicional para `person_profiles`, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.89:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo de `/app/account` o `/app/coaches`, navegador, Storage, SMTP, staging, F.15, ni invitaciones/Auth/email reales.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se valida avatar/firma Storage, documentos privados, perfiles RRHH sensibles, payroll, fichaje, ausencias, eventos, auditorias, subida documental visible ni eliminacion segura de equipo.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-person-profiles-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.89 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.90 - Tenant Direct Grants Coach Profiles Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como noveno harness runtime local minimo para `coach_profiles`. Se anade `tests/smoke/tenant-direct-grants-coach-profiles-runtime.spec.ts`, siguiendo el patron de S.82-S.89 pero sobre fichas operativas de coach. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/lib/coaches.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `coach_profiles`.
+- [x] Confirmar el DML directo actual de `coach_profiles`: `/app/coaches` crea fichas por `user_id` cuando existe membership, crea fichas pendientes por `person_profile_id` en invitaciones, actualiza `primary_center_id`, `weekly_contracted_hours`, `status` y `notes`, y el enlace avanzado puede actualizar `user_id` con `id` + `organization_id`. S.90 evita enlazar la ficha sintetica a un usuario Auth real.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan fichas operativas por `canManageOperationalTeamProfiles(...)` y policies; `coach` conserva lectura de fichas del tenant pero no DML directo de gestion. Las FKs compuestas a `organization_memberships`, `person_profiles` y `centers` mantienen frontera de tenant; `coach_profiles_validate_identity` bloquea identidades incoherentes; `coach_profiles_set_updated_at` conserva `updated_at`; el grant amplio actual a `authenticated` sigue sin endurecer porque S.77 es draft no aplicado.
+- [x] Cubrir caso feliz autorizado con `owner`: crear una `person_profile` sintetica, insertar una `coach_profile` sintetica vinculada por `person_profile_id` y actualizar tenant-scoped campos usados por la app (`primary_center_id`, `weekly_contracted_hours`, `status`, `notes`), confirmando que no aparece `permission denied for table coach_profiles`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `coach_profiles` denegado por RLS/rol, sin `permission denied for table coach_profiles`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `coachProfileId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la ficha ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-coach-profiles-smoke...`, incluyendo `person_profiles` sinteticas de soporte, sin tocar intencionadamente fichas reales ni datos sensibles.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales desactivan/vinculan fichas antes de cualquier eliminacion segura futura. Evitarlo mantiene S.90 fuera de borrado destructivo de equipo, asignaciones, fichajes, invitaciones, documentos o auditorias.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `coach_profiles` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.90:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo de `/app/coaches`, navegador, Storage, SMTP, staging, F.15, invitaciones/Auth/email reales ni aceptacion de invitacion.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se valida enlace `user_id` real, `organization_memberships`, `team_invitations`, regla de coach activo/asignable, asignaciones, fichajes, documentos privados, payroll, ausencias, eventos, auditorias ni eliminacion segura de equipo.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-coach-profiles-runtime.spec.ts` pasa: 3 tests passed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.90 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.91 - Tenant Direct Grants Organization Memberships Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como decimo harness runtime local minimo para `organization_memberships`. Se anade `tests/smoke/tenant-direct-grants-organization-memberships-runtime.spec.ts`, siguiendo el patron de S.82-S.90 pero sobre la fuente canonica de acceso/rol del tenant. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/lib/coaches.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `organization_memberships`.
+- [x] Confirmar el DML directo actual de `organization_memberships`: `/app/coaches` crea memberships por `organization_id`, `user_id`, `role`, `status`, `invited_at` y `joined_at`; `updateMembership` lee primero con `id` + `organization_id`, protege la propia membership y actualiza `role`, `status` y timestamps; `linkCoachProfileToExistingAccount` puede crear o actualizar membership antes de enlazar `person_profiles`/`coach_profiles`; la aceptacion de invitacion por RPC queda fuera.
+- [x] Confirmar permisos actuales: `owner` y `admin` gestionan accesos por `canManageTeamAccess(...)` y policies; `manager` puede leer memberships tenant-wide pero no gestionar; `coach` solo puede leer la propia membership. RLS permite `SELECT` propia o tenant-wide a `owner`/`admin`/`manager`; `INSERT`/`UPDATE` solo a `owner`/`admin`; `organization_memberships_set_updated_at` conserva `updated_at`; el grant amplio actual a `authenticated` sigue sin endurecer porque S.77 es draft no aplicado.
+- [x] Cubrir caso feliz autorizado con `owner` para insert directo solo si existe un `auth.users.id` local sintetico seguro con prefijo `e2e-direct-grants-organization-memberships-smoke` y sin membership previa en el tenant E2E. En la DB local actual no existe candidato seguro: hay 4 usuarios Auth y todos tienen ya membership en `E2E_ORGANIZATION_ID`, sin usuario sintetico prefijado disponible. El test salta explicitamente este subcaso y no fuerza insert sobre usuarios reales ni credenciales E2E.
+- [x] Cubrir update autorizado app-like con `owner` sobre una membership controlada del tenant activo: se prefiere membership sintetica si existe y, si no, una membership activa no propia; el update mantiene `role`, `status`, `user_id`, `invited_at` y `joined_at` intactos. No degrada ni cambia credenciales E2E criticas; el unico efecto posible del DML no-op es refrescar `updated_at` por trigger.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `organization_memberships` queda denegado por RLS/rol, sin `permission denied for table organization_memberships`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: update con `membershipId` de otro tenant y `organization_id` del tenant activo devuelve 0 filas y no cambia la membership ajena.
+- [x] No usar prefijo en campos de `organization_memberships` porque la tabla no tiene metadata/notas/campo libre. El criterio conservador es no tocar usuarios reales intencionadamente para insert, y para update preservar los campos de acceso existentes sin cambiar rol/estado/usuario/timestamps de acceso.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales gestionan accesos cambiando rol/estado o aceptando invitaciones, no borrando memberships. Evitarlo mantiene S.91 fuera de eliminacion destructiva de accesos, usuarios Auth, perfiles, invitaciones, fichajes, documentos o auditorias.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `organization_memberships` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.91:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo de `/app/coaches`, navegador, Storage, SMTP, staging, F.15, invitaciones/Auth/email reales, aceptacion de invitacion ni RPCs de invitacion.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se valida insert feliz porque falta un `auth.users.id` local sintetico seguro sin membership previa en el tenant E2E; no se inventa cobertura ni se crea usuario Auth desde el smoke.
+- No se cambia rol/estado de credenciales E2E criticas, no se suspende a nadie y no se borra ninguna membership.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-organization-memberships-runtime.spec.ts` pasa: 3 tests passed, 1 skipped por falta de usuario Auth sintetico seguro para insert.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.91 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.92 - Tenant Direct Grants Team Invitations Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como undecimo harness runtime local minimo para `team_invitations`. Se anade `tests/smoke/tenant-direct-grants-team-invitations-runtime.spec.ts`, siguiendo el patron de S.82-S.91 pero sobre invitaciones de equipo/accesos. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se envia email real, no se acepta ninguna invitacion y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/lib/team-invitations.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `team_invitations`.
+- [x] Confirmar el DML directo actual de `team_invitations`: `createTeamInvitation` inserta `coach_profile_id`, `email`, `email_normalized`, `expires_at`, `initial_access_status`, `invited_by_membership_id`, `invited_by_user_id`, `organization_id`, `person_profile_id`, `role`, `status = 'pending'` y `token_hash`; el marcado de envio actualiza `status`, `last_error`, `last_sent_at`, `provider_message_id`, `send_count` y `sent_at`; `resendTeamInvitation` rota `token_hash`; `cancelTeamInvitation` cambia `status = 'cancelled'`; la aceptacion por RPC queda fuera.
+- [x] Confirmar permisos actuales: `owner` y `admin` gestionan invitaciones por `canManageTeamAccess(...)` y policies; `coach` no crea ni actualiza invitaciones por RLS/rol. Las FKs compuestas con `person_profiles`, `coach_profiles` y `organization_memberships` mantienen frontera de tenant; `token_hash` exige SHA-256 hex, los indices activos limitan duplicados `pending`/`sent`, `team_invitations_set_updated_at` conserva `updated_at` y el grant amplio actual a `authenticated` sigue sin endurecer porque S.77 es draft no aplicado.
+- [x] Cubrir caso feliz autorizado con `owner` o `admin`: crear persona/ficha de coach sinteticas, insertar una invitacion sintetica `pending` con email y `token_hash` sinteticos, y actualizarla de forma tenant-scoped a `failed` con `last_error` sintetico. No se llama a Resend, SMTP/Auth ni se construye/usa token crudo real.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `team_invitations` queda denegado por RLS/rol, sin `permission denied for table team_invitations`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: se crea una fixture sintetica local de otro tenant solo para tener `foreignId`; update con `id` ajeno y `organization_id = E2E_ORGANIZATION_ID` devuelve 0 filas y no cambia la invitacion ajena.
+- [x] Usar solo datos sinteticos `e2e-direct-grants-team-invitations-smoke...`, incluyendo persona/ficha de soporte e invitacion ajena sintetica. No se tocan usuarios reales intencionadamente, credenciales E2E criticas ni invitaciones reales.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales cierran invitaciones cambiando `status` (`failed`, `sent`, `cancelled`, `accepted`, `expired`), no borrando filas. Evitarlo mantiene S.92 fuera de eliminacion destructiva de accesos, personas, fichas, auditorias, Auth, emails o historial operativo.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `Equipo/invitaciones` y `Direct SQL grants` reciben evidencia runtime local adicional, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.92:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo de `/app/coaches`, navegador, Storage, SMTP, Resend, Auth real, staging, F.15, aceptacion de invitacion, signup/login desde invitacion ni RPCs `get_team_invitation_public(...)` / `accept_team_invitation(...)`.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se envia email real, no se reintenta proveedor, no se acepta invitacion real, no se guarda token crudo y no se usan tokens reales.
+- No se cambia rol/estado de credenciales E2E criticas, no se suspende a nadie y no se borra ninguna invitacion, membership, persona ni ficha.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-team-invitations-runtime.spec.ts` pasa: 3 tests passed, 0 skipped.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.92 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.93 - Tenant Direct Grants Organizations Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como duodecimo harness runtime local minimo para `organizations`. Se anade `tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts`, siguiendo el patron de S.82-S.92 pero sobre configuracion minima de tenant. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se toca billing real, `slug`, `status`, timezone critica ni nombre real de forma destructiva y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/settings/page.tsx`, `src/app/(app)/app/settings/actions.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts`, `src/lib/organizations.ts` y migraciones relacionadas con `organizations`, `theme_config`, `time_tracking_config`, status, RLS/grants y resolucion de tenant.
+- [x] Confirmar el DML directo actual de `organizations`: `/app/settings` actualiza directamente `name` y `theme_config` con `id = organization.id`; `time_tracking_config` no entra en este smoke porque la app lo cambia por RPC `update_organization_time_tracking_config(...)` y tiene validacion/auditoria propia.
+- [x] Confirmar permisos actuales: members leen organizaciones activas por membership; `owner`/`admin` actualizan `organizations` por RLS; `coach` conserva lectura sin DML de configuracion global. `resolveActiveOrganization(...)` solo considera organizaciones `trialing`/`active`; `canManageTenantSettings(...)` limita identidad visual a `owner`/`admin`; `canManageTimeTrackingSettings(...)` separa politica de fichaje para `owner`/`admin`/`manager`.
+- [x] Cubrir caso feliz autorizado con `owner` o `admin`: update directo tenant-scoped sobre `organizations` manteniendo `name` igual y mutando solo una marca sintetica dentro de `theme_config.directGrantsOrganizationsSmoke`, confirmando que no aparece `permission denied for table organizations`; despues se restaura el `theme_config` original.
+- [x] Cubrir negativo por rol `coach`: update directo autenticado sobre `organizations.theme_config` queda denegado por RLS/rol o no muta, sin `permission denied for table organizations`, y se verifica que `name`, `slug`, `status`, `timezone`, `time_tracking_config` y `theme_config` permanecen iguales.
+- [x] Intentar cubrir negativo de ID ajeno con patron app-like sobre la forma real de la tabla (`eq("id", foreignOrganizationId)`). En la DB local actual queda skipped porque no existe una organizacion ajena segura donde la credencial `owner/admin` del tenant E2E no tenga tambien rol `owner/admin` activo; no se fuerza una mutacion sobre otro tenant gestionado por la misma credencial.
+- [x] Usar solo marca sintetica dentro de JSON/config con prefijo `e2e-direct-grants-organizations-smoke...`; no se escriben marcas en `name`, `slug`, `status`, timezone, billing ni campos operativos reales.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque `organizations` es raiz de tenant y el flujo real de settings solo actualiza configuracion minima. Evitarlo mantiene S.93 fuera de borrado destructivo de tenants, centros, accesos, horarios, fichajes, documentos, auditoria y billing futuro.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `Direct SQL grants` recibe evidencia runtime local adicional para `organizations`, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.93:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, POST directo de `/app/settings`, navegador, staging, F.15, billing real, ni RPC runtime completa de `update_organization_time_tracking_config(...)`.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se valida ID ajeno en runtime porque falta fixture segura: la credencial de gestion local no ofrece una organizacion ajena donde no tenga tambien rol `owner/admin` activo.
+- No se cambia `status`, `slug`, timezone critica, billing, nombre real, `time_tracking_config` ni configuracion funcional final del tenant.
+- No se abre IA, payroll funcional, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts` pasa: 2 tests passed, 1 skipped por falta de fixture segura de organizacion ajena no gestionada por la credencial `owner/admin` local.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.93 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.94 - Tenant Direct Grants Time Exports Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-20 como decimotercer harness runtime local minimo para `time_exports`. Se anade `tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts`, siguiendo el patron de S.82-S.93 pero sobre metadata canonica de exportes de fichaje. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se genera CSV descargable real, no se toca Storage/email/payroll y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/time/actions.ts`, `src/lib/time-tracking.ts`, `src/lib/time-tracking-actions.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `time_exports`, RLS, grants, auditoria, exportes y tenant boundary.
+- [x] Confirmar el DML directo actual de `time_exports`: `generateTimeRecordsCsvExport(...)` inserta metadata de exporte con `date_from`, `date_to`, `export_format = 'csv'`, `export_scope = 'time_records'`, `metadata`, `organization_id`, `person_profile_id`, `requested_by_membership_id`, `requested_by_user_id` y `status = 'requested'`; despues actualiza `generated_at`, `metadata.rowCount`, `row_count` y `status = 'generated'`, o `failure_reason`/`status = 'failed'` en errores internos. La ruta `/app/time/export` genera CSV en memoria y queda fuera de este smoke.
+- [x] Confirmar permisos actuales: `owner`, `admin` y `manager` gestionan exportes por `canReviewTimeTracking(...)` en app y `can_manage_time_tracking(...)` en RLS/trigger; `coach` no puede crear ni actualizar `time_exports`. `validate_time_export_row()` fija/verifica solicitante activo, protege campos inmutables y `record_time_audit_event_from_trigger()` audita `time_export_requested`/`time_export_updated`.
+- [x] Cubrir caso feliz autorizado con `owner`, `admin` o `manager`: insertar una fila sintetica de metadata `requested` y actualizarla de forma tenant-scoped a `generated` con `row_count = 0` y metadata sintetica `noFileGenerated`, confirmando que no aparece `permission denied for table time_exports`.
+- [x] Cubrir negativo por rol `coach`: insert directo autenticado sobre `time_exports` queda denegado por RLS/rol/trigger, sin `permission denied for table time_exports`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: se crea una fixture sintetica local de otro tenant solo para tener `foreignTimeExportId`; update con `id` ajeno y `organization_id = E2E_ORGANIZATION_ID` devuelve 0 filas y no cambia el exporte ajeno.
+- [x] Usar solo marcas sinteticas `e2e-direct-grants-time-exports-smoke...` en metadata/failure reason de prueba. No se tocan exportes reales intencionadamente, credenciales E2E criticas, fichajes reales, correcciones reales ni archivos.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales cierran exportes cambiando `status` (`requested`, `generated`, `failed`, `cancelled`), no borrando filas. Evitarlo mantiene S.94 fuera de eliminacion destructiva de auditoria/exportes.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `Direct SQL grants` recibe evidencia runtime local adicional para `time_exports`, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.94:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, navegador, staging, F.15 real, payroll, nominas, billing, Storage, email, descarga real, archivo CSV real ni ruta `/app/time/export` completa.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se mutan `time_records`, `time_punches`, `time_record_corrections`, `time_weekly_approvals`, documentos, ubicacion, ausencias, overtime, payroll ni auditoria visible.
+- No se abre IA, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts` pasa: 3 tests passed, 0 skipped.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.94 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.95 - Tenant Direct Grants Time Record Corrections Runtime Smoke Local
+
+Estado: ejecutado el 2026-05-21 como decimocuarto harness runtime local minimo para `time_record_corrections`. Se anade `tests/smoke/tenant-direct-grants-time-record-corrections-runtime.spec.ts`, cerrando la tabla DML directa de correcciones que quedaba pendiente en S.82-S.94. No se crea migracion `00044`, no se aplica S.77, no se cambian grants reales, no se cambian default privileges, no se toca `src`, no se mutan fichajes reales ni correcciones reales, no se valida staging y no se declara beta lista.
+
+Decision:
+
+- [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/time/actions.ts`, `src/lib/time-tracking.ts`, `src/lib/time-tracking-actions.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `time_record_corrections`, `time_records`, `time_punches`, RLS, grants, triggers, auditoria y tenant boundary.
+- [x] Confirmar el DML directo actual de `time_record_corrections`: `requestOwnTimeCorrection(...)` inserta una correccion propia `pending` con snapshots y motivo; `reviewTimeCorrection(...)` actualiza `status`/`review_note` con `id` + `organization_id`; `applyTimeCorrection(...)` aplica por RPC `apply_time_record_correction(...)`; y `createAndApplyOwnTimeCorrection(...)` usa RPC directa cuando el tenant no requiere aprobacion. El smoke cubre la tabla directa, no los RPCs de aplicacion ni mutaciones de `time_punches`.
+- [x] Confirmar permisos actuales: `coach` con persona propia puede solicitar correccion propia sobre un `time_record` propio abierto; `owner`, `admin` y `manager` revisan correcciones por `canReviewTimeTracking(...)`/`can_manage_time_tracking(...)`; `coach` no puede revisar por UPDATE directo; los triggers rellenan/verifican requester/reviewer, transiciones, motivo, snapshots, semana aprobada y auditoria.
+- [x] Cubrir caso autorizado app-like y propio: `coach` inserta una correccion sintetica `pending` sobre un `time_record` sintetico propio y `owner/admin/manager` la revisa a `rejected` con update tenant-scoped, confirmando que no aparece `permission denied for table time_record_corrections`.
+- [x] Cubrir negativo por rol: `coach` intenta revisar por UPDATE directo una correccion pendiente propia; queda denegado por RLS/rol o no muta, sin `permission denied for table time_record_corrections`, y la correccion sigue `pending` sin reviewer ni `review_note`.
+- [x] Cubrir negativo de ID ajeno en patron app-like: se crea una fixture sintetica local de otro tenant solo para tener `foreignCorrectionId`; update con `id` ajeno y `organization_id = E2E_ORGANIZATION_ID` devuelve 0 filas y no cambia la correccion ajena.
+- [x] Usar solo marcas sinteticas `e2e-direct-grants-time-record-corrections-smoke...` en motivos, notas, snapshots y metadata. Las fixtures crean `time_records` sinteticos seguros y una persona/correccion sintetica ajena por SQL local; no crean ni mutan `time_punches` y no tocan fichajes/correcciones reales intencionadamente.
+- [x] No cubrir `delete`: no es imprescindible para este corte de grants directos porque insert/update validan DML runtime sobre la tabla y los flujos reales conservan historial de correcciones/auditoria, aplicando cambios por estado/RPC, no por borrado fisico. Evitarlo mantiene S.95 fuera de eliminacion destructiva de correcciones, fichajes, registros, cierres semanales y auditoria.
+- [x] Actualizar la matriz negativa solo donde cambia evidencia real: `Direct SQL grants` recibe evidencia runtime local adicional para `time_record_corrections`, manteniendo `Direct SQL grants` en `parcial`.
+
+Bloqueado/no tocado por S.95:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se ejecuta el draft S.77 fuera de rollback ni se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, navegador, staging, F.15 real, firma propia real, payroll, nominas, billing, Storage, email, descarga real ni CSV real.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos sensibles.
+- No se prueban RPCs `apply_time_record_correction(...)` ni `create_and_apply_own_time_record_correction(...)`, ni se crean/actualizan/voidan `time_punches`; S.95 se limita a DML directo de `time_record_corrections`.
+- No se abre IA, app nativa, geofencing, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-time-record-corrections-runtime.spec.ts` pasa: 3 tests passed, 0 skipped.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] `git diff --check` pasa con avisos LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.95 solo anade test/docs permitidos y no abre IA, app nativa, geofencing, payroll funcional, documentos firmables, subida documental visible, grants UI, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+#### S.96 - Tenant Direct Grants Full Runtime Baseline Smoke Local
+
+Estado: ejecutado el 2026-05-21 como baseline runtime local agregado de la suite completa existente de smokes `tenant-direct-grants-*-runtime.spec.ts`. Consolida S.82-S.95 sobre las 14 tablas con DML directo actual, sin crear migracion `00044`, sin aplicar S.77, sin revocar grants reales, sin cambiar default privileges, sin tocar `src`, sin aplicar hardening y sin declarar beta lista.
+
+Decision:
+
+- [x] Inspeccionar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, S.82-S.95 y `docs/architecture/tenant-rls-negative-test-matrix.md` antes de ejecutar. La matriz ya tenia evidencia tabla por tabla para `Direct SQL grants` y estado `parcial`; S.96 aporta ejecucion agregada, no un cambio de estado.
+- [x] Ejecutar la suite completa con los 14 archivos expandidos explicitamente porque el comando literal con `*` no descubre tests en PowerShell/Playwright desde este entorno. La ejecucion agregada descubre 43 tests: 41 passed, 2 skipped, 0 failed.
+- [x] Confirmar tablas cubiertas por la suite agregada: `centers`, `class_types`, `schedule_templates`, `schedule_template_blocks`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, `person_profiles`, `coach_profiles`, `organization_memberships`, `team_invitations`, `organizations`, `time_exports` y `time_record_corrections`.
+- [x] Registrar skips exactos:
+  - `tenant-direct-grants-organization-memberships-runtime.spec.ts`: `authorized owner can insert a tenant membership only when a safe local auth user candidate exists`; motivo: `No hay auth.users sintetico seguro con prefijo e2e-direct-grants-organization-memberships-smoke sin membership previa en el tenant E2E; no se fuerza insert sobre usuarios reales ni credenciales E2E.`
+  - `tenant-direct-grants-organizations-runtime.spec.ts`: `owner/admin cannot update another organization when the foreign id is outside their managed tenants`; motivo: `Hace falta otra organizacion local donde la credencial owner/admin del tenant E2E no tenga rol owner/admin activo para validar ID ajeno sin riesgo de mutar un tenant tambien gestionado por esa credencial.`
+- [x] Confirmar que no cambia la matriz negativa: no hay evidencia nueva que cambie el estado real de `Direct SQL grants`; sigue `parcial`, porque S.77 no esta aplicado y no existe hardening persistente.
+- [x] Mantener la recomendacion prudente: preparar validacion del draft S.77 solo en entorno local desechable/autorizado, o mantenerlo bloqueado si la suite agregada deja de quedar verde.
+
+Bloqueado/no tocado por S.96:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se aplica S.77, no se ejecuta el draft fuera de rollback y no se reduce `authenticated` a `SELECT`.
+- No se aplican revokes reales ni default privilege changes persistentes.
+- No se toca `src`, grants, snippets SQL, migraciones, plantillas de evidencia runtime ni datos reales intencionadamente.
+- No se actualiza la matriz negativa porque el estado no cambia: `Direct SQL grants` sigue `parcial`.
+- No se valida PostgREST despues de S.77, Server Actions/cookies, navegador, Storage, SMTP, Resend, Auth real, billing, payroll, CSV real, F.15 real, staging, geofencing, IA, app nativa ni grants UI.
+- No se abre documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-*-runtime.spec.ts` ejecutado literalmente en PowerShell devuelve `No tests found`; el `*` no expande a archivos en este contexto y no se cuenta como resultado runtime.
+- [x] Suite equivalente con los 14 archivos `tenant-direct-grants-*-runtime.spec.ts` expandidos explicitamente pasa: 43 tests descubiertos, 41 passed, 2 skipped, 0 failed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] S.77 sigue sin aplicarse: no hay `00044` y el draft permanece como snippet no migrado.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff/alcance revisado para confirmar que S.96 solo actualiza `TASKS.md`, no toca `src`, no crea `00044`, no aplica S.77, mantiene `Direct SQL grants` en `parcial` y no abre hardening ni superficies fuera de alcance.
+
+#### S.97 - Tenant Direct Grants Minimal Hardening Draft Runtime Validation Local Disposable
+
+Estado: ejecutado el 2026-05-21 como validacion runtime local desechable/autorizada del draft S.77. Se aplica temporalmente `supabase/snippets/tenant-direct-grants-minimal-hardening-draft.sql` contra la DB local Docker `supabase_db_boxops` y se ejecuta la suite completa de smokes `tenant-direct-grants-*-runtime.spec.ts` con los 14 archivos expandidos explicitamente. No se crea migracion `00044`, no se aplica S.77 fuera de local, no se cambian default privileges, no se reduce `authenticated` a `SELECT`, no se toca `src` y no se declara hardening aplicado.
+
+Decision:
+
+- [x] Confirmar precondiciones: `Test-Path supabase\migrations\00044*` devuelve `False`; S.77 sigue como snippet draft en `supabase/snippets/tenant-direct-grants-minimal-hardening-draft.sql`; el entorno usado es Supabase local Docker (`project_id = "boxops"`, `supabase_db_boxops`, puerto DB local 54322), desechable/reseteable mediante `npm run supabase:reset`.
+- [x] Aplicar el draft solo contra la DB local con `Get-Content -Raw supabase\snippets\tenant-direct-grants-minimal-hardening-draft.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off`; `psql` devuelve `REVOKE` y `REVOKE`.
+- [x] Ejecutar la suite completa post-draft con los 14 archivos expandidos explicitamente, no con el glob literal de PowerShell.
+- [x] La ejecucion agregada final post-draft descubre 43 tests y pasa: 41 passed, 2 skipped, 0 failed.
+- [x] Confirmar tablas cubiertas por la suite agregada: `centers`, `class_types`, `schedule_templates`, `schedule_template_blocks`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, `person_profiles`, `coach_profiles`, `organization_memberships`, `team_invitations`, `organizations`, `time_exports` y `time_record_corrections`.
+- [x] Registrar skips exactos:
+  - `tenant-direct-grants-organization-memberships-runtime.spec.ts`: `authorized owner can insert a tenant membership only when a safe local auth user candidate exists`; motivo: `No hay auth.users sintetico seguro con prefijo e2e-direct-grants-organization-memberships-smoke sin membership previa en el tenant E2E; no se fuerza insert sobre usuarios reales ni credenciales E2E.`
+  - `tenant-direct-grants-organizations-runtime.spec.ts`: `owner/admin cannot update another organization when the foreign id is outside their managed tenants`; motivo: `Hace falta otra organizacion local donde la credencial owner/admin del tenant E2E no tenga rol owner/admin activo para validar ID ajeno sin riesgo de mutar un tenant tambien gestionado por esa credencial.`
+- [x] Registrar fallos exactos del resultado agregado final: ninguno. Incidencia observada y resuelta durante la validacion: una primera ejecucion agregada fallo en `tenant-direct-grants-class-types-runtime.spec.ts`, test `authorized owner can insert/update a tenant class type without table permission denial`, por `PGRST303` / `JWT issued at future`; el spec aislado despues paso 3/3 y la repeticion agregada final paso 41/2/0, por lo que no queda fallo runtime reproducido del draft.
+- [x] Actualizar la matriz negativa porque S.97 si cambia evidencia real: ahora existe evidencia local post-draft. El estado sigue `parcial` porque no hay migracion `00044`, no hay default privileges cerrados, no hay Server Actions/browser/staging y no se ha aplicado hardening persistente.
+- [x] Mantener recomendacion prudente: preparar `00044` como migracion minima posterior solo desde esta evidencia verde local y con revision de entorno/migracion; mantener bloqueado cualquier despliegue si reaparece un fallo runtime reproducible al repetir la suite.
+
+Bloqueado/no tocado por S.97:
+
+- No se crea migracion `00044` ni se mueve el draft S.77 a `supabase/migrations`.
+- No se aplica S.77 en staging/produccion ni se toca ningun entorno real.
+- No se cambian default privileges ni ownership/default ACLs de `postgres`/`supabase_admin`.
+- No se reduce `authenticated` a `SELECT` tabla por tabla y no se revocan `INSERT`/`UPDATE`/`DELETE`.
+- No se toca `src`, Storage, SMTP/Resend, Auth real, billing, payroll, CSV real, F.15 real, staging, geofencing, IA, app nativa ni grants UI.
+- No se abren documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-minimal-hardening-draft.sql | docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off` devuelve `REVOKE` y `REVOKE`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-centers-runtime.spec.ts tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-blocks-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-block-assignments-runtime.spec.ts tests/smoke/tenant-direct-grants-staff-work-windows-runtime.spec.ts tests/smoke/tenant-direct-grants-person-profiles-runtime.spec.ts tests/smoke/tenant-direct-grants-coach-profiles-runtime.spec.ts tests/smoke/tenant-direct-grants-organization-memberships-runtime.spec.ts tests/smoke/tenant-direct-grants-team-invitations-runtime.spec.ts tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts tests/smoke/tenant-direct-grants-time-record-corrections-runtime.spec.ts` pasa: 43 tests descubiertos, 41 passed, 2 skipped, 0 failed.
+- [x] `Test-Path supabase\migrations\00044*` devuelve `False`; no se crea migracion aplicada.
+- [x] S.77 queda validado solo en local desechable para esta suite runtime post-draft; no queda aplicado como migracion ni como estado de produccion/staging.
+- [x] Restauracion local posterior: `npm run supabase:reset` termina correctamente, aplica migraciones `00001`-`00043` y seeds locales, y evita que el draft S.77 quede como estado local implicito fuera de migracion.
+- [x] `Direct SQL grants` sigue `parcial`: hay evidencia post-draft local suficiente para proponer una migracion minima posterior, pero no para marcar hardening aplicado.
+
+#### S.98 - Tenant Direct Grants Minimal Hardening Migration Local Validation
+
+Estado: ejecutado el 2026-05-21 como validacion local de migracion minima para el hardening de direct grants. Se crea `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` con solo las dos sentencias validadas en S.97: `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;` y `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;`. No se cambian default privileges, no se revocan `authenticated INSERT/UPDATE/DELETE`, no se toca `src`, no se aplica en staging/produccion y no se declara beta lista.
+
+Decision:
+
+- [x] Confirmar precondiciones: antes de crear la migracion, `Test-Path supabase\migrations\00044*` devuelve `False`; el draft S.77 sigue existiendo como snippet en `supabase/snippets/tenant-direct-grants-minimal-hardening-draft.sql`; Supabase local esta en Docker (`project_id = "boxops"`, DB local `127.0.0.1:54322`) y es desechable/reseteable.
+- [x] Crear `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` como migracion minima. El archivo no contiene `ALTER DEFAULT PRIVILEGES` ni revokes de `authenticated SELECT/INSERT/UPDATE/DELETE`.
+- [x] Ejecutar `npm run supabase:reset`. En dos intentos el CLI aplica `00044_tenant_direct_grants_minimal_hardening.sql` y los seeds, pero ambos terminan con exit code 1 durante el reinicio final de contenedores por `Error status 502: An invalid response was received from the upstream server`. Logs de Kong apuntan a `GET /storage/v1/bucket` contra upstream Storage tras reinicio. `npm run supabase:status` confirma el stack local levantado despues.
+- [x] Confirmar aplicacion efectiva de la migracion pese al 502 final del CLI: `supabase_migrations.schema_migrations` devuelve `00044` como ultima version; el inventario de grants post-migracion deja `anon` sin grants directos de tabla publica y `authenticated` solo con `SELECT`, `INSERT`, `UPDATE` y `DELETE` en tablas publicas actuales.
+- [x] Preparar fixture Auth local sintetico porque el reset deja `auth.users` vacio y las seeds no crean cuentas Auth. Se usan solo emails `@boxops.local` y variables `E2E_*` sobrescritas en el proceso de Playwright, sin tocar `.env.local` ni datos reales.
+- [x] Ejecutar la suite runtime completa con los 14 archivos expandidos explicitamente, no con el glob literal de PowerShell.
+- [x] La ejecucion agregada final descubre 43 tests y pasa: 34 passed, 9 skipped, 0 failed.
+- [x] Confirmar tablas cubiertas por la suite agregada: `centers`, `class_types`, `schedule_templates`, `schedule_template_blocks`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, `person_profiles`, `coach_profiles`, `organization_memberships`, `team_invitations`, `organizations`, `time_exports` y `time_record_corrections`.
+- [x] Registrar skips exactos:
+  - `tenant-direct-grants-organization-memberships-runtime.spec.ts`: `authorized owner can insert a tenant membership only when a safe local auth user candidate exists`; motivo: `No hay auth.users sintetico seguro con prefijo e2e-direct-grants-organization-memberships-smoke sin membership previa en el tenant E2E; no se fuerza insert sobre usuarios reales ni credenciales E2E.`
+  - `tenant-direct-grants-schedule-blocks-runtime.spec.ts`: `owner cannot update a schedule block from another tenant when scoped to the active organization`; motivo: `Hace falta al menos un bloque real de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-organization-memberships-runtime.spec.ts`: `owner cannot update a membership from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una organization_membership de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-schedule-template-blocks-runtime.spec.ts`: `owner cannot update a schedule template block from another tenant when scoped to the active organization`; motivo: `Hace falta al menos un bloque de plantilla de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-schedule-templates-runtime.spec.ts`: `owner cannot update a schedule template from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una plantilla no archivada de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-schedule-block-assignments-runtime.spec.ts`: `owner cannot update a schedule block assignment from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una asignacion de bloque de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-staff-work-windows-runtime.spec.ts`: `owner cannot update a staff work window from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una franja de jornada prevista de otro tenant en Supabase local para validar ID ajeno.`
+  - `tenant-direct-grants-time-exports-runtime.spec.ts`: `owner/admin/manager cannot update a time export from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una membership activa en otro tenant local para crear un time_exports sintetico ajeno y validar ID ajeno.`
+  - `tenant-direct-grants-time-record-corrections-runtime.spec.ts`: `owner/admin/manager cannot update a correction from another tenant when scoped to the active organization`; motivo: `Hace falta al menos una membership activa en otro tenant local para crear una time_record_corrections sintetica ajena y validar ID ajeno.`
+- [x] Registrar fallos exactos del resultado agregado final: ninguno. Incidencias previas resueltas/no contadas como resultado final: primera suite post-reset fallo 14/43 por `Invalid login credentials` porque `auth.users` quedo vacio tras reset; un segundo intento con usuarios insertados a mano fallo por campos Auth incompletos (`instance_id` y tokens string). Tras normalizar fixture Auth local sintetico, la suite agregada final paso 34/9/0.
+- [x] Actualizar la matriz negativa porque S.98 cambia evidencia real: ahora existe migracion local `00044` aplicada y validada por suite runtime local. El estado global de `Direct SQL grants` sigue `parcial`: hay evidencia local migrada del hardening minimo, pero no default privileges cerrados, Server Actions/browser/staging, ni reduccion tabla por tabla de `authenticated` a SELECT/RPC.
+- [x] Mantener recomendacion prudente: siguiente corte para Server Actions/browser/staging sobre la migracion ya creada, o tratar default privileges como task separada de owner/operador.
+
+Bloqueado/no tocado por S.98:
+
+- No se aplica en staging/produccion ni se toca ningun entorno real.
+- No se cambian default privileges ni ownership/default ACLs de `postgres`/`supabase_admin`.
+- No se reduce `authenticated` a `SELECT` tabla por tabla y no se revocan `INSERT`/`UPDATE`/`DELETE`.
+- No se toca `src`, Storage funcional, SMTP/Resend, Auth real, billing, payroll, CSV real, F.15 real, geofencing, IA, app nativa ni grants UI.
+- No se abren documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True` despues de crear la migracion.
+- [x] `npm run supabase:reset` aplica `00044_tenant_direct_grants_minimal_hardening.sql`, pero termina con exit code 1 por `Error status 502` en el reinicio final de contenedores/Storage. La aplicacion SQL se confirma por `supabase_migrations.schema_migrations` y por inventario de grants post-migracion.
+- [x] `docker exec supabase_db_boxops psql -U postgres -d postgres -Atc "select version from supabase_migrations.schema_migrations order by version desc limit 5;"` devuelve `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] Inventario post-migracion de `information_schema.role_table_grants`: `anon` no aparece con grants de tabla publica; `authenticated` conserva `DELETE`, `INSERT`, `SELECT` y `UPDATE`, sin `TRUNCATE`, `REFERENCES` ni `TRIGGER`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-centers-runtime.spec.ts tests/smoke/tenant-direct-grants-class-types-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-templates-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-template-blocks-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-blocks-runtime.spec.ts tests/smoke/tenant-direct-grants-schedule-block-assignments-runtime.spec.ts tests/smoke/tenant-direct-grants-staff-work-windows-runtime.spec.ts tests/smoke/tenant-direct-grants-person-profiles-runtime.spec.ts tests/smoke/tenant-direct-grants-coach-profiles-runtime.spec.ts tests/smoke/tenant-direct-grants-organization-memberships-runtime.spec.ts tests/smoke/tenant-direct-grants-team-invitations-runtime.spec.ts tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts tests/smoke/tenant-direct-grants-time-record-corrections-runtime.spec.ts` pasa con credenciales sinteticas locales `@boxops.local` inyectadas por entorno de proceso: 43 tests descubiertos, 34 passed, 9 skipped, 0 failed.
+- [x] `git diff --check` pasa; solo emite warnings existentes de normalizacion LF/CRLF.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff/alcance revisado: S.98 anade `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no se edita `src`. El worktree ya tenia cambios amplios de `src` ajenos a S.98 y no se revierten.
+
+#### S.99 - Tenant Direct Grants Minimal Hardening App Runtime Local Validation
+
+Estado: ejecutado el 2026-05-21 como validacion local de runtime app/browser sobre la migracion `00044` ya aplicada. El objetivo fue comprobar que el hardening minimo de direct grants no rompe Server Actions ni rutas locales representativas. No se aplica en staging/produccion, no se cambian default privileges, no se reduce `authenticated` a `SELECT`, no se toca `.env.local` salvo lectura y no se edita `src`.
+
+Decision:
+
+- [x] Confirmar precondiciones: `Test-Path supabase\migrations\00044*` devuelve `True`; `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` sigue minima con solo `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;` y `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;`; no contiene `ALTER DEFAULT PRIVILEGES` ni cambios de default privileges; Supabase local corre en Docker y se trata como entorno desechable/reseteable.
+- [x] Confirmar `schema_migrations`: ``docker exec supabase_db_boxops psql -U postgres -d postgres -At -F "`t" -c "select version from supabase_migrations.schema_migrations order by version desc limit 5;"`` devuelve `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] Inventario de grants post-migracion: `anon` no aparece con grants directos de tabla publica; `authenticated` conserva `DELETE` en 29 tablas, `INSERT` en 29, `SELECT` en 40 y `UPDATE` en 29, sin `TRUNCATE`, `REFERENCES` ni `TRIGGER`.
+- [x] Preparar fixture Auth local sintetico solo con cuentas `@boxops.local`, inyectando password y usuarios E2E por entorno de proceso. Resultado: 4 `auth.users` sinteticos (`owner`, `admin`, `manager`, `coach`), 4 memberships activas en `00000000-0000-0000-0000-000000100001` y ficha `coach_profile` activa para `coach`. No se usan datos reales ni se modifica `.env.local`.
+- [x] Anadir `tests/smoke/tenant-direct-grants-app-runtime.spec.ts` para cubrir runtime app local sobre `00044` con Server Actions/rutas y fixture sintetico. Superficies cubiertas: centros, tipos, configuracion minima de organizacion, equipo/memberships/coach_profiles, horario/bloques/asignaciones, jornada prevista, plantillas/bloques de plantilla, fichaje/correcciones con metadata sintetica segura y export route con rango vacio sintetico.
+- [x] Ejecutar smoke app nuevo con `E2E_OWNER_EMAIL`, `E2E_ADMIN_EMAIL`, `E2E_MANAGER_EMAIL`, `E2E_COACH_EMAIL`, passwords sinteticas locales, `E2E_ORGANIZATION_ID=00000000-0000-0000-0000-000000100001`, `E2E_WEEK=2026-05-04` y `E2E_START_SERVER=1`: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-app-runtime.spec.ts` pasa con 6 tests descubiertos, 6 passed, 0 skipped, 0 failed.
+- [x] Ejecutar smokes existentes relevantes con el mismo entorno sintetico: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/protected-mvp-routes.spec.ts tests/smoke/operational-detail-panels.spec.ts tests/smoke/auth-protection.spec.ts` descubre 30 tests y termina con 28 passed, 1 skipped y 1 failed por timeout. Fallo exacto: `protected-mvp-routes.spec.ts` en `admin can reach core MVP 1 surfaces`, `Timeout of 120000ms exceeded` mientras navegaba a `/app/templates?organizationId=00000000-0000-0000-0000-000000100001&week=2026-05-04`.
+- [x] Repetir el fallo aislado: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/protected-mvp-routes.spec.ts --grep "admin can reach core MVP 1 surfaces"` pasa con 1 passed, 0 skipped, 0 failed. El timeout agregado no se reproduce aislado y no queda como grant denial abierto.
+- [x] Repetir el skip de panel de plantillas: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/operational-detail-panels.spec.ts --grep "templates week opens"` queda 1 skipped. Motivo exacto del test: `No hay bloques visibles para validar el panel operativo.` La superficie de plantillas queda cubierta por el smoke nuevo de Server Actions, pero este panel especifico sigue sin fixture visual apto.
+- [x] No se observa `permission denied for table` ni fallo de direct grants en los smokes ejecutados. `Direct SQL grants` sigue `parcial`: ahora hay evidencia local app/browser sobre `00044`, pero no staging, no default privileges, no reduccion `authenticated` a `SELECT/RPC` tabla por tabla y exportes/correcciones solo usan metadata sintetica segura.
+- [x] Recomendacion siguiente: staging controlado sobre `00044` con fixture autorizado, o task separada para default privileges owned by `postgres`/`supabase_admin`.
+
+Bloqueado/no tocado por S.99:
+
+- No se ejecuta staging/produccion ni se toca ningun entorno real.
+- No se cambian default privileges, ownership/default ACLs ni la migracion `00044`.
+- No se reduce `authenticated` a `SELECT`; no se revocan `INSERT`/`UPDATE`/`DELETE`.
+- No se toca `src`; los cambios de S.99 se limitan a smoke local y documentacion/matriz.
+- No se usa Storage funcional real, SMTP/Resend, Auth real, billing, payroll, CSV real, F.15 real, geofencing, IA, app nativa ni grants UI.
+- Invitaciones email quedan fuera porque SMTP/Resend y envio real estan fuera de alcance; export route se valida con rango vacio `2099-01-01` y metadata sintetica `row_count = 0`.
+- No se reproduce el `502` de S.98 porque S.99 no vuelve a ejecutar `npm run supabase:reset`; queda como watch item local de contenedores si aparece en un reset posterior.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Select-String -Path supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Pattern "ALTER DEFAULT PRIVILEGES|DEFAULT PRIVILEGES|GRANT |REVOKE"` confirma solo los dos `REVOKE` efectivos y ningun cambio de default privileges.
+- [x] ``docker exec supabase_db_boxops psql -U postgres -d postgres -At -F "`t" -c "select version from supabase_migrations.schema_migrations order by version desc limit 5;"`` devuelve `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] ``docker exec supabase_db_boxops psql -U postgres -d postgres -At -F "`t" -c "select grantee, privilege_type, count(*) from information_schema.role_table_grants where table_schema='public' and grantee in ('anon','authenticated') group by grantee, privilege_type order by grantee, privilege_type;"`` devuelve `authenticated DELETE 29`, `authenticated INSERT 29`, `authenticated SELECT 40`, `authenticated UPDATE 29`; `anon` sin filas.
+- [x] Fixture Auth local: 4 `auth.users` `@boxops.local`; 4 memberships activas en el tenant sintetico; `coach` con `coach_profile` activo.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-direct-grants-app-runtime.spec.ts`: 6 passed, 0 skipped, 0 failed.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/protected-mvp-routes.spec.ts tests/smoke/operational-detail-panels.spec.ts tests/smoke/auth-protection.spec.ts`: 30 descubiertos, 28 passed, 1 skipped, 1 failed por timeout agregado no reproducido aislado.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/protected-mvp-routes.spec.ts --grep "admin can reach core MVP 1 surfaces"`: 1 passed, 0 skipped, 0 failed.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/operational-detail-panels.spec.ts --grep "templates week opens"`: 1 skipped, motivo `No hay bloques visibles para validar el panel operativo.`
+- [x] `git diff --check` pasa; solo emite warnings de normalizacion LF/CRLF.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff/alcance revisado: S.99 anade `tests/smoke/tenant-direct-grants-app-runtime.spec.ts` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no se edita `src`. El worktree ya tenia cambios amplios ajenos a S.99 y no se revierten.
+
+#### S.100 - Tenant Direct Grants Default Privileges Separate Local Readiness
+
+Estado: ejecutado el 2026-05-21 como readiness local separado para default privileges despues de `00044`. Se anade `supabase/snippets/tenant-direct-grants-default-privileges-readiness-rollback.sql`, que inventaria `pg_default_acl`, prueba objetos futuros dentro de `BEGIN`/`ROLLBACK` y simula solo los revokes minimos de default privileges de tablas equivalentes a `00044`. No se cambia `00044`, no se crea migracion nueva, no se aplican default privileges persistentes, no se reduce `authenticated` a `SELECT`, no se toca `src`, no se toca `.env.local` y no se ejecuta staging/produccion.
+
+Decision:
+
+- [x] Confirmar precondiciones: `Test-Path supabase\migrations\00044*` devuelve `True`; `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` sigue minima con solo `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;` y `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;`; no contiene `ALTER DEFAULT PRIVILEGES` ni otros `GRANT`/`REVOKE` efectivos. Supabase local esta en Docker (`supabase_db_boxops`, DB local 54322, `project_id = "boxops"`) y el proyecto conserva `npm run supabase:reset` como reset local desechable; S.100 no ejecuta reset.
+- [x] Confirmar `schema_migrations`: el SQL contra `supabase_migrations.schema_migrations` devuelve `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] Inventario exacto de `pg_default_acl` filtrado a schema `public` y tipos `tables`/`sequences`/`functions`: no aparecen owners adicionales ni ACL globales para ese filtro; solo `postgres` y `supabase_admin`.
+  - `postgres/public/functions`: `{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}`.
+  - `postgres/public/sequences`: `{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}`.
+  - `postgres/public/tables`: `{postgres=arwdDxt/postgres,anon=arwdDxt/postgres,authenticated=arwdDxt/postgres,service_role=arwdDxt/postgres}`.
+  - `supabase_admin/public/functions`: `{postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin}`.
+  - `supabase_admin/public/sequences`: `{postgres=rwU/supabase_admin,anon=rwU/supabase_admin,authenticated=rwU/supabase_admin,service_role=rwU/supabase_admin}`.
+  - `supabase_admin/public/tables`: `{postgres=arwdDxt/supabase_admin,anon=arwdDxt/supabase_admin,authenticated=arwdDxt/supabase_admin,service_role=arwdDxt/supabase_admin}`.
+- [x] Inventario expandido de grants futuros potenciales para `anon` y `authenticated`: para ambos owners, las tablas futuras conceden `DELETE`, `INSERT`, `REFERENCES`, `SELECT`, `TRIGGER`, `TRUNCATE` y `UPDATE`; las secuencias futuras conceden `SELECT`, `UPDATE` y `USAGE`; las funciones futuras conceden `EXECUTE`.
+- [x] Inventario actual post-`00044` de `information_schema.role_table_grants`: `anon` no tiene filas; `authenticated` tiene `SELECT` en 40 tablas, `INSERT` en 29, `UPDATE` en 29 y `DELETE` en 29, sin `TRUNCATE`, `REFERENCES` ni `TRIGGER`.
+  - `authenticated SELECT` (40): `absence_request_events`, `absence_request_periods`, `absence_requests`, `center_time_location_settings`, `centers`, `change_request_events`, `change_request_targets`, `change_requests`, `class_types`, `coach_center_assignments`, `coach_profiles`, `document_access_events`, `document_access_grants`, `document_programming_links`, `document_subjects`, `document_versions`, `documents`, `operational_audit_events`, `operational_events`, `organization_memberships`, `organizations`, `overtime_candidate_events`, `overtime_candidate_sources`, `overtime_candidates`, `person_profiles`, `profile_assets`, `profile_signatures`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_audit_events`, `time_exports`, `time_location_events`, `time_punches`, `time_record_corrections`, `time_records`, `time_weekly_approvals`.
+  - `authenticated INSERT/UPDATE` (29, mismo listado): `center_time_location_settings`, `centers`, `change_request_events`, `change_request_targets`, `change_requests`, `class_types`, `coach_center_assignments`, `coach_profiles`, `document_access_grants`, `document_subjects`, `documents`, `organization_memberships`, `organizations`, `person_profiles`, `profile_assets`, `profile_signatures`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `staff_work_windows`, `team_invitations`, `time_audit_events`, `time_exports`, `time_location_events`, `time_punches`, `time_record_corrections`, `time_records`, `time_weekly_approvals`.
+  - `authenticated DELETE` (29): `center_time_location_settings`, `centers`, `change_request_events`, `change_request_targets`, `change_requests`, `class_types`, `coach_center_assignments`, `coach_profiles`, `document_access_grants`, `document_subjects`, `document_versions`, `documents`, `organization_memberships`, `organizations`, `person_profiles`, `profile_assets`, `profile_signatures`, `schedule_block_assignments`, `schedule_blocks`, `schedule_template_blocks`, `schedule_templates`, `team_invitations`, `time_audit_events`, `time_exports`, `time_location_events`, `time_punches`, `time_record_corrections`, `time_records`, `time_weekly_approvals`.
+- [x] Separar riesgo futuro de estado actual aplicado: las tablas existentes siguen en el estado endurecido por `00044` (`anon` sin grants directos y `authenticated` sin `TRUNCATE`/`REFERENCES`/`TRIGGER`), pero cualquier tabla publica futura creada por `postgres` o `supabase_admin` bajo los default ACL actuales volveria a recibir grants amplios para `anon` y `authenticated`. El mismo inventario muestra que secuencias futuras y funciones futuras tambien heredan grants amplios, aunque `00044` solo trataba tablas.
+- [x] Crear snippet rollback/readiness solo porque aporta evidencia nueva reversible. `supabase/snippets/tenant-direct-grants-default-privileges-readiness-rollback.sql`:
+  - exige ejecucion local como `supabase_admin` para simular objetos de `postgres` y `supabase_admin`;
+  - inventaria `pg_default_acl` raw y expandido;
+  - crea tablas/secuencias/funciones probe de ambos owners antes de cambios y confirma que `anon`/`authenticated` reciben los grants futuros amplios;
+  - simula dentro de la misma transaccion los cuatro `ALTER DEFAULT PRIVILEGES ... ON TABLES` minimos para `postgres` y `supabase_admin`;
+  - crea tablas probe despues de la simulacion y confirma que `anon` queda sin grants de tabla y `authenticated` conserva `SELECT`/`INSERT`/`UPDATE`/`DELETE` pero no `TRUNCATE`/`REFERENCES`/`TRIGGER`;
+  - documenta que secuencias y funciones quedan inventariadas, no decididas ni simuladas;
+  - termina en `ROLLBACK`.
+- [x] Resultado del snippet: pasa y termina en `ROLLBACK`. La salida confirma antes de la simulacion `t` para todos los grants de tabla de `anon`/`authenticated` en tablas futuras de `postgres` y `supabase_admin`; despues de la simulacion confirma `anon = f` en todos los grants de tabla y `authenticated = t` solo para `SELECT`/`INSERT`/`UPDATE`/`DELETE`, con `TRUNCATE`/`REFERENCES`/`TRIGGER = f`.
+- [x] Reconfirmacion posterior al snippet: `pg_default_acl` queda identico al inventario inicial, `information_schema.role_table_grants` sigue con `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29` y `anon` sin filas, y `to_regclass(...)` sobre las tablas probe devuelve `NULL` para todas.
+- [x] Estado final de `Direct SQL grants`: sigue `parcial`. S.100 cierra readiness local de default privileges y prueba una simulacion reversible para tablas futuras, pero no aplica migracion, no trata persistente secuencias/funciones, no reduce `authenticated` a `SELECT/RPC`, no valida staging/produccion y no convierte el hardening en cierre global.
+- [x] Recomendacion siguiente: crear una migracion separada de default privileges si se acepta el corte, como minimo para tablas publicas de `postgres` y `supabase_admin` con el mismo alcance que `00044`, y decidir explicitamente si secuencias/funciones futuras deben endurecerse en esa misma migracion o en otra; alternativa prudente si se prioriza release: staging controlado sobre `00044` antes de persistir default privileges.
+
+Bloqueado/no tocado por S.100:
+
+- No se cambia `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql`.
+- No se crea migracion `00045` ni ninguna migracion nueva.
+- No se aplican default privileges persistentes ni se cambian ownership/default ACLs reales.
+- No se reduce `authenticated` a `SELECT`; no se revocan `INSERT`/`UPDATE`/`DELETE` actuales ni futuros en la simulacion minima de tablas.
+- No se toca `src`, `.env.local`, Storage funcional, SMTP/Resend, Auth real, billing, payroll, CSV real, F.15 real, geofencing, IA, app nativa ni grants UI.
+- No se abren documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Select-String -Path supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Pattern "ALTER DEFAULT PRIVILEGES|DEFAULT PRIVILEGES|GRANT |REVOKE"` confirma solo los dos `REVOKE` efectivos y ningun `ALTER DEFAULT PRIVILEGES`.
+- [x] Inventario SQL con `docker exec -i supabase_db_boxops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off`: `schema_migrations` devuelve `00044` como ultima version; `pg_default_acl` devuelve los seis ACL raw exactos de `postgres`/`supabase_admin`; `information_schema.role_table_grants` devuelve `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas.
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-default-privileges-readiness-rollback.sql | docker exec -e PGPASSWORD=postgres -i supabase_db_boxops psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -P pager=off` pasa y termina en `ROLLBACK`.
+- [x] SQL posterior al snippet confirma que `pg_default_acl` y `information_schema.role_table_grants` siguen igual y que las tablas probe no existen.
+- [x] `git diff --check` pasa; solo emite warnings de normalizacion LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Hash SHA256 de `00044` reconfirmado sin cambios frente al inicio de S.100: `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] Diff/alcance revisado: S.100 solo anade `supabase/snippets/tenant-direct-grants-default-privileges-readiness-rollback.sql` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no edita `src`, `00044` ni `.env.local`. El worktree ya tenia cambios amplios ajenos y no se revierten.
+
+#### S.101 - Tenant Direct Grants Default Privileges Tables Migration Local Validation
+
+Estado: ejecutado el 2026-05-21 como validacion local de una migracion separada para default privileges de tablas futuras despues de `00044`. Se crea `supabase/migrations/00045_tenant_direct_grants_default_table_privileges.sql` con solo los cuatro `ALTER DEFAULT PRIVILEGES ... ON TABLES` minimos para `postgres` y `supabase_admin`, equivalentes al alcance de `00044` para objetos futuros. No se toca `00044`, no se cambian secuencias ni funciones, no se reduce `authenticated` a `SELECT`, no se toca `src`, no se toca `.env.local` y no se ejecuta staging/produccion.
+
+Incidencia local importante: `npm run supabase:reset` completo alcanza `00045` pero falla en el primer `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin ...` porque el reset local aplica migraciones con rol efectivo `postgres`, que no es miembro de `supabase_admin`. Para validar el SQL sin ampliar la migracion ni tocar roles, se resetea localmente hasta `00044` y se aplica el pendiente `00045` con `npx supabase migration up --db-url <local supabase_admin db url redacted>`, reproduciendo el owner/operator role usado por S.100. La DB local queda con `00045` aplicado y validado, pero el reset estandar completo queda como bloqueo operativo/runbook antes de considerar este corte listo para flujo normal.
+
+Decision:
+
+- [x] Confirmar precondiciones: `Test-Path supabase\migrations\00044*` devuelve `True`; `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql` sigue minima con solo `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;` y `REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;`; no contiene `ALTER DEFAULT PRIVILEGES`; hash SHA256 inicial de `00044` `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] Confirmar estado previo: `schema_migrations` devuelve `00044`, `00043`, `00042`, `00041`, `00040`; `Test-Path supabase\migrations\00045*` devuelve `False`; Supabase local esta en Docker (`supabase_db_boxops`, DB local 54322, `project_id = "boxops"`) y el proyecto conserva `npm run supabase:reset` como reset local desechable.
+- [x] Crear `supabase/migrations/00045_tenant_direct_grants_default_table_privileges.sql` limitada a:
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon;`
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;`
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM anon;`
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;`
+- [x] No anadir cambios de default privileges para secuencias ni funciones en esta fase. Quedan documentadas como decision pendiente porque S.100/S.101 siguen mostrando `anon`/`authenticated` con `USAGE`/`SELECT`/`UPDATE` en secuencias futuras y `EXECUTE` en funciones futuras.
+- [x] Ejecutar `npm run supabase:reset`: aplica `00001`-`00044`, alcanza `00045` y falla con `ERROR: must be member of role "supabase_admin" (SQLSTATE 42501)` en `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM anon`. `schema_migrations` queda en `00044`.
+- [x] Repetir con `npm run supabase:reset -- --db-url <local supabase_admin db url redacted>` reproduce el mismo bloqueo durante `db reset`; el flujo de reset local de la CLI sigue aplicando migraciones con rol efectivo insuficiente para `supabase_admin`.
+- [x] Restaurar un estado limpio hasta `00044` con `npm run supabase:reset -- --version 00044`: termina correctamente, aplica seeds locales y deja la DB lista para aplicar el pendiente de forma controlada.
+- [x] Aplicar `00045` con owner/operator local: `npx supabase migration up --db-url <local supabase_admin db url redacted>` devuelve `Applying migration 00045_tenant_direct_grants_default_table_privileges.sql...` y `Local database is up to date.`
+- [x] Confirmar aplicacion efectiva: `schema_migrations` devuelve `00045`, `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] Inventario `pg_default_acl` post-aplicacion:
+  - `postgres/public/tables`: `{postgres=arwdDxt/postgres,authenticated=arwd/postgres,service_role=arwdDxt/postgres}`.
+  - `supabase_admin/public/tables`: `{postgres=arwdDxt/supabase_admin,authenticated=arwd/supabase_admin,service_role=arwdDxt/supabase_admin}`.
+  - `postgres/public/sequences` y `supabase_admin/public/sequences` siguen con `anon=rwU` y `authenticated=rwU`.
+  - `postgres/public/functions` y `supabase_admin/public/functions` siguen con `anon=X` y `authenticated=X`.
+- [x] Inventario `information_schema.role_table_grants` post-aplicacion: `anon` no tiene filas; `authenticated` conserva `DELETE` en 29 tablas, `INSERT` en 29, `SELECT` en 40 y `UPDATE` en 29; no aparecen `TRUNCATE`, `REFERENCES` ni `TRIGGER`. Los grants actuales post-`00044` no cambian.
+- [x] Probe reversible de tablas futuras ejecutado como `supabase_admin` dentro de `BEGIN`/`ROLLBACK`: crea una tabla futura como `postgres` y otra como `supabase_admin`; confirma `anon = f` para `SELECT`/`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER` en ambas, y `authenticated = t` solo para `SELECT`/`INSERT`/`UPDATE`/`DELETE`, con `TRUNCATE`/`REFERENCES`/`TRIGGER = f`.
+- [x] Reconfirmacion posterior al probe: `to_regclass('public.s101_acl_future_postgres_table')` y `to_regclass('public.s101_acl_future_supabase_admin_table')` devuelven `NULL`; `pg_default_acl` y `information_schema.role_table_grants` siguen iguales.
+- [x] Actualizar matriz negativa porque S.101 cambia evidencia real: existe migracion `00045`, la DB local aplicada por owner/operator cierra default privileges de tablas futuras para `postgres` y `supabase_admin`, pero el estado global de `Direct SQL grants` sigue `parcial` por reset estandar bloqueado, secuencias/funciones pendientes, ausencia de staging/produccion y reduccion `authenticated` a `SELECT/RPC` aun futura.
+- [x] Recomendacion siguiente: decidir si el siguiente corte trata secuencias/funciones o si primero se formaliza un flujo owner/operator/staging controlado para aplicar `00045` sin romper `npm run supabase:reset`.
+
+Bloqueado/no tocado por S.101:
+
+- `npm run supabase:reset` completo no queda verde con `00045` por el ownership/default ACL de `supabase_admin`; requiere decision de owner/operator/runbook o ajuste del flujo de migraciones antes de tratarlo como reset normal cerrado.
+- No se cambia `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql`.
+- No se cambian default privileges de secuencias ni funciones.
+- No se reduce `authenticated` a `SELECT`; no se revocan `INSERT`/`UPDATE`/`DELETE` actuales ni futuros en tablas.
+- No se toca `src`, `.env.local`, Storage funcional, SMTP/Resend, Auth real, billing, payroll, CSV real, F.15 real, geofencing, IA, app nativa ni grants UI.
+- No se abren documentos firmables, subida documental visible, permisos por centro funcionales ni cumplimiento legal definitivo.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Select-String -Path supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Pattern "ALTER DEFAULT PRIVILEGES|DEFAULT PRIVILEGES|GRANT |REVOKE"` confirma solo los dos `REVOKE` efectivos y ningun `ALTER DEFAULT PRIVILEGES`.
+- [x] `Get-FileHash supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Algorithm SHA256` devuelve `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] `schema_migrations` previo devuelve `00044`, `00043`, `00042`, `00041`, `00040`; post owner/operator devuelve `00045`, `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] `npm run supabase:reset` ejecutado y bloqueado en `00045` por `must be member of role "supabase_admin"`; no se oculta como pass.
+- [x] `npm run supabase:reset -- --version 00044` pasa y deja estado limpio hasta `00044`.
+- [x] `npx supabase migration up --db-url <local supabase_admin db url redacted>` aplica `00045` y deja la DB local up to date.
+- [x] Inventario `pg_default_acl` post-aplicacion confirma tablas futuras sin `anon` y con `authenticated=arwd` para `postgres` y `supabase_admin`; secuencias/funciones siguen fuera del corte.
+- [x] Inventario `information_schema.role_table_grants` post-aplicacion confirma `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas.
+- [x] Probe reversible de tablas futuras para `postgres` y `supabase_admin` pasa y termina en `ROLLBACK`.
+- [x] Reconfirmacion posterior al probe: tablas `s101_acl_future_*` ausentes.
+- [x] `git diff --check` pasa; solo emite warnings de normalizacion LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff/alcance revisado: S.101 anade `supabase/migrations/00045_tenant_direct_grants_default_table_privileges.sql` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no edita `src`, `.env.local` ni `00044`. El worktree ya tenia cambios amplios ajenos y no se revierten.
+
+#### S.102 - Tenant Direct Grants Default Privileges Reset-Safe Split
+
+Estado: ejecutado el 2026-05-21 como cierre local del bloqueo operativo descubierto en S.101. La decision es no mantener dentro de una migracion normal ningun `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin` que el reset local no pueda aplicar. `00045` queda reset-safe para `postgres` y las sentencias de `supabase_admin` pasan a SQL operator separado. No se toca `00044`, no se toca `src`, no se toca `.env.local`, no se cambian secuencias/funciones y no se ejecuta staging/produccion.
+
+Decision:
+
+- [x] Confirmar precondiciones iniciales: `Test-Path supabase\migrations\00044*` devuelve `True`; hash SHA256 de `00044` sigue `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`; antes de editar, `00045` existia y contenia exactamente cuatro `ALTER DEFAULT PRIVILEGES ... ON TABLES`, dos para `postgres` y dos para `supabase_admin`; la DB local podia estar ya en `00045` por la aplicacion owner/operator de S.101.
+- [x] Reproducir bloqueo antes del cambio: `npm run supabase:reset` aplica `00001`-`00044`, alcanza `00045` y falla con `ERROR: must be member of role "supabase_admin" (SQLSTATE 42501)` en `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE ALL ON TABLES FROM anon`. `schema_migrations` queda en `00044`.
+- [x] Evidencia externa usada solo como criterio de decision: la documentacion de Supabase trata `supabase db reset` como flujo normal para reaplicar todas las migraciones locales; la documentacion de PostgreSQL confirma que `ALTER DEFAULT PRIVILEGES FOR ROLE target_role` solo puede cambiar defaults del rol actual o de roles de los que el ejecutor es miembro. Por tanto, no es prudente dejar una migracion local normal que depende de ser miembro de `supabase_admin`.
+- [x] Opciones evaluadas:
+  - Mantener `00045` con las cuatro sentencias y documentar comando owner/operator: descartado como migracion normal porque rompe `npm run supabase:reset`, que es flujo canonico local del repo.
+  - Mover la parte `supabase_admin` a snippet/operator SQL separado: implementado.
+  - Ajustar estrategia local con `db reset --db-url <local supabase_admin db url redacted>`: ya quedo reproducido en S.101 que no resuelve el bloqueo del reset completo.
+  - Hacer una migracion condicional que omita `supabase_admin` si el ejecutor no es miembro del rol: descartado porque dejaria `schema_migrations` marcando `00045` como aplicada aunque una parte critica no se hubiera ejecutado.
+  - Cambiar membership/roles reservados para que `postgres` pueda alterar defaults de `supabase_admin`: descartado por ser mas amplio que el problema, dependiente de privilegios reservados y no apropiado como requisito del repo.
+- [x] Implementar solucion minima:
+  - `supabase/migrations/00045_tenant_direct_grants_default_table_privileges.sql` queda solo con:
+    - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon;`
+    - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;`
+  - `supabase/snippets/tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` contiene las dos sentencias persistentes equivalentes para `supabase_admin`, con comentario de ejecucion owner/operator autorizada.
+- [x] Reejecutar `npm run supabase:reset` despues del split: pasa completo, aplica `00045`, ejecuta seeds locales y termina con `Finished supabase db reset on branch main.` La CLI local usada es `2.95.6`; avisa que existe `2.101.0`, pero la solucion no depende de cambiar version.
+- [x] Estado post-reset estandar antes del snippet operator: `schema_migrations` devuelve `00045`, `00044`, `00043`, `00042`, `00041`, `00040`; `pg_default_acl` deja `postgres/public/tables` sin `anon` y con `authenticated=arwd`, pero `supabase_admin/public/tables` sigue amplio con `anon=arwdDxt` y `authenticated=arwdDxt`. Esto confirma que el reset estandar ya no se rompe, pero no sustituye la accion owner/operator.
+- [x] Probe reversible post-reset estandar como `supabase_admin`: una tabla futura owned by `postgres` queda con `anon = f` para todos los privilegios y `authenticated = t` solo en `SELECT`/`INSERT`/`UPDATE`/`DELETE`; una tabla futura owned by `supabase_admin` conserva grants amplios para `anon`/`authenticated` hasta ejecutar el snippet operator. Termina en `ROLLBACK`.
+- [x] Aplicar localmente el snippet operator con `psql -U supabase_admin` para verificar la ruta separada: devuelve dos `ALTER DEFAULT PRIVILEGES`.
+- [x] Estado final local tras snippet operator: `schema_migrations` sigue en `00045`; `pg_default_acl` queda con `postgres/public/tables` y `supabase_admin/public/tables` sin `anon` y con `authenticated=arwd`; secuencias y funciones de ambos owners siguen fuera del corte con defaults amplios para `anon`/`authenticated`; `information_schema.role_table_grants` actual no cambia: `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas.
+- [x] Probe reversible final de tablas futuras como `supabase_admin`: tablas futuras owned by `postgres` y `supabase_admin` quedan con `anon = f` para todos los privilegios y `authenticated = t` solo en `SELECT`/`INSERT`/`UPDATE`/`DELETE`, con `TRUNCATE`/`REFERENCES`/`TRIGGER = f`; termina en `ROLLBACK` y `to_regclass(...)` confirma objetos probe ausentes.
+- [x] Estado final de `Direct SQL grants`: sigue `parcial`. El reset local estandar ya no queda roto por `00045`; el hardening persistente de tablas futuras de `supabase_admin` queda como paso owner/operator separado; secuencias/funciones futuras siguen pendientes; no hay staging/produccion y no se reduce `authenticated` a `SELECT/RPC`.
+- [x] Recomendacion siguiente: si se quiere seguir cerrando esta familia local, tratar secuencias/funciones futuras en un corte separado con la misma pregunta de owner/operator; si se prioriza realidad de entorno, ejecutar staging controlado con operador autorizado aplicando primero migraciones reset-safe y despues el snippet `supabase_admin` con evidencia redacted.
+
+Bloqueado/no tocado por S.102:
+
+- No se cambia `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql`.
+- No se cambian default privileges de secuencias ni funciones.
+- No se reduce `authenticated` a `SELECT`; no se revocan `INSERT`/`UPDATE`/`DELETE` actuales ni futuros en tablas.
+- No se toca `src`, `.env.local`, Storage funcional, SMTP/Resend, Auth real, billing, payroll, CSV real, geofencing, IA, app nativa ni grants UI.
+- No se ejecuta staging/produccion.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Get-FileHash supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Algorithm SHA256` devuelve `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] `Get-Content -Raw supabase\migrations\00045_tenant_direct_grants_default_table_privileges.sql` confirma que la migracion final contiene solo las dos sentencias `ALTER DEFAULT PRIVILEGES ... FOR ROLE postgres ... ON TABLES`.
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` confirma que las dos sentencias `FOR ROLE supabase_admin` viven fuera de migraciones.
+- [x] `npm run supabase:reset` pre-split falla en `00045` con `must be member of role "supabase_admin"`; post-split pasa completo.
+- [x] `schema_migrations` final devuelve `00045`, `00044`, `00043`, `00042`, `00041`, `00040`.
+- [x] Inventario final `pg_default_acl`: tablas futuras de `postgres` y `supabase_admin` sin `anon` y con `authenticated=arwd`; secuencias y funciones futuras siguen amplias para `anon`/`authenticated`.
+- [x] Inventario final `information_schema.role_table_grants`: `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas.
+- [x] Probe reversible final de tablas futuras pasa y termina en `ROLLBACK`; tablas `s102_reset_*` y `s102_operator_*` quedan ausentes.
+- [x] `git diff --check` pasa; solo emite warnings de normalizacion LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff/alcance revisado: S.102 modifica `supabase/migrations/00045_tenant_direct_grants_default_table_privileges.sql`, anade `supabase/snippets/tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no edita `src`, `.env.local` ni `00044`. El worktree ya tenia cambios amplios ajenos y no se revierten.
+
+#### S.103 - Tenant Direct Grants Default Sequence/Function Privileges Local Closure
+
+Estado: ejecutado el 2026-05-21 como cierre local reset-safe de default privileges futuros de secuencias y funciones tras el split de S.102. La decision es aplicar un corte minimo equivalente al patron S.102: migracion normal solo para defaults owned by `postgres` y SQL owner/operator separado para defaults owned by `supabase_admin`. No se toca `00044`, no se toca `src`, no se toca `.env.local`, no se cambian grants actuales de objetos existentes, no se reduce `authenticated` a `SELECT/RPC`, no se cambian roles reservados ni memberships y no se ejecuta staging/produccion.
+
+Decision:
+
+- [x] Confirmar precondiciones iniciales: `Test-Path supabase\migrations\00044*` devuelve `True`; hash SHA256 de `00044` sigue `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`; `00045` sigue limitada a las dos sentencias `ALTER DEFAULT PRIVILEGES ... FOR ROLE postgres ... ON TABLES`; `supabase/snippets/tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` sigue separado y limitado a las dos sentencias de tablas para `supabase_admin`.
+- [x] Confirmar reset antes de cambios: una primera ejecucion de `npm run supabase:reset` fallo antes de migraciones con `error running container`; `npx supabase db reset --debug` completo termina con `Finished supabase db reset on branch main.` y una repeticion normal de `npm run supabase:reset` antes de editar pasa completo, aplica `00045`, ejecuta seeds locales y termina con `Finished supabase db reset on branch main.`.
+- [x] Inventariar `pg_default_acl` inicial post-reset para `public`: `postgres/public/tables` ya queda sin `anon` y con `authenticated=arwd`; `postgres/public/sequences` sigue con `anon=rwU` y `authenticated=rwU`; `postgres/public/functions` sigue con `anon=X` y `authenticated=X`; `supabase_admin/public/tables`, `supabase_admin/public/sequences` y `supabase_admin/public/functions` siguen amplios hasta ejecutar SQL owner/operator.
+- [x] Inventariar grants actuales: `information_schema.role_table_grants` mantiene `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` no tiene grants directos de tabla publica; `information_schema.routine_privileges` muestra `anon EXECUTE 152` y `authenticated EXECUTE 152` sobre funciones existentes, sin cambio en esta fase.
+- [x] Opciones evaluadas:
+  - Mantener secuencias/funciones como deuda documentada: descartado para local porque la simulacion reversible muestra un corte minimo y reset-safe para `postgres`, y el carril operator de `supabase_admin` ya existe como patron.
+  - Anadir una migracion normal para defaults de `postgres`: implementado como `00046`, porque `npm run supabase:reset` puede aplicarla como `postgres`.
+  - Anadir SQL operator separado para defaults de `supabase_admin`: implementado como snippet nuevo, porque una migracion normal con `FOR ROLE supabase_admin` volveria a romper el reset o marcaria migraciones parcialmente aplicadas.
+  - Cambiar roles reservados o memberships de `postgres`/`supabase_admin`: descartado por ser mas amplio que el problema y fuera de alcance.
+  - Tocar grants actuales de secuencias/funciones existentes: descartado; en `public` no hay secuencias actuales y las funciones existentes conservan `EXECUTE` para no cambiar runtime/RPC en este corte.
+- [x] Simular dentro de `BEGIN`/`ROLLBACK` los revokes candidatos:
+  - Como `postgres`, `ALTER DEFAULT PRIVILEGES ... REVOKE ALL ON SEQUENCES` y `REVOKE EXECUTE ON FUNCTIONS` deja defaults futuros de `postgres/public/sequences` en `{postgres=rwU/postgres,service_role=rwU/postgres}` y `postgres/public/functions` en `{postgres=X/postgres,service_role=X/postgres}`; probes futuros no muestran privileges para `anon`/`authenticated` y terminan en `ROLLBACK`.
+  - Como `supabase_admin`, las mismas sentencias para `supabase_admin` dejan defaults futuros en `{postgres=rwU/supabase_admin,service_role=rwU/supabase_admin}` y `{postgres=X/supabase_admin,service_role=X/supabase_admin}`; probes futuros no muestran privileges para `anon`/`authenticated` y terminan en `ROLLBACK`.
+- [x] Implementar solucion minima:
+  - `supabase/migrations/00046_tenant_direct_grants_default_sequence_function_privileges.sql` contiene solo cuatro sentencias para `postgres`: dos sobre `SEQUENCES` y dos sobre `FUNCTIONS`.
+  - `supabase/snippets/tenant-direct-grants-supabase-admin-default-sequence-function-privileges-operator.sql` contiene las cuatro sentencias equivalentes para `supabase_admin`, con comentario de ejecucion owner/operator autorizada.
+- [x] Reejecutar `npm run supabase:reset` despues de `00046`: pasa completo, aplica `00046`, ejecuta seeds locales y termina con `Finished supabase db reset on branch main.` La CLI local usada es `2.95.6`; avisa que existe `2.101.0`, pero la solucion no depende de cambiar version.
+- [x] Estado post-reset estandar antes de snippets operator: `schema_migrations` devuelve `00046`, `00045`, `00044`, `00043`, `00042`, `00041`, `00040`, `00039`; `postgres/public/tables`, `postgres/public/sequences` y `postgres/public/functions` quedan sin `anon` y sin `authenticated` en secuencias/funciones; `supabase_admin/public/tables`, `supabase_admin/public/sequences` y `supabase_admin/public/functions` siguen amplios hasta ejecutar los snippets owner/operator.
+- [x] Aplicar localmente los snippets operator con `psql -U supabase_admin`: el snippet de tablas S.102 devuelve dos `ALTER DEFAULT PRIVILEGES`; el snippet nuevo de secuencias/funciones devuelve cuatro `ALTER DEFAULT PRIVILEGES`.
+- [x] Estado final local tras snippets operator: `schema_migrations` sigue en `00046`; `pg_default_acl` deja `postgres/public` y `supabase_admin/public` sin `anon` en tablas/secuencias/funciones futuras, `authenticated=arwd` solo en tablas futuras, sin `authenticated` en secuencias/funciones futuras, y conserva `service_role`/owner. `information_schema.role_table_grants` actual no cambia: `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas. `information_schema.routine_privileges` actual no cambia: `anon EXECUTE 152`, `authenticated EXECUTE 152`.
+- [x] Probe reversible final de secuencias/funciones futuras: como `postgres` y como `supabase_admin`, las secuencias y funciones `boxops_probe_*_s103_final` no muestran privileges para `anon`/`authenticated`; ambos probes terminan en `ROLLBACK` y la reconsulta posterior confirma ausencia de objetos probe.
+- [x] Estado final de `Direct SQL grants`: sigue `parcial`. Secuencias/funciones futuras quedan cerradas localmente para `postgres` y cubiertas por operator SQL para `supabase_admin`, pero el cierre global sigue requiriendo operador autorizado fuera de reset local, staging/produccion, decision futura sobre grants actuales de funciones existentes y reduccion tabla por tabla de `authenticated` a `SELECT/RPC`.
+- [x] Recomendacion siguiente: staging controlado con operador autorizado aplicando `00044`-`00046` y despues ambos snippets de `supabase_admin` con evidencia redacted; la reduccion de `authenticated` a `SELECT/RPC` queda como carril posterior separado.
+
+Bloqueado/no tocado por S.103:
+
+- No se cambia `supabase/migrations/00044_tenant_direct_grants_minimal_hardening.sql`.
+- No se modifica `00045` ni el snippet operator de tablas de S.102.
+- No se cambian grants actuales de tablas, secuencias ni funciones existentes.
+- No se reduce `authenticated` a `SELECT`; no se revocan `INSERT`/`UPDATE`/`DELETE` actuales ni futuros en tablas.
+- No se toca `src`, `.env.local`, Storage funcional, SMTP/Resend, Auth real, billing, payroll, CSV real, geofencing, IA, app nativa ni grants UI.
+- No se ejecuta staging/produccion.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Get-FileHash supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql -Algorithm SHA256` devuelve `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] `Get-Content -Raw supabase\migrations\00045_tenant_direct_grants_default_table_privileges.sql` confirma que la migracion contiene solo las dos sentencias de tablas para `postgres`.
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` confirma que el snippet contiene solo las dos sentencias de tablas para `supabase_admin`.
+- [x] `npm run supabase:reset` pre-cambio pasa completo tras rerun local; `npm run supabase:reset` post-`00046` pasa completo.
+- [x] `schema_migrations` final devuelve `00046`, `00045`, `00044`, `00043`.
+- [x] Inventario final `pg_default_acl`: `postgres/public` y `supabase_admin/public` sin `anon` en tablas/secuencias/funciones futuras; `authenticated=arwd` solo en tablas futuras; sin `authenticated` en secuencias/funciones futuras; owner y `service_role` conservados.
+- [x] Inventario final `information_schema.role_table_grants`: `authenticated DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`; `anon` sin filas.
+- [x] Probe reversible final de secuencias/funciones futuras pasa y termina en `ROLLBACK`; objetos `boxops_probe_*_s103*` quedan ausentes.
+- [x] `git diff --check` pasa; solo emite warnings de normalizacion LF/CRLF del worktree amplio preexistente.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff/alcance revisado: S.103 anade `supabase/migrations/00046_tenant_direct_grants_default_sequence_function_privileges.sql`, anade `supabase/snippets/tenant-direct-grants-supabase-admin-default-sequence-function-privileges-operator.sql` y actualiza `TASKS.md` + `docs/architecture/tenant-rls-negative-test-matrix.md`; no edita `src`, `.env.local`, `00044`, `00045` ni el snippet operator de tablas. El worktree ya tenia cambios amplios ajenos y no se revierten.
+
+#### S.104 - Tenant Direct Grants QA/Staging Recheck Bloqueado
+
+Estado: ejecutado el 2026-05-21 como reintento prudente de validar el carril `Direct SQL grants` en QA/staging autorizado para `00044`-`00046` y los dos snippets owner/operator de `supabase_admin`. No se ejecuta QA/staging ni produccion porque no hay mecanismo real autorizado desde este entorno y, antes de llegar a staging, el probe local efectivo detecta que funciones futuras siguen heredando `EXECUTE` via `PUBLIC`.
+
+Decision:
+
+- [x] Releer S.100-S.103, `00044`, `00045`, `00046`, los dos snippets operator de `supabase_admin` y la fila mas reciente de `Direct SQL grants` en `docs/architecture/tenant-rls-negative-test-matrix.md`.
+- [x] Confirmar precondiciones locales: `Test-Path supabase\migrations\00044*` devuelve `True`; hash SHA256 de `00044` sigue `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`; `00045` contiene solo dos sentencias efectivas para tablas futuras owned by `postgres`; `00046` contiene solo cuatro sentencias efectivas para secuencias/funciones futuras owned by `postgres`.
+- [x] Confirmar snippets operator separados: `tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` contiene solo dos sentencias efectivas para tablas owned by `supabase_admin`; `tenant-direct-grants-supabase-admin-default-sequence-function-privileges-operator.sql` contiene solo cuatro sentencias efectivas para secuencias/funciones owned by `supabase_admin`.
+- [x] Ejecutar `npm run supabase:reset`: pasa completo, aplica `00044`, `00045` y `00046`, ejecuta seeds locales, reinicia contenedores y termina con `Finished supabase db reset on branch main.` La CLI local usada es `2.95.6`; avisa de `2.101.0`.
+- [x] Aplicar localmente, solo en DB local, los dos snippets operator como `supabase_admin`: el snippet de tablas devuelve dos `ALTER DEFAULT PRIVILEGES`; el snippet de secuencias/funciones devuelve cuatro `ALTER DEFAULT PRIVILEGES`.
+- [x] Inventario local tras reset + snippets: `schema_migrations` devuelve `00046`, `00045`, `00044`, `00043`, `00042`, `00041`, `00040`, `00039`, `00038`, `00037`; `pg_default_acl` para `postgres/public` y `supabase_admin/public` queda sin entradas explicitas para `anon` ni `authenticated` en secuencias/funciones futuras y con `authenticated=arwd` solo en tablas futuras; `information_schema.role_table_grants` actual queda `anon` 0 grants de tabla y `authenticated` con `DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`, sin `TRUNCATE`/`REFERENCES`/`TRIGGER`; `information_schema.routine_privileges` actual conserva `anon EXECUTE 152` y `authenticated EXECUTE 152` sobre funciones existentes.
+- [x] Ejecutar probes reversibles `BEGIN`/`ROLLBACK` para tablas, secuencias y funciones futuras owned by `postgres` y `supabase_admin`.
+- [x] Resultado de probes de tablas futuras: `anon` queda sin privilegios efectivos; `authenticated` conserva solo `DELETE,INSERT,SELECT,UPDATE` para tablas owned by `postgres` y `supabase_admin`.
+- [x] Resultado de probes de secuencias futuras: `anon` y `authenticated` quedan sin `SELECT`, `UPDATE` ni `USAGE` efectivos para secuencias owned by `postgres` y `supabase_admin`.
+- [ ] Resultado de probes de funciones futuras: no pasa como cierre efectivo. Aunque `pg_default_acl` ya no muestra grants explicitos a `anon`/`authenticated`, las funciones probe quedan con ACL `=X/<owner>` y `information_schema.routine_privileges` muestra `PUBLIC EXECUTE`; `has_function_privilege('anon', ..., 'EXECUTE')` y `has_function_privilege('authenticated', ..., 'EXECUTE')` devuelven `true` para funciones futuras owned by `postgres` y `supabase_admin`.
+- [x] Reconfirmar ausencia de objetos probe tras `ROLLBACK`: tablas, secuencias y funciones `boxops_probe_direct_grants_*` devuelven `(none)`/`NULL`.
+- [x] Revisar acceso QA/staging redacted: `.env.local` esta ignorado y no se modifica; `NEXT_PUBLIC_SUPABASE_URL` clasifica como local/loopback, `NEXT_PUBLIC_SUPABASE_ANON_KEY` esta presente, no hay DB URL/ref QA/staging ni variables `QA`/`STAGING`/`PROD` suficientes; `supabase/config.toml` apunta al proyecto local `boxops`; `npx supabase projects list --output json` devuelve exit code `1` clasificado como `not-authenticated` sin imprimir refs ni valores.
+- [x] No ejecutar migraciones ni snippets contra QA/staging: falta URL/ref/DB URL o mecanismo autorizado, falta capacidad de aplicar migraciones normales del entorno y falta rol/capacidad owner/operator `supabase_admin` verificada. Ademas, el probe local efectivo de funciones futuras debe resolverse antes de llamar validado a staging.
+
+Bloqueado/no tocado por S.104:
+
+- No se toca produccion.
+- No se toca `src`.
+- No se escribe ni modifica `.env.local`; solo se leen nombres/clasificacion redacted.
+- No se modifican `00044`, `00045`, `00046` ni los snippets operator.
+- No se cambian roles reservados ni memberships de `postgres`/`supabase_admin`.
+- No se reduce `authenticated` a `SELECT/RPC`.
+- No se abren grants UI, Auth real adicional, Storage funcional, SMTP/Resend, billing, payroll, geofencing, IA, app nativa, push ni cache/offline.
+
+Handoff operator redacted mientras staging siga bloqueado:
+
+- [ ] No declarar cerrado `Direct SQL grants` en QA/staging con los SQL actuales hasta decidir una correccion separada para funciones futuras. El hallazgo local indica que revocar `EXECUTE` solo a `anon`/`authenticated` no elimina el privilegio efectivo cuando `PUBLIC` conserva `EXECUTE`.
+- [ ] Siguiente corte recomendado antes de staging: decidir y validar localmente si `00046` y el snippet operator de secuencias/funciones deben revocar tambien `EXECUTE ON FUNCTIONS FROM PUBLIC` para los defaults owned by `postgres` y `supabase_admin`; despues repetir `npm run supabase:reset`, snippets operator, inventarios y probes efectivos.
+- [ ] Cuando exista entorno autorizado y el probe local este verde: aplicar/verificar `00044`-`00046` por el flujo normal del entorno, ejecutar ambos snippets operator de `supabase_admin` en ventana autorizada con `<QA_DB_URL_REDACTED>` o mecanismo equivalente, y capturar fuera del repo `schema_migrations`, `pg_default_acl`, `information_schema.role_table_grants`, `information_schema.routine_privileges`, probes `BEGIN`/`ROLLBACK` con `has_table_privilege`/`has_sequence_privilege`/`has_function_privilege` y reconfirmacion de objetos probe ausentes.
+
+Estado final S.104: `Direct SQL grants` sigue `parcial` y el intento QA/staging queda `bloqueado`. La razon no es solo entorno: hay una brecha local efectiva en funciones futuras via `PUBLIC EXECUTE` que debe corregirse o aceptarse explicitamente antes de validar staging.
+
+#### S.105 - Tenant Direct Grants Future Function PUBLIC Execute Local Closure
+
+Estado: ejecutado el 2026-05-21 como correccion local reset-safe de la brecha detectada en S.104. La decision es mantener el split S.102/S.103: defaults owned by `postgres` en migracion normal y defaults owned by `supabase_admin` en snippet owner/operator separado. No se ejecuta QA/staging ni produccion, no se toca `src`, no se toca `.env.local`, no se cambian `00044` ni `00045`, no se cambian roles reservados o memberships, no se revocan grants actuales de funciones existentes y no se reduce `authenticated` a `SELECT/RPC`.
+
+Decision:
+
+- [x] Confirmar precondiciones locales: `Test-Path supabase\migrations\00044*` devuelve `True`; hash SHA256 de `00044` sigue `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`; `00045` sigue limitada a dos sentencias efectivas de tablas futuras para `postgres`; antes de editar, `00046` seguia con cuatro sentencias efectivas de secuencias/funciones para `postgres`, el snippet operator de tablas seguia con dos sentencias para `supabase_admin` y el snippet operator de secuencias/funciones seguia con cuatro sentencias para `supabase_admin`.
+- [x] Ejecutar `npm run supabase:reset` antes de cambios: pasa completo, aplica `00044`, `00045` y `00046`, ejecuta seeds locales, reinicia contenedores y termina con `Finished supabase db reset on branch main.`
+- [x] Investigar la correccion minima en `BEGIN`/`ROLLBACK`:
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` no cierra la brecha: una funcion futura owned by `postgres` sigue con ACL `=X/postgres`, `routine_privileges` muestra `PUBLIC EXECUTE` y `has_function_privilege('anon'/'authenticated', ..., 'EXECUTE')` devuelve `true`.
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` sin `IN SCHEMA` si cierra la brecha para funciones futuras en `public` owned by `postgres` cuando se combina con los revokes ya existentes a `anon`/`authenticated`: la funcion probe queda sin `PUBLIC`, sin `anon`, sin `authenticated` y `has_function_privilege` devuelve `false`.
+  - Como `supabase_admin`, el revoke global a `PUBLIC` debe combinarse con los revokes del snippet operator en `public`; el probe combinado deja la funcion futura con grants solo para `supabase_admin`, `postgres` y `service_role`, y `has_function_privilege('anon'/'authenticated', ..., 'EXECUTE')` devuelve `false`.
+- [x] Implementar solucion minima:
+  - `supabase/migrations/00046_tenant_direct_grants_default_sequence_function_privileges.sql` anade `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;` y conserva las cuatro sentencias previas para secuencias/funciones en `public`.
+  - `supabase/snippets/tenant-direct-grants-supabase-admin-default-sequence-function-privileges-operator.sql` anade `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;` y conserva las cuatro sentencias previas para secuencias/funciones en `public`.
+- [x] Ejecutar `npm run supabase:reset` despues del cambio: pasa completo, aplica `00044`, `00045` y `00046`, ejecuta seeds locales, reinicia contenedores y termina con `Finished supabase db reset on branch main.` La CLI local usada es `2.95.6`; avisa de `2.101.0`.
+- [x] Aplicar localmente ambos snippets operator como `supabase_admin`: el snippet de tablas devuelve dos `ALTER DEFAULT PRIVILEGES`; el snippet de secuencias/funciones devuelve cinco `ALTER DEFAULT PRIVILEGES`.
+- [x] Estado final de `schema_migrations`: estan aplicadas `00001`-`00046`; la ultima version es `00046`.
+- [x] Inventario final `pg_default_acl` relevante para `public`: `postgres/<global>/functions` queda `{postgres=X/postgres}`; `postgres/public/functions` queda `{postgres=X/postgres,service_role=X/postgres}`; `postgres/public/sequences` queda `{postgres=rwU/postgres,service_role=rwU/postgres}`; `postgres/public/tables` queda `{postgres=arwdDxt/postgres,authenticated=arwd/postgres,service_role=arwdDxt/postgres}`. Para `supabase_admin`, `<global>/functions` queda `{supabase_admin=X/supabase_admin}`; `public/functions` queda `{postgres=X/supabase_admin,service_role=X/supabase_admin}`; `public/sequences` queda `{postgres=rwU/supabase_admin,service_role=rwU/supabase_admin}`; `public/tables` queda `{postgres=arwdDxt/supabase_admin,authenticated=arwd/supabase_admin,service_role=arwdDxt/supabase_admin}`. Los defaults schema-scoped de otros schemas de plataforma no se cambian; solo se anade el revoke global necesario de funciones `PUBLIC`.
+- [x] Inventario final de grants actuales de tablas publicas: `information_schema.role_table_grants` queda sin filas para `anon`; `authenticated` conserva `DELETE 29`, `INSERT 29`, `SELECT 40`, `UPDATE 29`, sin `TRUNCATE`, `REFERENCES` ni `TRIGGER`.
+- [x] Inventario final de routine privileges actuales en `public`: no se cambian funciones existentes; `PUBLIC EXECUTE 41`, `anon EXECUTE 152` y `authenticated EXECUTE 152` siguen presentes como grants actuales fuera de este corte.
+- [x] Probe reversible final de objetos futuros owned by `postgres`: tabla futura sin privilegios para `anon` y con `authenticated` solo `DELETE/INSERT/SELECT/UPDATE`; secuencia futura sin `SELECT`/`UPDATE`/`USAGE` para `anon` ni `authenticated`; funcion futura con `has_function_privilege('anon', ..., 'EXECUTE') = false` y `has_function_privilege('authenticated', ..., 'EXECUTE') = false`; `routine_privileges` de la funcion probe muestra solo `postgres` y `service_role`; termina en `ROLLBACK`.
+- [x] Probe reversible final de objetos futuros owned by `supabase_admin`: tabla futura sin privilegios para `anon` y con `authenticated` solo `DELETE/INSERT/SELECT/UPDATE`; secuencia futura sin `SELECT`/`UPDATE`/`USAGE` para `anon` ni `authenticated`; funcion futura con `has_function_privilege('anon', ..., 'EXECUTE') = false` y `has_function_privilege('authenticated', ..., 'EXECUTE') = false`; `routine_privileges` de la funcion probe muestra solo `supabase_admin`, `postgres` y `service_role`; termina en `ROLLBACK`.
+- [x] Reconfirmar ausencia de objetos probe tras `ROLLBACK`: `s104_final_postgres_table`, `s104_final_postgres_seq`, `s104_final_postgres_fn`, `s104_final_supabase_admin_table`, `s104_final_supabase_admin_seq` y `s104_final_supabase_admin_fn` devuelven `NULL`.
+- [x] Estado final de `Direct SQL grants`: sigue `parcial`, pero la brecha local de funciones futuras via `PUBLIC EXECUTE` queda corregida para `postgres` por migracion reset-safe y para `supabase_admin` por snippet operator. Sigue pendiente QA/staging autorizado, produccion, grants actuales de funciones existentes y reduccion futura de `authenticated` a `SELECT/RPC`.
+
+Bloqueado/no tocado por S.105:
+
+- No se toca produccion, QA ni staging.
+- No se toca `src`.
+- No se toca `.env.local`.
+- No se cambian `00044` ni `00045`.
+- No se cambian roles reservados ni memberships de `postgres`/`supabase_admin`.
+- No se revocan grants actuales de funciones existentes.
+- No se reduce `authenticated` a `SELECT/RPC`.
+- No se abren grants UI, Auth real adicional, Storage funcional, SMTP/Resend, billing, payroll, geofencing, IA, app nativa, push ni cache/offline.
+
+Verificacion 2026-05-21:
+
+- [x] `Test-Path supabase\migrations\00044*` devuelve `True`.
+- [x] `Get-FileHash -Algorithm SHA256 supabase\migrations\00044_tenant_direct_grants_minimal_hardening.sql` devuelve `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] `Get-Content -Raw supabase\migrations\00045_tenant_direct_grants_default_table_privileges.sql` confirma solo dos sentencias efectivas de tablas para `postgres`.
+- [x] `Get-Content -Raw supabase\migrations\00046_tenant_direct_grants_default_sequence_function_privileges.sql` confirma cinco sentencias efectivas: cuatro previas y el revoke global de `PUBLIC` para funciones owned by `postgres`.
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-supabase-admin-default-table-privileges-operator.sql` confirma solo dos sentencias efectivas de tablas para `supabase_admin`.
+- [x] `Get-Content -Raw supabase\snippets\tenant-direct-grants-supabase-admin-default-sequence-function-privileges-operator.sql` confirma cinco sentencias efectivas: cuatro previas y el revoke global de `PUBLIC` para funciones owned by `supabase_admin`.
+- [x] `npm run supabase:reset` pre-cambio y post-cambio pasan completos.
+- [x] Ambos snippets operator se aplican localmente como `supabase_admin`.
+- [x] `schema_migrations`, `pg_default_acl`, `information_schema.role_table_grants` e `information_schema.routine_privileges` inventariados.
+- [x] Probes reversibles con `ROLLBACK` para tablas, secuencias y funciones futuras owned by `postgres` y `supabase_admin` pasan como privilegio efectivo.
+- [x] Reconsulta posterior confirma ausencia de objetos probe.
+- [x] `git diff --check` pasa; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src` para STL, `service_role`, IA/vector y geolocalizacion/push/cache sin coincidencias.
+
+Recomendacion siguiente: reintentar QA/staging solo con autorizacion explicita y entorno real, aplicando `00044`-`00046` por flujo normal y ambos snippets operator de `supabase_admin`; capturar evidencia redacted de inventarios y probes efectivos. Si QA/staging no puede aplicar el revoke global de `PUBLIC` para `supabase_admin`, mantener `Direct SQL grants` como bloqueado.
+
+#### S.106 - Tenant Direct Grants QA/Staging Recheck After S.105
+
+Estado: ejecutado el 2026-05-21 como reintento autorizado prudente de QA/staging para `Direct SQL grants` despues de la correccion local S.105 de funciones futuras via `PUBLIC EXECUTE`. No se ejecuta remoto porque este entorno no tiene acceso real QA/staging, DB URL/ref ni autenticacion Supabase CLI, y no se puede verificar rol/capacidad owner/operator para `supabase_admin`. No se toca produccion, no se toca `src`, no se modifica `.env.local`, no se cambian `00044`, `00045`, `00046` ni los snippets operator, no se cambian roles reservados/memberships y no se revocan grants actuales de funciones existentes.
+
+Decision:
+
+- [x] Releer `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, skill routing, S.100-S.105, `00044`, `00045`, `00046`, los dos snippets operator de `supabase_admin` y las filas recientes de `Direct SQL grants` en `docs/architecture/tenant-rls-negative-test-matrix.md`.
+- [x] Confirmar hash SHA256 de `00044`: `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] Confirmar contenido efectivo local: `00045` sigue limitado a dos sentencias `ALTER DEFAULT PRIVILEGES ... ON TABLES` para `postgres`; `00046` contiene cinco sentencias para `postgres` (secuencias, funciones y revoke global `EXECUTE ON FUNCTIONS FROM PUBLIC`); el snippet operator de tablas contiene dos sentencias para `supabase_admin`; el snippet operator de secuencias/funciones contiene cinco sentencias para `supabase_admin`.
+- [x] Confirmar capacidad QA/staging redacted sin imprimir secretos: `.env.local` existe pero solo clasifica `NEXT_PUBLIC_SITE_URL` y `NEXT_PUBLIC_SUPABASE_URL` como `local_loopback_redacted`; `NEXT_PUBLIC_SUPABASE_ANON_KEY`, credenciales E2E y `RESEND_API_KEY` estan presentes solo como secretos redacted; no hay DB URL/ref QA/staging en `.env.local`.
+- [x] Confirmar variables de entorno relevantes ausentes: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`, `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `DATABASE_URL`, `DIRECT_URL`, `POSTGRES_URL`, `QA_SUPABASE_DB_URL`, `STAGING_SUPABASE_DB_URL`, `QA_DATABASE_URL`, `STAGING_DATABASE_URL`, `QA_SUPABASE_PROJECT_REF` y `STAGING_SUPABASE_PROJECT_REF`.
+- [x] Confirmar Supabase local/config redacted: `supabase/config.toml` tiene `project_id` presente con valor redacted y puerto local API `54321`; no aporta ref remoto QA/staging.
+- [x] Confirmar Supabase CLI sin sesion remota usable: `npx supabase projects list --output json` devuelve exit code `1`, clasificado como `not_authenticated`, con salida redacted.
+- [x] No ejecutar `00044`-`00046`, snippets operator, inventarios ni probes contra QA/staging: falta DB URL/ref o flujo remoto autorizado, falta autenticacion Supabase CLI/access token y falta rol/capacidad owner/operator `supabase_admin` verificada.
+
+Bloqueado/no tocado por S.106:
+
+- No se toca produccion.
+- No se toca `src`.
+- No se escribe ni modifica `.env.local`; solo se leen nombres/clasificacion redacted.
+- No se modifican `00044`, `00045`, `00046` ni los dos snippets operator.
+- No se cambian roles reservados ni memberships de `postgres`/`supabase_admin`.
+- No se revocan grants actuales de funciones existentes.
+- No se reduce `authenticated` a `SELECT/RPC`.
+- No se abren grants UI, Auth real adicional, Storage funcional, SMTP/Resend, billing, payroll, geofencing, IA, app nativa, push ni cache/offline.
+
+Verificacion 2026-05-21:
+
+- [x] Hash SHA256 de `00044` confirmado.
+- [x] Contenido efectivo de `00045`, `00046` y ambos snippets operator confirmado.
+- [x] Evidencia redacted de capacidad QA/staging capturada como bloqueo, no como pass remoto.
+- [x] No hay `schema_migrations`, `pg_default_acl`, `information_schema.role_table_grants`, `information_schema.routine_privileges`, probes `BEGIN`/`ROLLBACK` ni reconfirmacion de objetos probe en QA/staging porque no existe acceso autorizado desde este entorno.
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src` para STL, `service_role`, IA/vector y geolocalizacion/push/cache sin coincidencias.
+
+Estado final S.106: `Direct SQL grants` sigue `parcial` y QA/staging queda `bloqueado-por-entorno` tras S.105. La correccion local de funciones futuras habilita el siguiente intento, pero falta un operador con acceso real para aplicar/verificar `00044`-`00046` y ambos snippets `supabase_admin` en QA/staging con evidencia redacted.
+
+Recomendacion siguiente: reintentar desde una sesion autorizada con project ref/DB URL QA/staging, autenticacion Supabase CLI o flujo normal del entorno, y rol/capacidad owner/operator para `supabase_admin`; despues capturar `schema_migrations`, `pg_default_acl`, grants actuales, routine privileges, probes reversibles de tablas/secuencias/funciones futuras y ausencia de objetos probe.
+
+#### S.107 - Tenant Direct Grants QA/Staging Recheck After S.106
+
+Estado: ejecutado el 2026-05-21 como nuevo reintento autorizado prudente de QA/staging para `Direct SQL grants` despues de S.105/S.106. No se ejecuta remoto porque las precondiciones de entorno siguen bloqueadas: no hay DB URL/ref QA/staging, no hay autenticacion Supabase CLI/access token, no hay flujo normal de migraciones contra un target QA/staging verificable y no se puede confirmar rol/capacidad owner/operator `supabase_admin`. No se toca produccion, no se toca `src`, no se modifica `.env.local`, no se cambian `00044`, `00045`, `00046` ni los snippets operator, no se cambian roles reservados/memberships y no se revocan grants actuales de funciones existentes.
+
+Decision:
+
+- [x] Releer `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, skill routing, S.100-S.106, `00044`, `00045`, `00046`, los dos snippets operator de `supabase_admin` y las filas recientes de `Direct SQL grants` en `docs/architecture/tenant-rls-negative-test-matrix.md`.
+- [x] Confirmar hash SHA256 de `00044`: `6D824E73DC7554C8C973BDF40BCC81101642B40148546157024727B117283334`.
+- [x] Confirmar contenido efectivo local por conteo de sentencias: `00045` tiene 2 sentencias para `postgres` sobre tablas; `00046` tiene 5 sentencias para `postgres` (2 de secuencias, 3 de funciones y 1 revoke global `PUBLIC`); el snippet operator de tablas tiene 2 sentencias para `supabase_admin`; el snippet operator de secuencias/funciones tiene 5 sentencias para `supabase_admin` (2 de secuencias, 3 de funciones y 1 revoke global `PUBLIC`).
+- [x] Confirmar capacidad QA/staging redacted sin imprimir secretos: `.env.local` existe y clasifica `NEXT_PUBLIC_SITE_URL` y `NEXT_PUBLIC_SUPABASE_URL` como `present_local_loopback_redacted`; `NEXT_PUBLIC_SUPABASE_ANON_KEY`, credenciales E2E y `RESEND_API_KEY` estan presentes solo como `present_secret_or_value_redacted`; no hay keys QA/STAGING ni DB/ref en `.env.local`.
+- [x] Confirmar variables de entorno de proceso ausentes: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`, `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `DATABASE_URL`, `DIRECT_URL`, `POSTGRES_URL`, `QA_SUPABASE_DB_URL`, `STAGING_SUPABASE_DB_URL`, `QA_DATABASE_URL`, `STAGING_DATABASE_URL`, `QA_SUPABASE_PROJECT_REF` y `STAGING_SUPABASE_PROJECT_REF`.
+- [x] Confirmar Supabase local/config redacted: `supabase/config.toml` existe, contiene `project_id` redacted y puertos locales `54321`/`54322`; `supabase/.temp/project-ref` no existe. No aporta ref remoto QA/staging.
+- [x] Confirmar Supabase CLI sin sesion remota usable: `npx supabase projects list --output json` devuelve exit code `1`, clasificado como `not_authenticated`, con salida redacted.
+- [x] No ejecutar `00044`-`00046`, snippets operator, inventarios ni probes contra QA/staging: falta DB URL/ref o flujo remoto autorizado, falta autenticacion Supabase CLI/access token y falta rol/capacidad owner/operator `supabase_admin` verificada.
+
+Bloqueado/no tocado por S.107:
+
+- No se toca produccion.
+- No se toca `src`.
+- No se escribe ni modifica `.env.local`; solo se leen nombres/clasificacion redacted.
+- No se modifican `00044`, `00045`, `00046` ni los dos snippets operator.
+- No se cambian roles reservados ni memberships de `postgres`/`supabase_admin`.
+- No se revocan grants actuales de funciones existentes.
+- No se reduce `authenticated` a `SELECT/RPC`.
+- No se abren grants UI, Auth real adicional, Storage funcional, SMTP/Resend, billing, payroll, geofencing, IA, app nativa, push ni cache/offline.
+
+Verificacion 2026-05-21:
+
+- [x] Hash SHA256 de `00044` confirmado.
+- [x] Contenido efectivo de `00045`, `00046` y ambos snippets operator confirmado por conteo de sentencias.
+- [x] Evidencia redacted de capacidad QA/staging capturada como bloqueo, no como pass remoto.
+- [x] No hay `schema_migrations`, `pg_default_acl`, `information_schema.role_table_grants`, `information_schema.routine_privileges`, probes `BEGIN`/`ROLLBACK` ni reconfirmacion de objetos probe en QA/staging porque no existe acceso autorizado desde este entorno.
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src` para STL, `service_role`, IA/vector y geolocalizacion/push/cache sin coincidencias.
+
+Estado final S.107: `Direct SQL grants` sigue `parcial` y QA/staging queda `bloqueado-por-entorno` tras S.105/S.106. La correccion local de funciones futuras sigue habilitando el siguiente intento, pero falta un operador con acceso real para aplicar/verificar `00044`-`00046` y ambos snippets `supabase_admin` en QA/staging con evidencia redacted.
+
+Recomendacion siguiente: reintentar desde una sesion autorizada con DB URL/ref QA/staging, autenticacion Supabase CLI o flujo normal del entorno, y rol/capacidad owner/operator para `supabase_admin`; despues capturar `schema_migrations`, `pg_default_acl`, grants actuales, routine privileges, probes reversibles de tablas/secuencias/funciones futuras y ausencia de objetos probe.
+
+#### S.108 - Supabase Local Reset Guard And Reproducible E2E Auth Fixture
+
+Estado: ejecutado el 2026-05-21 como guardrail operativo local tras confirmar que `supabase db reset` borra `auth.users` y que los seeds del repo no recrean usuarios Auth. No se ejecuta reset real, no se recrean usuarios persistentes, no se toca produccion, QA/staging ni remoto, no se modifica `.env.local`, no se toca `src`, no se cambian migraciones ni seeds y no se imprimen secretos.
+
+Decision:
+
+- [x] Confirmar causa local sin mutar datos: `auth.users=0`, `organization_memberships=0`, `person_profiles=10`, `coach_profiles=9`, `organizations=2`, `centers=4` y `schema_migrations` hasta `00046`. `supabase/config.toml` declara `seeds/01_demo_data.sql` y `seeds/02_stl_tenant.sql`; `supabase/README.md` ya indicaba que los seeds no crean usuarios Supabase Auth.
+- [x] Cambiar `package.json` para que `npm run supabase:reset` ya no ejecute `supabase db reset` directamente; ahora llama a `scripts/supabase-reset-guard.mjs`.
+- [x] Anadir `npm run supabase:reset:danger` como via explicita para reset local intencional. El wrapper tambien acepta `BOXOPS_ALLOW_SUPABASE_RESET=local-reset-ok npm run supabase:reset`.
+- [x] El wrapper de reset muestra conteos locales seguros (`auth_users`, memberships, perfiles, plantillas y bloques) si la DB local esta levantada, no imprime DB URLs, tokens ni valores de `.env.local`, y bloquea por defecto con explicacion clara.
+- [x] Anadir `scripts/setup-local-e2e-auth.mjs` para preparar usuarios Auth locales E2E reproducibles desde variables `E2E_*` ya usadas por los smokes y leidas desde entorno o `.env.local`.
+- [x] El setup E2E valida que `NEXT_PUBLIC_SUPABASE_URL` apunte a local loopback, requiere `E2E_ORGANIZATION_ID`, acepta los UUID seed del proyecto, usa la DB local Docker (`supabase_db_boxops`) y no permite remoto/QA/staging.
+- [x] Anadir comandos:
+  - `npm run supabase:setup:e2e-auth`: dry-run con `ROLLBACK`.
+  - `npm run supabase:setup:e2e-auth:commit`: persiste usuarios Auth, memberships, `person_profiles` y `coach_profile` del rol `coach` cuando hagan falta smokes autenticados.
+- [x] Actualizar `README.md`, `supabase/README.md`, `docs/guides/code-editing-guide.md` y `docs/guides/stack-guide.md` para documentar reset protegido, reset peligroso explicito y fixture Auth E2E recreable.
+
+Bloqueado/no tocado por S.108:
+
+- No se ejecuta `npm run supabase:reset:danger`.
+- No se ejecuta `npm run supabase:setup:e2e-auth:commit`.
+- No se crean usuarios Auth persistentes; el dry-run termina en `ROLLBACK`.
+- No se toca `.env.local`; solo se leen nombres/valores localmente desde el script sin imprimir secretos.
+- No se toca `src`, migraciones, seeds, roles reservados, memberships reales, produccion, QA/staging ni remoto.
+
+Verificacion 2026-05-21:
+
+- [x] `npm run supabase:reset` bloquea con exit code `1` esperado y muestra conteos locales seguros: `auth_users=0`, `organization_memberships=0`, `person_profiles=10`, `coach_profiles=9`, `schedule_templates=1`, `schedule_blocks=2`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run detecta credenciales `owner`, `admin`, `manager` y `coach` desde `.env.local`, omite `E2E_PAYROLL_MANAGER` como opcional, y dentro de la transaccion muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1`.
+- [x] Reconsulta tras dry-run confirma que no se persistio nada: `auth_users_after_dry_run=0` y `memberships_after_dry_run=0`.
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src` para STL, `service_role`, IA/vector y geolocalizacion/push/cache sin coincidencias.
+
+Seguimiento local 2026-05-21:
+
+- [x] Precondicion local confirmada sin reset: contenedor `supabase_db_boxops` healthy, `auth_users=0`, `organization_memberships=0`, `person_profiles=10` y `coach_profiles=9` antes de recrear usuarios E2E.
+- [x] `npm run supabase:reset` vuelve a bloquear por defecto con exit code `1`, mostrando conteos seguros y sin ejecutar `supabase db reset`; no se usa `supabase:reset:danger`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa, detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback. Reconsulta previa al commit confirmo `auth_users_after_dry_run=0` y `memberships_after_dry_run=0`.
+- [x] Al intentar smoke autenticado se detecta fallo real del fixture Auth local: GoTrue devolvia `unexpected_failure` porque usuarios sinteticos anteriores tenian tokens Auth string en `NULL` (`confirmation_token`, `recovery_token`, `email_change_token_new`). Se ajusta `scripts/setup-local-e2e-auth.mjs` para escribir tokens vacios compatibles con GoTrue actual y reparar filas E2E existentes via `ON CONFLICT`, sin cambiar el flujo documentado.
+- [x] `npm run supabase:setup:e2e-auth:commit` persiste/repara el fixture local. Conteos redacted finales: `auth_users_total=4`, `e2e_auth_users=4`, `e2e_memberships=4`, `e2e_memberships_by_role=admin:1,coach:1,manager:1,owner:1`, `e2e_person_profiles=4`, `e2e_coach_profiles=1`, `e2e_null_auth_tokens=0`.
+- [x] Revalidado despues del commit que `npm run supabase:reset` sigue bloqueando con exit code `1`; conteos seguros finales del guard: `auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`.
+- [x] Probe directo de Supabase Auth local con `.env.local`, sin imprimir credenciales: `owner=ok`, `admin=ok`, `manager=ok`, `coach=ok`.
+- [x] Smoke autenticado minimo contra servidor dev existente en `http://127.0.0.1:3000`: `protected-mvp-routes.spec.ts` pasa para admin y coach en el paquete principal (`4 passed` antes de parar por timeout de owner), owner pasa en rerun aislado (`1 passed`) y manager pasa en rerun aislado (`1 passed`). El intento con `E2E_START_SERVER=1 E2E_PORT=3003` no se reutiliza porque Next ya tenia un dev server del repo activo en `localhost:3000`.
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias; push/cache/offline sin coincidencias de feature (`PushManager`, `webpush`, `serviceWorker`, `CacheStorage`, `caches.`). Geolocalizacion devuelve referencias existentes de tipos/filtros/`time-location`, sin cambios de `src` en este corte.
+- [x] Confirmado que no se ejecuta reset real, no se toca `.env.local`, no se toca produccion/QA/staging/remoto y no se recrean usuarios manualmente en Studio.
+
+Seguimiento local 2026-05-21 (fixture Auth estable):
+
+- [x] Se anade `tests/smoke/e2e-auth-fixture.spec.ts` como smoke autenticado minimo: login real por `owner`, `admin`, `manager` y `coach`, con dos rutas protegidas por rol y sin imprimir emails/passwords.
+- [x] Se anade `npm run test:smoke:e2e-auth` para validar solo el fixture Auth local antes del recorrido amplio `protected-mvp-routes.spec.ts`.
+- [x] `README.md` y `supabase/README.md` documentan el flujo local acotado: dry-run, commit idempotente solo si hacen falta usuarios y smoke minimo antes del smoke amplio.
+- [x] `npm run supabase:reset` sigue bloqueando por defecto con exit code `1`; conteos redacted: `auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`. No se ejecuta `supabase:reset:danger`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con rollback: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, y muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1`.
+- [x] Conteos locales redacted compatibles sin commit adicional: `e2e_auth_users=4`, `e2e_memberships=4`, `e2e_memberships_by_role=admin:1,coach:1,manager:1,owner:1`, `e2e_person_profiles=4`, `e2e_coach_profiles=1`, `e2e_null_auth_tokens=0`, `e2e_non_empty_auth_tokens=0`.
+- [x] `E2E_START_SERVER=1 npm run test:smoke:e2e-auth` pasa: `4 passed (1.5m)`. Owner tarda `1.0m` por la primera carga/compilacion; admin, manager y coach pasan en unos `8s` cada uno.
+- [x] No se reejecuta `protected-mvp-routes.spec.ts` en este corte: queda como recorrido amplio de producto, no como unica prueba del fixture Auth.
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias; push/cache/offline sin coincidencias. Geolocalizacion devuelve referencias existentes de tipos/filtros/`time-location`, sin cambios de `src` en este corte.
+- [x] Confirmado que no se ejecuta reset real, no se toca `.env.local`, no se toca produccion/QA/staging/remoto, no se tocan migraciones/seeds y no se crean usuarios manuales en Studio.
+
+Seguimiento local 2026-05-21 (rutas protegidas por rol):
+
+- [x] Se anaden scripts npm acotados para el recorrido amplio protegido sin duplicar tests: `test:smoke:protected`, `test:smoke:protected:owner`, `test:smoke:protected:admin`, `test:smoke:protected:manager` y `test:smoke:protected:coach`.
+- [x] `protected-mvp-routes.spec.ts` conserva el mapa unico de producto y solo etiqueta los bloques `describe` con `@role-owner`, `@role-admin`, `@role-manager` y `@role-coach` para filtrar con `--grep`; no se relajan rutas, headings ni permisos.
+- [x] `README.md` y `supabase/README.md` documentan el flujo local: preflight minimo `npm run test:smoke:e2e-auth` y recorrido amplio aislado con `npm run test:smoke:protected:<rol>`.
+- [x] `npm run supabase:reset` sigue bloqueando por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con rollback: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, y muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1`.
+- [x] `npm run test:smoke:e2e-auth` pasa contra el dev server local existente en `http://127.0.0.1:3000`: `4 passed (1.0m)`. Tiempos: owner `22.7s`, admin `13.9s`, manager `10.9s`, coach `12.2s`.
+- [x] `npm run test:smoke:protected:owner`: `1 passed (48.5s)`.
+- [x] `npm run test:smoke:protected:admin`: `1 passed (32.8s)`.
+- [x] `npm run test:smoke:protected:manager`: `1 passed (32.0s)`.
+- [x] `npm run test:smoke:protected:coach`: `3 passed (36.9s)`.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias; push/cache/offline sin coincidencias. Geolocalizacion devuelve referencias existentes de filtros de privacidad, tipos y `time-location`, sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Confirmado durante este seguimiento que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se toca `.env.local`, no se toca produccion/QA/staging/remoto y no se tocan migraciones/seeds.
+
+Seguimiento local 2026-05-21 (flujo secuencial final):
+
+- [x] Se anade `test:smoke:protected:roles` como atajo secuencial explicito: owner, admin, manager y coach en ese orden, reutilizando los scripts por rol y el spec unico.
+- [x] Se anade `test:smoke:e2e-local` como regresion local autenticada completa: primero `test:smoke:e2e-auth` y despues `test:smoke:protected:roles`.
+- [x] `README.md` y `supabase/README.md` documentan el flujo final recomendado: preflight Auth minimo, recorrido protegido por roles y atajo completo local.
+- [x] `npm run supabase:reset` sigue bloqueando por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con rollback: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, y muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1`.
+- [x] `npm run test:smoke:e2e-auth` pasa contra el dev server local existente en `http://127.0.0.1:3000`: `4 passed (51.5s)`.
+- [x] `npm run test:smoke:protected:roles` pasa secuencialmente: owner `1 passed (31.8s)`, admin `1 passed (27.0s)`, manager `1 passed (28.5s)`, coach `3 passed (37.8s)`.
+- [x] `npm run test:smoke:e2e-local` pasa con exit code `0`: preflight Auth `4 passed (27.7s)`, owner `1 passed (37.4s)`, admin `1 passed (38.3s)`, manager `1 passed (29.7s)`, coach `3 passed (40.8s)`.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias. Geo/push/cache no muestra push/cache/runtime de navegador; geolocalizacion devuelve referencias existentes de tipos, validadores y `time-location`, sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Confirmado durante este seguimiento que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se toca `.env.local`, no se toca produccion/QA/staging/remoto y no se tocan migraciones/seeds.
+
+Seguimiento local 2026-05-21 (documentacion operativa smoke autenticado):
+
+- [x] Se actualizan `README.md`, `supabase/README.md`, `docs/operations/smoke-checklist.md`, `docs/guides/stack-guide.md` y `docs/guides/code-editing-guide.md` para cerrar el flujo recomendado: `supabase:setup:e2e-auth` dry-run con `ROLLBACK`, preflight `test:smoke:e2e-auth`, recorrido amplio secuencial `test:smoke:protected:roles`, scripts por rol y atajo `test:smoke:e2e-local`.
+- [x] `package.json` confirmado sin cambiar scripts: existen `supabase:reset`, `supabase:setup:e2e-auth`, `test:smoke:e2e-auth`, `test:smoke:protected:owner`, `test:smoke:protected:admin`, `test:smoke:protected:manager`, `test:smoke:protected:coach`, `test:smoke:protected:roles` y `test:smoke:e2e-local`.
+- [x] `npm run supabase:reset` sigue bloqueando por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] No se reejecutan `test:smoke:e2e-auth`, `test:smoke:protected:roles` ni `test:smoke:e2e-local` en este corte porque solo se toca documentacion y S.108 ya los dejo verdes.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` preciso, IA/vector y push/cache/offline sin coincidencias. Geolocalizacion devuelve referencias existentes a columnas/tipos `latitude`/`longitude`, denylist de campos sensibles y copy de fichaje "sin geolocalizacion", sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Confirmado durante este seguimiento que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se toca `.env.local`, no se toca `src`, no se tocan specs Playwright, no se toca `package.json`, no se toca produccion/QA/staging/remoto y no se tocan migraciones/seeds.
+
+Seguimiento local 2026-05-21 (revalidacion runtime smoke autenticado tras S.108):
+
+- [x] Scripts confirmados en `package.json` sin modificar archivo: `supabase:reset`, `supabase:setup:e2e-auth`, `test:smoke:e2e-auth`, `test:smoke:protected:roles` y `test:smoke:e2e-local` existen con el flujo documentado.
+- [x] Precondicion runtime local confirmada: servidor existente responde en `http://127.0.0.1:3000/login` con status `200`; no se arranca servidor nuevo ni se cambia puerto.
+- [x] `npm run supabase:reset` bloquea por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] `npm run test:smoke:e2e-auth` pasa contra el servidor local existente: `4 passed (48.6s)`.
+- [x] `npm run test:smoke:protected:roles` pasa secuencialmente: owner `1 passed (24.7s)`, admin `1 passed (28.6s)`, manager `1 passed (21.4s)` y coach `3 passed (26.0s)`.
+- [x] `npm run test:smoke:e2e-local` tambien pasa con exit code `0`: preflight Auth `4 passed (23.1s)`, owner `1 passed (23.9s)`, admin `1 passed (26.8s)`, manager `1 passed (21.4s)` y coach `3 passed (31.6s)`.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF del worktree amplio preexistente.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias. Push/cache/offline de navegador (`PushManager`, `webpush`, `serviceWorker`, `CacheStorage`, `caches.`, `offline`) sin coincidencias. Geolocalizacion devuelve referencias existentes a tipos/validadores/copy de `time-location`, filtros de privacidad y `src/types/supabase.ts`, sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Confirmado durante este seguimiento que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit`, no se toca `.env.local`, no se toca `src`, no se tocan specs Playwright, no se toca `package.json`, no se toca produccion/QA/staging/remoto y no se tocan migraciones/seeds.
+- [x] Bloqueos reales restantes: ninguno para el flujo smoke local autenticado de S.108; solo quedan warnings no bloqueantes de Playwright (`NO_COLOR` ignorado por `FORCE_COLOR`) y warnings LF/CRLF ya presentes en el worktree.
+
+Estado final S.108: la DB local puede seguir limpia como baseline reproducible, el reset normal queda protegido por defecto y los usuarios E2E pasan a ser recreables cuando hagan falta smokes autenticados. El smoke minimo `test:smoke:e2e-auth` valida el fixture Auth local por rol sin depender del recorrido amplio, `test:smoke:protected:<rol>` permite validar el mapa protegido por rol aislado, `test:smoke:protected:roles` ejecuta owner, admin, manager y coach en orden, y `test:smoke:e2e-local` queda como atajo recomendado para regresion local autenticada completa. Cualquier reset real debe ser explicitamente peligroso y autorizado en el turno.
+
+#### S.109 - Local Authenticated Smoke Operational Stabilization
+
+Estado: ejecutado el 2026-05-21 como estabilizacion operativa minima posterior a S.108. No se toca producto, UI, `src`, specs Playwright, migraciones, seeds, QA/staging/remoto/produccion ni `.env.local`. No se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger` y no se ejecuta `npm run supabase:setup:e2e-auth:commit`.
+
+Decision sobre `NO_COLOR`/`FORCE_COLOR`:
+
+- [x] Causa confirmada: la shell y `npm run env --silent` traen `NO_COLOR=1` y `TERM=dumb`, sin `FORCE_COLOR`; Playwright fuerza `FORCE_COLOR: "1"` en workers desde `node_modules/playwright/lib/runner/workerHost.js`, y tambien lo declara para webServer en `node_modules/playwright/lib/plugins/webServerPlugin.js`.
+- [x] La traza con `NODE_OPTIONS=--trace-warnings npm run test:smoke:e2e-auth -- --grep coach` situo el aviso en `node:internal/tty` (`warnOnDeactivatedColors` / `getColorDepth`), antes de codigo de producto o specs.
+- [x] Se aplica ajuste minimo en `playwright.smoke.config.ts`: si el entorno trae `NO_COLOR`, se elimina para el proceso de smoke antes de que Playwright cree workers. Esto evita el warning sin tocar producto ni cambiar la semantica efectiva del worker, porque Playwright ya estaba forzando `FORCE_COLOR=1`.
+- [x] Revalidacion puntual con `NODE_OPTIONS=--trace-warnings npm run test:smoke:e2e-auth -- --grep coach`: `1 passed (10.4s)` y ya no aparece el warning.
+
+Decision sobre LF/CRLF:
+
+- [x] `git diff --check` sigue pasando con exit code `0`; solo muestra warnings amplios de normalizacion LF/CRLF del worktree ya presentes en multiples archivos.
+- [x] No se normalizan line endings ni se toca el repo de forma amplia. El ruido LF/CRLF queda documentado como preexistente y no bloqueante.
+
+Verificacion 2026-05-21:
+
+- [x] Precondicion runtime local: `http://127.0.0.1:3000/login` responde `200`; no se arranca servidor nuevo.
+- [x] `npm run supabase:reset` bloquea por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] `npm run test:smoke:e2e-auth` pasa sin warning `NO_COLOR`/`FORCE_COLOR`: `4 passed (33.7s)`.
+- [x] `npm run test:smoke:protected:roles` pasa sin warning `NO_COLOR`/`FORCE_COLOR`: owner `1 passed (30.2s)`, admin `1 passed (29.8s)`, manager `1 passed (31.8s)` y coach `3 passed (31.9s)`.
+- [x] `npm run test:smoke:e2e-local` pasa sin warning `NO_COLOR`/`FORCE_COLOR`: preflight Auth `4 passed (55.1s)`, owner `1 passed (48.3s)`, admin `1 passed (1.0m)`, manager `1 passed (1.2m)` y coach `3 passed (1.3m)`.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF del worktree amplio preexistente, incluyendo el nuevo aviso para `playwright.smoke.config.ts`, sin errores de whitespace.
+- [x] Guardrails `rg` en `src`: `STL` sin coincidencias; `service_role` preciso sin coincidencias; IA/vector sin coincidencias; push/cache/offline de navegador (`PushManager`, `webpush`, `serviceWorker`, `CacheStorage`, `caches.`, `offline`) sin coincidencias. Geolocalizacion solo devuelve referencias existentes de tipos, validadores/denylist y `time-location`, sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Archivos tocados por S.109: `playwright.smoke.config.ts` y `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para el smoke autenticado local. Quedan solo los warnings LF/CRLF amplios del worktree preexistente.
+
+Recomendacion siguiente: dejar el flujo local autenticado cerrado y pasar al siguiente corte operativo/documental pequeno; no abrir normalizacion de line endings salvo task propia y separada.
+
+#### S.110 - Local Authenticated Smoke Documentation Hygiene
+
+Estado: ejecutado el 2026-05-21 como higiene operativa minima posterior a S.109. No se toca producto, UI, `src`, scripts, specs Playwright, migraciones, seeds, QA/staging/remoto/produccion ni `.env.local`. No se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger` y no se ejecuta `npm run supabase:setup:e2e-auth:commit`.
+
+Revision:
+
+- [x] `package.json` conserva los scripts esperados sin cambios: reset protegido, reset peligroso explicito, setup E2E dry-run/commit, preflight Auth, smokes por rol, `test:smoke:protected:roles` y `test:smoke:e2e-local`.
+- [x] `playwright.smoke.config.ts` queda coherente con S.109: solo elimina `NO_COLOR` antes de crear workers Playwright; no se toca configuracion ni specs.
+- [x] `README.md`, `supabase/README.md`, `docs/operations/smoke-checklist.md`, `docs/guides/stack-guide.md` y `docs/guides/code-editing-guide.md` revisados contra S.108/S.109.
+- [x] Incoherencias documentales corregidas:
+  - `supabase/README.md` separa ahora el dry-run reversible de `supabase:setup:e2e-auth` del `supabase:setup:e2e-auth:commit` opcional.
+  - `docs/guides/stack-guide.md` deja `supabase:reset:danger` fuera del bloque normal de comandos Supabase local y lo conserva solo como opcion con confirmacion explicita.
+  - `README.md` aclara que `supabase:reset:danger` y `supabase:setup:e2e-auth:commit` son comandos disponibles, no flujo por defecto.
+- [x] No se cambia `docs/operations/smoke-checklist.md` ni `docs/guides/code-editing-guide.md`: ya expresaban dry-run, rollback, commit opcional y reset peligroso solo con autorizacion explicita.
+- [x] La explicacion `NO_COLOR`/`FORCE_COLOR` queda solo donde aporta valor: comentario tecnico minimo en `playwright.smoke.config.ts` y evidencia/decision en S.109.
+
+Verificacion 2026-05-21:
+
+- [x] `npm run supabase:reset` bloquea por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] No se reejecutan `test:smoke:e2e-auth`, `test:smoke:protected:roles` ni `test:smoke:e2e-local` porque S.110 solo toca documentacion y `TASKS.md`; no se toca `playwright.smoke.config.ts`, scripts ni specs.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF amplios del worktree preexistente, sin errores de whitespace. No se normalizan line endings.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias; capacidades browser de geolocalizacion/push/cache (`navigator.geolocation`, `PushManager`, `webpush`, `serviceWorker`, `CacheStorage`, `caches.`, `offline`) sin coincidencias. La busqueda amplia de geolocalizacion solo devuelve referencias existentes a tipos/validadores/copy de `time-location`, sin cambios de `src` en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Archivos tocados por S.110: `README.md`, `supabase/README.md`, `docs/guides/stack-guide.md` y `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para el smoke autenticado local. Quedan solo warnings LF/CRLF preexistentes del worktree.
+
+Recomendacion siguiente: mantener el flujo local autenticado como baseline operativa y pasar al siguiente corte documental/operativo pequeno; no abrir normalizacion de line endings salvo tarea separada.
+
+#### S.111 - Project Brief Source Of Truth Smoke Auth Alignment
+
+Estado: ejecutado el 2026-05-21 como cierre documental minimo posterior a S.108-S.110. No se toca producto, UI, `src`, scripts, specs Playwright, migraciones, seeds, QA/staging/remoto/produccion ni `.env.local`. No se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger` y no se ejecuta `npm run supabase:setup:e2e-auth:commit`.
+
+Revision:
+
+- [x] `PROJECT_BRIEF.md` se revisa solo en secciones relevantes: `Estado Actual`, `Comandos`, `Proximos Pasos` y referencias de smoke/Supabase local.
+- [x] Incoherencia real encontrada: `Smoke tests basicos` seguia describiendo los flujos autenticados como opcionales solo para `admin` y `coach`, aunque S.108 deja fixture local reproducible para `owner`, `admin`, `manager` y `coach`.
+- [x] Incoherencia real encontrada: `Comandos` listaba `npm run supabase:reset` sin aclarar que ahora esta protegido y bloquea por defecto; esto podia leerse como flujo normal de reset real.
+- [x] Brecha documental menor encontrada: `Proximos Pasos` no nombraba S.108-S.110 como baseline local autenticada ni diferenciaba dry-run/commit del fixture Auth.
+- [x] Ajuste aplicado en `PROJECT_BRIEF.md`: smoke autenticado local por roles, preflight Auth, smokes protegidos por rol, atajo `test:smoke:e2e-local`, reset protegido, reset peligroso explicito y setup E2E dry-run/commit opcional.
+- [x] Se anade revision 2026-05-21 en `PROJECT_BRIEF.md` para dejar S.108-S.110 como cierre del flujo local autenticado y mencionar la estabilizacion `NO_COLOR`/`FORCE_COLOR` sin repetir evidencia larga.
+
+Verificacion 2026-05-21:
+
+- [x] `npm run supabase:reset` bloquea por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF amplios del worktree preexistente, sin errores de whitespace. No se normalizan line endings.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role` e IA/vector sin coincidencias.
+- [x] Guardrail de capacidades browser de geolocalizacion/push/cache (`navigator.geolocation`, `PushManager`, `webpush`, `serviceWorker`, `CacheStorage`, `caches.`, `offline`) sin coincidencias.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] No se reejecutan `test:smoke:e2e-auth`, `test:smoke:protected:roles` ni `test:smoke:e2e-local` porque este corte solo toca documentacion source-of-truth y `TASKS.md`; S.108/S.109 ya dejaron esos smokes verdes tras tocar scripts/configuracion.
+- [x] Confirmado durante este corte que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit`, no se toca `.env.local`, no se toca `src`, no se tocan specs Playwright, no se toca `package.json`, no se toca produccion/QA/staging/remoto y no se tocan migraciones/seeds.
+- [x] Archivos tocados por S.111: `PROJECT_BRIEF.md` y `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para el smoke autenticado local. Quedan solo warnings LF/CRLF preexistentes del worktree.
+
+Recomendacion siguiente: mantener S.108-S.111 como baseline documental/operativa local y pasar a un corte pequeno separado solo si se decide normalizar line endings o revalidar un flujo runtime nuevo.
+
+#### S.112 - Minimal Local Authenticated Runtime Revalidation
+
+Estado: ejecutado el 2026-05-21 como revalidacion runtime minima posterior a S.111. No se abre producto, no se toca `src`, specs Playwright, scripts, migraciones, seeds, QA/staging/remoto/produccion ni `.env.local`. No se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit` y no se normalizan line endings.
+
+Revision documental:
+
+- [x] `PROJECT_BRIEF.md`, `TASKS.md`, `README.md`, `supabase/README.md` y `docs/operations/smoke-checklist.md` se revisan solo para reset protegido, setup E2E dry-run/commit, smokes autenticados por rol y uso no predeterminado de comandos peligrosos.
+- [x] No aparecen contradicciones documentales nuevas en la guia operativa actual: `npm run supabase:reset` queda protegido y bloquea por defecto; `supabase:reset:danger` queda fuera del flujo normal; `npm run supabase:setup:e2e-auth` es dry-run con `ROLLBACK`; `supabase:setup:e2e-auth:commit` queda opcional y explicito; los smokes por `owner`, `admin`, `manager` y `coach` siguen separados entre preflight y recorrido amplio.
+- [x] Las menciones historicas antiguas de `npm run supabase:reset` en tareas ya completadas de `TASKS.md` se tratan como registro de fases previas, no como instruccion operativa vigente posterior a S.108.
+
+Verificacion 2026-05-21:
+
+- [x] `npm run supabase:reset` bloquea por defecto con exit code `1`, muestra conteos seguros (`auth_users=4`, `organization_memberships=4`, `person_profiles=14`, `coach_profiles=10`, `schedule_templates=1`, `schedule_blocks=2`) y no ejecuta `supabase db reset`.
+- [x] `npm run supabase:setup:e2e-auth` dry-run pasa con exit code `0`: detecta `owner`, `admin`, `manager` y `coach`, omite `E2E_PAYROLL_MANAGER`, muestra `input_roles=4`, `auth_users_matched=4`, `memberships_matched=4`, `person_profiles_matched=4`, `coach_profiles_matched=1` y termina con rollback.
+- [x] `npm run test:smoke:e2e-auth` pasa con exit code `0`: `4 passed (40.4s)`.
+- [x] No se ejecuta `npm run test:smoke:protected:roles` porque el preflight Auth pasa y no aparece incoherencia real nueva.
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF amplios del worktree preexistente, sin errores de whitespace. No se normalizan line endings.
+- [x] Guardrails `rg` en `src`: `STL`, `service_role`, IA/vector y capacidades runtime de geolocalizacion/push/cache sin coincidencias.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] Confirmado durante este corte que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit`, no se toca `.env.local`, no se toca producto, no se toca `src`, no se tocan specs Playwright, no se tocan scripts, migraciones ni seeds, y no se toca QA/staging/remoto/produccion.
+- [x] Archivos tocados por S.112: `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para el baseline local autenticado. Quedan solo warnings LF/CRLF preexistentes y amplios del worktree.
+
+Recomendacion siguiente: mantener S.108-S.112 como baseline local autenticado cerrado; no repetir `test:smoke:protected:roles` ni normalizar line endings salvo tarea separada con motivo explicito.
+
+#### S.113 - Higiene De Estado Local Post S.112
+
+Estado: ejecutado el 2026-05-21 como cierre de higiene local posterior a S.112. No se abre producto, no se toca `src`, specs Playwright, scripts, migraciones, seeds, QA/staging/remoto/produccion ni `.env.local`. No se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit`, no se ejecutan smokes largos y no se normalizan line endings.
+
+Revision de worktree:
+
+- [x] `git status --short` confirma worktree amplio: 147 entradas, con 55 archivos trackeados modificados y 92 entradas untracked.
+- [x] `git diff --name-status` confirma 55 archivos trackeados modificados; los untracked aparecen solo en `git status --short`.
+- [x] `git diff --stat` confirma 55 archivos trackeados cambiados, 15352 insertions y 2909 deletions antes de registrar este S.113.
+- [x] S.112 queda documentada como aislada a `TASKS.md` (`Archivos tocados por S.112: TASKS.md`). El worktree global sigue amplio por cortes previos y archivos untracked, pero no aparece contradiccion nueva en este corte.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` sigue fuera del diff.
+
+Verificacion 2026-05-21:
+
+- [x] `git diff --check` pasa con exit code `0`; solo muestra warnings LF/CRLF amplios del worktree preexistente, sin errores de whitespace. No se normalizan line endings.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src` sin coincidencias.
+- [x] No se repite `npm run test:smoke:protected:roles` porque S.112 ya dejo el baseline local autenticado sin bloqueos y esta higiene no encuentra incoherencia real nueva.
+- [x] Confirmado durante este corte que no se ejecuta reset real, no se ejecuta `npm run supabase:reset:danger`, no se ejecuta `npm run supabase:setup:e2e-auth:commit`, no se toca `.env.local` y no se toca producto.
+- [x] Archivos tocados por S.113: `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para el baseline local autenticado. Queda solo el worktree amplio y los warnings LF/CRLF preexistentes como ruido no bloqueante.
+
+Recomendacion siguiente: mantener S.108-S.113 como baseline local autenticado cerrado; si se quiere reducir ruido, separar en una tarea dedicada la clasificacion/commit del worktree amplio, sin mezclarlo con normalizacion de line endings.
+
+#### S.114 - Inventario De Clasificacion Del Worktree Post Baseline Local Autenticado
+
+Estado: ejecutado el 2026-05-21 como inventario no destructivo posterior a S.108-S.113. No se toca producto, `src`, specs, scripts, migraciones, seeds, docs operativos ni `.env.local`; solo se registra esta clasificacion en `TASKS.md`. No se ejecuta `git add`, `git commit`, `git stash`, `git reset`, `git checkout`, limpieza de untracked, reset Supabase, smokes largos ni normalizacion LF/CRLF.
+
+Foto del worktree antes de registrar S.114:
+
+- [x] `git status --short` confirma 147 entradas resumidas: 55 trackeadas modificadas y 92 entradas untracked en la salida corta; `scripts/` aparece colapsado como carpeta.
+- [x] `git diff --name-status` confirma 55 archivos trackeados modificados; los untracked no aparecen en ese comando.
+- [x] `git diff --stat` confirma 55 archivos trackeados cambiados, 15379 insertions y 2909 deletions antes de este registro.
+- [x] `git ls-files --others --exclude-standard` muestra 93 archivos untracked exactos; la diferencia frente a `git status --short` se explica porque `scripts/` contiene dos archivos y status lo resume como carpeta.
+
+Clasificacion del worktree:
+
+- Baseline local autenticado S.108-S.113:
+  - Candidatos principales: `package.json`, `scripts/supabase-reset-guard.mjs`, `scripts/setup-local-e2e-auth.mjs`, `playwright.smoke.config.ts`, `tests/smoke/e2e-auth-fixture.spec.ts`, `tests/smoke/helpers/env.ts` y los cambios de etiquetas por rol en `tests/smoke/protected-mvp-routes.spec.ts`.
+  - Documentacion asociada: `README.md`, `supabase/README.md`, `docs/operations/smoke-checklist.md`, `docs/guides/stack-guide.md`, `docs/guides/code-editing-guide.md`, `PROJECT_BRIEF.md` y las entradas S.108-S.113 de `TASKS.md`.
+  - Nota de mezcla: `tests/smoke/protected-mvp-routes.spec.ts` tambien incluye `/app/documents`, que pertenece al repositorio documental visible; `PROJECT_BRIEF.md` y `TASKS.md` acumulan historia de muchas fases, por lo que conviene revisar hunks si se separa un commit fino.
+- Documentacion, runbooks y roadmap:
+  - `AGENTS.md`, `docs/architecture/domain-model.md`, `docs/architecture/personal-data-permissions.md`, `docs/architecture/security-baseline.md`, `docs/architecture/asvs-level-1-beta-matrix.md`, `docs/architecture/tenant-rls-negative-test-implementation-plan.md` y `docs/architecture/tenant-rls-negative-test-matrix.md`.
+  - `docs/operations/beta-operational-readiness-runbook.md`, `docs/operations/daily-operations-beta-readiness-runbook.md`, `docs/operations/document-programming-manual-validation-runbook.md`, `docs/operations/document-repository-beta-readiness-runbook.md`, `docs/operations/tenant-direct-grants-runtime-evidence-capture-template.md`, `docs/operations/tenant-direct-grants-runtime-scenario-manifest.md`, `docs/operations/tenant-direct-grants-runtime-validation-runbook.md`, `docs/operations/tenant-readiness-checklist.md`, `docs/operations/time-tracking-beta-readiness-runbook.md`, `docs/operations/legal-and-privacy-notes.md` y `docs/operations/pre-qa-controlled-pilot-runbook.md`.
+  - `docs/product/roadmap.md`, `docs/product/theming.md`, `docs/product/ux-principles.md`, `docs/product/webapp-completion-roadmap.md` y `docs/user-guides/admin.md`.
+  - `.gitignore` parece relacionado con higiene de evidencia local/QA, no con el baseline Auth puro.
+- Cambios funcionales de `src`:
+  - Superficies modificadas: `absences`, `account`, `centers`, `class-types`, `coaches`, `coverage`, `more`, dashboard `/app`, `requests`, `schedule`, `settings`, `stats`, `templates` y `time`.
+  - Superficies nuevas o auxiliares: `src/app/(app)/app/documents/page.tsx`, componentes de schedule para eventos/franjas, `src/components/features/transient-feedback-banner.tsx`.
+  - Helpers/lib nuevos o modificados: `coverage-traceability`, `document-programming`, `documents`, `operational-events`, `overtime-candidate-detection`, `overtime-candidates`, `staff-work-windows`, permisos/auth, redirects, Resend, navegacion, auditoria operativa y `src/types/supabase.ts`.
+  - Estos cambios no pertenecen al baseline local autenticado; parecen corresponder a fases funcionales previas de jornada prevista, eventos operativos, trazabilidad, documentos/programacion, repositorio documental y fichaje/horas extra.
+- Migraciones y snippets Supabase:
+  - Migraciones nuevas `00036`-`00046`: staff work windows, operational events, overtime candidates, coverage traceability, document programming/repository y tenant direct grants.
+  - Snippets QA/rollback: programacion documental, repositorio documental, overtime candidates, tenant boundary RLS, tenant direct grants e inicializacion runtime A/B local.
+  - No pertenecen al baseline local autenticado. Deben revisarse por cortes de dominio y con RLS/rollback correspondiente antes de commit.
+- Specs Playwright y smokes:
+  - Parte baseline: `tests/smoke/e2e-auth-fixture.spec.ts`, lectura de `.env.local` en `tests/smoke/helpers/env.ts` y etiquetas `@role-*` en `protected-mvp-routes`.
+  - Parte funcional/documental: `auth-protection` con `/app/documents`, `coverage-bulk-resolution`, `coverage-traceability`, document programming/repository, operational events, overtime candidates, staff work windows, tenant direct grants runtime y tenant RLS negative specs.
+  - Recomendacion: no juntar todos los specs en un unico commit; agruparlos con su migracion/helper/superficie correspondiente.
+- Archivos locales/temporales o ruido:
+  - `supabase/.temp/cli-latest` es el principal candidato a ruido local/generado y no parece pertenecer a un corte de producto ni al baseline Auth.
+  - Los warnings LF/CRLF aparecen en los comandos Git como ruido preexistente del worktree amplio; no se normalizan en S.114.
+  - `.env.local` no aparece en diff ni se toca.
+
+Candidatos razonables a commits futuros, sin ejecutar staging:
+
+- Commit pequeno 1: baseline local autenticado S.108-S.113, con scripts de reset/setup, comandos npm, config Playwright, smoke Auth minimo, tags por rol y documentacion de flujo local. Revisar hunks mixtos antes de stage.
+- Commit pequeno 2: documentacion de readiness/roadmap/guardrails, separando runbooks operativos, arquitectura y roadmap de los cambios runtime.
+- Commit pequeno 3: staff work windows y schedule context, con migraciones `00036`/`00038`, helpers, componentes y smoke propio.
+- Commit pequeno 4: operational events, con migracion `00037`, helper/actions/superficie schedule y specs.
+- Commit pequeno 5: overtime candidates y time tracking, con migraciones `00039`/`00040`, helpers, `/app/time` y specs.
+- Commit pequeno 6: coverage traceability y mejoras de cobertura, con migracion `00041`, helpers, paneles y specs.
+- Commit pequeno 7: document programming/repository, con migraciones `00042`/`00043`, `src/lib/document-programming.ts`, `src/lib/documents.ts`, `/app/documents`, runbooks y smokes.
+- Commit pequeno 8: tenant direct grants hardening, con migraciones `00044`-`00046`, snippets, runbooks y runtime specs.
+- Limpieza separada: decidir si `supabase/.temp/cli-latest` se descarta o se ignora, sin mezclarlo con commits funcionales ni normalizacion EOL.
+
+Verificacion 2026-05-21:
+
+- [x] `git diff --check` pasa con exit code `0`; solo emite warnings LF/CRLF del worktree amplio preexistente, sin errores de whitespace.
+- [x] `git diff --name-only -- .env.local` sin salida: `.env.local` no forma parte del diff.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src` sin coincidencias.
+- [x] Confirmado durante S.114: no se ejecuta reset real, `supabase:reset:danger`, `supabase:setup:e2e-auth:commit`, `git add`, `git commit`, `git stash`, `git reset`, `git checkout`, limpieza de untracked, smokes largos, QA/staging/remoto/produccion ni normalizacion LF/CRLF.
+- [x] Archivos tocados por S.114: `TASKS.md`.
+
+Bloqueos reales restantes: ninguno para cerrar el inventario ni para el baseline local autenticado. Quedan como trabajo pendiente de gestion del repo el worktree amplio, los archivos mixtos que requieren separar hunks con cuidado, el candidato a ruido `supabase/.temp/cli-latest` y los warnings LF/CRLF preexistentes si se decide tratarlos en una tarea aparte.
+
+Recomendacion siguiente: no limpiar ni commitear en bloque. Si se va a reducir ruido, empezar por el commit pequeno del baseline local autenticado S.108-S.113 y dejar fuera cualquier hunk de documentos/superficies funcionales; despues avanzar por dominio con verificacion propia.
+
 ### Fase A - Cierre MVP 1 Real Con Datos Validados Y Deuda Pequena
 
 Objetivo: cerrar la base operativa ya construida contra datos reales, sin abrir modulos nuevos.
@@ -453,6 +5135,86 @@ Pendiente antes de QA STL:
 - [ ] Probar invitacion real de punta a punta con un email controlado.
 
 Fuera de B.3: permisos por centro, invitaciones masivas, SSO/MFA, dominios de email por tenant, alta de alumnos, HR sensible y auditoria operativa completa S.1.
+
+#### B.4 - Cierre de base SaaS y permisos de tenant para beta interna
+
+Estado: documentado el 2026-05-17 como siguiente bloque prudente del mapa de cierre. Es readiness SaaS/tenant y permisos, no desarrollo funcional grande. No abre permisos por centro, logo real, onboarding automatico, billing, documentos firmables, subida documental visible, payroll, app nativa, geofencing ni IA. `center_manager` sigue futuro hasta tener frontera por centro en schema/RLS/UX.
+
+Decision:
+
+- [x] Revisar B.1/B.2/B.3: configuracion minima, `organizations.theme_config`, roles avanzados compatibles e invitaciones por email.
+- [x] Crear `docs/operations/tenant-readiness-checklist.md` como checklist de tenant readiness.
+- [x] Distinguir obligatorio para beta interna frente a v1 comercial.
+- [x] Mantener `owner`/`admin` como configuracion/accesos, `manager` como operativa diaria tenant-wide y `coach` como uso operativo/personal.
+- [x] Mantener `staff`, `document_admin`, `payroll_manager` y `center_manager` reconocidos pero sin permisos especializados por herencia.
+- [x] Mantener IA como ultimo extra futuro.
+
+Checklist documentado:
+
+- [x] Logo/asset privado de organizacion: no obligatorio para beta; futuro con asset privado/controlado, formatos, tamanos, permisos y usos en exports/documentos.
+- [x] Colores por centro: opcionales y solo si aportan claridad operativa; no deben competir con estados criticos.
+- [x] Permisos por centro / `center_manager`: futuro o fase concreta; no activar sin frontera por centro en DB/RLS/helpers/actions/UX/tests.
+- [x] Onboarding de nuevo box: definido como paquete operativo manual para beta y como flujo guiado futuro para v1.
+- [x] Matriz final inicial de roles/capacidades para `owner`, `admin`, `manager`, `coach`, `staff`, `document_admin`, `payroll_manager` y `center_manager`.
+- [x] Limites entre configuracion global, gestion diaria, funciones personales y roles sensibles.
+- [x] Validacion de que no haya hardcode de STL en `src`.
+- [x] Configuracion minima requerida por tenant antes de activarlo.
+
+Obligatorio para beta interna:
+
+- [ ] Tenant con nombre visible, estado operativo y `theme_config` valido o vacio.
+- [ ] Centros activos con nombre, slug, timezone y estado revisados.
+- [ ] Roles iniciales reales: al menos `owner` o `admin`; `manager` si aplica; `coach` para pruebas operativas.
+- [ ] Tipos de actividad y `required_coaches` revisados.
+- [ ] Invitaciones/Auth/email validados segun S.8 antes de invitar usuarios reales.
+- [ ] Semana/plantilla inicial validada por responsable operativo.
+- [ ] Smoke anonimo y autenticado por rol ejecutado o bloqueo registrado.
+- [ ] Evidencia de tenant readiness guardada fuera del repo si contiene datos reales.
+- [ ] `rg -n "STL" src` sin coincidencias.
+
+Revision B.4 2026-05-18:
+
+- [x] Releer entorno sin imprimir secretos ni valores: `.env.local` existe, esta ignorado y no trackeado; solo se detecta configuracion local, sin URL QA/staging, project/ref, DB URL, tenant QA/staging ni credenciales E2E por rol.
+- [x] Revisar base de codigo de tenant readiness: configuracion minima en `/app/settings`, resolucion por `organization_memberships`, roles B.2 y flujo de invitaciones B.3 siguen presentes.
+- [x] Confirmar que `center_manager` sigue futuro en app: reconocido como rol, pero sin permisos especializados en `src/lib/auth/permissions.ts`; la migracion B.2 retira escrituras globales heredadas para las tablas operativas principales.
+- [x] Confirmar bloqueo de evidencia real: no se puede validar organizacion, centros, roles reales, tipos, semana/plantilla, huecos, Auth/email real, invitacion, aceptacion, reset ni segundo tenant controlado sin acceso QA/staging.
+- [x] No crear UI, migraciones, features, permisos por centro, onboarding guiado, billing, documentos firmables, subida visible, payroll, IA, geolocalizacion, push, service worker ni CacheStorage.
+
+Resultado B.4 2026-05-18: `bloqueado por acceso/tenant real`, no `listo para beta interna`.
+
+Pendiente para v1 comercial:
+
+- [ ] Onboarding guiado o runbook repetible de nuevo box.
+- [ ] Eliminacion segura de altas erroneas de equipo para `owner`: permitir retirar una ficha/acceso/invitacion creada por error desde Equipo con confirmacion explicita tipo modal, sin auto-eliminacion del propietario actual, sin borrar historial operativo y distinguiendo claramente entre `organization_memberships`, `person_profiles`, `coach_profiles`, `team_invitations` y usuario Auth global. Si ya hay asignaciones, fichajes, documentos, auditoria o historial conectado, priorizar desactivar/archivar o anonimizar de forma controlada antes que borrado destructivo.
+- [ ] Logo privado/controlado si se decide comercialmente.
+- [ ] Colores por centro si aportan claridad en uso real.
+- [ ] Permisos por centro y `center_manager` solo con task tecnica propia.
+- [ ] Billing/soporte/exportes comerciales.
+- [ ] Documentacion comercial de limites: que cubre la webapp y que queda fuera.
+
+Fuera de B.4:
+
+- IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs o UI de IA.
+- App nativa, push, geofencing, service worker, web push o background sync.
+- Payroll, nomina, importes o compensaciones.
+- Documentos firmables, subida visible documental o pagina documental completa.
+- Implementar permisos por centro o activar `center_manager`.
+- Migraciones o cambios de UI/codigo salvo correccion critica separada.
+- Hardcodear STL en `src` o introducir `service_role` en `src`.
+
+Verificacion documental esperada:
+
+- [x] `npm run typecheck` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `npm run lint` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `git diff --check` global pasa el 2026-05-18; solo muestra avisos LF/CRLF del worktree.
+- [x] `git diff --check -- TASKS.md docs\operations\tenant-readiness-checklist.md` pasa el 2026-05-18; solo muestra aviso LF/CRLF en `TASKS.md`.
+- [x] `git diff --check -- PROJECT_BRIEF.md TASKS.md docs\product\roadmap.md docs\architecture\personal-data-permissions.md docs\product\theming.md docs\architecture\security-baseline.md` pasa para docs trackeadas tocadas en B.4; `rg` de whitespace cubre tambien docs no trackeadas.
+- [x] `rg -n "[ \t]+$" docs\operations\tenant-readiness-checklist.md PROJECT_BRIEF.md TASKS.md docs\product\roadmap.md docs\product\webapp-completion-roadmap.md docs\architecture\personal-data-permissions.md docs\product\theming.md docs\architecture\security-baseline.md` sin coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] `git diff` revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida visible documental ni permisos por centro funcionales sin fase propia.
 
 ### Fase C - Auth/Security Polish
 
@@ -650,7 +5412,7 @@ Fuera de D.5: documentos firmables, boton "Firmar", snapshots documentales reale
 
 ### Fase E - Documentos, Permisos, Nominas, Firmas Y Certificaciones
 
-Estado 2026-05-10: E.1 queda documentada como modelado seguro de documentos privados/empresa/persona, permisos, Storage privado candidato y firma documental futura. E.2 implementa el primer schema minimo de metadata documental privada tenant-scoped (`documents`, `document_versions`, `document_subjects`, `document_access_grants`) con RLS estricta. E.3 implementa Storage documental privado minimo con bucket `document-files`, RPCs de subida/activacion/cancelacion y policies de `storage.objects`. E.4 implementa auditoria documental minima segura con `document_access_events`, RLS estricta y RPCs de registro/consulta. E.5 abre solo rutas backend controladas para preview/descarga de `document_versions` privadas con signed URLs cortas y auditoria; sigue sin UI, pagina documental, subida desde app, boton "Firmar", documentos firmables ni snapshots reales.
+Estado 2026-05-21: E.1 queda documentada como modelado seguro de documentos privados/empresa/persona, permisos, Storage privado candidato y firma documental futura. E.2 implementa el primer schema minimo de metadata documental privada tenant-scoped (`documents`, `document_versions`, `document_subjects`, `document_access_grants`) con RLS estricta. E.3 implementa Storage documental privado minimo con bucket `document-files`, RPCs de subida/activacion/cancelacion y policies de `storage.objects`. E.4 implementa auditoria documental minima segura con `document_access_events`, RLS estricta y RPCs de registro/consulta. E.5 abre solo rutas backend controladas para preview/descarga de `document_versions` privadas con signed URLs cortas y auditoria; sigue sin UI de firma, boton "Firmar", documentos firmables ni snapshots reales. E.6/I.27 documenta programacion util asociada a documentos y horario como base previa a cualquier IA futura. E.7/I.28 abre la base tecnica interna `document_programming_links` con RLS/RPC/helper. E.8/I.29 abre la primera superficie visible minima en detalle de bloque de `/app/schedule` para consultar programacion autorizada, sin IA ni subida visible. E.9/I.30 anade QA interno con snippet SQL rollback y smoke para validar grants, denegaciones, cross-tenant y que asignaciones no conceden permiso documental. E.10/I.31 anade preparacion operativa controlada para validacion manual local/QA mediante runbook interno, plantilla SQL rollback y smoke estatico. E.11 abre un primer repositorio documental visible minimo en `/app/documents`, listado por `can_access_document` y preview/descarga por rutas E.5. E.12 prepara validacion QA/staging controlada con SQL rollback, evidencia esperada y smoke estatico sin abrir producto nuevo. E.13 cierra evidencia local y bloqueos QA/staging con plantilla redacted, sin abrir producto nuevo. E.14 reintenta la validacion QA/staging real con archivo Storage controlado y deja bloqueo exacto al no haber acceso real disponible desde el entorno actual. E.15 actualiza el desbloqueo controlado de esa validacion real: relee entorno sin secretos, reejecuta el SQL local con rollback y mantiene QA/staging bloqueado por falta de project/ref, DB URL, credenciales/casos QA y objeto `document-files` controlado. E.16 documenta el handoff operativo controlado para que un operador con acceso real prepare tenant/casos/documentos/archivo controlado, ejecute la validacion QA/staging y registre evidencia redacted sin inventar resultados. E.17 reintenta la asistencia QA/staging desde este entorno: no encuentra acceso real ni CLI autenticada, reejecuta el SQL local con rollback y mantiene el estado `bloqueado por acceso/entorno` sin producto nuevo ni evidencia inventada. E.19 anade un primer adjunto minimo desde `/app/documents` para `owner`, `admin` y `document_admin`, limitado a metadata `company`/`programming`, primera version en Storage privado, sin grants UI, reemplazo, firma documental, payroll ni IA.
 
 Objetivo: centralizar documentos con permisos estrictos y trazabilidad.
 
@@ -856,7 +5618,7 @@ Verificacion E.5 2026-05-10:
 
 Objetivo: registrar jornada en web de forma manual o automatica por planificacion, exportable, corregible, aprobable semanalmente y auditable, sin geolocalizacion web.
 
-Estado 2026-05-13: F.1 queda completada como modelado documental, F.2 implementa el primer schema minimo seguro para fichaje manual, F.3 abre una capa servidor minima en `src/lib`, F.4 crea la primera superficie visible propia en `/app/time`, F.5 anade solicitud propia de correcciones, F.6 abre la primera revision administrativa minima de correcciones pendientes, F.7 abre la aplicacion trazable de correcciones ya aprobadas, F.8 cambia la politica por defecto para que las correcciones propias se apliquen directamente salvo configuracion del `owner`, F.9 anade vista semanal con avisos operativos frente a bloques asignados, F.10 separa punches sustituidos/anulados hacia historial visible de cambios, F.11 implementa fichaje automatico web por planificacion, F.12 implementa la base backend de cierre semanal/aprobacion firmada, F.13 implementa avisos in-app en Inicio y F.14 implementa el primer CSV interno revisable. Existe migracion Supabase, RLS, auditoria tecnica, RPC de fichaje propio, RPC transaccional de aplicacion de correcciones, RPC de automatico por planificacion, RPCs de envio/aprobacion/rechazo/reapertura semanal, tipos Supabase actualizados, helpers de lectura/revision/aplicacion/cierre/exporte, server actions, ruta backend de descarga y UI para registrar entrada/salida, corregir directamente, solicitar/revisar/aplicar cuando el tenant exige aprobacion, consultar historico propio, comparar la semana con asignaciones y descargar exporte interno para roles autorizados. No hay geolocalizacion activa, payroll, calculo automatico de horas extra, exporte legal definitivo, seeds reales ni promesa de cumplimiento legal definitivo.
+Estado 2026-05-17: F.1 queda completada como modelado documental, F.2 implementa el primer schema minimo seguro para fichaje manual, F.3 abre una capa servidor minima en `src/lib`, F.4 crea la primera superficie visible propia en `/app/time`, F.5 anade solicitud propia de correcciones, F.6 abre la primera revision administrativa minima de correcciones pendientes, F.7 abre la aplicacion trazable de correcciones ya aprobadas, F.8 cambia la politica por defecto para que las correcciones propias se apliquen directamente salvo configuracion del `owner`, F.9 anade vista semanal con avisos operativos frente a bloques asignados, F.10 separa punches sustituidos/anulados hacia historial visible de cambios, F.11 implementa fichaje automatico web por planificacion, F.12 implementa la base backend de cierre semanal/aprobacion firmada, F.13 implementa avisos in-app en Inicio, F.14 implementa el primer CSV interno revisable y F.15 documenta el cierre de readiness de fichaje web para beta interna en `docs/operations/time-tracking-beta-readiness-runbook.md`. Existe migracion Supabase, RLS, auditoria tecnica, RPC de fichaje propio, RPC transaccional de aplicacion de correcciones, RPC de automatico por planificacion, RPCs de envio/aprobacion/rechazo/reapertura semanal, tipos Supabase actualizados, helpers de lectura/revision/aplicacion/cierre/exporte, server actions, ruta backend de descarga y UI para registrar entrada/salida, corregir directamente, solicitar/revisar/aplicar cuando el tenant exige aprobacion, consultar historico propio, comparar la semana con asignaciones, cerrar/aprobar/rechazar semanas desde avisos in-app y descargar exporte interno para roles autorizados. No hay geolocalizacion activa, payroll, calculo automatico/legal de horas extra, exporte legal definitivo, seeds reales ni promesa de cumplimiento legal definitivo.
 
 Decision 2026-05-13: la webapp no pedira ubicacion al fichar. La evolucion de Fase F sera manual + automatico por clases/bloques asignados. El automatico web no prueba presencia real; debe quedar corregible y pasar por cierre semanal. Cada domingo a las 23:59, la semana de cada usuario se enviara automaticamente a aprobacion. `owner`, `admin` y `manager` tendran una cola visible en Inicio para aprobar con firma propia ("Firmar y aprobar") o rechazar con nota obligatoria. Aprobar cierra la semana y bloquea modificaciones normales; rechazar notifica al usuario, exige correcciones y permite reenviar a aprobacion. Las notificaciones iniciales son in-app; push movil queda para app nativa.
 
@@ -895,7 +5657,7 @@ Criterio de salida:
 - [x] Se registra inicio y fin de jornada mediante base de datos/RPC propio y UI personal minima.
 - [x] Correcciones guardan motivo, autor, fecha, estado y snapshots antes/despues.
 - [x] Aprobacion semanal queda trazada como schema auditable.
-- [x] Exporte revisable queda modelado como metadata de lote, sin archivo/generacion real todavia.
+- [x] Exporte CSV interno revisable queda generado desde backend y registrado como metadata de lote.
 - [x] Se documenta conservacion de registros durante 4 anos en Espana.
 - [x] Se documenta acceso para trabajador, representantes e Inspeccion.
 - [x] La documentacion avisa que legal debe revisar antes de prometer cumplimiento.
@@ -906,14 +5668,16 @@ Criterio de salida:
 - [x] `/app/time` muestra una vista semanal navegable con horas asignadas, horas fichadas, balance y avisos por falta, exceso, fichaje abierto o fichaje sin asignacion visible.
 - [x] Fichaje automatico web por clases/bloques asignados, sin ubicacion ni prueba de presencia.
 - [x] Base de envio automatico de semanas a aprobacion el domingo a las 23:59 por organizacion/timezone mediante scheduler DB.
-- [ ] Cola visible en Inicio para `owner`, `admin` y `manager` con semanas pendientes.
+- [x] Cola visible en Inicio para `owner`, `admin` y `manager` con semanas pendientes.
 - [x] Aprobacion con firma propia y bloqueo de la semana aprobada.
 - [x] Rechazo con nota obligatoria y base de correccion/reenvio; notificacion in-app queda en F.13.
-- [ ] Notificaciones in-app para usuarios y gestores; push movil queda fuera hasta app nativa.
+- [x] Notificaciones in-app para usuarios y gestores; push movil queda fuera hasta app nativa.
+- [x] Runbook F.15 distingue flujos listos, validacion real/staging, bloqueos, roles, smokes, evidencia, deuda menor/bloqueante, v1 comercial y promesas prohibidas.
 
 Decision pendiente legal:
 
 - [ ] Validar retencion, formato de exporte, acceso de representantes y textos de consentimiento antes de usar datos reales.
+- [ ] Ejecutar F.15 en staging/real con evidencias antes de presentar fichaje como listo para beta interna real.
 
 #### F.1 - Modelo documental de fichaje manual seguro
 
@@ -1384,6 +6148,47 @@ Fuera de F.14:
 - envio por email, push o app nativa;
 - ubicacion real, mapas, geofencing, IP/Wi-Fi/Bluetooth.
 
+#### F.15 - Cierre de fichaje web y cierre laboral prudente para beta interna
+
+Estado: completada documentalmente el 2026-05-17. No cambia `src`, migraciones, seeds, rutas, UI ni permisos. Crea `docs/operations/time-tracking-beta-readiness-runbook.md` como checklist operativo de readiness para usar fichaje web en beta interna controlada.
+
+Decision: F.15 no es un producto nuevo ni un salto legal. Es un cierre prudente de lo ya implementado en F.4-F.14 y de la relacion con I.20-I.24: fichaje manual, vista semanal, correcciones, modo de aprobacion configurable, automatico web por planificacion, cierre semanal, aprobacion firmada interna, rechazo con nota, avisos en Inicio, CSV interno revisable, horario/asignaciones/jornada prevista como contexto y candidatos de posible exceso como revision operativa.
+
+- [x] Documentar que el fichaje web actual no usa geolocalizacion y la webapp no debe pedir `navigator.geolocation`.
+- [x] Documentar que el fichaje automatico por planificacion reduce friccion, pero no prueba presencia real.
+- [x] Documentar que jornada prevista no es fichaje, contrato, payroll ni prueba definitiva.
+- [x] Documentar que aprobar una semana firmada es confirmacion interna, no firma electronica avanzada/cualificada.
+- [x] Documentar que candidatos de posible exceso no son horas extra aprobadas ni payroll.
+- [x] Documentar que el CSV actual es exporte interno revisable, no exporte legal definitivo.
+- [x] Mapear flujos listos para beta interna, flujos que requieren validacion real/staging y bloqueos por datos, credenciales, entorno o revision legal.
+- [x] Distinguir roles `owner`, `admin`, `manager`, `coach`, `payroll_manager` futuro y `center_manager` futuro en fichaje.
+- [x] Definir smoke minimo anonimo y por rol.
+- [x] Definir evidencia que debe guardarse fuera del repo si contiene datos reales.
+- [x] Separar deuda UX menor que no bloquea beta de deuda que si bloquea beta.
+- [x] Separar beta interna de v1 comercial.
+- [x] Mantener fuera geofencing, app nativa, payroll, documentos firmables, subida documental visible, IA y cumplimiento legal definitivo.
+
+Fuera de F.15:
+
+- [x] No crear migraciones ni modificar schema.
+- [x] No tocar UI, rutas ni Server Actions.
+- [x] No activar `navigator.geolocation`, geofencing, app nativa, push, service worker, background sync, caches privadas ni modo offline.
+- [x] No abrir payroll, importes, compensaciones, saldos, aprobacion legal de horas extra ni nominas.
+- [x] No abrir documentos firmables, subida visible documental ni pagina documental completa.
+- [x] No abrir IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs ni UI de IA.
+
+Verificacion F.15:
+
+- [x] `docs/operations/time-tracking-beta-readiness-runbook.md` creado.
+- [x] `TASKS.md`, `PROJECT_BRIEF.md`, `docs/product/roadmap.md` y `docs/product/webapp-completion-roadmap.md` referencian F.15.
+- [x] `git diff --check` ejecutado: falla globalmente por deuda preexistente en `src/types/supabase.ts:6046` (`new blank line at EOF`), fuera del cambio documental F.15.
+- [x] `git diff --check -- <docs F.15>` pasa para los archivos tocados por este cierre.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "navigator\\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\\.|CacheStorage" src` sin nuevas coincidencias.
+- [x] Diff documental revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida visible documental ni cumplimiento legal definitivo.
+
 ### Fase G - Fichaje Geolocalizado Asistido
 
 Objetivo: preparar geolocalizacion real para una app nativa o wrapper movil, no para la webapp.
@@ -1792,7 +6597,7 @@ Alcance:
 - auditoria operativa corta de cambios sobre bloques, asignaciones de coaches y plantillas;
 - ausencias, vacaciones y permisos;
 - eventos, festivos y competiciones;
-- horas extra detectadas/validadas/cerradas;
+- horas extra candidatas/revisables/cerradas operativamente;
 - IA sobre programacion solo cuando documentos y horarios esten modelados.
 
 No incluye:
@@ -1816,10 +6621,28 @@ Criterio de salida:
 - [x] I.13 abre creacion minima de solicitud propia desde `/app/absences` mediante `createOwnAbsenceRequest(...)`, sin crear para otra persona, sin calendario, sin saldos legales y sin resolver cobertura.
 - [x] I.14 endurece `/app/absences` con filtros GET, validacion visible, estados no accionables y copy prudente, sin cambiar schema/RLS/RPC ni ampliar dominio.
 - [x] I.15 cubre QA/hardening tecnico de regresion para `/app/absences` posterior a I.14, con smoke/guardrails de permisos, query string y limites de seguridad, sin abrir calendario, saldos, cobertura automatica ni creacion ajena.
-- [ ] Cambios y ausencias actualizan cobertura de forma trazable.
-- [ ] Cambios de bloque/asignacion/plantilla quedan consultables por admins durante una ventana corta con actor, accion y campos cambiados minimizados.
-- [ ] Horas extra no se presentan como nomina ni calculo fiscal.
-- [ ] IA queda subordinada a documentos/programacion utiles.
+- [x] I.16 integra ausencias aprobadas o en revision como impacto derivado en lectura de cobertura, sin persistir impactos, modificar horarios/asignaciones ni resolver cobertura automaticamente.
+- [x] I.17 deja modelados eventos, festivos y competiciones como contexto operativo del box, sin schema, UI, calendario avanzado, payroll ni cambios automaticos de horario/cobertura.
+- [x] I.18 abre `operational_events` como foundation tecnica interna DB/RLS/RPC/helper con auditoria minimizada, sin UI grande ni mutaciones automaticas de horario/cobertura.
+- [x] I.19 muestra eventos/festivos/competiciones de forma minima en `/app/schedule`, con gestion colapsada para `owner`/`admin`/`manager` y lectura de `coach` sin controles.
+- [x] I.20 deja modeladas horas extra como contexto operativo candidato, separando planificacion, fichaje, diferencias, revision operativa futura y aprobacion legal/payroll futura fuera de alcance.
+- [x] I.21 abre la foundation tecnica minima de horas extra candidatas con DB/RLS/RPC/helper interno y guardrail de fuente, sin UI visible ni mutaciones de horario/fichaje.
+- [x] I.22 anade QA/RLS con rollback y smoke endurecido para roles, tenant, fuentes, estados finales, escritura directa bloqueada y no mutacion de horario/fichaje.
+- [x] I.23 abre la primera superficie visible minima de revision operativa de candidatos de posible exceso en `/app/time`, solo para `owner`/`admin`/`manager`, sin payroll, calculo definitivo ni aprobacion legal.
+- [x] I.24 anade deteccion server-side prudente de candidatos de posible exceso desde contexto existente, disparada manualmente por `owner`/`admin`/`manager`, sin automatismo legal, payroll ni mutacion de fuentes.
+- [x] I.25 cierra trazabilidad operativa prudente de cobertura para cambios y ausencias: `/app/schedule` y `/app/coverage` explican trazas recientes desde cambios, impacto derivado de ausencias y auditoria operativa filtrada, sin resolver cobertura automaticamente.
+- [x] I.26 deja modelada la IA futura como capacidad subordinada a documentos/programacion utiles, permisos, auditoria, privacidad y fuentes canonicas, sin implementar IA real.
+- [x] E.6/I.27 deja modelada la programacion util asociada a documentos y horario como paso previo a cualquier IA: fuentes canonicas, permisos, auditoria, privacidad, asociaciones por fecha/tipo/centro/bloque y limites explicitos.
+- [x] E.7/I.28 abre la base tecnica interna de programacion documental con `document_programming_links`, RLS/RPC/helper y consultas autorizadas por bloque o fecha/tipo, sin UI visible ni IA.
+- [x] E.8/I.29 muestra programacion autorizada desde el detalle de bloque en Horario, con preview/descarga solo por permiso documental.
+- [x] E.9/I.30 valida asociaciones de programacion documental con QA interno rollback y smoke, sin abrir UI documental ni IA.
+- [x] E.10/I.31 convierte esa validacion en runbook manual local/QA para casos controlados de programacion documental autorizada.
+- [x] OD.1/I.32 documenta el cierre de operativa diaria completa para beta interna en `docs/operations/daily-operations-beta-readiness-runbook.md`, sin codigo ni producto nuevo.
+- [x] Cambios y ausencias actualizan cobertura de forma trazable.
+- [x] Cambios de bloque/asignacion/plantilla quedan consultables por `owner`, `admin` y `manager` durante una ventana corta con actor, accion y campos cambiados minimizados.
+- [x] Horas extra no se presentan como nomina ni calculo fiscal.
+- [x] IA queda subordinada a documentos/programacion utiles.
+- [x] Programacion util queda subordinada a documentos/versiones autorizadas, no a IA ni a asignaciones como permiso documental.
 
 #### I.1 - Modelado Documental Seguro De Cambios/Cobertura
 
@@ -2757,6 +7580,1387 @@ Verificacion I.16:
 - [x] `rg -n "service_role" src` sin coincidencias.
 - [x] Guardrail de geolocalizacion/push/cache sin nuevas coincidencias.
 
+#### I.17 - Modelado Seguro De Eventos/Festivos/Competiciones
+
+Estado: documentado el 2026-05-15 como siguiente corte seguro de Fase I tras I.16. No se implementa schema, migraciones, helpers, UI, Server Actions, seeds ni datos reales. El objetivo es cerrar modelo, permisos, estados, retencion e impacto operativo antes de decidir una foundation DB/RLS/RPC minima.
+
+Lectura de alcance:
+
+- [x] `TASKS.md` y `docs/product/roadmap.md` no tenian una task I.17 explicita.
+- [x] Fase I ya nombraba eventos, festivos y competiciones como submodulo pendiente.
+- [x] Fase 4 historica mantenia pendientes eventos internos/externos, competiciones, festivos, voluntariado de festivo e impacto sobre cobertura.
+- [x] La base actual de Horario, Plantillas, Cobertura, Solicitudes, Ausencias, Mi Fichaje y Jornada prevista no debe rehacerse ni convertirse en dependencia dura del corte.
+
+Decision I.17:
+
+- empezar por documentacion/modelado y no por foundation tecnica, porque todavia falta decidir el comportamiento exacto de eventos frente a bloques, festivos, calendario y cobertura;
+- tratar eventos, festivos y competiciones como contexto operativo tenant-scoped del box, no como payroll, RRHH sensible, fichaje, saldos legales, horas extra aprobadas ni cumplimiento legal definitivo;
+- mantener `schedule_blocks` y `schedule_block_assignments` como fuentes canonicas del horario real y cobertura;
+- permitir que un evento impacte la lectura operativa del horario, pero no convertir automaticamente eventos/festivos en bloques, cancelaciones, asignaciones ni solicitudes de cobertura;
+- dejar calendario mensual/anual avanzado, asistencia, voluntariado de festivo, recordatorios, push, geolocalizacion y app nativa para cortes posteriores.
+
+Entidades candidatas sin migrar:
+
+- `box_events`: cabecera tenant-scoped del evento operativo, con tipo, titulo corto, estado, visibilidad, centro opcional, notas minimizadas y fechas de referencia;
+- `box_event_occurrences`: fechas o ventanas concretas si un evento dura varios dias, afecta varios centros o necesita distinguir dia completo de tramo horario;
+- `box_event_schedule_contexts`: relacion futura opcional y derivable con bloques afectados, solo como contexto o revision, no como mutacion automatica del horario;
+- `box_event_responses`: respuesta propia futura de coaches/personas (`interested`, `attending`, `maybe`, `unavailable`, `wants_to_work`) cuando exista un flujo de asistencia o voluntariado;
+- `box_event_audit_events`: historial propio minimizado de cambios de estado, fechas, centros, contexto y respuestas si una fase futura lo implementa.
+
+Tipos y estados candidatos:
+
+- tipos: `holiday`, `closure`, `competition`, `seminar`, `open_day`, `internal_event`, `external_event`, `maintenance`, `community_event`;
+- alcance temporal: `all_day`, `time_window`, `multi_day`;
+- estados: `draft`, `planned`, `confirmed`, `cancelled`, `completed`, `archived`;
+- impacto candidato: `context_only`, `schedule_review_needed`, `coverage_review_needed`, `staffing_needed`;
+- respuesta futura: `interested`, `attending`, `maybe`, `unavailable`, `wants_to_work`, `declined`.
+
+Permisos candidatos:
+
+- `owner`, `admin` y `manager` podran crear, editar, cancelar y archivar eventos operativos del tenant cuando exista foundation tecnica;
+- `coach` podra leer eventos confirmados que afecten a su horario, centro visible o contexto operativo compartido;
+- respuestas propias futuras deben derivar persona desde `auth.uid()` + `organization_id`, sin aceptar `person_profile_id` desde cliente;
+- `center_manager` queda futuro hasta tener frontera por centro en schema/RLS/UX;
+- `document_admin`, `payroll_manager` y `staff` no reciben permisos por herencia en este submodulo.
+
+Relaciones con horario/cobertura:
+
+- Un evento puede explicar por que un dia requiere revisar horario, centro, personal o cobertura.
+- Un festivo puede marcar contexto de dia completo o ventana horaria, pero no cancela bloques ni cambia `required_coaches`.
+- Una competicion o seminario puede requerir un bloque operativo real si se decide cubrirlo con coaches; ese bloque debe crearse de forma explicita en `schedule_blocks`, no como conversion automatica silenciosa.
+- La cobertura no debe tratar `box_events` como restriccion dura. Si el evento reduce disponibilidad o exige cobertura, la resolucion sigue siendo ajuste manual, `change_requests` o ausencias segun corresponda.
+- Si una fase futura muestra contexto en `/app/schedule` o `/app/coverage`, debe ser discreto, accionable y sin duplicar cobertura ni ensuciar la vista.
+
+Retencion, auditoria y privacidad:
+
+- Retencion candidata: eventos operativos 24 meses tras finalizar o archivarse; auditoria/respuestas visibles 180 dias, pendiente de revision legal/privacidad antes de datos reales.
+- Los festivos recurrentes o calendarios base pueden necesitar configuracion separada por tenant/region en una fase futura; no se hardcodean reglas de ningun tenant.
+- Auditoria minima futura: actor derivado, evento, accion, resultado, campos tocados, `created_at` y `retain_until`, sin payloads completos.
+- Datos prohibidos en notas/respuestas: salud, bajas medicas, documentos/justificantes, salario, payroll, datos familiares, sanciones, ubicacion, IP/fingerprint, URLs, tokens, rutas Storage y texto largo sensible.
+- Las respuestas `unavailable` o `wants_to_work` son datos personales operativos y no equivalen a ausencia aprobada, hora extra aprobada ni fichaje.
+
+No incluye I.17:
+
+- schema, migraciones, RLS, RPCs, helpers server-side, UI, navegacion, calendario mensual/anual avanzado o seeds;
+- modificar `schedule_blocks`, `schedule_block_assignments`, plantillas, cobertura, ausencias, fichaje o solicitudes existentes;
+- convertir eventos/festivos en cancelaciones, bloques, asignaciones, ofertas, ausencias o fichajes automaticamente;
+- payroll, horas extra aprobadas, voluntariado legal de festivo, cierres mensuales, documentos firmables, firmas, push, service worker, background sync, caches privadas, geolocalizacion web, app nativa o datos reales/hardcodeados de tenant.
+
+Gates antes de un corte tecnico posterior:
+
+- decidir si la siguiente fase crea solo foundation DB/RLS/RPC o una lectura UI minima;
+- crear migracion incremental con `organization_id` obligatorio, FKs tenant-safe, enums/checks cerrados, RLS y grants desde la primera version;
+- definir helper de permisos y Server Actions/RPCs que revaliden sesion, membership, tenant, rol, centro, fechas y notas;
+- anadir verificacion negativa de otro tenant, rol sin permiso, centro ajeno, respuesta por otra persona, escrituras directas y notas sensibles;
+- regenerar tipos Supabase si se implementa schema;
+- si hay UI, integrarla de forma compacta y secundaria donde aporte contexto, sin pantalla grande nueva salvo que el calendario pase a ser objetivo explicito.
+
+Verificacion I.17:
+
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 34 passed, 13 skipped por falta de credenciales E2E autenticadas.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail de geolocalizacion/push/cache sin nuevas coincidencias.
+- [x] I.17 no cambia `src`, migraciones, seeds, dependencias ni datos reales.
+
+#### I.18 - Base Tecnica Minima De Eventos/Festivos/Competiciones
+
+Estado: implementado el 2026-05-15 como foundation tecnica interna y tenant-scoped. No abre UI grande, calendario mensual/anual, seeds, datos reales ni conversion automatica a horario/cobertura.
+
+Decision I.18:
+
+- usar `operational_events` como nombre real de la tabla, aterrizando el candidato documental `box_events` de I.17 con un nombre mas explicito de contexto operativo;
+- mantener una sola cabecera con ventana temporal (`starts_at`, `ends_at`, `all_day`, `timezone`) para este corte; ocurrencias multi-dia avanzadas, respuestas personales y contexto persistido con bloques quedan futuros;
+- cerrar `event_type` a `holiday`, `closure`, `competition`, `seminar`, `open_day`, `internal_event`, `external_event`, `maintenance` y `community_event`;
+- reducir los estados tecnicos iniciales a `active`, `cancelled` y `archived`; los estados editoriales de I.17 (`draft`, `planned`, `confirmed`, `completed`) quedan fuera hasta que exista UI/workflow;
+- conservar `visibility` como `management`, `staff` o `all_staff`, pero sin dar permisos nuevos a `staff`; en I.18 `coach` lee solo eventos `active` con visibilidad compartida;
+- registrar auditoria minima en `operational_audit_events` con `entity_type = operational_events`, campos tocados minimizados y retencion de 180 dias;
+- mantener retencion candidata de eventos operativos en 24 meses desde finalizacion/cierre segun metadata tecnica, pendiente de revision legal/privacidad antes de datos reales.
+
+Implementacion I.18:
+
+- [x] Crear migracion incremental `supabase/migrations/00037_operational_events_foundation.sql`.
+- [x] Crear tabla `operational_events` con `organization_id` obligatorio, FK tenant-safe opcional a `centers`, actor membership de creacion/actualizacion y constraints de fechas, estados, visibilidad, impacto, timezone, titulo y notas minimizadas.
+- [x] Activar RLS con lectura para `owner`/`admin`/`manager` y lectura de `coach` solo si el evento esta `active` y `visibility` es `staff` o `all_staff`.
+- [x] Revocar escrituras directas a `authenticated`; las mutaciones pasan por RPCs `create_operational_event`, `update_operational_event` y `set_operational_event_status`.
+- [x] Crear helper interno `src/lib/operational-events.ts` para listar, crear, editar y cambiar estado desde servidor, revalidando sesion, tenant, rol, fechas, timezone, visibilidad y notas.
+- [x] Anadir permisos TS `canReadOperationalEvents` y `canManageOperationalEvents` sin activar `staff`, `center_manager`, `document_admin` ni `payroll_manager`.
+- [x] Extender la auditoria operativa corta para aceptar `operational_events` sin guardar payloads completos ni notas.
+- [x] Anadir smoke/guardrail de fuente `tests/smoke/operational-events-foundation.spec.ts`.
+
+No incluye I.18:
+
+- UI grande, calendario mensual/anual, pantalla nueva o copy visible.
+- Modificar `schedule_blocks`, `schedule_block_assignments`, plantillas, cobertura, ausencias, fichaje o solicitudes existentes.
+- Convertir eventos/festivos en cancelaciones, bloques, asignaciones, ofertas, ausencias o fichajes automaticamente.
+- Respuestas personales, voluntariado de festivo, payroll, horas extra aprobadas, saldos legales, documentos firmables, push, service worker, background sync, caches privadas, geolocalizacion web, app nativa, seeds reales o reglas hardcodeadas de tenant.
+
+Verificacion I.18:
+
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 35 passed, 13 skipped por falta de credenciales E2E autenticadas.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail de geolocalizacion/push/cache sin nuevas coincidencias.
+
+#### I.19 - Superficie Minima De Eventos/Festivos/Competiciones
+
+Estado: implementado el 2026-05-15 como superficie visible minima en `/app/schedule`. Hace visible `operational_events` como contexto semanal/del dia, sin calendario mensual/anual avanzado y sin efectos automaticos sobre horario, cobertura, ausencias, fichaje o payroll.
+
+Decision I.19:
+
+- integrar eventos/festivos en Horario porque ayudan como contexto inmediato junto a Jornada prevista;
+- mantener la superficie discreta: resumen semanal por dia, detalle compacto y formulario colapsado solo para gestion;
+- reutilizar `operational_events`, helper server-side y RPCs de I.18 antes de anadir schema nuevo;
+- permitir gestion solo a `owner`, `admin` y `manager`; `coach` solo lee eventos visibles segun RLS/helper y no recibe controles;
+- mantener `organization_id` explicito y permisos server-side antes de crear, editar, cancelar, reactivar o archivar.
+
+Implementacion I.19:
+
+- [x] Anadir Server Actions acotadas en `src/app/(app)/app/schedule/operational-event-actions.ts`.
+- [x] Cargar `operational_events` en `/app/schedule` mediante `listOperationalEvents(...)`, con rango semanal y sin listar en vista mensual.
+- [x] Renderizar tarjeta compacta "Eventos y festivos" debajo de Jornada prevista y antes del tablero.
+- [x] Mostrar resumen por dia y detalle compacto; en movil se prioriza el dia seleccionado.
+- [x] Crear, editar, cancelar, reactivar y archivar desde formularios colapsados solo cuando `canManageOperationalEvents(...)` lo permite.
+- [x] Ajustar el helper para que eventos puntuales sin `ends_at` no se traten como eventos infinitos al filtrar por rango.
+- [x] Anadir smoke/guardrail `tests/smoke/operational-events-surface.spec.ts`.
+
+No incluye I.19:
+
+- Calendario mensual/anual avanzado, pantalla nueva grande o motor de planificacion.
+- Modificar `schedule_blocks`, `schedule_block_assignments`, plantillas, cobertura, ausencias, fichaje, solicitudes o payroll.
+- Convertir eventos/festivos en cancelaciones, bloques, asignaciones, ofertas, ausencias, fichajes o resoluciones automaticas de cobertura.
+- Asistencia, interes, no disponibilidad, "quiero trabajarlo", voluntariado de festivo, documentos firmables, horas extra aprobadas, saldos legales, cumplimiento legal definitivo, geolocalizacion, push, service worker, background sync, caches privadas, app nativa, seeds reales o reglas hardcodeadas de tenant.
+
+Verificacion I.19:
+
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 36 passed, 13 skipped por falta de credenciales E2E autenticadas.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail de geolocalizacion/push/cache sin nuevas coincidencias.
+
+#### I.20 - Modelado Documental Seguro De Horas Extra
+
+Estado: documentado el 2026-05-16 como corte solo documental de Fase I. No se implementa schema, migraciones, helpers, UI, Server Actions, seeds, dependencias ni datos reales. El objetivo es definir que puede significar "hora extra" en BoxOps como contexto operativo candidato y revisable, sin convertirlo en nomina, calculo legal definitivo, saldo laboral, compensacion ni aprobacion payroll.
+
+Lectura de alcance:
+
+- [x] Fase F ya tiene fichaje propio en `/app/time`, correcciones trazadas, vista semanal, automatico web por planificacion, cierre semanal/aprobacion firmada y exporte interno revisable.
+- [x] F.9 ya muestra diferencias operativas entre bloques asignados y fichajes, pero no aprueba horas extra ni calcula nomina.
+- [x] F.14 exporta fichaje como CSV interno revisable, sin horas extra aprobadas ni formato legal definitivo.
+- [x] I.17-I.19 dejan eventos/festivos/competiciones como contexto operativo, pero no voluntariado legal ni horas extra aprobadas.
+- [x] `staff_work_windows` aporta presencia prevista, pero no es contrato, fichaje ni payroll.
+
+Definicion I.20:
+
+- Una "hora extra" en BoxOps queda definida por ahora como un candidato operativo de exceso o diferencia positiva que requiere revision humana.
+- No nace automaticamente por fichar mas minutos que los planificados, por trabajar un festivo, por aceptar una cobertura, por aparecer en un evento, por tener una franja de jornada prevista ni por cierre semanal aprobado.
+- No equivale a aprobacion legal, compensacion, pago, saldo, nomina, devengo ni cumplimiento laboral definitivo.
+- Cualquier uso legal o payroll futuro debe abrir un modulo/capacidad separada, con asesoramiento laboral, permisos explicitos, retencion, exporte y auditoria propios.
+
+Separacion obligatoria:
+
+- Horas planificadas: contexto derivable de `schedule_blocks`, `schedule_block_assignments` y `staff_work_windows`. Son previsiones operativas, no prueba de presencia ni contrato laboral completo.
+- Horas fichadas/trabajadas: contexto derivable de `time_records` y `time_punches` activos, despues de correcciones trazadas. Punches abiertos, sustituidos o anulados no deben convertirse en horas extra finales.
+- Diferencias/alertas operativas: comparaciones entre minutos planificados, fichados, asignaciones, ausencia/evento contextual y cierre semanal. Deben etiquetarse como `overtime_candidate` o "posible exceso", no como hora extra aprobada.
+- Revision o validacion operativa futura: una persona autorizada podria revisar el candidato, rechazarlo o marcarlo como validado operativamente para analisis interno.
+- Aprobacion legal/payroll futura: queda fuera de I.20 y no debe compartir estados, copy ni permisos con la revision operativa.
+
+Entidades candidatas sin migrar:
+
+- `overtime_candidates`: cabecera tenant-scoped del candidato, con `organization_id`, persona afectada, rango temporal, fuente de deteccion, minutos planificados snapshot, minutos fichados snapshot, diferencia candidata, estado operativo y timestamps.
+- `overtime_candidate_sources`: referencias minimizadas a fuentes de contexto como `time_records`, `time_punches` activos, `time_weekly_approvals`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, `absence_requests`/periodos y `operational_events`.
+- `overtime_candidate_events`: auditoria propia minimizada de deteccion, cambio de estado, revision, rechazo, cierre y supersesion.
+- `overtime_candidate_exports`: solo futuro y solo si se necesita exporte interno revisable de candidatos; no debe ser exporte legal/payroll definitivo.
+
+Estados candidatos:
+
+- `detected`: candidato calculado o marcado para revision, sin validacion.
+- `needs_review`: requiere decision operativa porque faltan datos, hay fichaje abierto, hay correcciones pendientes o el contexto es ambiguo.
+- `under_review`: un rol autorizado lo esta revisando.
+- `operationally_validated`: validado como contexto operativo interno, sin implicacion payroll/legal.
+- `operationally_rejected`: descartado por error de fichaje, cambio operativo, ausencia, evento o explicacion interna.
+- `superseded`: reemplazado por un nuevo candidato tras correccion, reapertura semanal o cambio de horario.
+- `closed`: cerrado administrativamente para el periodo revisado, sin promesa legal.
+
+Permisos candidatos:
+
+- La persona afectada puede leer sus propios candidatos y el estado operativo minimizado cuando exista superficie visible futura.
+- `owner`, `admin` y `manager` podrian revisar candidatos operativos del tenant si una foundation tecnica futura lo habilita.
+- `payroll_manager` no recibe acceso por herencia en I.20; cualquier uso payroll requiere capacidad propia y modelo legal separado.
+- `center_manager`, `document_admin` y `staff` no reciben permisos por herencia.
+- Acciones propias deben derivar persona desde `auth.uid()` + `organization_id`; ninguna UI futura debe aceptar `person_profile_id` propio desde cliente.
+
+Relaciones con modelos existentes:
+
+- `time_records`: fuente de registros diarios y estado de jornada; un candidato debe referenciar snapshots de minutos, no editar registros.
+- `time_punches`: solo punches activos y pares entrada/salida cerrados pueden alimentar minutos trabajados; `superseded`/`voided` quedan como historial, no suma vigente.
+- `time_weekly_approvals`: el cierre semanal puede congelar contexto para revision, pero aprobar una semana no aprueba horas extra.
+- `schedule_blocks`: aporta planificacion operativa de bloques reales, sin convertirse en contrato ni payroll.
+- `schedule_block_assignments`: aporta asignaciones `assigned`; cambios aplicados por `change_requests` pueden cambiar la planificacion de referencia, pero no aprueban horas extra.
+- `staff_work_windows`: aporta presencia prevista compartida; no debe usarse como jornada legal ni saldo.
+- Ausencias: una ausencia aprobada o en revision puede explicar una diferencia o excluir contexto, pero no genera ni aprueba horas extra.
+- `operational_events`: un festivo, cierre o competicion aporta contexto; no genera por si solo voluntariado legal ni hora extra aprobada.
+
+Auditoria, retencion y privacidad:
+
+- Toda entidad futura debe incluir `organization_id` obligatorio, RLS desde la primera migracion, mutaciones por RPC/helper acotado y verificacion negativa de tenant/rol.
+- Auditoria minima: actor derivado, candidato, accion, resultado, campos tocados, estado anterior/nuevo, `created_at` y `retain_until`, sin payload completo.
+- Retencion candidata inicial: candidatos cerrados 24 meses y eventos de revision 180 dias, pendiente de revision legal/privacidad antes de datos reales o produccion.
+- Si una fase futura usa candidatos para obligaciones legales, payroll, representantes o Inspeccion, debe definir otra retencion/exporte y no heredar automaticamente la retencion operativa.
+- Datos prohibidos: salario, tarifa, importe, moneda, nomina, conceptos retributivos, datos bancarios/fiscales, diagnosticos, salud, justificantes, documentos, motivos sensibles de ausencias, texto libre largo, ubicacion, IP/fingerprint, coordenadas, Wi-Fi/Bluetooth, signed URLs, rutas Storage, tokens, payloads completos y reglas hardcodeadas de tenant/region.
+
+No incluye I.20:
+
+- schema, migraciones, RLS, RPCs, helpers server-side, UI, navegacion, Server Actions, seeds, datos reales, tipos Supabase ni tests tecnicos nuevos;
+- calculo automatico o definitivo de horas extra reales;
+- aprobacion legal/payroll, compensacion, pago, saldos, devengo, cierre mensual legal, importes, nominas o exporte legal definitivo;
+- modificar fichajes, cierres semanales, horario, asignaciones, cobertura, ausencias, eventos, plantillas o solicitudes;
+- push, service worker, background sync, caches privadas, geolocalizacion, app nativa, reglas regionales o datos hardcodeados de tenant;
+- `service_role` en `src`.
+
+Gates antes de un corte tecnico posterior:
+
+- confirmar nombres finales (`overtime_candidates` frente a `overtime_entries`) y mantener semantica de candidato operativo;
+- crear foundation DB/RLS/RPC con `organization_id`, FKs tenant-safe, enums/checks cerrados, escritura directa bloqueada y pruebas negativas;
+- crear helper server-side que derive tenant/persona desde sesion y no acepte IDs propios desde cliente;
+- definir un calculo server-side prudente para planificado vs fichado que trate fichajes abiertos/correcciones pendientes como `needs_review`;
+- abrir, si procede, una superficie minima visible como alertas operativas, no como pantalla payroll;
+- anadir QA/hardening para no introducir `service_role`, `STL`, geolocalizacion/push/cache, importes, nomina, saldos legales ni escrituras directas a fichajes/horario.
+
+Verificacion I.20:
+
+- [x] No se toca `src`.
+- [x] No se crean migraciones, snippets SQL, seeds ni dependencias.
+- [x] Documentacion actualizada en `TASKS.md`, `docs/product/roadmap.md`, `PROJECT_BRIEF.md`, `docs/architecture/domain-model.md`, `docs/architecture/security-baseline.md`, `docs/architecture/personal-data-permissions.md`, `docs/operations/legal-and-privacy-notes.md` y `docs/product/ux-principles.md`.
+
+#### I.21 - Base Tecnica Minima De Horas Extra
+
+Estado: implementado el 2026-05-16 como foundation interna DB/RLS/RPC y helper server-side para candidatos operativos de exceso/diferencia. No abre UI visible, Server Actions de producto, seeds, calculo legal definitivo, aprobacion legal/payroll, importes, saldos ni compensaciones. El objetivo es poder registrar y consultar senales revisables con tenant safety, manteniendo el fichaje y el horario como fuentes de contexto de solo lectura.
+
+Lectura de I.20 aplicada:
+
+- [x] El nombre final del corte tecnico es `overtime_candidates`, no `overtime_entries`.
+- [x] La entidad representa posible exceso positivo, no una hora extra aprobada.
+- [x] Se separan minutos planificados snapshot, minutos trabajados snapshot, diferencia candidata y estado operativo.
+- [x] `time_records`, `time_punches`, `time_weekly_approvals`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, ausencias y eventos pueden ser fuentes/contexto, pero no se mutan.
+- [x] `owner`, `admin` y `manager` revisan operativamente; lectura propia minimizada queda protegida por RLS.
+
+Implementacion I.21:
+
+- [x] `supabase/migrations/00039_overtime_candidates_foundation.sql` crea `overtime_candidates`, `overtime_candidate_sources` y `overtime_candidate_events`; `00040_overtime_candidates_retention_guard.sql` ajusta la ventana de retencion a la ultima revision/cierre.
+- [x] Todas las tablas tienen `organization_id` obligatorio, FKs tenant-safe donde aplica, indices de consulta y retencion candidata.
+- [x] `overtime_candidates` guarda `person_profile_id`, rango de fechas, `timezone`, `detection_source`, `planned_minutes_snapshot`, `worked_minutes_snapshot`, `candidate_minutes` generado, estado operativo y trazas de creacion/revision/cierre.
+- [x] `overtime_candidate_sources` referencia fuentes minimizadas por `source_type` + `source_id` y valida pertenencia al tenant/persona cuando la fuente es personal.
+- [x] `overtime_candidate_events` audita deteccion, fuentes anadidas, inicio de revision, cambios de estado, validacion/rechazo operativo, supersesion y cierre con `changed_fields` minimizado.
+- [x] RLS permite lectura de candidatos propios y lectura/revision operativa para `owner`, `admin` y `manager`; no concede permisos de revision a roles especializados por herencia.
+- [x] Escritura directa queda bloqueada para `authenticated`; las mutaciones pasan por RPCs `create_overtime_candidate_signal(...)`, `add_overtime_candidate_source(...)` y `set_overtime_candidate_status(...)`.
+- [x] `list_overtime_candidates(...)` consulta candidatos con filtros acotados por tenant, persona, estado, periodo y limite.
+- [x] `src/lib/overtime-candidates.ts` anade helper interno con sesion Supabase normal, validacion server-side de tenant/rol/persona/periodo/minutos/estado/fuente y llamadas a RPC.
+- [x] `src/lib/auth/permissions.ts` anade `canReadOvertimeCandidates(...)` y `canReviewOvertimeCandidates(...)`, con revision limitada a `owner`, `admin` y `manager`.
+- [x] `tests/smoke/overtime-candidates-foundation.spec.ts` protege fuente: sin mutaciones a horario/fichaje, sin escrituras directas a candidatos, sin `service_role`, sin STL, sin geolocalizacion/push/cache y sin campos economicos en foundation/helper.
+
+Estados I.21:
+
+- `detected`
+- `needs_review`
+- `under_review`
+- `operationally_validated`
+- `operationally_rejected`
+- `superseded`
+- `closed`
+
+Fuentes I.21:
+
+- `time_record`
+- `time_punch`
+- `time_weekly_approval`
+- `schedule_block`
+- `schedule_block_assignment`
+- `staff_work_window`
+- `absence_request`
+- `absence_request_period`
+- `operational_event`
+- `manual_context`
+
+No incluye I.21:
+
+- UI visible de revision de horas extra;
+- Server Actions de producto;
+- calculo automatico o definitivo de horas extra reales;
+- aprobacion legal/payroll, nominas, importes, salarios, compensaciones, saldos, cierre mensual legal o exporte legal definitivo;
+- edicion automatica de fichajes, cierres semanales, horario, asignaciones, cobertura, ausencias o eventos;
+- cambios en `schedule_blocks`, `schedule_block_assignments`, `time_records` o `time_punches` salvo referencias validadas de lectura;
+- push, service worker, background sync, caches privadas, geolocalizacion web, app nativa, reglas legales/regionales hardcodeadas o datos STL;
+- `service_role` en `src`.
+
+Siguientes cortes seguros:
+
+- Foundation QA/RLS con verificacion SQL negativa de otro tenant, rol sin permiso, persona ajena, fuente ajena, escritura directa y candidato cerrado.
+- Helper server-side ampliado solo si se necesita calcular snapshots desde fichaje/planificacion; fichajes abiertos, correcciones pendientes y semanas reabiertas deben quedar como `needs_review`.
+- Superficie minima visible, si procede, cerca de Fichaje/Inicio de gestion o Estadisticas, con copy de "posible exceso" y nunca de aprobacion legal.
+- QA/hardening posterior para mantener fuera importes, nomina, saldos, compensaciones, geolocalizacion/push/cache y mutaciones directas de horario/fichaje.
+
+Verificacion I.21:
+
+- [x] `npx supabase migration up --local`.
+- [x] `npx supabase db lint --local`.
+- [x] `npx supabase migration list --local` muestra `00039` y `00040` aplicadas localmente.
+- [x] `npm run supabase:types`.
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 37 passed, 13 skipped por falta de credenciales E2E autenticadas.
+- [x] Smoke especifico `overtime-candidates-foundation.spec.ts`: 1 passed.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias.
+
+#### I.22 - QA/RLS Y Hardening Tecnico De Horas Extra Candidatas
+
+Estado: implementado el 2026-05-16 como QA tecnico de la foundation I.21. No abre UI visible, Server Actions de producto, calculo automatico definitivo, payroll, importes, saldos, compensaciones, aprobacion legal ni exporte legal. El objetivo es demostrar con verificacion reproducible que `overtime_candidates` sigue siendo un modelo interno de candidatos operativos revisables y que las RPC/RLS cierran tenant, rol, persona, fuente y estados finales.
+
+Alcance I.22:
+
+- [x] Revisar I.21 contra `TASKS.md`, roadmap, domain model, security baseline, matriz de permisos personales, legal/privacy notes y UX principles.
+- [x] Crear `supabase/snippets/overtime-candidates-rls-verification.sql` como verificacion SQL reejecutable con transaccion y `ROLLBACK`.
+- [x] Verificar paths positivos: `owner`, `admin` y `manager` pueden crear senales; roles de revision pueden anadir fuentes, listar candidatos del tenant y cambiar estado operativo.
+- [x] Verificar lectura propia minimizada: la persona/coach afectada lee solo sus candidatos; otro coach del mismo tenant no lee ni fuerza `person_profile_id` ajeno.
+- [x] Verificar negativos de rol: `coach` no crea, no revisa y no anade fuentes; `payroll_manager` no hereda lectura tenant-wide ni revision.
+- [x] Verificar negativos de tenant: otro tenant no lee candidatos, fuentes ni eventos, no lista por RPC y no referencia candidatos/fuentes de tenant ajeno.
+- [x] Verificar fuentes: fuentes personales como `time_record`, `time_punch`, `schedule_block_assignment` y `staff_work_window` deben pertenecer a la persona afectada; fuentes de otra persona u otro tenant se rechazan; `operational_event` tambien se valida por tenant.
+- [x] Verificar estados finales: candidatos `closed` o `superseded` no aceptan nuevas fuentes ni cambios de estado.
+- [x] Verificar escritura directa bloqueada para `authenticated` sobre `overtime_candidates`, `overtime_candidate_sources` y `overtime_candidate_events` mediante `INSERT`, `UPDATE` y `DELETE`.
+- [x] Verificar que las operaciones de candidatos no mutan `schedule_blocks`, `schedule_block_assignments`, `time_records` ni `time_punches` usando snapshot antes/despues.
+- [x] Endurecer `tests/smoke/overtime-candidates-foundation.spec.ts` para exigir el snippet RLS, rollback, permisos, no UI de candidatos, no escrituras directas a tablas de candidatos desde `src`, no `service_role`, no STL, no geolocalizacion/push/cache y ausencia de campos economicos en foundation/helper.
+
+No incluye I.22:
+
+- UI visible de revision de horas extra;
+- Server Actions de producto o rutas nuevas;
+- calculo automatico/definitivo desde fichajes u horarios;
+- aprobacion legal/payroll, nominas, importes, salarios, compensaciones, saldos, cierre mensual legal o exporte legal definitivo;
+- edicion automatica de fichajes, cierres semanales, horarios, asignaciones, cobertura, ausencias o eventos;
+- push, service worker, background sync, caches privadas, geolocalizacion web, app nativa, reglas legales/regionales hardcodeadas o datos STL;
+- `service_role` en `src`.
+
+Verificacion I.22:
+
+- [x] `npx supabase migration up --local` pasa; la base local ya estaba al dia.
+- [x] `npx supabase db lint --local` pasa sin errores de schema.
+- [x] `supabase/snippets/overtime-candidates-rls-verification.sql` ejecutado contra Supabase local con `ROLLBACK`.
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 37 passed, 13 skipped por condiciones/credenciales E2E del suite.
+- [x] Smoke especifico `overtime-candidates-foundation.spec.ts`: 1 passed.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin coincidencias en `src`.
+
+#### I.23 - Primera Superficie Visible De Revision Operativa De Horas Extra Candidatas
+
+Estado: implementado el 2026-05-16 como primera superficie visible minima en `/app/time`. Abre una cola discreta y protegida para revisar candidatos operativos de posible exceso, sin convertirlos en payroll, calculo definitivo, aprobacion legal, saldo, compensacion, exporte legal ni mutacion de fichaje/horario.
+
+Alcance I.23:
+
+- [x] Revisar I.20-I.22 contra `TASKS.md`, roadmap, domain model, security baseline, matriz de permisos personales, legal/privacy notes y UX principles.
+- [x] Integrar en `/app/time` una seccion densa y administrativa `Candidatos operativos de posible exceso`, visible solo para `owner`, `admin` y `manager`.
+- [x] Listar candidatos del tenant con `listOvertimeCandidates(...)`, limite acotado y referencias minimizadas de persona afectada.
+- [x] Mostrar solo datos operativos minimizados: persona afectada, rango, minutos planificados snapshot, minutos trabajados snapshot, diferencia candidata, estado operativo, fuente de deteccion y fechas de creacion/revision/cierre.
+- [x] Permitir cambios de estado operativos mediante Server Action minima que delega en `setOvertimeCandidateStatus(...)`.
+- [x] Mantener `closed` y `superseded` no accionables en UI; no se ofrece `superseded` como accion visible.
+- [x] Ocultar cola tenant-wide y acciones de revision a `coach`; no abrir lectura propia visible en este corte.
+- [x] Confirmar que `payroll_manager` no hereda cola, lectura tenant-wide ni acciones de revision por ese rol.
+- [x] Mantener copy de "posible exceso", "candidato operativo" y "pendiente de revision"; evitar "hora extra aprobada".
+- [x] Anadir estados vacio/error prudentes sin abrir modulo grande, landing ni hero.
+- [x] Endurecer `tests/smoke/overtime-candidates-foundation.spec.ts` para cubrir la nueva superficie visible por rol cuando haya credenciales E2E, copy prohibido, no escrituras directas a tablas de candidatos desde UI/actions y guardrails de no `service_role`, STL, geolocalizacion/push/cache.
+
+No incluye I.23:
+
+- calculo automatico o definitivo de horas extra reales;
+- creacion manual visible de candidatos;
+- aprobacion legal/payroll, nominas, importes, salarios, compensaciones, saldos, cierre mensual legal o exporte legal definitivo;
+- edicion automatica de fichajes, cierres semanales, horarios, asignaciones, cobertura, ausencias o eventos;
+- escritura directa desde UI/actions sobre `overtime_candidates`, `overtime_candidate_sources` u `overtime_candidate_events`;
+- lectura tenant-wide para `coach` o `payroll_manager`;
+- push, service worker, background sync, caches privadas, geolocalizacion web, app nativa, reglas legales/regionales hardcodeadas o datos STL;
+- `service_role` en `src`.
+
+Verificacion I.23:
+
+- [x] `npx supabase migration up --local`: base local al dia.
+- [x] `npx supabase db lint --local`: sin errores de schema.
+- [x] `supabase/snippets/overtime-candidates-rls-verification.sql` ejecutado contra Supabase local con `ROLLBACK`.
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 37 passed, 18 skipped por condiciones/credenciales E2E del suite.
+- [x] Smoke especifico `overtime-candidates-foundation.spec.ts`: 1 passed, 5 skipped por credenciales E2E.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin coincidencias nuevas en `src`.
+
+#### I.24 - Deteccion Operativa Prudente De Candidatos De Posible Exceso
+
+Estado: implementado el 2026-05-16 como deteccion server-side minima y manual desde `/app/time`. El corte crea candidatos operativos de posible exceso solo cuando hay una diferencia positiva clara entre minutos planificados snapshot y minutos trabajados snapshot. No convierte el resultado en payroll, calculo definitivo, aprobacion legal, compensacion, saldo ni exporte legal.
+
+Alcance I.24:
+
+- [x] Revisar `PROJECT_BRIEF.md`, `TASKS.md`, roadmap, security baseline, domain model, matriz de permisos personales, legal/privacy notes y UX principles antes de tocar codigo.
+- [x] Crear `src/lib/overtime-candidate-detection.ts` como helper server-side acotado con sesion Supabase normal y permisos previos.
+- [x] Leer solo contexto existente de `time_records`, `time_punches`, `time_weekly_approvals`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows` y correcciones de fichaje como contexto de prudencia.
+- [x] Generar candidatos solo con diferencia positiva clara entre snapshot planificado y snapshot trabajado.
+- [x] Enviar fichajes abiertos, correcciones pendientes/aprobadas, semanas reabiertas o datos incompletos a `needs_review`; nunca a validacion automatica.
+- [x] Crear senales con `createOvertimeCandidateSignal(...)` y fuentes con `addOvertimeCandidateSource(...)`; ajustar estado prudente con `setOvertimeCandidateStatus(...)` cuando aplica.
+- [x] Mantener idempotencia por persona, rango, fuente y snapshots para no duplicar candidatos obvios.
+- [x] Anadir Server Action minima protegida para disparar la deteccion desde `/app/time`.
+- [x] Integrar el control discreto `Detectar posibles excesos` solo para `owner`, `admin` y `manager`.
+- [x] Mostrar resultado minimo: creados, ya existentes e ignorados por datos insuficientes.
+- [x] Endurecer smoke guardrail para permisos, no mutaciones de fuentes y copy prohibido.
+
+No incluye I.24:
+
+- payroll, importes, salarios, compensaciones, saldos, cierre mensual legal ni exporte legal;
+- calculo definitivo, aprobacion legal, aprobacion payroll ni validacion automatica;
+- cron, scheduler, background job, automatismo permanente ni aprobacion por cierre semanal;
+- mutaciones sobre `time_records`, `time_punches`, `schedule_blocks`, `schedule_block_assignments`, `staff_work_windows`, ausencias ni eventos;
+- lectura tenant-wide o acciones para `coach` o `payroll_manager` por herencia de rol;
+- `service_role` en `src`, STL hardcodeado, geolocalizacion, push, service worker, background sync ni caches privadas.
+
+Verificacion I.24:
+
+- [x] `npx supabase migration up --local`: base local al dia.
+- [x] `npx supabase db lint --local`: sin errores de schema.
+- [x] `supabase/snippets/overtime-candidates-rls-verification.sql` ejecutado contra Supabase local con `ROLLBACK`.
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 37 passed, 18 skipped por condiciones/credenciales E2E del suite.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin coincidencias nuevas en `src`.
+
+#### I.25 - Cierre Prudente De Trazabilidad Operativa De Cobertura
+
+Estado: implementado el 2026-05-16 como cierre minimo de lectura y UI para explicar por que una cobertura cambio o esta en riesgo. El corte mantiene `schedule_blocks` y `schedule_block_assignments` como fuente canonica del horario real, calcula ausencias al vuelo y no crea modelo grande nuevo de impactos.
+
+Auditoria previa:
+
+- `/app/schedule`, `/app/coverage`, Inicio y `/app/stats` ya derivaban cobertura desde `schedule_blocks`, `schedule_block_assignments`, coaches/personas/memberships y `calculateScheduleCoverageByBlock(...)`.
+- I.16 ya cruzaba `absence_requests` y `absence_request_periods` mediante `listOperationalAbsenceScheduleImpacts(...)`, sin persistir `absence_schedule_impacts`.
+- `change_requests` y `change_request_events` ya aportaban workflow y trazabilidad de solicitudes/ofertas de cobertura, pero no eran fuente canonica de horario.
+- `operational_audit_events` ya registraba cambios de bloques, asignaciones y plantillas con retencion corta; I.25 anade una lectura filtrada solo para trazabilidad de cobertura porque la lectura general de auditoria sigue limitada a `owner`/`admin`.
+
+Alcance I.25:
+
+- [x] Crear `supabase/migrations/00041_coverage_traceability_audit_read.sql` con RPC read-only `list_coverage_trace_audit_events(...)`, filtrada por tenant, bloque, entidad operativa y `retain_until > now()`.
+- [x] Permitir esa lectura filtrada a `owner`, `admin` y `manager`; `coach` y `payroll_manager` no heredan acceso.
+- [x] Crear `src/lib/coverage-traceability.ts` como helper server-side que fusiona, por bloque, impacto derivado de ausencias, estados/eventos de `change_requests` y auditoria operativa minimizada.
+- [x] No leer ni mostrar `reason_summary`; la UI solo muestra tipo/estado/eventos y campos tocados minimizados.
+- [x] Mostrar "Trazabilidad operativa" en los paneles de detalle de `/app/schedule` y `/app/coverage` para roles operativos de gestion.
+- [x] Mantener Inicio y `/app/stats` como superficies agregadas: siguen calculando riesgos/cobertura desde las mismas fuentes canonicas y el impacto derivado existente, sin abrir un panel adicional.
+- [x] Anadir `tests/smoke/coverage-traceability.spec.ts` para proteger tenant safety, roles, ausencia de mutaciones, ausencia de `service_role`, ausencia de STL y bloqueo de geo/push/cache.
+
+No incluye I.25:
+
+- payroll, importes, salarios, compensaciones, saldos, cierre legal ni exporte legal;
+- IA, recomendaciones automaticas, scheduler, cron, background job ni automatismo permanente;
+- persistir `absence_schedule_impacts` ni crear un modelo nuevo de cobertura;
+- mutar fichajes, horas extra, ausencias, `schedule_blocks`, `schedule_block_assignments`, plantillas o `change_requests`;
+- resolver cobertura automaticamente, crear ofertas/targets o asignar coaches sin accion explicita existente;
+- ampliar acceso a `coach`, `payroll_manager` o roles especializados futuros;
+- `service_role` en `src`, STL hardcodeado, geolocalizacion, push, service worker, background sync ni caches privadas.
+
+Verificacion I.25:
+
+- [x] `npx supabase migration up --local`.
+- [x] `npx supabase db lint --local`.
+- [x] `npm run typecheck`.
+- [x] `npm run lint`.
+- [x] `npm run build`.
+- [x] `npm run test:smoke`: 38 passed, 18 skipped por condiciones/credenciales E2E del suite.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin coincidencias nuevas en `src`.
+
+#### I.26 - Modelado Prudente De IA Subordinada A Documentos Y Programacion Util
+
+Estado: documentado el 2026-05-16 como corte de producto/arquitectura. No implementa IA real, no crea migraciones, no toca `src`, no anade SDKs, prompts runtime, embeddings, vector DB, jobs, cron ni UI visible.
+
+Objetivo I.26:
+
+- [x] Dejar claro que IA solo puede entrar cuando existan documentos/programacion utiles, fuentes canonicas claras, permisos, grants, auditoria, privacidad y revision legal suficientes.
+- [x] Mantener IA fuera del MVP operativo actual: cambios/cobertura, ausencias, eventos, horas extra, fichaje y horario no deben depender de IA.
+- [x] Evitar que IA contamine decisiones operativas: no decide cobertura, no aprueba solicitudes, no calcula payroll, no valida horas extra y no sustituye revision humana.
+
+Encaje futuro auditado:
+
+- [x] Documentos/programacion: la fuente candidata debe ser documental, tenant-scoped y versionada. `documents` con `document_scope = programming`, `document_versions`, `document_subjects` y `document_access_grants` son la base natural si una fase futura usa contenido autorizado.
+- [x] Horario real: `schedule_blocks` y `schedule_block_assignments` pueden aportar contexto operativo de fecha, centro, tipo de actividad, coach y bloque, pero no son motor de contenido deportivo ni permiso documental por si solos.
+- [x] Grants y permisos: cualquier consulta asistida debe resolver sesion, organizacion activa, membership, rol/capacidad y grants documentales antes de leer contenido; `owner`, `admin` y `manager` no heredan acceso a todo documento por ser roles altos.
+- [x] Auditoria futura: cualquier lectura asistida de contenido privado debe dejar rastro minimizado de actor, documento/version, resultado permitido/denegado y proposito, sin guardar prompts completos, respuestas largas, URLs firmadas, rutas Storage, tokens ni contenido documental.
+- [x] Privacidad/legal: prompts, respuestas, retencion, logs, proveedor, transferencia de datos y entrenamiento deben tener decision explicita antes de datos reales.
+
+Casos candidatos permitidos en una fase futura:
+
+- [x] Resumen de programacion autorizada por fecha, clase, tipo de actividad o bloque.
+- [x] Consulta sobre documentos/programacion solo con permisos y grants vigentes.
+- [x] Ayuda interna para preparar clases usando contenido autorizado y contexto operativo del bloque.
+- [x] Busqueda o explicacion de contenido autorizado, citando o enlazando la fuente documental cuando exista.
+
+Casos prohibidos:
+
+- [x] Decisiones automaticas de cobertura, asignacion o sustitucion de coaches.
+- [x] Aprobacion de cambios, ausencias, fichajes, correcciones, cierres semanales u horas extra.
+- [x] Payroll, nominas, importes, compensaciones, saldos, reglas fiscales o calculos legales definitivos.
+- [x] Inferencias sensibles sobre salud, disciplina, rendimiento laboral, ubicacion, ausencias, sanciones o situacion personal.
+- [x] Uso de datos, documentos, prompts o resultados de otro tenant.
+- [x] Entrenamiento, fine-tuning o evaluacion con datos privados del tenant sin decision explicita de producto, seguridad, privacidad y legal.
+
+No incluye I.26:
+
+- IA funcional, llamadas a OpenAI/LLM, embeddings, RAG, vector search, `pgvector`, prompts runtime, SDKs, API routes, helpers, Server Actions, jobs, cron, scheduler o UI visible;
+- nuevas tablas, migraciones, policies, buckets, seeds, snippets SQL o datos reales;
+- cambios en horario, fichaje, ausencias, cambios, cobertura, documentos ni horas extra;
+- `service_role` en `src`, STL hardcodeado, geolocalizacion, push, service worker, background sync o caches privadas.
+
+Gates antes de cualquier implementacion futura:
+
+- [ ] Programacion/documentos visibles y utiles ya modelados en producto, no solo buckets/rutas internas.
+- [ ] Fuentes canonicas decididas para contenido de programacion, con versionado y relacion segura a fecha/tipo/bloque cuando aplique.
+- [ ] Permisos por rol/capacidad/grant definidos y probados con acceso denegado de otro tenant y rol sin permiso.
+- [ ] Auditoria minimizada de acceso asistido decidida antes de leer contenido privado.
+- [ ] Politica de prompts/respuestas/logs/retencion/proveedor revisada con privacidad/legal.
+- [ ] Decision explicita sobre prohibicion o uso de entrenamiento/fine-tuning con datos privados.
+
+Verificacion I.26:
+
+- [x] Corte documental: no se toca `src`, migraciones, seeds ni rutas.
+- [x] No se ejecuta build completo porque no hay cambios de codigo.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin coincidencias nuevas en `src`.
+- [x] `git diff` revisado para confirmar que el corte propio es documental. Nota: el worktree ya tenia cambios previos en docs, `src`, migraciones y tests antes de I.26; no se revierten.
+
+#### E.6 / I.27 - Modelado De Programacion Util Asociada A Documentos Y Horario
+
+Estado: documentado el 2026-05-16 como fase prudente de producto/arquitectura. Es programacion/documentos utiles, no IA. No implementa IA funcional, embeddings, RAG, vector search, `pgvector`, prompts runtime, SDKs, jobs, cron, rutas, UI visible, subida real desde app, migraciones ni cambios en `src`.
+
+Objetivo E.6/I.27:
+
+- [x] Convertir el gate de I.26 en una base util concreta: programacion versionada, autorizada y enlazable al horario.
+- [x] Mantener `documents` con `document_scope = programming` como cabecera canonica de programacion, y `document_versions` como version canonica consultable/descargable cuando el usuario tenga permiso.
+- [x] Definir como se relaciona programacion con fecha, tipo de actividad, centro opcional y `schedule_blocks` cuando aplique, sin convertir el horario en repositorio de contenido.
+- [x] Reforzar que `schedule_block_assignments` es contexto operativo de quien cubre o prepara un bloque, no permiso documental.
+- [x] Preparar la base para una UI futura de "ver programacion" sin abrir todavia listado/subida visible ni ayuda asistida.
+
+Fuentes canonicas y asociaciones:
+
+- [x] Cabecera: `documents` con `document_scope = programming`, `organization_id`, sensibilidad, estado y titulo operativo.
+- [x] Contenido/version: `document_versions` en estado `active`/`archived` como version canonica; la UI futura debe enlazar a una version concreta o resolver `current_version_id`.
+- [x] Sujetos/contexto: `document_subjects` puede asociar programacion a `class_type`, `center` y `schedule_block`; E.7/I.28 anade `document_programming_links` para fecha/rango sin bloque y combinaciones tipo/centro/bloque antes de cualquier UI.
+- [x] Grants: `document_access_grants` define lectura de metadata, preview, descarga o gestion; los grants pueden ser por persona, membership, rol o capacidad y no nacen de una asignacion.
+- [x] Auditoria: `document_access_events` registra preview/descarga ya en E.5; una UI futura de programacion debe reutilizar rutas controladas o mantener el mismo nivel de auditoria.
+- [x] Horario: `schedule_blocks` aporta fecha, hora, centro y tipo de actividad; `schedule_block_assignments` aporta coach/persona asignada solo como contexto operativo.
+
+Permisos y privacidad:
+
+- [x] Cualquier lectura de programacion debe resolver sesion, organizacion activa, membership activa y permiso documental antes de exponer metadata, preview o descarga.
+- [x] `owner`, `admin` y `manager` no heredan acceso global a programacion privada por ser roles altos; pueden gestionar documentos no sensibles de programacion solo donde la capacidad/grant lo permita.
+- [x] Un coach asignado a un bloque puede ver programacion del bloque solo si existe grant/capacidad/sujeto que lo autorice; estar en `schedule_block_assignments` no basta.
+- [x] Los documentos de programacion no deben contener datos sensibles de salud, disciplina, rendimiento laboral, ubicacion, nomina, salario, bajas, sanciones ni motivos personales.
+- [x] Mantener uso cross-tenant prohibido: documento, version, sujetos, grants, centro, tipo, bloque y asignaciones deben pertenecer al mismo `organization_id`.
+
+Casos iniciales permitidos:
+
+- [x] Ver programacion autorizada desde un bloque de horario, resolviendo documento/version/grant antes de abrir preview o descarga.
+- [x] Consultar programacion por fecha y tipo de actividad cuando exista asociacion canonica y permiso documental vigente.
+- [x] Asociar documentos existentes a bloque, tipo de actividad, centro opcional o fecha en un modelo futuro tenant-scoped.
+- [x] Preparar una UI futura de "ver programacion" que muestre fuente, fecha/version y estado de permiso sin copiar contenido a tablas de horario.
+
+Casos fuera de alcance:
+
+- [x] IA funcional, llamadas a LLM, embeddings, vector search/RAG, `pgvector`, prompts runtime, SDKs, jobs, cron, scheduler o UI de IA.
+- [x] Subida real visible desde app si no queda preparada en una task tecnica posterior con permisos, validacion, estados y pruebas negativas.
+- [x] Decisiones automaticas de cobertura, asignacion, sustitucion, aprobaciones, cambios, ausencias, fichaje, cierres semanales u horas extra.
+- [x] Payroll, nomina, importes, compensaciones, saldos, reglas fiscales o calculos legales definitivos.
+- [x] Documentos firmables, boton "Firmar", solicitudes de firma o evidencias/snapshots.
+- [x] Datos sensibles de salud, disciplina, rendimiento, ubicacion, sanciones, bajas, documentos medicos o situacion personal.
+- [x] Uso cross-tenant, entrenamiento/fine-tuning o evaluacion con datos privados sin decision explicita futura.
+
+Gates antes de una task tecnica:
+
+- [ ] Decidir si `document_subjects` actual basta para fecha/tipo/bloque o si hace falta tabla puente especifica para programacion por fecha sin bloque.
+- [ ] Definir consultas server-side de programacion autorizada por bloque, fecha y tipo con tests negativos de tenant, rol sin permiso y asignacion sin grant.
+- [ ] Decidir copy/UX de falta de permiso: "no hay programacion disponible para tu permiso" sin sugerir pedir IA ni mostrar contenido parcial.
+- [ ] Definir auditoria minima para metadata listada si se considera sensible, no solo preview/descarga.
+
+Verificacion E.6/I.27:
+
+- [x] Corte documental: no se toca `src`, migraciones, seeds ni rutas.
+- [x] No se ejecuta build completo porque no hay cambios de codigo.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias en `src`.
+- [x] `git diff` revisado para confirmar que el corte propio es documental. Nota: el worktree ya tenia cambios previos en docs, `src`, migraciones y tests; no se revierten.
+
+#### E.7 / I.28 - Base Tecnica Interna De Programacion Documental Asociada A Horario
+
+Estado: implementado el 2026-05-16 como foundation interna. Es programacion documental asociada a horario, no IA. No abre subida visible, pagina documental, documentos firmables, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs, cron ni UI de IA.
+
+Decision E.7/I.28:
+
+- [x] `document_subjects` se mantiene para sujetos/contexto simple, pero no basta para fecha/rango + tipo/centro/bloque con consultas autorizadas por horario.
+- [x] Crear `document_programming_links` como tabla puente tenant-scoped entre `documents`/`document_versions` de `document_scope = programming` y un rango de fechas, con `class_type_id`, `center_id` y `schedule_block_id` opcionales.
+- [x] Mantener `documents` y `document_versions` como fuente canonica; la asociacion apunta a una version concreta `active`/`archived`.
+- [x] Mantener `document_access_grants` y `can_access_document(...)` como permiso real para metadata, preview y descarga.
+- [x] Mantener `document_subjects` como sujetos/contexto cuando aplique; no se borra ni se sustituye.
+- [x] Tratar `schedule_blocks` como contexto operativo de fecha, hora, centro y tipo.
+- [x] Tratar `schedule_block_assignments` solo como contexto operativo; no aparece en permisos ni en grants documentales.
+- [x] Anadir capacidades `programming_content_read` y `programming_content_manage` como valores validos de grants, siempre mediadas por una fila explicita de `document_access_grants`.
+
+Implementacion E.7/I.28:
+
+- [x] Migracion `supabase/migrations/00042_document_programming_schedule_links.sql`.
+- [x] Tabla `document_programming_links` con `organization_id`, `document_id`, `document_version_id`, `starts_on`, `ends_on`, `class_type_id`, `center_id`, `schedule_block_id`, `status`, `created_by_user_id`, `updated_by_user_id`, `created_at` y `updated_at`.
+- [x] Validacion DB: solo documentos `programming`, versiones `active`/`archived`, rango maximo inicial de 367 dias, FKs tenant-safe y coherencia de centro/tipo si se enlaza un bloque concreto.
+- [x] RLS estricta: lectura solo de asociaciones activas cuando `can_access_document(..., 'read_metadata')` permite ver el documento/version; sin `INSERT`, `UPDATE` ni `DELETE` directos para `authenticated`.
+- [x] RPCs internas: `create_document_programming_link`, `set_document_programming_link_status`, `list_document_programming_for_block` y `list_document_programming_for_context`.
+- [x] Helper server-side `src/lib/document-programming.ts` con sesion Supabase SSR normal y sin `service_role`.
+
+Casos permitidos cubiertos:
+
+- [x] Listar programacion documental autorizada por bloque con filtro de permiso documental.
+- [x] Listar programacion documental autorizada por fecha, tipo y centro opcional.
+- [x] Preparar una futura UI "ver programacion" con fuente documental, version y permisos claros.
+- [x] Asociar documentos existentes a bloque, tipo, centro o fecha desde modelo tecnico interno.
+
+Fuera de alcance mantenido:
+
+- [x] IA funcional, embeddings/vector search/RAG/pgvector, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Subida visible de documentos, pagina documental completa o documentos firmables.
+- [x] Decisiones automaticas de cobertura, aprobaciones, payroll, datos sensibles, geolocalizacion o uso cross-tenant.
+
+Verificacion E.7/I.28:
+
+- [x] `npx supabase migration up --local`
+- [x] `npx supabase db lint --local`
+- [x] `npm run supabase:types`
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/document-programming-foundation.spec.ts`
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias.
+- [x] `git diff` revisado para confirmar que no se abrio IA ni UI fuera de alcance.
+
+#### E.8 / I.29 - Primera Superficie Visible Minima De Programacion Autorizada Desde Horario
+
+Estado: implementado el 2026-05-16 como UI minima de consulta desde horario. Es programacion documental autorizada, no IA. No crea subida visible, pagina documental completa, documentos firmables, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs ni cron.
+
+Decision E.8/I.29:
+
+- [x] Reutilizar la foundation E.7/I.28 y el helper server-side `listDocumentProgrammingForBlock(...)`.
+- [x] Mostrar la programacion autorizada dentro del detalle de bloque existente de `/app/schedule`, como seccion secundaria y operativa.
+- [x] Mantener `documents` y `document_versions` como fuente canonica de titulo, version, archivo y estado.
+- [x] Mantener `document_access_grants`/`can_access_document(...)` como permiso real; `schedule_block_assignments` no concede acceso documental.
+- [x] Mantener `document_programming_links` como asociacion tecnica y `schedule_blocks` solo como contexto de fecha/hora/centro/tipo.
+- [x] Reutilizar las rutas backend E.5 para preview/descarga y no generar signed URLs desde cliente.
+
+Implementacion E.8/I.29:
+
+- [x] `TASKS.md` registra el corte E.8/I.29.
+- [x] `/app/schedule` prepara server-side un mapa bloque -> programacion autorizada con `listDocumentProgrammingForBlock(...)`, limitado a metadata autorizada.
+- [x] `ScheduleBlockDetailPanels` muestra titulo/fuente, version/fecha, vigencia y disponibilidad.
+- [x] Preview y descarga solo se muestran si el helper devuelve `can_preview` o `can_download`, y enlazan a `/app/documents/[documentId]/versions/[documentVersionId]/preview|download?organizationId=...`.
+- [x] El empty state dice que no hay programacion disponible para el permiso actual, sin sugerir IA ni mostrar contenido parcial.
+- [x] No se duplica contenido documental en `schedule_blocks` ni en tablas de horario.
+- [x] No se crea migracion nueva.
+
+Fuera de alcance mantenido:
+
+- [x] IA funcional, embeddings/vector search/RAG/pgvector, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Subida visible de documentos, gestion documental completa, pagina documental completa o documentos firmables.
+- [x] Asociaciones visibles desde UI, aprobaciones, payroll, datos sensibles, geolocalizacion, decisiones automaticas o uso cross-tenant.
+
+Verificacion E.8/I.29:
+
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/document-programming-foundation.spec.ts tests/smoke/document-programming-schedule-surface.spec.ts tests/smoke/operational-detail-panels.spec.ts`
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias.
+- [x] `rg` confirma que no se crean rutas/UI de subida documental ni pagina documental completa nueva.
+- [x] `git diff` revisado para confirmar que no se abrio IA, subida visible ni pagina documental completa.
+
+#### E.9 / I.30 - QA Interno Y Preparacion Operativa No Visible De Asociaciones De Programacion Documental
+
+Estado: implementado el 2026-05-16 como QA interno y preparacion operativa no visible. Es programacion documental autorizada asociada a horario, no IA. No crea migracion, subida visible, pagina documental completa, asociaciones visibles desde UI, documentos firmables, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs ni cron.
+
+Decision E.9/I.30:
+
+- [x] Mantener `documents` y `document_versions` como fuente canonica de contenido/version.
+- [x] Mantener `document_access_grants`/`can_access_document(...)` como permiso real para metadata, preview y descarga.
+- [x] Mantener `document_programming_links` como asociacion tecnica reejecutable desde SQL/RPC interno.
+- [x] Mantener `schedule_blocks` solo como contexto operativo de fecha/hora/centro/tipo.
+- [x] Confirmar que `schedule_block_assignments` no concede permisos documentales aunque el coach este asignado al bloque.
+- [x] Mantener las rutas backend E.5 de preview/descarga como unica via de archivo desde UI.
+
+Implementacion E.9/I.30:
+
+- [x] Snippet local/QA `supabase/snippets/document-programming-schedule-qa-verification.sql` con `BEGIN`/`ROLLBACK` e instrucciones de ejecucion.
+- [x] Fixture interno del snippet con dos tenants, documento/version `programming`, link activo por bloque/contexto, coaches asignados, grant de descarga, grant solo metadata y coach asignado sin grant.
+- [x] Verificacion positiva: usuario con grant documental ve la asociacion activa desde `list_document_programming_for_block(...)` y `list_document_programming_for_context(...)` con `can_preview`/`can_download` cuando corresponde.
+- [x] Verificacion metadata limitada: grant `read_metadata` devuelve metadata y `can_preview = false` / `can_download = false`.
+- [x] Verificacion negativa: usuario asignado al bloque sin grant no ve programacion y no puede gestionar el link.
+- [x] Verificacion cross-tenant: otro tenant no lista ni enlaza contexto del tenant A.
+- [x] Verificacion de no mutacion: el snippet compara snapshots de `schedule_blocks` y `schedule_block_assignments`.
+- [x] Smoke `tests/smoke/document-programming-qa.spec.ts` protege que el snippet exista, use rollback, cubra grants/denegaciones/cross-tenant/asignaciones y no abra rutas/UI fuera de alcance.
+
+Fuera de alcance mantenido:
+
+- [x] IA funcional, embeddings/vector search/RAG/pgvector, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Subida visible de documentos, gestion documental completa, pagina documental completa o documentos firmables.
+- [x] Asociaciones visibles desde UI, aprobaciones, payroll, datos sensibles, geolocalizacion, decisiones automaticas o uso cross-tenant.
+- [x] Introducir `service_role` en `src`.
+
+Verificacion E.9/I.30:
+
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/document-programming-foundation.spec.ts tests/smoke/document-programming-schedule-surface.spec.ts tests/smoke/document-programming-qa.spec.ts`
+- [x] `supabase/snippets/document-programming-schedule-qa-verification.sql` contra Supabase local con rollback.
+- [x] Smoke/guardrail especifico de Horario E.8/I.29 reejecutado sin tocar UI de horario.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias.
+- [x] `rg` confirma que no se crean rutas/UI de subida documental ni pagina documental completa nueva; las coincidencias de RPC de subida permanecen limitadas a tipos generados existentes.
+- [x] `git diff` revisado para confirmar que no se abrio IA, subida visible, gestion documental completa ni asociaciones visibles desde UI.
+
+#### E.10 / I.31 - Preparacion Operativa Controlada Para Validacion Manual De Programacion Documental Autorizada
+
+Estado: implementado el 2026-05-16 como preparacion operativa/manual local/QA. Es validacion controlada de programacion documental autorizada, no IA. No crea migracion, no toca UI de Horario, no abre subida visible, pagina documental completa, asociaciones visibles desde UI, documentos firmables, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs ni cron.
+
+Decision E.10/I.31:
+
+- [x] Mantener `documents` y `document_versions` como fuente canonica de documento/version.
+- [x] Mantener `document_access_grants` y `can_access_document(...)` como permiso real para metadata, preview y descarga.
+- [x] Mantener `document_programming_links` como asociacion tecnica interna, no como entidad gestionable desde UI.
+- [x] Mantener `schedule_blocks` solo como contexto operativo de fecha/hora/centro/tipo.
+- [x] Mantener `schedule_block_assignments` fuera de permisos documentales, incluso para el coach asignado.
+- [x] Mantener las rutas backend E.5 de preview/descarga como unica via de archivo desde UI.
+- [x] Convertir E.9/I.30 en un procedimiento operativo repetible para validar un caso real controlado sin persistir cambios accidentales.
+
+Implementacion E.10/I.31:
+
+- [x] Runbook interno `docs/operations/document-programming-manual-validation-runbook.md`.
+- [x] El runbook documenta prerequisitos, seleccion de `documents`, `document_versions`, `document_access_grants`, `document_programming_links` y `schedule_blocks`, verificacion manual en Horario, resultados esperados por permiso, limpieza/rollback y limites de seguridad.
+- [x] Plantilla SQL local/QA con `BEGIN`/`ROLLBACK` incluida en el runbook para envolver validaciones de un caso existente con placeholders.
+- [x] Se mantiene `supabase/snippets/document-programming-schedule-qa-verification.sql` como snippet ejecutable de referencia con fixture rollback.
+- [x] Smoke/guardrail `tests/smoke/document-programming-manual-validation.spec.ts` confirma que E.10/I.31 queda como operativa interna y no abre UI/rutas fuera de alcance.
+- [x] No se toca UI de Horario ni se crea migracion nueva.
+
+Checklist manual cubierto:
+
+- [x] Usuario con grant de preview/descarga: ve metadata y acciones solo por `can_preview`/`can_download`.
+- [x] Usuario con grant `read_metadata`: ve metadata sin preview/descarga.
+- [x] Usuario asignado al bloque sin grant: no ve programacion ni contenido parcial.
+- [x] Usuario cross-tenant: no lista ni abre documento/version/link/bloque ajeno.
+- [x] Rollback/limpieza: los fixtures E.9 y la plantilla E.10 no deben persistir datos accidentales.
+
+Fuera de alcance mantenido:
+
+- [x] IA funcional, embeddings/vector search/RAG/pgvector, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Subida visible de documentos, gestion documental completa, pagina documental completa o documentos firmables.
+- [x] Asociaciones visibles desde UI, aprobaciones, payroll, datos sensibles, geolocalizacion, decisiones automaticas o uso cross-tenant.
+- [x] Introducir `service_role` en `src`.
+
+Verificacion E.10/I.31:
+
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/document-programming-foundation.spec.ts tests/smoke/document-programming-schedule-surface.spec.ts tests/smoke/document-programming-qa.spec.ts tests/smoke/document-programming-manual-validation.spec.ts`
+- [x] `supabase/snippets/document-programming-schedule-qa-verification.sql` contra Supabase local con rollback.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] Guardrail geolocalizacion/push/cache sin nuevas coincidencias.
+- [x] `rg` confirma que no se crean rutas/UI de subida documental ni pagina documental completa nueva; las coincidencias de RPC de subida permanecen limitadas a tipos generados existentes.
+- [x] `git diff` revisado para confirmar que no se abrio IA, subida visible, gestion documental completa, asociaciones visibles desde UI ni documentos firmables.
+
+#### E.11 - Primer Repositorio Documental Visible Minimo Para Beta Interna
+
+Estado: implementado/documentado el 2026-05-17 como primer corte visible prudente. Abre `/app/documents` como repositorio de lectura, no como gestor documental completo. Mantiene IA, subida visible, grants UI, documentos firmables, snapshots de firma, payroll, app nativa y geofencing fuera.
+
+Decision E.11:
+
+- [x] Crear `list_accessible_document_versions(...)` como RPC de lectura que filtra por tenant, versiones activas/archivadas y `can_access_document(..., 'read_metadata')`.
+- [x] Excluir documentos con `requires_signature = true`, `sensitivity_level = 'sensitive_hr'`, `payroll` y `signature_evidence` de la superficie beta.
+- [x] Calcular `can_preview` y `can_download` en servidor/base de datos, no en cliente.
+- [x] Mantener preview/descarga exclusivamente mediante rutas backend E.5.
+- [x] No asumir que `owner`, `admin` o `manager` ven todo; `manager` solo ve grants/sujetos/capacidades reales.
+- [x] Enlazar la superficie desde `/app/more` y navegacion secundaria personal, sin convertirla en item principal mobile.
+- [x] Documentar roles, bloqueos, evidencia, deuda UX menor, deuda bloqueante, v1 comercial y promesas prohibidas en `docs/operations/document-repository-beta-readiness-runbook.md`.
+
+Implementacion E.11:
+
+- [x] Migracion `supabase/migrations/00043_document_repository_minimal_visible.sql`.
+- [x] Helper server-side `src/lib/documents.ts`.
+- [x] Pagina protegida `/app/documents` con filtros por ambito, estados vacios, conteos y acciones condicionadas por permiso.
+- [x] Entrada secundaria desde `/app/more` para todos los roles con membership activa.
+- [x] Smoke/guardrail `tests/smoke/documents-repository-surface.spec.ts`.
+- [x] Actualizacion de smokes de rutas protegidas y guardrails documentales E.8-E.10 para permitir la pagina E.11 sin abrir subida ni firma.
+
+Fuera de alcance mantenido:
+
+- [x] Subida documental visible, gestion de versiones desde UI o llamadas a `begin_document_version_upload`/`activate_document_version_upload`/`cancel_document_version_upload`.
+- [x] Gestion visible de grants, auditoria documental visible o asociaciones de programacion desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA funcional, embeddings/vector search/RAG/pgvector, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Geolocalizacion, app nativa, push, service worker, background sync o CacheStorage.
+
+Verificacion E.11:
+
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`
+- [x] `git diff --check`
+- [x] `rg -n "STL" src`
+- [x] `rg -n "service_role" src`
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src`
+- [ ] `git diff` revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental no preparada ni cumplimiento legal definitivo.
+
+#### E.12 - Validacion QA/Staging Controlada Del Repositorio Documental Visible Minimo
+
+Estado: implementado/documentado el 2026-05-17 como fase prudente de validacion controlada posterior a E.11. No abre UI nueva, migraciones, subida visible, grants UI, auditoria visible, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa ni geolocalizacion. La ejecucion contra staging/real queda pendiente hasta tener entorno, usuarios y documentos sinteticos/controlados preparados.
+
+Revision E.11 realizada:
+
+- [x] Migracion `supabase/migrations/00043_document_repository_minimal_visible.sql`: `list_accessible_document_versions(...)` exige membership activa, filtra por tenant, version activa/archivada, `document-files`, `can_access_document(..., 'read_metadata')`, `requires_signature = false` y excluye `sensitive_hr`, `payroll` y `signature_evidence`.
+- [x] Helper `src/lib/documents.ts`: resuelve usuario, memberships y organizacion activa en servidor, valida `organizationId`, scope y limit, y llama a la RPC sin `service_role`.
+- [x] `/app/documents`: superficie solo lectura con filtros por ambito, estados vacios, conteos, "solo metadata" y botones condicionados por `can_preview`/`can_download`.
+- [x] Navegacion desde `/app/more` y navegacion secundaria: documentos queda como acceso secundario, no como subida ni gestor documental completo.
+- [x] Rutas backend E.5: preview/download reutilizan `handleDocumentVersionFileAccess`, revalidan sesion/tenant/permiso, generan signed URL corta solo en backend y registran `file_preview`/`file_download` o `denied` cuando aplica. El bloqueo de `sensitive_hr`, `payroll` y `signature_evidence` pertenece al listado E.11; E.5 sigue siendo infraestructura general de archivo privado y bloquea `requires_signature`.
+- [x] Smoke documental existente `tests/smoke/documents-repository-surface.spec.ts` revisado y ampliado para proteger E.12.
+
+QA/SQL E.12:
+
+- [x] Snippet `supabase/snippets/document-repository-beta-qa-verification.sql` con `BEGIN`/`ROLLBACK`.
+- [x] Fixture sintetico con tenant A, tenant B, usuario con grant `download`, usuario con grant solo `read_metadata`, usuario sin grant y usuario de otro tenant.
+- [x] Documento `programming` visible y documento `company` visible para usuarios autorizados.
+- [x] Documento `sensitive_hr`, documento `payroll` y documento `signature_evidence` con grant sintetico, pero excluidos del repositorio visible minimo.
+- [x] Documento `requires_signature` validado como bloqueado por constraint/trigger actual antes de entrar al listado.
+- [x] Validacion de estado solo metadata: aparece metadata sin preview/descarga y `can_access_document(..., 'preview')` no escala permiso.
+- [x] Validacion de estado vacio sin grant.
+- [x] Validacion de denegacion cross-tenant.
+- [x] Validacion de eventos `file_preview` y `file_download` mediante RPC de auditoria dentro de rollback. La prueba real de archivo por rutas E.5 requiere objeto Storage controlado en staging/local.
+
+Evidencia esperada para QA/staging:
+
+- [x] Rol probado y organizacion activa.
+- [x] Documento/version redacted, sin contenido ni signed URL guardada.
+- [x] Resultado de listado por usuario: download, solo metadata, sin grant y otro tenant.
+- [x] Resultado de preview/download cuando exista archivo controlado y permiso real.
+- [x] Evento de auditoria `file_preview`/`file_download` cuando se pruebe archivo real; denegacion auditada solo para documentos existentes del mismo tenant cuando la ruta E.5 reciba intento sin permiso.
+- [x] Confirmacion cross-tenant bloqueada.
+- [x] Confirmacion de que `sensitive_hr`, `payroll`, `signature_evidence` y `requires_signature` no aparecen en `/app/documents`.
+- [x] Confirmacion de que no se usa documento real sensible, nomina, contrato, firma documental ni promesa legal definitiva.
+
+Fuera de alcance mantenido:
+
+- [x] Subida visible, gestion de versiones desde UI o uso nuevo de RPCs de upload.
+- [x] Grants UI, auditoria visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Geolocalizacion, app nativa, push, service worker, background sync o CacheStorage.
+
+Verificacion E.12:
+
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback. Nota: la DB local no tenia aplicada la funcion de `00043`, asi que se aplico primero `supabase/migrations/00043_document_repository_minimal_visible.sql` en local para poder ejecutar el QA.
+- [x] `git diff --check`
+- [x] `rg -n "STL" src`
+- [x] `rg -n "service_role" src`
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src`
+- [x] `git diff` revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental no preparada ni cumplimiento legal definitivo.
+
+#### E.13 - Cierre De Evidencia QA/Staging Del Repositorio Documental Visible Minimo
+
+Estado: ejecutado/documentado el 2026-05-17 como cierre prudente de evidencia posterior a E.12. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa ni geolocalizacion. La validacion local con rollback queda cerrada; la validacion QA/staging real queda bloqueada por falta de acceso/credenciales de entorno y no se inventa evidencia.
+
+Decision E.13:
+
+- [x] Tratar E.13 como cierre de evidencia y bloqueos, no como ampliacion del repositorio documental.
+- [x] Reutilizar `supabase/snippets/document-repository-beta-qa-verification.sql` como verificacion SQL controlada de E.12 manteniendo `BEGIN`/`ROLLBACK`.
+- [x] Ejecutar el snippet E.12 contra Supabase local disponible y registrar resultado como evidencia tecnica local.
+- [x] Documentar bloqueo concreto para QA/staging: no hay `SUPABASE_ACCESS_TOKEN`, project ref, DB URL real/staging, credenciales E2E por rol ni documento Storage controlado disponibles en el entorno actual.
+- [x] Crear plantilla redacted de evidencia en `docs/operations/document-repository-beta-readiness-runbook.md`.
+- [x] Mantener la evidencia con datos reales fuera del repo y sin contrasenas, tokens, cookies, signed URLs, documentos privados ni contenido documental.
+- [x] Proteger con smoke estatico que E.13 siga siendo evidencia/redaction/bloqueo honesto y no producto nuevo.
+
+Evidencia local E.13:
+
+- [x] `npm run supabase:status` confirma Supabase local levantada.
+- [x] `.env.local` solo expone nombres de variables locales/publicas y Resend; no se imprimen valores.
+- [x] Variables de proceso revisadas por nombre: no hay credenciales de staging/QA reales disponibles.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`.
+- [x] El snippet valida usuario con grant `download`, usuario solo `read_metadata`, usuario sin grant, usuario de otro tenant, `programming`, `company`, exclusiones `sensitive_hr`/`payroll`/`signature_evidence`, bloqueo de `requires_signature` y eventos de auditoria `file_preview`/`file_download` por RPC.
+- [x] La prueba local no crea objetos Storage reales; por tanto preview/download E.5 con archivo real controlado queda pendiente para QA/staging.
+- [ ] QA/staging real: bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project ref/DB URL, tenant QA, cuatro usuarios/casos, grants controlados y archivo `document-files` sintetico.
+- [ ] Preview/download E.5 real con objeto Storage controlado: pendiente de QA/staging o local preparado con archivo real no sensible.
+
+Fuera de alcance mantenido:
+
+- [x] Subida visible, gestion de versiones desde UI o uso nuevo de RPCs de upload.
+- [x] Grants UI, auditoria visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Geolocalizacion, app nativa, push, service worker, background sync o CacheStorage.
+
+Verificacion E.13:
+
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback.
+- [x] `npm run typecheck`
+- [x] `npm run lint`
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`
+- [x] `git diff --check` sin errores; solo avisos LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] `git diff` revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo.
+
+#### E.14 - Validacion QA/Staging Real Controlada Del Repositorio Documental Minimo Con Archivo Storage Controlado
+
+Estado: ejecutado/documentado el 2026-05-17 como reintento prudente posterior a E.13. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa ni geolocalizacion. La validacion QA/staging real sigue bloqueada porque el entorno actual no aporta acceso real, credenciales por rol ni archivo Storage controlado.
+
+Decision E.14:
+
+- [x] Tratar E.14 como validacion real condicionada por acceso, no como ampliacion del repositorio documental.
+- [x] Releer el entorno actual sin imprimir secretos ni valores sensibles.
+- [x] Confirmar que no hay `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`, credenciales E2E por rol ni usuarios/casos documentales QA disponibles.
+- [x] Confirmar que `.env.local` sigue ignorado y no aporta project/ref staging, DB URL real ni casos documentales QA entre las claves revisadas.
+- [x] Reejecutar el snippet E.12 disponible contra Supabase local con `BEGIN`/`ROLLBACK`.
+- [x] No ejecutar QA/staging ni preparar fixtures persistentes si no hay acceso real disponible.
+- [x] Documentar en el runbook el bloqueo exacto de archivo Storage controlado, preview/download por rutas E.5 y auditoria backend real.
+- [x] Mantener la evidencia real fuera del repo y sin contrasenas, tokens, cookies, signed URLs, rutas Storage activas, documentos privados ni contenido documental.
+
+Evidencia local E.14:
+
+- [x] Supabase local esta levantada.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`.
+- [x] El snippet valida usuario con grant `download`, usuario solo `read_metadata`, usuario sin grant, usuario de otro tenant, `programming`, `company`, exclusiones `sensitive_hr`/`payroll`/`signature_evidence`, bloqueo de `requires_signature` y eventos de auditoria `file_preview`/`file_download` por RPC.
+- [x] La prueba local no crea objetos Storage reales; por tanto preview/download E.5 con archivo real controlado sigue pendiente.
+- [ ] QA/staging real: bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project ref/DB URL, tenant QA, cuatro usuarios/casos, grants controlados y archivo `document-files` sintetico.
+- [ ] Preview/download E.5 real con objeto Storage controlado: pendiente de QA/staging o local preparado con archivo real no sensible.
+- [ ] Auditoria real por rutas backend E.5: pendiente hasta ejecutar preview/download con archivo controlado.
+
+Fuera de alcance mantenido:
+
+- [x] Subida visible, gestion de versiones desde UI o uso nuevo de RPCs de upload.
+- [x] Grants UI, auditoria visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs, cron o UI de IA.
+- [x] Geolocalizacion, app nativa, push, service worker, background sync o CacheStorage.
+
+Verificacion E.14:
+
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback.
+- [x] `git diff --check`
+- [x] `rg -n "STL" src`
+- [x] `rg -n "service_role" src`
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src`
+- [x] Diff documental de E.14 revisado para confirmar que el corte no abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+- [x] `npm run typecheck` y `npm run lint` no se ejecutan en E.14 porque no se toca codigo ni smoke TS.
+
+#### E.15 - Desbloqueo Controlado De Validacion Real Del Repositorio Documental Minimo Con Archivo Storage Controlado
+
+Estado: ejecutado/documentado el 2026-05-17 como siguiente fase prudente posterior a E.14. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa ni geolocalizacion. La validacion QA/staging real sigue bloqueada porque la relectura del entorno no aporta acceso real, project/ref, DB URL, credenciales/casos QA ni objeto Storage controlado.
+
+Decision E.15:
+
+- [x] Tratar E.15 como desbloqueo controlado condicionado por acceso real, no como ampliacion del repositorio documental.
+- [x] Releer entorno sin imprimir secretos ni valores de `.env.local`.
+- [x] Confirmar que `.env.local` esta ignorado y, entre las claves revisadas, solo contiene `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`; no contiene project/ref staging, DB URL real, credenciales E2E documentales ni path de objeto QA controlado.
+- [x] Confirmar que el proceso actual no tiene `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_URL`, `DATABASE_URL`, `POSTGRES_URL`, credenciales E2E por rol, usuarios/casos documentales QA ni `DOCUMENT_QA_STORAGE_OBJECT_PATH`.
+- [x] Reejecutar `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con `BEGIN`/`ROLLBACK`.
+- [x] Documentar que la evidencia local no valida preview/download real por rutas E.5 con objeto Storage, porque el snippet no crea un archivo real en `document-files`.
+- [x] Documentar el bloqueo exacto actualizado para QA/staging real sin inventar evidencia.
+- [x] Mantener cualquier evidencia real fuera del repo y sin contrasenas, tokens, cookies, signed URLs, rutas Storage activas, documentos privados ni contenido documental.
+
+Evidencia local E.15:
+
+- [x] Docker local tiene `supabase_db_boxops` disponible.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`.
+- [x] La ejecucion paso los asserts de listado autorizado, solo metadata, sin grant, cross-tenant, bloqueo `requires_signature`, exclusiones sensibles y auditoria por RPC.
+- [x] No se creo objeto Storage real y no hay evidencia de preview/download E.5 contra un archivo controlado.
+- [ ] QA/staging real: bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project/ref o DB URL gestionado fuera del repo, tenant QA/staging, cuatro usuarios/casos redacted, grants controlados y un archivo sintetico no sensible en bucket privado `document-files`.
+
+Bloqueo QA/staging E.15:
+
+- [ ] Falta `SUPABASE_ACCESS_TOKEN` o acceso DB/Supabase CLI autenticado al proyecto QA/staging.
+- [ ] Falta project/ref redacted o DB URL real/staging gestionado fuera del repo.
+- [ ] Faltan credenciales E2E/sesiones para casos redacted: `download-user`, `metadata-only-user`, `no-grant-user` y `cross-tenant-user`.
+- [ ] Falta tenant QA/staging controlado y usuarios/casos documentales preparados.
+- [ ] Faltan documentos sinteticos persistentes no sensibles `programming` y `company` con grants controlados.
+- [ ] Falta archivo real controlado en bucket privado `document-files` para validar preview/download por rutas backend E.5 y auditoria `file_preview`/`file_download`.
+- [ ] Sigue sin evidencia staging real de `/app/documents`; estado correcto: `bloqueado por acceso/entorno`, no `validado en staging`.
+
+Fuera de E.15:
+
+- [x] Subida documental visible, begin/activate/cancel upload desde UI o gestor documental completo.
+- [x] Grants UI, auditoria documental visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA, embeddings, vector search, RAG, prompts runtime, app nativa, push, service worker, CacheStorage o geolocalizacion.
+
+Verificacion E.15:
+
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback.
+- [x] Relectura de entorno redacted sin imprimir secretos.
+- [x] `npm run typecheck` y `npm run lint` no aplican: no se toca codigo ni smoke TS.
+- [x] `git diff --check`.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias.
+- [x] Diff documental de E.15 revisado para confirmar que el corte no abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### E.16 - Handoff Operativo Controlado Para Desbloquear Validacion Real QA/Staging Del Repositorio Documental Minimo
+
+Estado: ejecutado/documentado el 2026-05-17 como siguiente fase prudente posterior a E.15. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa, service worker, CacheStorage ni geolocalizacion. La validacion QA/staging real sigue bloqueada desde este entorno; E.16 deja el handoff redacted para un operador con acceso real.
+
+Decision E.16:
+
+- [x] Tratar E.16 como handoff operativo, no como ampliacion del repositorio documental.
+- [x] Releer entorno sin imprimir secretos, valores de `.env.local`, cookies, signed URLs ni rutas Storage activas.
+- [x] Confirmar que `.env.local` esta ignorado por git.
+- [x] Confirmar que `.env.local`, entre nombres revisados y sin imprimir valores, contiene variables publicas/locales de Supabase y variables de email/Resend, pero no contiene project/ref staging, DB URL real, credenciales E2E documentales ni path de objeto QA controlado.
+- [x] Confirmar que el proceso actual no tiene `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_URL`, `DATABASE_URL`, `POSTGRES_URL`, credenciales E2E por rol, usuarios/casos documentales QA ni `DOCUMENT_QA_STORAGE_OBJECT_PATH`.
+- [x] Reejecutar `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con `BEGIN`/`ROLLBACK`.
+- [x] Documentar que la evidencia local no valida preview/download real por rutas E.5 con objeto Storage, porque el snippet no crea un archivo real en `document-files`.
+- [x] Preparar en `docs/operations/document-repository-beta-readiness-runbook.md` un handoff redacted con variables/capacidades necesarias, casos QA requeridos, checklist de operador, evidencia esperada y criterios de pass/bloqueado.
+- [x] Mantener cualquier evidencia real fuera del repo y sin contrasenas, tokens, cookies, signed URLs, rutas Storage activas, documentos privados ni contenido documental.
+
+Evidencia local E.16:
+
+- [x] `.env.local` esta ignorado por git.
+- [x] `.env.local` contiene nombres de variables locales/publicas de Supabase y email/Resend, sin valores impresos; no contiene acceso QA/staging documental real entre las claves revisadas.
+- [x] El proceso actual no expone acceso QA/staging ni casos documentales QA por variables de entorno.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`.
+- [x] La ejecucion paso los asserts de listado autorizado, solo metadata, sin grant, cross-tenant, bloqueo `requires_signature`, exclusiones sensibles y auditoria por RPC.
+- [x] No se creo objeto Storage real y no hay evidencia de preview/download E.5 contra un archivo controlado.
+- [ ] QA/staging real: bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project/ref o DB URL gestionado fuera del repo, tenant QA/staging, cuatro usuarios/casos redacted, grants controlados y un archivo sintetico no sensible en bucket privado `document-files`.
+
+Bloqueo QA/staging E.16:
+
+- [ ] Falta `SUPABASE_ACCESS_TOKEN` o acceso DB/Supabase CLI autenticado al proyecto QA/staging.
+- [ ] Falta project/ref redacted o DB URL real/staging gestionado fuera del repo.
+- [ ] Faltan credenciales E2E/sesiones para casos redacted: `download-user`, `metadata-only-user`, `no-grant-user` y `cross-tenant-user`.
+- [ ] Falta tenant QA/staging controlado y usuarios/casos documentales preparados.
+- [ ] Faltan documentos sinteticos persistentes no sensibles `programming` y `company` con grants controlados.
+- [ ] Falta archivo real controlado en bucket privado `document-files` para validar preview/download por rutas backend E.5 y auditoria `file_preview`/`file_download`.
+- [ ] Sigue sin evidencia staging real de `/app/documents`; estado correcto: `bloqueado por acceso/entorno`, no `validado en staging`.
+
+Handoff operativo E.16:
+
+- [x] Variables/capacidades necesarias documentadas sin valores: acceso DB o Supabase CLI autenticado, project/ref redacted o DB URL gestionada fuera del repo, URL de app QA/staging, cuatro sesiones/casos QA, tenant QA/staging, permisos para crear datos sinteticos/documentos/grants y objeto controlado en `document-files`.
+- [x] Casos QA requeridos documentados: usuario con download, usuario solo metadata, usuario sin grant y usuario cross-tenant.
+- [x] Checklist de operador documentada: preparar tenant/casos/documentos, cargar archivo sintetico no sensible, ejecutar SQL con rollback o equivalente, validar `/app/documents`, validar rutas E.5, revisar `document_access_events`, verificar denegaciones y registrar evidencia redacted fuera del repo.
+- [x] Evidencia esperada documentada: entorno/project redacted, modo de conexion, rol/caso, listado, preview/download, auditoria, cross-tenant, solo metadata, vacio sin grant, exclusiones sensibles y estado pass/bloqueado.
+- [x] Criterios de pass/bloqueado documentados sin aceptar evidencia inventada.
+
+Fuera de E.16:
+
+- [x] Subida documental visible, begin/activate/cancel upload desde UI o gestor documental completo.
+- [x] Grants UI, auditoria documental visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA, embeddings, vector search, RAG, prompts runtime, app nativa, push, service worker, CacheStorage o geolocalizacion.
+
+Verificacion E.16:
+
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback.
+- [x] Relectura de entorno redacted sin imprimir secretos.
+- [x] `npm run typecheck` y `npm run lint` no aplican: no se toca codigo ni smoke TS.
+- [x] `git diff --check` pasa; solo muestra warnings LF/CRLF del worktree.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff documental de E.16 revisado para confirmar que el corte no abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### E.17 - Validacion Real QA/Staging Asistida Del Repositorio Documental Minimo
+
+Estado: ejecutado/documentado el 2026-05-18 como siguiente fase prudente posterior a E.16. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa, service worker, CacheStorage ni geolocalizacion. La validacion QA/staging real sigue bloqueada desde este entorno por falta de acceso real y casos QA controlados.
+
+Decision E.17:
+
+- [x] Tratar E.17 como validacion real asistida condicionada por acceso, no como ampliacion del repositorio documental.
+- [x] Releer entorno sin imprimir secretos, valores de `.env.local`, cookies, signed URLs ni rutas Storage activas.
+- [x] Confirmar que `.env.local` esta ignorado por git.
+- [x] Confirmar que el entorno no aporta `SUPABASE_ACCESS_TOKEN`, project/ref, DB URL real/staging ni acceso Supabase CLI autenticado.
+- [x] Confirmar que no hay URL QA/staging, tenant QA/staging, credenciales/casos documentales redacted ni `DOCUMENT_QA_STORAGE_OBJECT_PATH`.
+- [x] Reejecutar `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con `BEGIN`/`ROLLBACK`.
+- [x] Mantener QA/staging real como bloqueado sin inventar evidencia de `/app/documents`, preview/download E.5, auditoria backend real ni cross-tenant en staging.
+
+Evidencia local E.17:
+
+- [x] `.env.local` esta presente e ignorado por git; contiene variables publicas/locales necesarias, sin imprimir valores.
+- [x] El proceso y entorno de usuario/maquina no exponen acceso QA/staging ni casos documentales QA entre las claves revisadas.
+- [x] `npx supabase projects list --output json` no devuelve acceso a proyectos desde este entorno; detalles redacted.
+- [x] Supabase local `supabase_db_boxops` esta levantado.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`.
+- [x] La ejecucion paso los asserts de listado autorizado, solo metadata, sin grant, cross-tenant, bloqueo `requires_signature`, exclusiones sensibles y auditoria por RPC.
+- [x] No se creo objeto Storage real y no hay evidencia de preview/download E.5 contra un archivo controlado.
+- [ ] QA/staging real: bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project/ref o DB URL gestionado fuera del repo, URL de app QA/staging, tenant QA/staging, cuatro usuarios/casos redacted, grants controlados y un archivo sintetico no sensible en bucket privado `document-files`.
+
+Bloqueo QA/staging E.17:
+
+- [ ] Falta `SUPABASE_ACCESS_TOKEN` o acceso DB/Supabase CLI autenticado al proyecto QA/staging.
+- [ ] Falta project/ref redacted o DB URL real/staging gestionado fuera del repo.
+- [ ] Falta URL de app QA/staging gestionada fuera del repo.
+- [ ] Faltan credenciales E2E/sesiones para casos redacted: `download-user`, `metadata-only-user`, `no-grant-user` y `cross-tenant-user`.
+- [ ] Falta tenant QA/staging controlado y usuarios/casos documentales preparados.
+- [ ] Faltan documentos sinteticos persistentes no sensibles `programming` y `company` con grants controlados.
+- [ ] Falta archivo real controlado en bucket privado `document-files` para validar preview/download por rutas backend E.5 y auditoria `file_preview`/`file_download`.
+- [ ] Sigue sin evidencia staging real de `/app/documents`; estado correcto: `bloqueado por acceso/entorno`, no `validado en staging`.
+
+Fuera de E.17:
+
+- [x] Subida documental visible, begin/activate/cancel upload desde UI o gestor documental completo.
+- [x] Grants UI, auditoria documental visible o asociaciones documentales gestionables desde UI.
+- [x] Documentos firmables, boton "Firmar", snapshots/evidencias de firma documental.
+- [x] Payroll, nominas, importes, compensaciones, contratos reales o cumplimiento legal documental definitivo.
+- [x] IA, embeddings, vector search, RAG, prompts runtime, app nativa, push, service worker, CacheStorage o geolocalizacion.
+
+Verificacion E.17:
+
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` contra Supabase local con rollback.
+- [x] Relectura de entorno redacted sin imprimir secretos.
+- [x] `npm run typecheck` y `npm run lint` no aplican: no se toca codigo ni smoke TS.
+- [x] `git diff --check` pasa.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] Diff documental de E.17 revisado para confirmar que el corte no abrio IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo. El worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### E.18 - Validacion Real QA/Staging Prudente Del Repositorio Documental Minimo
+
+Estado: ejecutado/documentado el 2026-05-18 como siguiente fase prudente posterior a E.17. No abre UI nueva, migraciones, permisos, grants UI, auditoria visible, subida documental, documentos firmables, boton "Firmar", snapshots/evidencias de firma, payroll, IA, app nativa, service worker, CacheStorage ni geolocalizacion. La validacion QA/staging real sigue bloqueada desde este entorno por falta de acceso real completo.
+
+Evidencia minima E.18:
+
+- [x] Entorno releido sin imprimir secretos, valores de `.env.local`, cookies, signed URLs ni rutas Storage activas.
+- [x] `.env.local` esta presente e ignorado por git; entre las claves revisadas solo aporta variables publicas/locales de Supabase y `NEXT_PUBLIC_SITE_URL`.
+- [x] No hay `SUPABASE_ACCESS_TOKEN`, project/ref, DB URL real/staging, URL de app QA/staging, tenant QA/staging, credenciales/casos documentales redacted ni `DOCUMENT_QA_STORAGE_OBJECT_PATH`.
+- [x] No hay CLI global de Supabase; `npx supabase` esta disponible como dependencia (`2.95.6`), pero `npx supabase projects list --output json` no devuelve acceso a proyectos desde este entorno.
+- [x] `supabase/snippets/document-repository-beta-qa-verification.sql` ejecutado contra `supabase_db_boxops` con `ROLLBACK`; paso los asserts locales de permisos, cross-tenant, exclusiones sensibles y auditoria por RPC.
+- [ ] QA/staging real sigue bloqueado hasta disponer de acceso DB o Supabase CLI autenticado, project/ref o DB URL gestionado fuera del repo, URL QA/staging, tenant QA/staging, casos redacted y archivo sintetico no sensible en `document-files`.
+
+Verificacion E.18:
+
+- [x] `git diff --check` pasa con avisos CRLF del worktree preexistente, sin errores de whitespace.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias nuevas.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin coincidencias nuevas.
+- [x] No se ejecutan `npm run typecheck` ni `npm run lint`: E.18 no toca codigo ni smoke TS.
+- [x] Diff revisado: no se abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible ni cumplimiento legal documental definitivo; el worktree global ya tenia cambios amplios ajenos al corte y no se revierten.
+
+#### E.19 - Primer Adjunto Documental Minimo Desde /app/documents
+
+Estado: implementado/documentado el 2026-05-21 como primer corte minimo y seguro de adjunto documental desde la app. Amplia E.11 sin convertir `/app/documents` en gestor documental completo: permite crear metadata minima y subir una primera version de archivo para roles autorizados, mantiene preview/descarga por rutas backend E.5 y deja fuera grants UI, reemplazo de versiones, firma documental, auditoria visible, payroll, RRHH sensible, IA, app nativa, service worker, CacheStorage y geolocalizacion.
+
+Revision local controlada 2026-05-22: se ejecuto un primer smoke runtime local con archivo `.txt` sintetico no sensible desde `/app/documents` usando el usuario E2E admin ya configurado. El primer intento detecto un fallo real en la Server Action: `.insert(...).select("id").single()` quedaba bloqueado por RLS/PostgREST en el retorno de metadata aunque la insercion sin retorno era valida. Se corrigio generando el UUID del documento en servidor, evitando ese `RETURNING` y publicando la metadata tras activar la version. El smoke posterior paso y verifico metadata tenant-scoped, version activa, objeto en bucket privado, preview/download por rutas backend E.5 con `302` y `Cache-Control: no-store`, auditoria `file_preview`/`file_download`, y ausencia de signed URL, `storage_path` o `document-files` en la UI. El cleanup del smoke deja la metadata/version sinteticas en `deleted`; no queda documento activo visible. QA/staging real sigue bloqueado por falta de acceso/casos/objeto controlado.
+
+Segundo smoke local controlado 2026-05-22: se ajusto el runtime opt-in `E2E_DOCUMENT_UPLOAD_RUNTIME=1` para cubrir tambien un adjunto `programming` desde `/app/documents` con archivo `.txt` sintetico no sensible. El smoke paso y verifico `document_scope = 'programming'`, `document_type = 'programming_document'`, `sensitivity_level = 'restricted'`, version `active`, `documents.current_version_id` apuntando a esa version, bucket `document-files` privado (`storage.buckets.public = false`), preview/download por rutas backend E.5 con `302` y `Cache-Control: no-store`, auditoria local `file_preview`/`file_download`, y ausencia en la UI de signed URLs persistentes, `storage_path`, `storage_bucket`, `document-files`, `/storage` o `storage/v1`. Con credenciales locales disponibles, `manager` y `coach` autenticados no vieron el formulario de adjunto ni input `documentFile`. El cleanup prudente marca metadata/version sinteticas como `deleted` por tablas documentales y no borra directamente tablas internas de Storage, no resetea Supabase y no deja documento activo visible. QA/staging real sigue bloqueado por falta de acceso/casos/objeto controlado.
+
+Decision E.19:
+
+- [x] Limitar la creacion desde UI a documentos `company` y `programming`, con `document_type` interno derivado y `sensitivity_level = restricted`.
+- [x] Permitir el formulario solo a `owner`, `admin` y `document_admin`, y volver a validar en servidor con `can_manage_document_metadata(...)`.
+- [x] Resolver `organization_id`, usuario y membership desde la sesion/contexto activo; no permitir elegir otro tenant, otra persona, sujeto documental ni grant desde cliente.
+- [x] Reutilizar el flujo existente de Storage privado: metadata `draft`, `begin_document_version_upload`, upload al bucket privado `document-files`, publicacion controlada y `activate_document_version_upload`.
+- [x] Mantener preview/descarga fuera del cliente directo: la UI sigue enlazando a `/app/documents/[documentId]/versions/[documentVersionId]/preview|download` y esas rutas generan signed URL corta solo en backend.
+- [x] Usar validacion conservadora de archivo antes de tocar Storage: nombre, tamano, MIME, extension y firma/magic bytes para tipos soportados.
+
+Implementacion E.19:
+
+- [x] `src/lib/documents.ts` define scopes permitidos, limite de 5 MB, MIME aceptados y helper `validateMinimalDocumentUploadFile(...)`.
+- [x] `src/app/(app)/app/documents/actions.ts` crea el documento con UUID generado en servidor, prepara version pendiente, calcula SHA-256, sube al Storage privado por el path exacto de la RPC, activa la version, publica la metadata y cancela/retira metadata ante fallo.
+- [x] `src/app/(app)/app/documents/page.tsx` anade un panel colapsable de alta minima con estados de exito/error por query param, sin exponer secrets, Storage paths ni signed URLs persistentes.
+- [x] `src/app/(app)/app/documents/document-upload-submit-button.tsx` muestra el estado pending del Server Action sin mover la logica sensible al cliente.
+- [x] `next.config.ts` sube el limite de Server Actions a `6mb`, por encima del maximo de producto de 5 MB y sin abrir subida grande.
+- [x] `tests/smoke/documents-repository-surface.spec.ts` y `tests/smoke/tenant-rls-negative-local.spec.ts` cubren el contrato local del formulario, RPCs, Storage privado, ausencia de signed URLs cliente y validacion de archivo. `documents-repository-surface.spec.ts` incluye ademas un smoke runtime opt-in con `E2E_DOCUMENT_UPLOAD_RUNTIME=1` para el adjunto sintetico local controlado.
+
+Fuera de E.19:
+
+- [x] Gestor documental completo, subida masiva, reemplazo de versiones existentes, edicion avanzada de metadata, grants/permisos desde UI y seleccion manual de sujetos/personas.
+- [x] Documentos firmables, boton "Firmar", `requires_signature = true`, snapshots/evidencias de firma documental y certificaciones completas.
+- [x] Auditoria visible, QA/staging real, reset real de Supabase, documentos sensibles reales, payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache y app nativa.
+
+Verificacion E.19:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 4 skipped opt-in el 2026-05-22.
+- [x] `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 7 passed el 2026-05-22, incluyendo subida local `company` y `programming` de `.txt` sintetico, version activa/current version, Storage documental privado, preview/download backend, auditoria backend local y negativos de formulario para `manager`/`coach`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "visible file input|document storage and signed URL"`: 6 passed el 2026-05-22.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "visible file input|profile upload validator|document storage and signed URL"`: 10 passed.
+- [x] `npm run typecheck` ejecutado; bloqueado por errores TS preexistentes en smokes no documentales del corte (`tenant-direct-grants-organizations-runtime`, `tenant-direct-grants-time-exports-runtime` y target ES de named capture en `tenant-rls-negative-local`).
+- [x] `git diff --check` pasa con avisos LF/CRLF ya existentes del worktree y sin errores de whitespace.
+- [x] `git diff --name-only -- .env.local` sin salida.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src` sin coincidencias.
+
+Bloqueos restantes E.19:
+
+- [ ] No hay evidencia QA/staging real del flujo completo con objeto Storage controlado, sesion por rol real y auditoria backend real; sigue dependiendo del handoff E.16 y de acceso/casos QA externos al repo.
+- [ ] El flujo es intencionadamente de primera version: reemplazo, archivo historico desde UI, grants UI, subjects/personas y documentos sensibles requieren fases propias.
+
+#### E.20 - Control Local De Permisos Negativos Backend Del Adjunto Documental Minimo
+
+Estado: ejecutado el 2026-05-22 como corte local controlado posterior a E.19. No amplia `/app/documents` a gestor documental completo: solo endurece el smoke opt-in para validar que las rutas backend E.5 de preview/download del adjunto sintetico deniegan acceso directo a roles autenticados sin permiso documental. QA/staging real sigue bloqueado por falta de acceso/casos/objeto controlado.
+
+Revision local E.20:
+
+- [x] Releidos `tests/smoke/documents-repository-surface.spec.ts`, rutas E.5 `preview`/`download`, `src/lib/document-file-access.ts`, `src/lib/documents.ts`, E.19 en `TASKS.md` y `docs/operations/document-repository-beta-readiness-runbook.md`.
+- [x] Scope runtime probado: documento sintetico `programming` con archivo `.txt` no sensible desde `/app/documents`.
+- [x] Admin autorizado crea metadata/version, obtiene hrefs internos `/app/documents/[documentId]/versions/[documentVersionId]/preview|download?organizationId=...` y abre preview/download por E.5 con `302` y `Cache-Control: no-store`.
+- [x] Se cierra sesion tras crear el documento sintetico y se vuelve a autenticar con roles negativos locales disponibles.
+- [x] `manager` autenticado: acceso directo a preview y download por las rutas backend E.5 queda denegado como `404` JSON `document_file_not_available`, con `Cache-Control: no-store`.
+- [x] `coach` autenticado: acceso directo a preview y download por las rutas backend E.5 queda denegado como `404` JSON `document_file_not_available`, con `Cache-Control: no-store`.
+- [x] Auditoria local de denegacion verificada en `document_access_events`: para cada rol negativo y documento/version exactos existe `result = 'denied'`, `event_type = 'file_preview'` y `file_download`, con `metadata.reason = 'insufficient_access'`.
+- [x] Cleanup prudente: las metadata/versiones sinteticas quedan marcadas como `deleted`; no se borran directamente tablas internas de Storage y no se resetea Supabase. Consulta local posterior tras repetir el runtime final: `deleted|10` para los titulos sinteticos E.19/E.20, sin documento activo visible.
+
+Implementacion E.20:
+
+- [x] `tests/smoke/documents-repository-surface.spec.ts` reutiliza la subida sintetica controlada para devolver hrefs backend internos y evidencia DB local.
+- [x] Se anaden dos smokes runtime opt-in E.20 para `manager` y `coach`, con skip explicito si faltan credenciales del rol o el entorno `E2E_DOCUMENT_UPLOAD_RUNTIME=1`.
+- [x] El smoke consulta auditoria local por `organization_id`, `document_id`, `document_version_id`, email del actor y rol, evitando contar evidencia ajena.
+
+Fuera de E.20:
+
+- [x] No QA/staging/remoto/produccion, no reset real de Supabase, no documentos reales ni sensibles.
+- [x] No grants UI, no reemplazo de versiones, no firma documental, no auditoria visible y no gestor documental completo.
+- [x] No payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache ni app nativa.
+
+Verificacion E.20:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 6 skipped opt-in el 2026-05-22.
+- [x] Equivalente PowerShell de `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 9 passed el 2026-05-22, incluyendo denegacion backend directa para `manager` y `coach`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
+- [x] Consulta local de cleanup: `SELECT status, count(*) ...` devuelve `deleted|10` para titulos sinteticos E.19/E.20.
+- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF ya existentes del worktree.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`: sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src`: sin coincidencias.
+
+Bloqueos restantes E.20:
+
+- [ ] No hay evidencia QA/staging real de denegacion backend directa con objeto Storage controlado; sigue dependiendo del handoff E.16 y de acceso/casos QA externos al repo.
+- [ ] No se validan grants personalizados, cross-tenant por ruta directa, reemplazo de versiones ni documentos sensibles; requieren cortes propios.
+
+#### OD.1 / I.32 - Cierre De Operativa Diaria Completa Para Beta Interna
+
+Estado: revisado el 2026-05-18 como siguiente fase prudente del mapa de cierre tras S.8/A.1 y B.4. Es cierre de operativa diaria para beta interna, no producto nuevo. No crea migraciones, no toca `src`, no abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, calendario avanzado ni resolucion automatica de cobertura.
+
+Decision OD.1/I.32:
+
+- [x] Confirmar que esta fase revisa lo ya hecho en horario semanal, plantillas, asignaciones, cobertura, solicitudes de cambio/cobertura, ausencias, eventos/festivos/competiciones, jornada prevista, Inicio/dashboard por rol y smokes por rol.
+- [x] Crear `docs/operations/daily-operations-beta-readiness-runbook.md` como checklist operativo de beta interna diaria.
+- [x] Distinguir flujos listos para beta interna, flujos que requieren real/staging y flujos bloqueados por falta de datos, credenciales o entorno.
+- [x] Separar minimo obligatorio para beta interna frente a v1 comercial.
+- [x] Mantener `owner`, `admin`, `manager` y `coach` con diferencias operativas explicitas.
+- [x] Mantener cobertura, ausencias, eventos y jornada prevista como contexto operativo, no como decisiones automaticas.
+- [x] Mantener IA como ultimo extra futuro.
+
+Checklist documentado:
+
+- [x] Flujos diarios listos para beta interna: Horario, Plantillas, Asignaciones, Cobertura, Inicio, Solicitudes, Ausencias, Eventos y Jornada prevista con limites actuales.
+- [x] Flujos que requieren validacion real/staging: semana real, plantilla real, credenciales E2E por rol, solicitud end-to-end, ausencia controlada, evento real/contextual y franjas de jornada prevista.
+- [x] Bloqueos por datos/credenciales/entorno: falta de Supabase real/staging, Auth/email, credenciales E2E, responsable operativo, datos de solicitudes/ausencias/eventos o expectativa de automatismos.
+- [x] Diferencias por rol: `owner`, `admin`, `manager` y `coach`.
+- [x] Criterios minimos de smoke anonimo y autenticado por rol.
+- [x] Evidencia que debe guardarse fuera del repo si contiene datos reales.
+- [x] Deuda UX menor que no bloquea beta.
+- [x] Deuda que si bloquea beta.
+- [x] Pendiente para v1 comercial.
+- [x] Que no prometer todavia: automatismos de cobertura, legalidad definitiva, payroll, IA, geofencing, documentos firmables o produccion.
+
+Pendiente para cerrar beta interna real:
+
+- [ ] Validar semana real bloque a bloque con responsable operativo.
+- [ ] Ejecutar smokes autenticados por `owner`, `admin`, `manager` y `coach` en real/staging.
+- [ ] Probar solicitud de cambio/cobertura end-to-end con solicitante, target y rol de gestion.
+- [ ] Probar ausencia propia/revision/impacto sin motivos sensibles reales.
+- [ ] Probar eventos/festivos/competiciones como contexto sin mutacion automatica.
+- [ ] Probar jornada prevista como contexto, no fichaje ni payroll.
+- [ ] Guardar evidencia de decision final.
+
+Revision OD.1/I.32 2026-05-18:
+
+- [x] Releido entorno sin imprimir secretos ni valores: `.env.local` existe, esta ignorado y no trackeado.
+- [x] Confirmado bloqueo de acceso real: no hay URL QA/staging, project/ref, DB URL, credenciales E2E por rol, tenant QA/staging, dataset operativo controlado, SMTP real ni email interno controlado verificable.
+- [x] Revisadas superficies existentes solo a nivel de codigo/documentacion: Inicio `/app`, Horario `/app/schedule`, Plantillas `/app/templates`, Cobertura `/app/coverage`, Solicitudes `/app/requests`, Ausencias `/app/absences`, eventos/jornada prevista dentro de `/app/schedule` y Fichaje `/app/time` solo como referencia F.15.
+- [x] Confirmadas diferencias esperadas de rol: `owner`/`admin` conservan configuracion global/accesos y gestion amplia; `manager` conserva gestion diaria tenant-wide sin configuracion global sensible; `coach` conserva uso personal/lectura y no ve colas tenant-wide sensibles; `center_manager` sigue futuro sin permisos por centro funcionales.
+- [x] Confirmado que cobertura, ausencias, eventos y jornada prevista siguen siendo contexto operativo o acciones humanas explicitas, no decisiones automaticas ni resolucion automatica de cobertura.
+- [x] No se ejecutan validaciones reales, smokes autenticados, invitacion, aceptacion, reset ni purga real por falta de acceso/entorno.
+
+Resultado OD.1/I.32 2026-05-18: `bloqueado por acceso/entorno`, no `listo para beta interna`.
+
+Fuera de OD.1/I.32:
+
+- IA funcional, embeddings, RAG, vector DB, prompts runtime, SDKs, jobs o UI de IA.
+- App nativa, push, geofencing, service worker, web push, background sync, caches privadas o lectura de ubicacion web.
+- Payroll, nomina, importes, compensaciones, saldos o aprobacion legal de horas extra.
+- Documentos firmables, subida visible documental, pagina documental completa o UI documental nueva.
+- Resolver cobertura automaticamente o crear ranking inteligente de coaches.
+- Calendario avanzado si no es estrictamente documental.
+- Migraciones o cambios de UI/codigo salvo correccion critica separada.
+- Hardcodear STL en `src` o introducir `service_role` en `src`.
+
+Verificacion documental esperada:
+
+- [x] `npm run typecheck` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `npm run lint` no aplica: corte solo documental, sin cambios de codigo.
+- [x] `git diff --check` global pasa el 2026-05-18; solo muestra avisos LF/CRLF del worktree.
+- [x] `git diff --check -- PROJECT_BRIEF.md TASKS.md docs\product\roadmap.md docs\product\webapp-completion-roadmap.md docs\operations\beta-operational-readiness-runbook.md docs\operations\tenant-readiness-checklist.md docs\operations\daily-operations-beta-readiness-runbook.md docs\architecture\security-baseline.md docs\product\ux-principles.md` pasa para docs trackeadas tocadas; `rg` de whitespace cubre tambien docs no trackeadas.
+- [x] `rg -n "[ \t]+$" PROJECT_BRIEF.md TASKS.md docs\product\roadmap.md docs\product\webapp-completion-roadmap.md docs\operations\beta-operational-readiness-runbook.md docs\operations\tenant-readiness-checklist.md docs\operations\daily-operations-beta-readiness-runbook.md docs\architecture\security-baseline.md docs\product\ux-principles.md` sin coincidencias.
+- [x] `rg -n "STL" src` sin coincidencias.
+- [x] `rg -n "service_role" src` sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
+- [x] `rg -n "navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage" src` sin nuevas coincidencias.
+- [x] Diff de los archivos documentales tocados por OD.1 y guardrails `rg` revisados para confirmar que el corte no abrio IA, app nativa, geofencing, payroll, documentos firmables, subida visible documental, UI documental nueva ni resolucion automatica de cobertura. El worktree global ya tenia cambios de `src` ajenos al corte y no se revierten.
+
 #### Cierre Transversal 2026-05-14 - Fixes UX Y Coherencia Operativa
 
 Estado: documentado el 2026-05-14 para no perder decisiones de producto aplicadas durante el pulido posterior a H.4/I.8. No abre una fase nueva ni cambia prioridades: congela comportamientos que ya existen y que no deben revertirse por refactor, "limpieza" visual o cambios futuros de navegacion.
@@ -2775,7 +8979,7 @@ Alcance cerrado:
 - [x] Plantillas: el coach por defecto se filtra para evitar asignar el mismo coach a dos bloques solapados dentro de la misma plantilla; el guardrail de horario real sigue en Postgres.
 - [x] Plantillas: guardar plantilla o bloque de plantilla sincroniza el rango activo mediante `ensureScheduleTemplateRangeApplied(...)`; ya no se comunica que "se asignara cuando apliques" si el rango activo ya dicta horario generado.
 - [x] Tipos de actividad: `update_class_type_and_sync_defaults(...)` actualiza el catalogo y sincroniza `required_coaches` en todas las plantillas y en horarios presentes/futuros no cancelados/completados. La migracion `00033` corrige el comportamiento conservador previo que solo tocaba bloques con el valor anterior.
-- [x] Cobertura: `/app/coverage` permite seleccionar varios riesgos y asignar explicitamente el mismo entrenador a todos los bloques seleccionados, reutilizando validacion server-side de tenant, rol operativo, bloque activo, entrenador asignable y solapes; no crea cobertura automaticamente ni modifica `schedule_blocks`.
+- [x] Cobertura: `/app/coverage` permite seleccionar varios riesgos y editar en lote el tipo de actividad, el numero de entrenadores necesarios o anadir un entrenador comun. El select desactiva entrenadores ocupados en la seleccion y la action revalida tenant, rol operativo, bloque activo, entrenador asignable y solapes; no crea cobertura automaticamente.
 - [x] Equipo: filtros de ficha por nombre/busqueda, centro y estado/rol operativo para gestionar listados largos sin convertir la pantalla en tabla pesada.
 - [x] Guia/onboarding: los pasos de Resumen de la semana y Pendiente deben apuntar a elementos reales; mantener atributos `data-tour` al refactorizar Inicio.
 
@@ -3557,7 +9761,7 @@ Alcance ejecutado:
 - [x] Filtro por centro con `center_id` en query string.
 - [x] Filtro por coach asignado con `coach_profile_id` en query string.
 - [x] Filtro por tipo de clase/actividad con `class_type_id` en query string.
-- [x] Filtro por estado operativo con `block_status` en query string.
+- [x] Filtro por estado operativo en query string. Retirado de la UI y de URLs nuevas en mayo de 2026 porque no aportaba valor operativo al usuario.
 - [x] Filtro por cobertura calculada con `coverage_state` limitado a `covered`, `uncovered`, `insufficient` y `conflict`.
 - [x] Filtro rapido "solo riesgos" con `risks_only=1`, incluyendo `uncovered`, `insufficient` y `conflict`.
 - [x] Mantener `organizationId` y `week` en la URL junto a los filtros.
@@ -3582,7 +9786,7 @@ Decisiones tecnicas:
 - No se crea migracion nueva: los filtros usan columnas existentes de `schedule_blocks`, `centers`, `class_types`, `coach_profiles` y `schedule_block_assignments`.
 - El filtrado se aplica en servidor despues de cargar la semana del tenant y calcular cobertura al vuelo.
 - El filtro de coach solo considera asignaciones con `assignment_status = 'assigned'`; `pending`, `declined` y `removed` no hacen que un bloque aparezca como asignado a ese coach.
-- `cancelled` y `completed` quedan fuera de "solo riesgos" porque el calculo los marca como `inactive`, pero pueden consultarse con `block_status`.
+- `cancelled` y `completed` quedan fuera de "solo riesgos" porque el calculo los marca como `inactive`; el estado queda como dato interno del bloque, no como filtro operativo de la UI.
 - No se crea dashboard visual, no se crean plantillas y no se implementan cambios, invitaciones, ausencias ni fichaje.
 
 Verificacion:
@@ -3602,7 +9806,7 @@ Alcance ejecutado:
 
 - [x] Filtro rapido "Mi horario" con `mine=1` en query string.
 - [x] Mantener `organizationId` y `week` en la URL junto al filtro.
-- [x] Conservar compatibilidad con `center_id`, `coach_profile_id`, `class_type_id`, `block_status`, `coverage_state` y `risks_only`.
+- [x] Conservar compatibilidad con `center_id`, `coach_profile_id`, `class_type_id`, `coverage_state` y `risks_only`.
 - [x] Combinar "Mi horario" con el resto de filtros como interseccion.
 - [x] Resolver el `coach_profile` del usuario autenticado dentro del tenant activo.
 - [x] Usar `schedule_block_assignments` como fuente canonica para decidir los bloques del usuario.
@@ -4166,8 +10370,9 @@ Dependencias de schema/migraciones futuras:
 - [ ] Crear turnos o bloques especiales de festivo.
 - [ ] Flujo voluntario para trabajar festivo.
 - [ ] Deteccion de impacto de eventos sobre cobertura.
-- [ ] Tracking interno de horas extra.
-- [ ] Validacion admin de horas extra.
+- [x] Tracking interno de horas extra como candidatos operativos de posible exceso (I.20-I.24), sin nomina ni calculo legal.
+- [x] Primera revision operativa admin de candidatos de posible exceso (I.23), sin validacion legal/payroll.
+- [x] Deteccion operativa prudente y manual de candidatos de posible exceso (I.24), sin automatismo legal/payroll.
 - [ ] Cierre mensual simple.
 
 ## Fase 5 - MVP 4: Fichaje
@@ -4182,8 +10387,10 @@ Dependencias de schema/migraciones futuras:
 
 ## Fase 6 - MVP 5: Documentos, Firmas Y Certificaciones
 
-- [ ] Repositorio de documentos laborales por empleado.
-- [ ] Documentos de empresa.
+- [x] E.11 abre un primer repositorio documental visible minimo en `/app/documents`, solo lectura y filtrado por grants/capacidades reales.
+- [x] E.19 anade un primer adjunto documental minimo desde `/app/documents` para `owner`, `admin` y `document_admin`, con metadata `company`/`programming`, Storage privado y preview/descarga por backend.
+- [ ] Repositorio completo de documentos laborales por empleado.
+- [ ] Documentos de empresa con subida/gestion visible.
 - [ ] Apartado de documentos publicos de equipo, visibles para miembros activos segun permisos del tenant.
 - [ ] Apartado de documentos de gestion/admin, visible solo para `admin` en el primer corte.
 - [ ] Apartado de documentos particulares de cada miembro, visibles para la persona afectada y roles autorizados.
@@ -4199,21 +10406,38 @@ Dependencias de schema/migraciones futuras:
 - [ ] Cursos/certificaciones de coaches.
 - [ ] Fechas de obtencion/caducidad.
 - [ ] Adjuntos de certificados.
-- [ ] Documentos/enlaces de programacion asociados a clase, tipo o fecha.
-- [ ] Boton "ver programacion" desde horario.
+- [x] E.6/I.27 modela programacion util asociada a documentos y horario como base previa a IA, sin UI visible ni subida real.
+- [x] E.7/I.28 crea base tecnica interna para documentos/enlaces de programacion asociados a clase, tipo, fecha, centro o bloque, sin UI visible.
+- [x] E.8/I.29 muestra programacion autorizada desde el detalle de bloque en Horario, con preview/descarga solo si `can_preview`/`can_download`.
+- [x] E.9/I.30 anade QA interno no visible para validar grants, denegaciones, cross-tenant y que asignaciones no conceden permiso documental.
+- [x] E.10/I.31 prepara runbook operativo interno local/QA para validacion manual controlada de programacion documental autorizada, con rollback y sin abrir UI documental, subida, asociaciones visibles ni IA.
+- [x] E.11 lista documentos/versiones accesibles desde `/app/documents`, con preview/descarga solo por rutas E.5 y sin subida, documentos firmables, payroll ni IA.
+- [x] E.12 prepara validacion QA/staging controlada del repositorio documental minimo con SQL rollback, evidencia esperada, grants, solo metadata, sin grant, cross-tenant y exclusiones sensibles.
+- [x] E.13 cierra evidencia local/bloqueos QA-staging del repositorio documental minimo con plantilla redacted y sin inventar evidencia.
+- [x] E.14 reintenta validacion QA/staging real con archivo Storage controlado y documenta bloqueo exacto por falta de acceso real/credenciales/casos QA desde el entorno actual.
+- [x] E.15 actualiza el desbloqueo controlado de validacion real con relectura de entorno redacted, SQL local rollback y bloqueo QA/staging exacto por falta de project/ref, DB URL, credenciales/casos QA y archivo `document-files` controlado.
+- [x] E.16 deja handoff operativo controlado para desbloquear validacion real QA/staging del repositorio documental minimo con operador autorizado, casos QA redacted, archivo `document-files` controlado, evidencia esperada y criterios de pass/bloqueado.
+- [x] E.17 reintenta validacion QA/staging asistida desde este entorno, confirma ausencia de acceso real/CLI/DB/casos/archivo controlado, reejecuta SQL local con rollback y mantiene QA/staging bloqueado sin inventar evidencia.
+- [x] E.19 implementa primer adjunto seguro desde `/app/documents`, sin grants UI, reemplazo de versiones, firma documental, payroll, IA, geolocalizacion ni gestor completo.
+- [x] E.18 reintenta validacion QA/staging real solo si hay acceso completo; confirma que solo existe CLI via `npx` sin proyectos/acceso, reejecuta SQL local con rollback y mantiene QA/staging bloqueado sin inventar evidencia.
+- [x] E.20 cierra control local de permisos negativos backend para el adjunto minimo E.19: `manager` y `coach` autenticados no abren preview/download directos por E.5 y generan auditoria `denied`.
 - [ ] Validar requisitos legales antes de presentar la firma como firma electronica avanzada/cualificada.
 
 ## Fase 7 - MVP 6: IA Sobre Programacion
 
+- [x] I.26 documenta que IA queda subordinada a documentos/programacion utiles, permisos, grants, auditoria, privacidad y fuentes canonicas; no implementa IA real.
+- [x] I.27 confirma que el siguiente paso tras IA documentada no es IA, sino programacion/documentos utiles asociados a horario.
 - [ ] Subida de PDFs de programacion.
 - [ ] Extraccion por dia/clase.
 - [ ] Consulta en lenguaje natural sobre programacion.
 - [ ] Resumen de material, escalados y notas.
+- [ ] Definir permisos, auditoria y fuentes canonicas antes de cualquier IA funcional.
 
 ## Backlog Futuro
 
 - [ ] Billing por organizacion/centro/coach.
 - [ ] Onboarding de nuevo box.
+- [ ] Eliminacion segura de usuarios/fichas creados por error desde Equipo: `owner` puede necesitar borrar una ficha pendiente, acceso o invitacion mal creada con modal de confirmacion; definir primero permisos, auditoria, bloqueo de auto-eliminacion, impacto en Auth, historial operativo y fallback a desactivar/archivar cuando existan referencias.
 - [ ] Permisos avanzados por centro.
 - [ ] Configuracion de categorias de tipos de actividad por tenant: el admin debe poder añadir, editar, desactivar y eliminar categorias visibles en `/app/class-types` cuando exista el modulo de Configuracion. La fase futura debe revisar la lista fija actual y el `CHECK` de `class_types.category`; si una categoria ya esta en uso, priorizar archivar/desactivar antes que borrado destructivo para preservar historial de bloques.
 - [ ] Exportes CSV/PDF.

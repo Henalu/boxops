@@ -41,23 +41,56 @@ Cobertura base sin credenciales:
   - `/app/schedule`
   - `/app/templates`
 
-Cobertura opcional con credenciales:
+## Flujo local autenticado recomendado
 
-- `admin` puede entrar en las superficies MVP 1:
-  - dashboard admin basico en `/app`
-  - centros
-  - usuarios/coaches
-  - tipos de actividad
-  - horario semanal
-  - cobertura
-  - plantillas semanales
-  - mas/gestion
-- `coach` puede entrar en las mismas superficies en lectura.
+Antes de validar smokes autenticados locales, prepara primero el fixture Auth en
+modo reversible:
+
+```bash
+npm run supabase:setup:e2e-auth
+```
+
+Ese comando es dry-run, termina en `ROLLBACK` y debe ejecutarse antes de
+cualquier `npm run supabase:setup:e2e-auth:commit` local. Usa el commit solo si
+la evidencia del dry-run cuadra y necesitas crear o reparar usuarios E2E
+persistentes en la DB local.
+
+`npm run supabase:reset` esta protegido y debe seguir bloqueando por defecto.
+No uses `npm run supabase:reset:danger` salvo autorizacion explicita del turno.
+
+Flujo expandido recomendado:
+
+```bash
+npm run supabase:setup:e2e-auth
+npm run test:smoke:e2e-auth
+npm run test:smoke:protected:roles
+```
+
+- `test:smoke:e2e-auth` es el preflight Auth minimo: login real por rol y pocas
+  rutas protegidas para confirmar que el fixture local funciona.
+- `test:smoke:protected:<rol>` ejecuta el recorrido amplio del mapa protegido
+  para un rol aislado (`owner`, `admin`, `manager` o `coach`).
+- `test:smoke:protected:roles` encadena owner, admin, manager y coach en orden,
+  reutilizando los scripts por rol.
+- `test:smoke:e2e-local` es el atajo completo local para los dos pasos de smoke:
+  preflight Auth minimo y despues recorrido amplio por roles.
+
+El motivo de separar el flujo es operativo: el problema detectado fue
+timeout/lentitud al juntar todo, no un fallo funcional de permisos.
+
+Cobertura autenticada local:
+
+- `owner`, `admin` y `manager` recorren las superficies de gestion permitidas.
+- `coach` recorre las superficies en lectura y las entradas propias esperadas.
 
 Variables opcionales:
 
+- `E2E_OWNER_EMAIL`
+- `E2E_OWNER_PASSWORD`
 - `E2E_ADMIN_EMAIL`
 - `E2E_ADMIN_PASSWORD`
+- `E2E_MANAGER_EMAIL`
+- `E2E_MANAGER_PASSWORD`
 - `E2E_COACH_EMAIL`
 - `E2E_COACH_PASSWORD`
 - `E2E_ORGANIZATION_ID` si el usuario tiene varias memberships activas.

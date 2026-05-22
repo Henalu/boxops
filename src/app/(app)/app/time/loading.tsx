@@ -8,14 +8,14 @@ export default function TimeLoading() {
     <div className="space-y-6">
       <PageHeader
         badge="Fichaje"
-        description="Cargando registros y correcciones de la organización activa."
+        description="Cargando registros, correcciones y candidatos operativos de la organización activa."
         title="Mi fichaje"
       />
 
       <Card>
         <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
           <Clock aria-hidden="true" className="size-4 animate-pulse" />
-          Cargando fichaje y revisión de correcciones...
+          Cargando fichaje, revisión de correcciones y posible exceso...
         </CardContent>
       </Card>
 

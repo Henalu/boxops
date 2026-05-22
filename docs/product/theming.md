@@ -2,7 +2,7 @@
 
 Este documento define como deberia funcionar el theming por tenant en BoxOps. Es una especificacion de producto/arquitectura visual, no una implementacion.
 
-Estado 2026-05-07: B.1 implementa el primer corte real de theming ligero y B.2 ajusta permisos compatibles. `organizations.theme_config jsonb` existe y `/app/settings` permite a `owner` y `admin` editar `accentColor`; la UI los muestra como Propietario y Administrador. `manager` (Responsable), `coach` (Entrenador) y roles especializados quedan en lectura para configuracion global. La aplicacion solo usa el acento para tokens de marca ligera (`primary`, `secondary`, `accent` y equivalentes de sidebar), con fallback de BoxOps si falta o no valida. Logo real, colores por centro y permisos por centro siguen pendientes.
+Estado 2026-05-17: B.1 implementa el primer corte real de theming ligero, B.2 ajusta permisos compatibles y B.4 documenta tenant readiness. `organizations.theme_config jsonb` existe y `/app/settings` permite a `owner` y `admin` editar `accentColor`; la UI los muestra como Propietario y Administrador. `manager` (Responsable), `coach` (Entrenador) y roles especializados quedan en lectura para configuracion global. La aplicacion solo usa el acento para tokens de marca ligera (`primary`, `secondary`, `accent` y equivalentes de sidebar), con fallback de BoxOps si falta o no valida. Logo real, colores por centro y permisos por centro siguen pendientes y no bloquean beta interna si el tenant tiene configuracion minima valida.
 
 ## Principio
 
@@ -174,6 +174,13 @@ Decision B.1:
 - no se guarda una URL publica en `theme_config`;
 - el logo queda bloqueado hasta definir modelo de asset/Storage privado, formatos, permisos y usos en documentos/exportes.
 
+Decision B.4:
+
+- el logo no es obligatorio para beta interna;
+- cualquier logo futuro debe ser asset privado/controlado, no URL publica pegada en `theme_config`;
+- `owner`/`admin` son candidatos a reemplazarlo, pero hace falta task propia con permisos, Storage, validacion de formatos y auditoria si afecta exports/documentos;
+- la app debe seguir siendo usable y reconocible como BoxOps sin logo de tenant.
+
 ## Centros Y Colores
 
 Los colores de centro ayudan en vistas multi-centro, pero deben ser discretos:
@@ -185,6 +192,8 @@ Los colores de centro ayudan en vistas multi-centro, pero deben ser discretos:
 - selector de centro.
 
 No usar grandes fondos por centro en dashboards o calendarios densos, porque compiten con estados de cobertura.
+
+B.4 deja colores por centro como opcionales. Solo deben abrirse si el uso real demuestra valor operativo; no son requisito para beta interna ni excusa para activar `center_manager`. Si se implementan, deben vivir como datos tenant-safe, validar contraste y no cambiar permisos.
 
 ## Tipos De Actividad
 
@@ -226,5 +235,6 @@ El primer corte B.1 ya cubre persistencia y acento minimo. Los siguientes cortes
 - que contraste y estados criticos no se rompen con tenants reales;
 - se pruebe con al menos dos configuraciones de tenant;
 - exista matriz de permisos para quien cambia logo, colores por centro o branding avanzado; B.2 solo habilita configuracion global para `owner`/`admin`;
+- B.4 se cumple mediante `docs/operations/tenant-readiness-checklist.md`: tenant usable sin logo, centro-colores opcionales y `center_manager` futuro hasta frontera por centro;
 - `rg -n "STL" src` no encuentre referencias hardcodeadas;
 - la UI siga siendo usable sin logo ni color configurado.

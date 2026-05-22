@@ -214,12 +214,28 @@ npm run build
 
 `npm run test:smoke` usa por defecto `http://127.0.0.1:3000` o `E2E_BASE_URL`. No levanta el dev server salvo que se pida explicitamente con `E2E_START_SERVER=1`.
 
+Smoke autenticado local recomendado:
+
+```bash
+npm run supabase:setup:e2e-auth
+npm run test:smoke:e2e-auth
+npm run test:smoke:protected:roles
+```
+
+`supabase:setup:e2e-auth` es dry-run con `ROLLBACK`; ejecutalo antes de
+cualquier `supabase:setup:e2e-auth:commit` local. El preflight
+`test:smoke:e2e-auth` valida el fixture Auth minimo. El recorrido amplio vive
+en `test:smoke:protected:<rol>` y el atajo `test:smoke:protected:roles`
+encadena owner, admin, manager y coach en orden. `test:smoke:e2e-local` es solo
+el atajo completo de ambos pasos.
+
 Supabase local:
 
 ```bash
 npm run supabase:start
 npm run supabase:status
 npm run supabase:reset
+npm run supabase:setup:e2e-auth
 npm run supabase:types
 ```
 
@@ -227,4 +243,6 @@ Notas:
 
 - `.env.local` sale de `.env.example`.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` debe ser la clave publishable/anon del Supabase local o remoto.
+- `npm run supabase:reset` esta protegido y bloquea por defecto porque `supabase db reset` borra `auth.users` y datos locales manuales. Usa `npm run supabase:reset:danger` solo con confirmacion explicita.
+- `npm run supabase:setup:e2e-auth` es dry-run; `npm run supabase:setup:e2e-auth:commit` recrea usuarios E2E locales desde `.env.local` cuando hagan falta smokes autenticados.
 - `npm run supabase:types` pisa `src/types/supabase.ts` con los tipos generados. Bien usado, es una bendicion. Mal usado contra el proyecto equivocado, una tarde curiosa.

@@ -27,6 +27,7 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -618,7 +619,7 @@ function AbsenceCreationForm({
   return (
     <section className="space-y-3">
       <SectionHeader
-        description="Crea solo una solicitud propia. La persona se deriva de tu sesion y organizacion activa."
+        description="Solicita vacaciones, permisos u otras ausencias para ti."
         title="Nueva solicitud"
       />
 
@@ -628,8 +629,9 @@ function AbsenceCreationForm({
             <div className="min-w-0">
               <CardTitle>Solicitud propia</CardTitle>
               <CardDescription>
-                Se envia a aprobacion operativa. No calcula saldos legales, no
-                crea cobertura y no sustituye revision laboral.
+                Al enviarla, quedara pendiente de revision del equipo
+                responsable. Si afecta al horario, la cobertura se gestiona
+                aparte.
               </CardDescription>
             </div>
             <Badge variant="outline">Propia</Badge>
@@ -740,7 +742,7 @@ function AbsenceCreationForm({
               />
               <span className="text-muted-foreground">
                 Confirmo que el resumen no incluye datos sensibles ni
-                justificantes. La revision es operativa, no legal definitiva.
+                justificantes. Se usara solo para gestionar esta solicitud.
               </span>
             </label>
 
@@ -1277,7 +1279,7 @@ export default async function AbsencesPage({
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Ausencias"
@@ -1285,8 +1287,8 @@ export default async function AbsencesPage({
         <details className="group max-w-3xl">
           <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
             <span>
-              Bandeja protegida de vacaciones, permisos y no disponibilidad, con
-              creacion propia minima.
+              Solicita vacaciones, permisos o no disponibilidad y consulta su
+              estado.
             </span>{" "}
             <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
               Mas
@@ -1308,21 +1310,19 @@ export default async function AbsencesPage({
       </PageHeader>
 
       {status && statusMessages[status] ? (
-        <Alert>
-          <AlertTitle>{statusMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La bandeja ya se ha recargado con la informacion visible para tu
-            rol.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="La bandeja ya se ha actualizado."
+          title={statusMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden="true" className="size-4" />
-          <AlertTitle>No se ha podido completar la accion</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se ha podido completar la accion"
+          tone="error"
+        />
       ) : null}
 
       {filters.errors.length > 0 ? (
@@ -1353,10 +1353,7 @@ export default async function AbsencesPage({
       ) : null}
 
       <section className="space-y-3">
-        <SectionHeader
-          description="Filtros simples por query string. No crean navegacion nueva ni cambian permisos."
-          title="Filtros"
-        />
+        <SectionHeader title="Filtros" />
         <AbsenceFiltersPanel
           canManage={canManage}
           filters={filters}
@@ -1372,10 +1369,7 @@ export default async function AbsencesPage({
       />
 
       <section className="space-y-3">
-        <SectionHeader
-          description="Lectura propia derivada de tu sesion y persona operativa vinculada."
-          title="Mis solicitudes"
-        />
+        <SectionHeader title="Mis solicitudes" />
         {!canUseSelfService ? null : ownResult && !ownResult.ok ? (
           <SectionError error={ownResult.error} />
         ) : filters.view === "review" ? (
@@ -1447,11 +1441,11 @@ export default async function AbsencesPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Limitaciones del corte</CardTitle>
+          <CardTitle>Uso de esta vista</CardTitle>
           <CardDescription>
-            I.13 abre solo creacion propia minima. No incluye creacion para otra
-            persona, calendario, saldos legales, bajas medicas documentadas,
-            payroll, adjuntos, push, geolocalizacion ni cobertura automatica.
+            Aqui puedes crear y consultar tus propias solicitudes. Para una
+            ausencia de otra persona, adjuntos o casos especiales, contacta con
+            el equipo responsable.
           </CardDescription>
         </CardHeader>
       </Card>

@@ -8,6 +8,7 @@ const protectedRoutes = [
   "/app/centers",
   "/app/coaches",
   "/app/class-types",
+  "/app/documents",
   "/app/coverage?week=2026-05-04",
   "/app/coverage?week=2026-05-04&block_id=00000000-0000-0000-0000-000000100412",
   "/app/more",

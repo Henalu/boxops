@@ -1368,7 +1368,7 @@ function AccessDenied({
       <PageHeader
         badge="Estadísticas"
         description="Panel reservado para administración y gestión operativa."
-        meta={<Badge variant="outline">Rol {getApplicationRoleLabel(role)}</Badge>}
+        meta={<Badge variant="outline">{getApplicationRoleLabel(role)}</Badge>}
         title="Estadísticas operativas"
       />
       <Alert variant="destructive">
@@ -1544,7 +1544,7 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Estadísticas operativas"

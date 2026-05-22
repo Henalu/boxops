@@ -18,8 +18,6 @@ type SendEmailResult =
 
 type ResendEmailResponse = {
   id?: string;
-  message?: string;
-  name?: string;
 };
 
 function getEmailConfig() {
@@ -72,15 +70,15 @@ export async function sendTransactionalEmail(
       method: "POST",
     });
 
-    const payload = (await response.json().catch(() => ({}))) as ResendEmailResponse;
-
     if (!response.ok) {
       return {
         code: "email-send-failed",
-        message: payload.message ?? payload.name ?? "Email provider rejected the request.",
+        message: "Email provider rejected the request.",
         ok: false,
       };
     }
+
+    const payload = (await response.json().catch(() => ({}))) as ResendEmailResponse;
 
     return {
       id: payload.id ?? null,

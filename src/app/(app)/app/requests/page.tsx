@@ -29,6 +29,7 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1065,7 +1066,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
           meta={
             <>
               <Badge variant="outline">{resolution.organization.name}</Badge>
-              <Badge variant="outline">Rol {roleLabel}</Badge>
+              <Badge variant="outline">{roleLabel}</Badge>
             </>
           }
           title="Solicitudes"
@@ -1103,7 +1104,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Solicitudes"
@@ -1134,31 +1135,19 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
       </PageHeader>
 
       {status && statusMessages[status] ? (
-        <Alert>
-          <AlertTitle>{statusMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La bandeja ya se ha recargado con la informacion visible por RLS.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="La bandeja ya esta actualizada."
+          title={statusMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden="true" className="size-4" />
-          <AlertTitle>No se ha podido completar la accion</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      {!canManage ? (
-        <Alert>
-          <AlertTitle>Vista acotada por rol</AlertTitle>
-          <AlertDescription>
-            Puedes ver solicitudes propias o recibidas segun RLS. La aprobacion,
-            rechazo operativo y aplicacion al horario quedan para Propietario,
-            Administrador o Responsable.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se ha podido completar la accion"
+          tone="error"
+        />
       ) : null}
 
       {creationOptionsResult.ok ? (

@@ -21,6 +21,69 @@ npm run supabase:reset
 npm run supabase:types
 ```
 
+`npm run supabase:reset` esta protegido por un wrapper local y bloquea por
+defecto. `supabase db reset` borra la base local completa, incluyendo
+`auth.users`, memberships y fixtures creadas manualmente. Para un reset local
+intencional usa:
+
+```bash
+npm run supabase:reset:danger
+```
+
+Si necesitas pasar argumentos a `supabase db reset`, anadelos despues de `--`:
+
+```bash
+npm run supabase:reset:danger -- --version 00046
+```
+
+Antes de confiar en usuarios E2E locales, y especialmente tras un reset, valida
+primero el fixture desde `.env.local` de forma reversible:
+
+```bash
+npm run supabase:setup:e2e-auth
+```
+
+Ese comando es dry-run, termina en `ROLLBACK` y debe ejecutarse antes de
+cualquier commit local del fixture. Si la evidencia cuadra y necesitas crear o
+reparar usuarios E2E persistentes, entonces ejecuta:
+
+```bash
+npm run supabase:setup:e2e-auth:commit
+```
+
+El commit persiste los usuarios Auth, memberships, `person_profiles` y el
+`coach_profile` necesario para el rol `coach`.
+
+Despues del commit, valida el fixture Auth local con un smoke minimo antes del
+recorrido amplio de producto:
+
+```bash
+npm run test:smoke:e2e-auth
+```
+
+El recorrido amplio de producto se puede ejecutar por rol para evitar timeouts
+agregados y conservar el spec unico:
+
+```bash
+npm run test:smoke:protected:owner
+npm run test:smoke:protected:admin
+npm run test:smoke:protected:manager
+npm run test:smoke:protected:coach
+```
+
+El atajo secuencial para esos cuatro roles es:
+
+```bash
+npm run test:smoke:protected:roles
+```
+
+La regresion local autenticada completa ejecuta primero el preflight Auth y
+despues el recorrido protegido por roles:
+
+```bash
+npm run test:smoke:e2e-local
+```
+
 O contra un proyecto remoto:
 
 ```bash
@@ -38,6 +101,8 @@ npx supabase db push
 - Los seeds no crean usuarios de Supabase Auth.
 - Los snippets no se ejecutan en `supabase db reset`; se aplican manualmente cuando haga falta validar un escenario local concreto.
 - Para dar acceso a un usuario real, primero debe existir en `auth.users`.
+- Los usuarios E2E locales no deben crearse a mano en Studio como unica fuente:
+  usa `npm run supabase:setup:e2e-auth:commit` para que sean recreables.
 - STL vive solo en `02_stl_tenant.sql`; la migracion base no contiene reglas especiales para STL.
 - Todas las tablas operativas incluyen `organization_id`.
 - RLS permite lectura a miembros activos y escritura a roles operativos/admin.

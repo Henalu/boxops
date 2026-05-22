@@ -16,24 +16,33 @@ import {
   resolveWeek,
 } from "@/lib/schedule-blocks";
 import {
+  addAuditFieldChange,
   auditFieldChange,
   auditFieldSet,
+  type OperationalAuditChangedFields,
   recordOperationalAuditEvent,
 } from "@/lib/operational-audit";
 import { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-type BulkAssignableBlock = {
+type BulkEditableBlock = {
+  center_id: string;
+  class_type_id: string;
   end_time: string;
   id: string;
+  is_template_exception: boolean;
+  notes: string | null;
   required_coaches: number;
   service_date: string;
   start_time: string;
   status: string;
+  template_block_id: string | null;
+  template_id: string | null;
 };
 
-const MAX_BULK_ASSIGNMENT_BLOCKS = 50;
+const BULK_KEEP_VALUE = "keep";
+const MAX_BULK_COVERAGE_BLOCKS = 50;
 const ACTION_RETURN_PATHS = ["/app/coverage"] as const;
 
 function getFormString(formData: FormData, key: string) {
@@ -158,13 +167,25 @@ function getAssignmentMutationError(errorCode?: string) {
   return "save-failed";
 }
 
+function getBlockMutationError(errorCode?: string) {
+  if (errorCode === "23503") {
+    return "invalid-reference";
+  }
+
+  if (errorCode === "23514") {
+    return "invalid-required-coaches";
+  }
+
+  return "save-failed";
+}
+
 function timeToMinutes(value: string) {
   const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
 
   return hours * 60 + minutes;
 }
 
-function blocksOverlap(first: BulkAssignableBlock, second: BulkAssignableBlock) {
+function blocksOverlap(first: BulkEditableBlock, second: BulkEditableBlock) {
   if (first.service_date !== second.service_date) {
     return false;
   }
@@ -241,7 +262,104 @@ async function validateAssignableCoach({
   return null;
 }
 
-async function getBulkAssignableBlocks({
+function parseBulkCoachProfileId(value: string | null) {
+  if (!value || value === BULK_KEEP_VALUE) {
+    return {
+      error: null,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  if (!isScheduleUuid(value)) {
+    return {
+      error: "invalid-coach" as const,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  return {
+    error: null,
+    shouldUpdate: true,
+    value,
+  } as const;
+}
+
+function parseBulkClassTypeId(value: string | null) {
+  if (!value || value === BULK_KEEP_VALUE) {
+    return {
+      error: null,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  if (!isScheduleUuid(value)) {
+    return {
+      error: "invalid-class-type" as const,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  return {
+    error: null,
+    shouldUpdate: true,
+    value,
+  } as const;
+}
+
+function parseBulkRequiredCoaches(value: string | null) {
+  if (!value) {
+    return {
+      error: null,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  const requiredCoaches = Number(value);
+
+  if (
+    !Number.isInteger(requiredCoaches) ||
+    requiredCoaches < 0 ||
+    requiredCoaches > 20
+  ) {
+    return {
+      error: "invalid-required-coaches" as const,
+      shouldUpdate: false,
+      value: null,
+    } as const;
+  }
+
+  return {
+    error: null,
+    shouldUpdate: true,
+    value: requiredCoaches,
+  } as const;
+}
+
+async function validateClassTypeReference({
+  classTypeId,
+  organizationId,
+  supabase,
+}: {
+  classTypeId: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+}) {
+  const { data, error } = await supabase
+    .from("class_types")
+    .select("id")
+    .eq("id", classTypeId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  return error || !data ? "invalid-class-type" : null;
+}
+
+async function getBulkEditableBlocks({
   blockIds,
   organizationId,
   supabase,
@@ -252,32 +370,29 @@ async function getBulkAssignableBlocks({
 }) {
   const { data: blocks, error } = await supabase
     .from("schedule_blocks")
-    .select("id, service_date, start_time, end_time, required_coaches, status")
+    .select(
+      "id, center_id, class_type_id, service_date, start_time, end_time, required_coaches, status, notes, template_id, template_block_id, is_template_exception",
+    )
     .eq("organization_id", organizationId)
     .in("id", blockIds);
 
   if (error || !blocks || blocks.length !== blockIds.length) {
     return {
       error: "invalid-block",
-      value: [] as BulkAssignableBlock[],
+      value: [] as BulkEditableBlock[],
     } as const;
   }
 
-  if (
-    blocks.some(
-      (block) =>
-        !isCoverageActiveBlock(block.status) || block.required_coaches <= 0,
-    )
-  ) {
+  if (blocks.some((block) => !isCoverageActiveBlock(block.status))) {
     return {
       error: "block-not-assignable",
-      value: [] as BulkAssignableBlock[],
+      value: [] as BulkEditableBlock[],
     } as const;
   }
 
   return {
     error: null,
-    value: blocks satisfies BulkAssignableBlock[],
+    value: blocks satisfies BulkEditableBlock[],
   } as const;
 }
 
@@ -302,7 +417,7 @@ async function getCoachAssignedBlocks({
   if (error || !assignments) {
     return {
       error: "save-failed",
-      value: [] as BulkAssignableBlock[],
+      value: [] as BulkEditableBlock[],
     } as const;
   }
 
@@ -317,20 +432,22 @@ async function getCoachAssignedBlocks({
   if (blockIds.length === 0) {
     return {
       error: null,
-      value: [] as BulkAssignableBlock[],
+      value: [] as BulkEditableBlock[],
     } as const;
   }
 
   const { data: blocks, error: blocksError } = await supabase
     .from("schedule_blocks")
-    .select("id, service_date, start_time, end_time, required_coaches, status")
+    .select(
+      "id, center_id, class_type_id, service_date, start_time, end_time, required_coaches, status, notes, template_id, template_block_id, is_template_exception",
+    )
     .eq("organization_id", organizationId)
     .in("id", blockIds);
 
   if (blocksError || !blocks) {
     return {
       error: "save-failed",
-      value: [] as BulkAssignableBlock[],
+      value: [] as BulkEditableBlock[],
     } as const;
   }
 
@@ -340,7 +457,7 @@ async function getCoachAssignedBlocks({
   } as const;
 }
 
-function hasSelectedBlockOverlap(blocks: BulkAssignableBlock[]) {
+function hasSelectedBlockOverlap(blocks: BulkEditableBlock[]) {
   for (let index = 0; index < blocks.length; index += 1) {
     for (let compareIndex = index + 1; compareIndex < blocks.length; compareIndex += 1) {
       if (blocksOverlap(blocks[index], blocks[compareIndex])) {
@@ -356,8 +473,8 @@ function hasExistingBlockOverlap({
   assignedBlocks,
   selectedBlocks,
 }: {
-  assignedBlocks: BulkAssignableBlock[];
-  selectedBlocks: BulkAssignableBlock[];
+  assignedBlocks: BulkEditableBlock[];
+  selectedBlocks: BulkEditableBlock[];
 }) {
   return selectedBlocks.some((selectedBlock) =>
     assignedBlocks.some((assignedBlock) =>
@@ -366,143 +483,72 @@ function hasExistingBlockOverlap({
   );
 }
 
-export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
-  const context = await getCoverageActionContext(formData);
-  const coachProfileId = getFormString(formData, "coachProfileId");
-  const blockIds = [...new Set(getFormStrings(formData, "scheduleBlockIds"))];
+function isTemplateAppliedBlock(block: BulkEditableBlock) {
+  return Boolean(block.template_id || block.template_block_id);
+}
 
-  if (blockIds.length === 0) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "bulk-selection-required",
-      }),
-    );
-  }
-
-  if (blockIds.length > MAX_BULK_ASSIGNMENT_BLOCKS) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "bulk-selection-too-large",
-      }),
-    );
-  }
-
-  if (!coachProfileId) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "coach-required",
-      }),
-    );
-  }
-
-  if (!isScheduleUuid(coachProfileId) || blockIds.some((id) => !isScheduleUuid(id))) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "invalid-block",
-      }),
-    );
-  }
-
-  const supabase = await createClient();
+async function validateBulkCoachAssignment({
+  blockIds,
+  coachProfileId,
+  organizationId,
+  selectedBlocks,
+  supabase,
+}: {
+  blockIds: string[];
+  coachProfileId: string;
+  organizationId: string;
+  selectedBlocks: BulkEditableBlock[];
+  supabase: SupabaseServerClient;
+}) {
   const coachError = await validateAssignableCoach({
     coachProfileId,
-    organizationId: context.organization.id,
+    organizationId,
     supabase,
   });
 
   if (coachError) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: coachError,
-      }),
-    );
+    return coachError;
   }
 
-  const selectedBlocksResult = await getBulkAssignableBlocks({
-    blockIds,
-    organizationId: context.organization.id,
-    supabase,
-  });
-
-  if (selectedBlocksResult.error) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: selectedBlocksResult.error,
-      }),
-    );
+  if (selectedBlocks.some((block) => block.required_coaches <= 0)) {
+    return "bulk-coach-not-needed";
   }
 
-  if (hasSelectedBlockOverlap(selectedBlocksResult.value)) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "coach-unavailable",
-      }),
-    );
+  if (hasSelectedBlockOverlap(selectedBlocks)) {
+    return "coach-unavailable";
   }
 
   const selectedBlockIdSet = new Set(blockIds);
   const assignedBlocksResult = await getCoachAssignedBlocks({
     coachProfileId,
-    organizationId: context.organization.id,
+    organizationId,
     selectedBlockIds: selectedBlockIdSet,
     supabase,
   });
 
   if (assignedBlocksResult.error) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: assignedBlocksResult.error,
-      }),
-    );
+    return assignedBlocksResult.error;
   }
 
   if (
     hasExistingBlockOverlap({
       assignedBlocks: assignedBlocksResult.value,
-      selectedBlocks: selectedBlocksResult.value,
+      selectedBlocks,
     })
   ) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "coach-unavailable",
-      }),
-    );
+    return "coach-unavailable";
   }
 
   const { data: existingAssignments, error: existingAssignmentsError } =
     await supabase
       .from("schedule_block_assignments")
       .select("id, assignment_status, schedule_block_id")
-      .eq("organization_id", context.organization.id)
+      .eq("organization_id", organizationId)
       .eq("coach_profile_id", coachProfileId)
       .in("schedule_block_id", blockIds);
 
   if (existingAssignmentsError || !existingAssignments) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "save-failed",
-      }),
-    );
+    return "save-failed";
   }
 
   if (
@@ -510,13 +556,33 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
       (assignment) => assignment.assignment_status !== "removed",
     )
   ) {
-    redirect(
-      getActionResultPath({
-        key: "error",
-        returnPath: context.returnPath,
-        value: "duplicate-assignment",
-      }),
-    );
+    return "duplicate-assignment";
+  }
+
+  return null;
+}
+
+async function assignCoachToBlocks({
+  blockIds,
+  coachProfileId,
+  organizationId,
+  supabase,
+}: {
+  blockIds: string[];
+  coachProfileId: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+}) {
+  const { data: existingAssignments, error: existingAssignmentsError } =
+    await supabase
+      .from("schedule_block_assignments")
+      .select("id, assignment_status, schedule_block_id")
+      .eq("organization_id", organizationId)
+      .eq("coach_profile_id", coachProfileId)
+      .in("schedule_block_id", blockIds);
+
+  if (existingAssignmentsError || !existingAssignments) {
+    return "save-failed";
   }
 
   const removedAssignmentsByBlockId = new Map(
@@ -537,18 +603,12 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
           source: "manual",
         })
         .eq("id", existingAssignment.id)
-        .eq("organization_id", context.organization.id)
+        .eq("organization_id", organizationId)
         .select("id")
         .single();
 
       if (error) {
-        redirect(
-          getActionResultPath({
-            key: "error",
-            returnPath: context.returnPath,
-            value: getAssignmentMutationError(error.code),
-          }),
-        );
+        return getAssignmentMutationError(error.code);
       }
 
       await recordOperationalAuditEvent({
@@ -564,7 +624,7 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
         },
         entityId: existingAssignment.id,
         entityType: "schedule_block_assignments",
-        organizationId: context.organization.id,
+        organizationId,
         supabase,
       });
 
@@ -576,7 +636,7 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
       .insert({
         assignment_status: "assigned",
         coach_profile_id: coachProfileId,
-        organization_id: context.organization.id,
+        organization_id: organizationId,
         schedule_block_id: blockId,
         source: "manual",
       })
@@ -584,13 +644,7 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
       .single();
 
     if (error || !assignment) {
-      redirect(
-        getActionResultPath({
-          key: "error",
-          returnPath: context.returnPath,
-          value: getAssignmentMutationError(error?.code),
-        }),
-      );
+      return getAssignmentMutationError(error?.code);
     }
 
     await recordOperationalAuditEvent({
@@ -603,16 +657,299 @@ export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
       },
       entityId: assignment.id,
       entityType: "schedule_block_assignments",
+      organizationId,
+      supabase,
+    });
+  }
+
+  return null;
+}
+
+async function updateBulkScheduleBlocks({
+  bulkSize,
+  classTypeId,
+  organizationId,
+  requiredCoaches,
+  selectedBlocks,
+  supabase,
+}: {
+  bulkSize: number;
+  classTypeId: string | null;
+  organizationId: string;
+  requiredCoaches: number | null;
+  selectedBlocks: BulkEditableBlock[];
+  supabase: SupabaseServerClient;
+}) {
+  for (const block of selectedBlocks) {
+    const updates: {
+      class_type_id?: string;
+      is_template_exception?: boolean;
+      required_coaches?: number;
+    } = {};
+    const changedFields: OperationalAuditChangedFields = {
+      bulk_size: auditFieldSet(bulkSize),
+      bulk_update: auditFieldSet(true),
+    };
+
+    if (classTypeId && block.class_type_id !== classTypeId) {
+      updates.class_type_id = classTypeId;
+      addAuditFieldChange(
+        changedFields,
+        "class_type_id",
+        block.class_type_id,
+        classTypeId,
+      );
+    }
+
+    if (requiredCoaches !== null && block.required_coaches !== requiredCoaches) {
+      updates.required_coaches = requiredCoaches;
+      addAuditFieldChange(
+        changedFields,
+        "required_coaches",
+        block.required_coaches,
+        requiredCoaches,
+      );
+    }
+
+    if (Object.keys(updates).length === 0) {
+      continue;
+    }
+
+    const shouldMarkTemplateException =
+      block.is_template_exception || isTemplateAppliedBlock(block);
+
+    if (shouldMarkTemplateException !== block.is_template_exception) {
+      updates.is_template_exception = shouldMarkTemplateException;
+      addAuditFieldChange(
+        changedFields,
+        "is_template_exception",
+        block.is_template_exception,
+        shouldMarkTemplateException,
+      );
+    }
+
+    const { error } = await supabase
+      .from("schedule_blocks")
+      .update(updates)
+      .eq("id", block.id)
+      .eq("organization_id", organizationId)
+      .select("id")
+      .single();
+
+    if (error) {
+      return getBlockMutationError(error.code);
+    }
+
+    await recordOperationalAuditEvent({
+      action: "updated",
+      changedFields,
+      entityId: block.id,
+      entityType: "schedule_blocks",
+      organizationId,
+      supabase,
+    });
+  }
+
+  return null;
+}
+
+export async function updateSelectedCoverageBlocks(formData: FormData) {
+  const context = await getCoverageActionContext(formData);
+  const blockIds = [...new Set(getFormStrings(formData, "scheduleBlockIds"))];
+
+  if (blockIds.length === 0) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "bulk-selection-required",
+      }),
+    );
+  }
+
+  if (blockIds.length > MAX_BULK_COVERAGE_BLOCKS) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "bulk-selection-too-large",
+      }),
+    );
+  }
+
+  if (blockIds.some((id) => !isScheduleUuid(id))) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "invalid-block",
+      }),
+    );
+  }
+
+  const coachUpdate = parseBulkCoachProfileId(getFormString(formData, "coachProfileId"));
+  const classTypeUpdate = parseBulkClassTypeId(
+    getFormString(formData, "classTypeId"),
+  );
+  const requiredCoachesUpdate = parseBulkRequiredCoaches(
+    getFormString(formData, "requiredCoaches"),
+  );
+  const firstValidationError =
+    coachUpdate.error ?? classTypeUpdate.error ?? requiredCoachesUpdate.error;
+
+  if (firstValidationError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: firstValidationError,
+      }),
+    );
+  }
+
+  if (
+    !coachUpdate.shouldUpdate &&
+    !classTypeUpdate.shouldUpdate &&
+    !requiredCoachesUpdate.shouldUpdate
+  ) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "bulk-update-required",
+      }),
+    );
+  }
+
+  if (
+    coachUpdate.shouldUpdate &&
+    coachUpdate.value &&
+    requiredCoachesUpdate.shouldUpdate &&
+    requiredCoachesUpdate.value === 0
+  ) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "bulk-coach-not-needed",
+      }),
+    );
+  }
+
+  const supabase = await createClient();
+
+  if (classTypeUpdate.shouldUpdate && classTypeUpdate.value) {
+    const classTypeError = await validateClassTypeReference({
+      classTypeId: classTypeUpdate.value,
       organizationId: context.organization.id,
       supabase,
     });
+
+    if (classTypeError) {
+      redirect(
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: classTypeError,
+        }),
+      );
+    }
+  }
+
+  const selectedBlocksResult = await getBulkEditableBlocks({
+    blockIds,
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  if (selectedBlocksResult.error) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: selectedBlocksResult.error,
+      }),
+    );
+  }
+
+  const selectedBlocksForAssignment =
+    coachUpdate.shouldUpdate &&
+    coachUpdate.value &&
+    requiredCoachesUpdate.shouldUpdate &&
+    requiredCoachesUpdate.value !== null
+      ? selectedBlocksResult.value.map((block) => ({
+          ...block,
+          required_coaches: requiredCoachesUpdate.value ?? block.required_coaches,
+        }))
+      : selectedBlocksResult.value;
+
+  if (coachUpdate.shouldUpdate && coachUpdate.value) {
+    const coachAssignmentError = await validateBulkCoachAssignment({
+      blockIds,
+      coachProfileId: coachUpdate.value,
+      organizationId: context.organization.id,
+      selectedBlocks: selectedBlocksForAssignment,
+      supabase,
+    });
+
+    if (coachAssignmentError) {
+      redirect(
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: coachAssignmentError,
+        }),
+      );
+    }
+  }
+
+  const blockUpdateError = await updateBulkScheduleBlocks({
+    bulkSize: blockIds.length,
+    classTypeId: classTypeUpdate.value,
+    organizationId: context.organization.id,
+    requiredCoaches: requiredCoachesUpdate.value,
+    selectedBlocks: selectedBlocksResult.value,
+    supabase,
+  });
+
+  if (blockUpdateError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: blockUpdateError,
+      }),
+    );
+  }
+
+  if (coachUpdate.shouldUpdate && coachUpdate.value) {
+    const assignmentError = await assignCoachToBlocks({
+      blockIds,
+      coachProfileId: coachUpdate.value,
+      organizationId: context.organization.id,
+      supabase,
+    });
+
+    if (assignmentError) {
+      redirect(
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: assignmentError,
+        }),
+      );
+    }
   }
 
   redirect(
     getActionResultPath({
       key: "status",
       returnPath: context.returnPath,
-      value: blockIds.length === 1 ? "assigned" : "bulk-assigned",
+      value: "bulk-updated",
     }),
   );
+}
+
+export async function assignCoachToSelectedCoverageBlocks(formData: FormData) {
+  return updateSelectedCoverageBlocks(formData);
 }

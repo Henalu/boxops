@@ -11,7 +11,9 @@ export type OperationalAuditEntityType =
   | "schedule_blocks"
   | "schedule_block_assignments"
   | "schedule_templates"
-  | "schedule_template_blocks";
+  | "schedule_template_blocks"
+  | "staff_work_windows"
+  | "operational_events";
 
 export type OperationalAuditAction =
   | "created"
@@ -22,6 +24,8 @@ export type OperationalAuditAction =
   | "linked_account"
   | "assigned"
   | "removed"
+  | "reactivated"
+  | "deactivated"
   | "archived"
   | "restored"
   | "applied_to_week";

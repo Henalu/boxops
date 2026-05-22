@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 
 import {
+  type CoverageBulkAssignment,
+  type CoverageBulkBlock,
+  type CoverageBulkClassType,
   CoverageBulkResolveList,
   type CoverageBulkRiskItem,
 } from "./coverage-bulk-resolve-list";
@@ -24,6 +27,7 @@ import {
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { RouteStateButton } from "@/components/features/route-state-link";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +50,10 @@ import {
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
 import { listOperationalAbsenceScheduleImpacts } from "@/lib/absence-requests";
+import {
+  listCoverageTraceItems,
+  type CoverageTraceItem,
+} from "@/lib/coverage-traceability";
 import { getCoveragePath, getSchedulePath } from "@/lib/navigation/app-paths";
 import {
   calculateScheduleCoverageByBlock,
@@ -119,6 +127,8 @@ type CoverageData = {
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
+  coverageTraceByBlock: Map<string, CoverageTraceItem[]>;
+  coverageTraceLoadError: string | null;
 };
 
 type CoachDisplay = {
@@ -146,6 +156,7 @@ const successMessages: Record<string, string> = {
   "assignment-removed": "Asignación retirada.",
   assigned: "Entrenador asignado.",
   "bulk-assigned": "Entrenador asignado a los bloques seleccionados.",
+  "bulk-updated": "Seleccion actualizada.",
 };
 
 const errorMessages: Record<string, string> = {
@@ -162,6 +173,9 @@ const errorMessages: Record<string, string> = {
   "bulk-selection-required": "Selecciona al menos un riesgo para resolver en lote.",
   "bulk-selection-too-large":
     "Selecciona menos bloques para resolverlos en lote.",
+  "bulk-update-required": "Elige al menos un cambio para aplicar en lote.",
+  "bulk-coach-not-needed":
+    "No se puede anadir entrenador comun si dejas los bloques sin requisito.",
   "duplicate-assignment":
     "Ese entrenador ya tiene una asignación lógica en este bloque.",
   forbidden: "Tu rol no permite gestionar la cobertura.",
@@ -169,7 +183,12 @@ const errorMessages: Record<string, string> = {
   "invalid-assignment-reference":
     "La asignación ya no apunta a un bloque o entrenador válido.",
   "invalid-block": "El bloque recibido no es válido.",
+  "invalid-class-type": "El tipo de actividad seleccionado no es valido.",
   "invalid-coach": "El entrenador seleccionado no es válido.",
+  "invalid-reference":
+    "Alguna referencia del cambio ya no pertenece a esta organizacion.",
+  "invalid-required-coaches":
+    "El numero de entrenadores debe estar entre 0 y 20.",
   "invalid-person-profile":
     "El perfil visible del entrenador no pertenece a esta organización.",
   "person-profile-inactive": "El perfil visible del entrenador no está activo.",
@@ -336,11 +355,13 @@ function buildCoachDisplays({
 
 async function getCoverageData({
   includeAbsenceImpacts,
+  includeCoverageTrace,
   organizationId,
   weekEnd,
   weekStart,
 }: {
   includeAbsenceImpacts: boolean;
+  includeCoverageTrace: boolean;
   organizationId: string;
   weekEnd: string;
   weekStart: string;
@@ -482,6 +503,17 @@ async function getCoverageData({
     memberships,
     persons,
   });
+  const coverageTraceResult =
+    includeCoverageTrace && blockIds.length > 0
+      ? await listCoverageTraceItems({
+          absenceImpacts,
+          limit: 120,
+          organizationId,
+          scheduleBlockIds: blockIds,
+          serviceDateFrom: weekStart,
+          serviceDateTo: weekEnd,
+        })
+      : { data: new Map<string, CoverageTraceItem[]>(), ok: true as const };
 
   return {
     assignments,
@@ -494,6 +526,12 @@ async function getCoverageData({
     classTypes,
     coachDisplaysById,
     coverageByBlock,
+    coverageTraceByBlock: coverageTraceResult.ok
+      ? coverageTraceResult.data
+      : new Map(),
+    coverageTraceLoadError: coverageTraceResult.ok
+      ? null
+      : coverageTraceResult.error,
   };
 }
 
@@ -663,18 +701,24 @@ function CoverageOverview({
 }
 
 function ResolveNow({
+  assignments,
   basePath,
+  blocks,
   canManageSchedule,
   centersById,
+  classTypes,
   classTypesById,
   coachOptions,
   organizationId,
   riskItems,
   weekStart,
 }: {
+  assignments: AssignmentRow[];
   basePath: string;
+  blocks: ScheduleBlockRow[];
   canManageSchedule: boolean;
   centersById: Map<string, CenterRow>;
+  classTypes: ClassTypeRow[];
   classTypesById: Map<string, ClassTypeRow>;
   coachOptions: CoachDisplay[];
   organizationId: string;
@@ -709,7 +753,7 @@ function ResolveNow({
       <SectionHeader
         description={
           canManageSchedule
-            ? "Selecciona varios riesgos si se pueden cubrir con el mismo entrenador."
+            ? "Selecciona riesgos para editar tipo, requisito o entrenador comun."
             : "Lo primero que debería revisar un rol operativo está arriba."
         }
         title="Resolver ahora"
@@ -730,8 +774,33 @@ function ResolveNow({
         />
       ) : (
         <CoverageBulkResolveList
+          assignments={
+            assignments.map((assignment) => ({
+              assignment_status: assignment.assignment_status,
+              coach_profile_id: assignment.coach_profile_id,
+              id: assignment.id,
+              schedule_block_id: assignment.schedule_block_id,
+            })) satisfies CoverageBulkAssignment[]
+          }
           basePath={basePath}
+          blocks={
+            blocks.map((block) => ({
+              end_time: block.end_time,
+              id: block.id,
+              required_coaches: block.required_coaches,
+              service_date: block.service_date,
+              start_time: block.start_time,
+              status: block.status,
+            })) satisfies CoverageBulkBlock[]
+          }
           canManageSchedule={canManageSchedule}
+          classTypes={
+            classTypes.map((classType) => ({
+              id: classType.id,
+              name: classType.name,
+              status: classType.status,
+            })) satisfies CoverageBulkClassType[]
+          }
           coachOptions={coachOptions}
           items={bulkRiskItems}
           organizationId={organizationId}
@@ -861,8 +930,12 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
   const canReviewAbsenceImpact = canManageAbsenceRequests(
     resolution.membership.role,
   );
+  const canManageSchedule = canManageOperationalData(
+    resolution.membership.role,
+  );
   const data = await getCoverageData({
     includeAbsenceImpacts: canReviewAbsenceImpact,
+    includeCoverageTrace: canManageSchedule,
     organizationId: resolution.organization.id,
     weekEnd: week.weekEnd,
     weekStart: week.weekStart,
@@ -871,9 +944,6 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
   const centersById = new Map(data.centers.map((center) => [center.id, center]));
   const classTypesById = new Map(
     data.classTypes.map((classType) => [classType.id, classType]),
-  );
-  const canManageSchedule = canManageOperationalData(
-    resolution.membership.role,
   );
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
   const coverageBasePath = getCoveragePath({
@@ -925,7 +995,7 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Cobertura"
@@ -980,19 +1050,19 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
       ) : null}
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La cola de cobertura ya muestra los datos actuales.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="La cola de cobertura ya muestra los datos actuales."
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       {data.absenceImpactLoadError ? (
@@ -1007,9 +1077,12 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
       <CoverageOverview blockCount={data.blocks.length} riskItems={riskItems} />
 
       <ResolveNow
+        assignments={data.assignments}
         basePath={coverageBasePath}
+        blocks={data.blocks}
         canManageSchedule={canManageSchedule}
         centersById={centersById}
+        classTypes={data.classTypes}
         classTypesById={classTypesById}
         coachOptions={data.assignableCoaches}
         organizationId={resolution.organization.id}
@@ -1053,6 +1126,8 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         classTypes={data.classTypes}
         coachDisplays={[...data.coachDisplaysById.values()]}
         coverageByBlock={[...data.coverageByBlock.entries()]}
+        coverageTraceByBlock={[...data.coverageTraceByBlock.entries()]}
+        coverageTraceLoadError={Boolean(data.coverageTraceLoadError)}
         initialSelectedBlockId={selectedBlockId}
         organizationId={resolution.organization.id}
         weekStart={week.weekStart}

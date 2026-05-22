@@ -206,7 +206,7 @@ En `page.tsx` esta:
 - lectura server-first de `schedule_blocks`
 - filtro semanal por `week=YYYY-MM-DD`
 - normalizacion de semana al lunes
-- filtros operativos por query string: `center_id`, `coach_profile_id`, `class_type_id`, `block_status`, `coverage_state`, `risks_only` y `mine`
+- filtros operativos por query string: `center_id`, `coach_profile_id`, `class_type_id`, `coverage_state`, `risks_only` y `mine`
 - validacion de que los IDs de filtros pertenecen al tenant activo antes de aplicarlos
 - resolucion de "Mi horario" desde el `coach_profile` del usuario autenticado dentro del tenant activo
 - selects de centros y tipos de actividad
@@ -387,9 +387,15 @@ Que no tocar a lo loco:
 Si cambia schema:
 
 1. nueva migracion
-2. `npm run supabase:reset`
-3. `npm run supabase:types`
-4. revisar que RLS sigue cerrando por organizacion
+2. `npm run supabase:reset` para confirmar que el reset queda bloqueado por defecto
+3. `npm run supabase:reset:danger` solo con confirmacion explicita del turno si hace falta reconstruir la DB local
+4. `npm run supabase:setup:e2e-auth` como dry-run con `ROLLBACK` antes de cualquier `supabase:setup:e2e-auth:commit` local
+5. `npm run supabase:setup:e2e-auth:commit` solo si la evidencia cuadra y los smokes autenticados necesitan crear o reparar usuarios locales recreables
+6. `npm run test:smoke:e2e-auth` como preflight Auth minimo
+7. `npm run test:smoke:protected:<rol>` para aislar owner, admin, manager o coach, o `npm run test:smoke:protected:roles` para el recorrido amplio secuencial
+8. `npm run test:smoke:e2e-local` si quieres ejecutar el preflight y el recorrido por roles como un atajo completo local
+9. `npm run supabase:types`
+10. revisar que RLS sigue cerrando por organizacion
 
 ## Como añadir una pantalla nueva bajo `/app`
 

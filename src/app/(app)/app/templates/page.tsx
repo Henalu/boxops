@@ -39,6 +39,7 @@ import {
   SectionHeader,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2730,19 +2731,19 @@ export default async function TemplatesPage({
       ) : null}
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La lista ya muestra las plantillas actuales.
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description="La lista ya muestra las plantillas actuales."
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       {canManageTemplates ? (
@@ -2902,7 +2903,7 @@ function PageHeader({
         {organizationName ? (
           <Badge variant="secondary">{organizationName}</Badge>
         ) : null}
-        {roleLabel ? <Badge variant="outline">Rol {roleLabel}</Badge> : null}
+        {roleLabel ? <Badge variant="outline">{roleLabel}</Badge> : null}
         {typeof templateCount === "number" ? (
           <Badge variant="outline">{templateCount} plantillas</Badge>
         ) : null}

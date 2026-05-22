@@ -19,6 +19,7 @@ import {
 } from "@/components/features/operations-ui";
 import { ColorPaletteField } from "@/components/features/color-palette-field";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -353,28 +354,30 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Configuración"
       />
 
       {status && successMessages[status] ? (
-        <Alert>
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            {status === "time-tracking-updated"
-              ? "La política de correcciones ya está disponible en fichaje."
-              : "La identidad ligera de la organización ya está aplicada en esta sesión."}
-          </AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={
+            status === "time-tracking-updated"
+              ? "La politica de correcciones ya esta disponible en fichaje."
+              : "La identidad de la organizacion ya esta aplicada."
+          }
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTitle>No se han guardado los cambios</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se han guardado los cambios"
+          tone="error"
+        />
       ) : null}
 
       {!canManageSettings ? (

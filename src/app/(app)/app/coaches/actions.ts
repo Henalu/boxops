@@ -128,6 +128,14 @@ function getTeamInvitationMutationError(errorCode?: string) {
   return "save-failed";
 }
 
+function getSafeInvitationEmailErrorMessage(errorCode: string) {
+  if (errorCode === "email-not-configured") {
+    return "El envio de email no esta configurado para este entorno.";
+  }
+
+  return "No se pudo entregar el email.";
+}
+
 function validateTeamInvitationForm(formData: FormData) {
   const rawEmail = getRequiredFormString(formData, "email");
   const email = normalizeInvitationEmail(rawEmail);
@@ -318,7 +326,7 @@ async function sendInvitationEmailAndMarkSent({
     await supabase
       .from("team_invitations")
       .update({
-        last_error: sendResult.message.slice(0, 1000),
+        last_error: getSafeInvitationEmailErrorMessage(sendResult.code),
         status: "failed",
       })
       .eq("id", invitationId)

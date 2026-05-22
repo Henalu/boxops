@@ -27,6 +27,10 @@ const mvpRoutes = [
     path: "/app/time",
   },
   {
+    heading: /Documentos/i,
+    path: "/app/documents",
+  },
+  {
     heading: /Centros/i,
     path: "/app/centers",
   },
@@ -67,7 +71,7 @@ const managementRoutes = [
   },
 ];
 
-test.describe("admin MVP 1 protected routes smoke", () => {
+test.describe("admin MVP 1 protected routes smoke @role-admin", () => {
   test.setTimeout(120_000);
 
   test.skip(
@@ -88,7 +92,7 @@ test.describe("admin MVP 1 protected routes smoke", () => {
   });
 });
 
-test.describe("coach MVP 1 protected routes smoke", () => {
+test.describe("coach MVP 1 protected routes smoke @role-coach", () => {
   test.setTimeout(120_000);
 
   test.skip(
@@ -133,7 +137,7 @@ test.describe("coach MVP 1 protected routes smoke", () => {
   });
 });
 
-test.describe("owner B.2 advanced role smoke", () => {
+test.describe("owner B.2 advanced role smoke @role-owner", () => {
   test.setTimeout(120_000);
 
   test.skip(
@@ -154,7 +158,7 @@ test.describe("owner B.2 advanced role smoke", () => {
   });
 });
 
-test.describe("manager B.2 operational role smoke", () => {
+test.describe("manager B.2 operational role smoke @role-manager", () => {
   test.setTimeout(120_000);
 
   test.skip(

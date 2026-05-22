@@ -68,6 +68,27 @@ const ABSENCE_REQUEST_MANAGEMENT_ROLES: ApplicationRole[] = [
   "admin",
   "manager",
 ];
+const STAFF_WORK_WINDOW_MANAGEMENT_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
+const OPERATIONAL_EVENT_READ_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+  "coach",
+];
+const OPERATIONAL_EVENT_MANAGEMENT_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
+const OVERTIME_CANDIDATE_REVIEW_ROLES: ApplicationRole[] = [
+  "owner",
+  "admin",
+  "manager",
+];
 
 export function isApplicationRole(role: string): role is ApplicationRole {
   return APPLICATION_ROLES.includes(role as ApplicationRole);
@@ -131,4 +152,24 @@ export function canUseAbsenceSelfService(role: string) {
 
 export function canManageAbsenceRequests(role: string) {
   return ABSENCE_REQUEST_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageStaffWorkWindows(role: string) {
+  return STAFF_WORK_WINDOW_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canReadOperationalEvents(role: string) {
+  return OPERATIONAL_EVENT_READ_ROLES.includes(role as ApplicationRole);
+}
+
+export function canManageOperationalEvents(role: string) {
+  return OPERATIONAL_EVENT_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canReadOvertimeCandidates(role: string) {
+  return isApplicationRole(role);
+}
+
+export function canReviewOvertimeCandidates(role: string) {
+  return OVERTIME_CANDIDATE_REVIEW_ROLES.includes(role as ApplicationRole);
 }

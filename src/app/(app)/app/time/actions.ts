@@ -9,6 +9,11 @@ import {
   requestOwnTimeCorrectionAction,
   reviewTimeCorrectionAction,
 } from "@/lib/time-tracking-actions";
+import {
+  setOvertimeCandidateStatus,
+  type OvertimeCandidateReviewStatus,
+} from "@/lib/overtime-candidates";
+import { detectOperationalOvertimeCandidates } from "@/lib/overtime-candidate-detection";
 import { canUsePersonalFeatures } from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
@@ -57,9 +62,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_DATE_TIME_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 const TIME_PATTERN = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
-const TIME_CORRECTION_TYPES = [
-  "record_update",
-  "punch_add",
+const APP_TIME_CORRECTION_TYPES = [
   "punch_update",
   "punch_void",
 ] as const satisfies readonly TimeCorrectionType[];
@@ -71,6 +74,15 @@ const TIME_CORRECTION_REVIEW_DECISIONS = [
   "approved",
   "rejected",
 ] as const satisfies readonly TimeCorrectionReviewDecision[];
+const OVERTIME_CANDIDATE_REVIEW_STATUSES = [
+  "needs_review",
+  "under_review",
+  "operationally_validated",
+  "operationally_rejected",
+  "closed",
+] as const satisfies readonly OvertimeCandidateReviewStatus[];
+type AppOvertimeCandidateReviewStatus =
+  (typeof OVERTIME_CANDIDATE_REVIEW_STATUSES)[number];
 const MAX_CORRECTION_NOTE_LENGTH = 1000;
 
 function getFormString(formData: FormData, key: string) {
@@ -100,6 +112,21 @@ function getRedirectWeekStart(formData: FormData) {
   return isDateInput(weekStart) ? weekStart : null;
 }
 
+function addDaysToDateInput(dateValue: string, days: number) {
+  if (!isDateInput(dateValue)) {
+    return null;
+  }
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 function getTimeErrorPath(
   organizationId: string | null,
   error: string,
@@ -124,8 +151,10 @@ function getTimeStatusPath(
   });
 }
 
-function isTimeCorrectionType(value: string): value is TimeCorrectionType {
-  return TIME_CORRECTION_TYPES.includes(value as TimeCorrectionType);
+function isAppTimeCorrectionType(value: string): value is TimeCorrectionType {
+  return APP_TIME_CORRECTION_TYPES.includes(
+    value as (typeof APP_TIME_CORRECTION_TYPES)[number],
+  );
 }
 
 function isTimePunchType(value: string): value is TimePunchType {
@@ -137,6 +166,14 @@ function isTimeCorrectionReviewDecision(
 ): value is TimeCorrectionReviewDecision {
   return TIME_CORRECTION_REVIEW_DECISIONS.includes(
     value as TimeCorrectionReviewDecision,
+  );
+}
+
+function isOvertimeCandidateReviewStatus(
+  value: string,
+): value is AppOvertimeCandidateReviewStatus {
+  return OVERTIME_CANDIDATE_REVIEW_STATUSES.includes(
+    value as AppOvertimeCandidateReviewStatus,
   );
 }
 
@@ -625,7 +662,7 @@ export async function submitOwnTimeCorrectionFromForm(formData: FormData) {
     redirectWithError("invalid_time_record");
   }
 
-  const normalizedCorrectionType = isTimeCorrectionType(correctionType)
+  const normalizedCorrectionType = isAppTimeCorrectionType(correctionType)
     ? correctionType
     : null;
 
@@ -850,4 +887,102 @@ export async function applyTimeCorrectionFromForm(formData: FormData) {
   }
 
   redirect(getTimeStatusPath(organizationId, "correction-applied"));
+}
+
+export async function detectOvertimeCandidatesFromForm(formData: FormData) {
+  const organizationId = getFormString(formData, "organizationId");
+  const weekStart = getRedirectWeekStart(formData);
+  const redirectWithError = (code: string): never => {
+    redirect(getTimeErrorPath(organizationId || null, code, weekStart));
+  };
+
+  if (!organizationId) {
+    redirectWithError("organization_required");
+  }
+
+  if (!isPostgresUuid(organizationId)) {
+    redirectWithError("invalid_organization");
+  }
+
+  if (!weekStart) {
+    redirectWithError("invalid_date");
+  }
+
+  const periodEndDate = addDaysToDateInput(
+    weekStart ?? redirectWithError("invalid_date"),
+    6,
+  );
+
+  if (!periodEndDate) {
+    redirectWithError("invalid_date");
+  }
+
+  const result = await detectOperationalOvertimeCandidates({
+    organizationId,
+    periodEndDate: periodEndDate ?? redirectWithError("invalid_date"),
+    periodStartDate: weekStart ?? redirectWithError("invalid_date"),
+  });
+
+  if (!result.ok) {
+    redirectWithError(`overtime_detection_${result.error.replaceAll("-", "_")}`);
+  }
+
+  const detectionSummary = result.ok
+    ? result.data
+    : redirectWithError("overtime_detection_save_failed");
+
+  redirect(
+    getTimePath({
+      organizationId,
+      overtimeCreated: detectionSummary.created,
+      overtimeExisting: detectionSummary.existing,
+      overtimeIgnored: detectionSummary.ignoredInsufficientData,
+      status: "overtime-detection-complete",
+      week: weekStart,
+    }),
+  );
+}
+
+export async function setOvertimeCandidateStatusFromForm(formData: FormData) {
+  const organizationId = getFormString(formData, "organizationId");
+  const candidateId = getFormString(formData, "candidateId");
+  const status = getFormString(formData, "overtimeCandidateStatus");
+  const weekStart = getRedirectWeekStart(formData);
+  const redirectWithError = (code: string): never => {
+    redirect(getTimeErrorPath(organizationId || null, code, weekStart));
+  };
+
+  if (!organizationId) {
+    redirectWithError("organization_required");
+  }
+
+  if (!isPostgresUuid(organizationId)) {
+    redirectWithError("invalid_organization");
+  }
+
+  if (!isPostgresUuid(candidateId)) {
+    redirectWithError("invalid_overtime_candidate");
+  }
+
+  if (!isOvertimeCandidateReviewStatus(status)) {
+    redirectWithError("invalid_overtime_candidate_status");
+  }
+
+  const result = await setOvertimeCandidateStatus({
+    candidateId,
+    organizationId,
+    status,
+  });
+
+  if (!result.ok) {
+    redirectWithError(`overtime_${result.error.replaceAll("-", "_")}`);
+  }
+
+  redirect(
+    getTimeStatusPath(
+      organizationId,
+      "overtime-candidate-updated",
+      weekStart,
+    ),
+  );
 }

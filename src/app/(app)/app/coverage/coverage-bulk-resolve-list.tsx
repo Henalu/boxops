@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowRight, CheckSquare, Square, X } from "lucide-react";
+import { CheckSquare, Save, Square, X } from "lucide-react";
 
-import { assignCoachToSelectedCoverageBlocks } from "./actions";
+import { updateSelectedCoverageBlocks } from "./actions";
 import { CoverageRiskCard } from "@/components/features/operations-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getUnavailableScheduleCoachAssignments } from "@/lib/schedule-blocks";
 
 type Tone =
   | "critical"
@@ -28,11 +30,68 @@ export type CoverageBulkRiskItem = {
   tone: Tone;
 };
 
+export type CoverageBulkBlock = {
+  end_time: string;
+  id: string;
+  required_coaches: number;
+  service_date: string;
+  start_time: string;
+  status: string;
+};
+
+export type CoverageBulkAssignment = {
+  assignment_status: string;
+  coach_profile_id: string;
+  id: string | null;
+  schedule_block_id: string;
+};
+
+export type CoverageBulkClassType = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 type CoachOption = {
   id: string;
   isFallback: boolean;
   label: string;
 };
+
+const KEEP_VALUE = "keep";
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
+
+  return hours * 60 + minutes;
+}
+
+function blocksOverlap(first: CoverageBulkBlock, second: CoverageBulkBlock) {
+  if (first.service_date !== second.service_date) {
+    return false;
+  }
+
+  return (
+    timeToMinutes(first.start_time) < timeToMinutes(second.end_time) &&
+    timeToMinutes(second.start_time) < timeToMinutes(first.end_time)
+  );
+}
+
+function hasSelectedBlockOverlap(blocks: CoverageBulkBlock[]) {
+  for (let index = 0; index < blocks.length; index += 1) {
+    for (
+      let compareIndex = index + 1;
+      compareIndex < blocks.length;
+      compareIndex += 1
+    ) {
+      if (blocksOverlap(blocks[index], blocks[compareIndex])) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 function BulkSubmitButton({
   disabled,
@@ -45,27 +104,36 @@ function BulkSubmitButton({
 
   return (
     <Button disabled={disabled || pending} type="submit">
-      {pending ? "Asignando..." : `Asignar a ${selectedCount}`}
-      <ArrowRight aria-hidden="true" />
+      {pending ? "Aplicando..." : `Aplicar a ${selectedCount}`}
+      <Save aria-hidden="true" />
     </Button>
   );
 }
 
 export function CoverageBulkResolveList({
+  assignments,
   basePath,
+  blocks,
   canManageSchedule,
+  classTypes,
   coachOptions,
   items,
   organizationId,
   weekStart,
 }: {
+  assignments: CoverageBulkAssignment[];
   basePath: string;
+  blocks: CoverageBulkBlock[];
   canManageSchedule: boolean;
+  classTypes: CoverageBulkClassType[];
   coachOptions: CoachOption[];
   items: CoverageBulkRiskItem[];
   organizationId: string;
   weekStart: string;
 }) {
+  const [bulkClassTypeId, setBulkClassTypeId] = useState(KEEP_VALUE);
+  const [bulkCoachProfileId, setBulkCoachProfileId] = useState(KEEP_VALUE);
+  const [bulkRequiredCoaches, setBulkRequiredCoaches] = useState("");
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -73,9 +141,86 @@ export function CoverageBulkResolveList({
     () => items.filter((item) => selectedBlockIds.has(item.blockId)),
     [items, selectedBlockIds],
   );
+  const selectedBlockIdSet = useMemo(
+    () => new Set(selectedItems.map((item) => item.blockId)),
+    [selectedItems],
+  );
+  const selectedBlocks = useMemo(
+    () => blocks.filter((block) => selectedBlockIdSet.has(block.id)),
+    [blocks, selectedBlockIdSet],
+  );
   const selectedCount = selectedItems.length;
   const allSelected = selectedCount === items.length && items.length > 0;
-  const canBulkAssign = canManageSchedule && coachOptions.length > 0;
+  const normalizedRequiredCoaches = bulkRequiredCoaches.trim();
+  const requiredCoachesValue =
+    normalizedRequiredCoaches === "" ? null : Number(normalizedRequiredCoaches);
+  const bulkRemovesRequirement =
+    requiredCoachesValue !== null &&
+    Number.isInteger(requiredCoachesValue) &&
+    requiredCoachesValue === 0;
+  const selectedBlocksHaveOverlap = useMemo(
+    () => hasSelectedBlockOverlap(selectedBlocks),
+    [selectedBlocks],
+  );
+  const unavailableCoachProfileIds = useMemo(() => {
+    const unavailable = new Set<string>();
+
+    if (selectedBlocks.length === 0) {
+      return unavailable;
+    }
+
+    const assignmentsOutsideSelection = assignments.filter(
+      (assignment) => !selectedBlockIdSet.has(assignment.schedule_block_id),
+    );
+
+    for (const coach of coachOptions) {
+      const isAlreadyAssignedToSelection = assignments.some(
+        (assignment) =>
+          selectedBlockIdSet.has(assignment.schedule_block_id) &&
+          assignment.assignment_status !== "removed" &&
+          assignment.coach_profile_id === coach.id,
+      );
+      const overlapsExistingBlock = selectedBlocks.some((targetBlock) =>
+        getUnavailableScheduleCoachAssignments({
+          assignments: assignmentsOutsideSelection,
+          blocks,
+          targetBlock,
+        }).some((unavailableBlock) => unavailableBlock.coachProfileId === coach.id),
+      );
+
+      if (
+        selectedBlocksHaveOverlap ||
+        isAlreadyAssignedToSelection ||
+        overlapsExistingBlock
+      ) {
+        unavailable.add(coach.id);
+      }
+    }
+
+    return unavailable;
+  }, [
+    assignments,
+    blocks,
+    coachOptions,
+    selectedBlockIdSet,
+    selectedBlocks,
+    selectedBlocksHaveOverlap,
+  ]);
+  const selectedCoachUnavailable =
+    bulkCoachProfileId !== KEEP_VALUE &&
+    unavailableCoachProfileIds.has(bulkCoachProfileId);
+  const effectiveBulkCoachProfileId =
+    bulkRemovesRequirement || selectedCoachUnavailable
+      ? KEEP_VALUE
+      : bulkCoachProfileId;
+  const hasBulkChange =
+    bulkClassTypeId !== KEEP_VALUE ||
+    effectiveBulkCoachProfileId !== KEEP_VALUE ||
+    normalizedRequiredCoaches !== "";
+  const canSubmitBulkEdit =
+    canManageSchedule &&
+    selectedCount > 0 &&
+    hasBulkChange;
 
   function toggleSelected(blockId: string) {
     setSelectedBlockIds((current) => {
@@ -99,16 +244,24 @@ export function CoverageBulkResolveList({
     setSelectedBlockIds(new Set());
   }
 
+  function updateRequiredCoaches(value: string) {
+    setBulkRequiredCoaches(value);
+
+    if (Number(value.trim()) === 0) {
+      setBulkCoachProfileId(KEEP_VALUE);
+    }
+  }
+
   return (
     <div className="grid gap-3">
       {canManageSchedule ? (
         <div className="rounded-lg border border-border bg-card px-3 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Resolver en lote</p>
+              <p className="text-sm font-medium">Editar selección</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Selecciona varios riesgos y asigna un mismo entrenador si está
-                libre en todas las franjas.
+                Cambia el tipo, el requisito o añade un entrenador común solo si
+                está libre en todos los bloques elegidos.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -135,8 +288,8 @@ export function CoverageBulkResolveList({
 
           {selectedCount > 0 ? (
             <form
-              action={assignCoachToSelectedCoverageBlocks}
-              className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-[minmax(0,1fr)_auto]"
+              action={updateSelectedCoverageBlocks}
+              className="mt-3 grid gap-3 border-t border-border pt-3 lg:grid-cols-[minmax(0,1fr)_150px_minmax(0,1fr)_auto]"
             >
               <input name="organizationId" type="hidden" value={organizationId} />
               <input name="weekStart" type="hidden" value={weekStart} />
@@ -149,35 +302,108 @@ export function CoverageBulkResolveList({
                   value={item.blockId}
                 />
               ))}
+
               <label className="grid min-w-0 gap-2">
-                <span className="text-sm font-medium">
-                  Entrenador para los seleccionados
-                </span>
+                <span className="text-sm font-medium">Tipo de actividad</span>
                 <select
-                  className="h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:h-9"
-                  disabled={!canBulkAssign}
-                  name="coachProfileId"
-                  required
+                  className="h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-9"
+                  name="classTypeId"
+                  onChange={(event) => setBulkClassTypeId(event.currentTarget.value)}
+                  value={bulkClassTypeId}
                 >
-                  {coachOptions.length === 0 ? (
-                    <option value="">Sin entrenadores asignables</option>
-                  ) : null}
-                  {coachOptions.map((coach) => (
-                    <option key={coach.id} value={coach.id}>
-                      {coach.label}
-                      {coach.isFallback ? " (sin perfil visible)" : ""}
+                  <option value={KEEP_VALUE}>Mantener tipo actual</option>
+                  {classTypes.map((classType) => (
+                    <option key={classType.id} value={classType.id}>
+                      {classType.name}
+                      {classType.status === "inactive" ? " (inactivo)" : ""}
                     </option>
                   ))}
                 </select>
               </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Entrenadores</span>
+                <Input
+                  max="20"
+                  min="0"
+                  name="requiredCoaches"
+                  onChange={(event) => updateRequiredCoaches(event.currentTarget.value)}
+                  placeholder="Mantener"
+                  type="number"
+                  value={bulkRequiredCoaches}
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Añadir entrenador</span>
+                {bulkRemovesRequirement ? (
+                  <>
+                    <input name="coachProfileId" type="hidden" value={KEEP_VALUE} />
+                    <select
+                      aria-readonly="true"
+                      className="h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:h-9"
+                      disabled
+                      value={KEEP_VALUE}
+                    >
+                      <option value={KEEP_VALUE}>No añadir con requisito 0</option>
+                    </select>
+                  </>
+                ) : (
+                  <select
+                    className="h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:h-9"
+                    disabled={coachOptions.length === 0}
+                    name="coachProfileId"
+                    onChange={(event) =>
+                      setBulkCoachProfileId(event.currentTarget.value)
+                    }
+                    value={effectiveBulkCoachProfileId}
+                  >
+                    <option value={KEEP_VALUE}>No añadir entrenador</option>
+                    {coachOptions.map((coach) => {
+                      const unavailable = unavailableCoachProfileIds.has(coach.id);
+
+                      return (
+                        <option
+                          disabled={unavailable}
+                          key={coach.id}
+                          value={coach.id}
+                        >
+                          {coach.label}
+                          {unavailable
+                            ? " (ocupado)"
+                            : coach.isFallback
+                              ? " (sin perfil visible)"
+                              : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </label>
+
               <div className="flex flex-wrap items-end gap-2">
                 <Badge variant="outline">
                   {selectedCount} seleccionado{selectedCount === 1 ? "" : "s"}
                 </Badge>
                 <BulkSubmitButton
-                  disabled={!canBulkAssign}
+                  disabled={!canSubmitBulkEdit}
                   selectedCount={selectedCount}
                 />
+              </div>
+
+              <div className="grid gap-1 text-xs leading-5 text-muted-foreground lg:col-span-4">
+                {bulkRemovesRequirement ? (
+                  <p>Con 0 entrenadores no se añade un entrenador común.</p>
+                ) : null}
+                {unavailableCoachProfileIds.size > 0 ? (
+                  <p>
+                    Los entrenadores ocupados o ya presentes en la selección
+                    aparecen desactivados.
+                  </p>
+                ) : null}
+                {!hasBulkChange ? (
+                  <p>Elige al menos un cambio para aplicar la selección.</p>
+                ) : null}
               </div>
             </form>
           ) : null}
@@ -220,7 +446,7 @@ export function CoverageBulkResolveList({
       {canManageSchedule && selectedCount === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Square aria-hidden="true" className="size-4" />
-          Marca los bloques que quieras resolver juntos.
+          Marca los bloques que quieras editar juntos.
         </p>
       ) : null}
     </div>

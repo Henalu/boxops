@@ -133,7 +133,7 @@ export async function updateClassType(formData: FormData) {
   const { error } = await supabase.rpc("update_class_type_and_sync_defaults", {
     target_category: validation.values.category,
     target_class_type_id: classTypeId,
-    target_color: validation.values.color,
+    target_color: validation.values.color as string,
     target_effective_from: getTodayDateString(context.organization.timezone),
     target_name: validation.values.name,
     target_organization_id: context.organization.id,

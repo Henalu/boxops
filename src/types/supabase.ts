@@ -34,6 +34,267 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_request_events: {
+        Row: {
+          absence_request_id: string
+          actor_membership_id: string
+          actor_person_profile_id: string | null
+          actor_user_id: string
+          changed_fields: Json
+          created_at: string
+          event_type: string
+          id: string
+          organization_id: string
+          result: string
+          retain_until: string
+        }
+        Insert: {
+          absence_request_id: string
+          actor_membership_id: string
+          actor_person_profile_id?: string | null
+          actor_user_id: string
+          changed_fields?: Json
+          created_at?: string
+          event_type: string
+          id?: string
+          organization_id: string
+          result?: string
+          retain_until: string
+        }
+        Update: {
+          absence_request_id?: string
+          actor_membership_id?: string
+          actor_person_profile_id?: string | null
+          actor_user_id?: string
+          changed_fields?: Json
+          created_at?: string
+          event_type?: string
+          id?: string
+          organization_id?: string
+          result?: string
+          retain_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absence_request_events_absence_request_id_organization_id_fkey"
+            columns: ["absence_request_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "absence_requests"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_request_events_actor_membership_id_organization_id_fkey"
+            columns: ["actor_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_request_events_actor_person_profile_id_organizatio_fkey"
+            columns: ["actor_person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_request_events_organization_id_actor_user_id_fkey"
+            columns: ["organization_id", "actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "absence_request_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      absence_request_periods: {
+        Row: {
+          absence_request_id: string
+          all_day: boolean
+          created_at: string
+          ends_at: string
+          id: string
+          organization_id: string
+          period_index: number
+          starts_at: string
+          timezone: string
+        }
+        Insert: {
+          absence_request_id: string
+          all_day?: boolean
+          created_at?: string
+          ends_at: string
+          id?: string
+          organization_id: string
+          period_index?: number
+          starts_at: string
+          timezone: string
+        }
+        Update: {
+          absence_request_id?: string
+          all_day?: boolean
+          created_at?: string
+          ends_at?: string
+          id?: string
+          organization_id?: string
+          period_index?: number
+          starts_at?: string
+          timezone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absence_request_periods_absence_request_id_organization_id_fkey"
+            columns: ["absence_request_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "absence_requests"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_request_periods_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      absence_requests: {
+        Row: {
+          absence_type: string
+          cancelled_at: string | null
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          reason_summary: string | null
+          requested_at: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at: string | null
+          retain_until: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          reviewed_by_person_profile_id: string | null
+          status: string
+          subject_coach_profile_id: string | null
+          subject_person_profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          absence_type: string
+          cancelled_at?: string | null
+          created_at?: string
+          expired_at?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id: string
+          reason_summary?: string | null
+          requested_at?: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at?: string | null
+          retain_until?: string
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by_membership_id?: string | null
+          reviewed_by_person_profile_id?: string | null
+          status?: string
+          subject_coach_profile_id?: string | null
+          subject_person_profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          absence_type?: string
+          cancelled_at?: string | null
+          created_at?: string
+          expired_at?: string | null
+          expires_at?: string | null
+          id?: string
+          organization_id?: string
+          reason_summary?: string | null
+          requested_at?: string
+          requested_by_membership_id?: string
+          requested_by_person_profile_id?: string
+          requested_by_user_id?: string
+          resolved_at?: string | null
+          retain_until?: string
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by_membership_id?: string | null
+          reviewed_by_person_profile_id?: string | null
+          status?: string
+          subject_coach_profile_id?: string | null
+          subject_person_profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absence_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absence_requests_organization_id_requested_by_user_id_fkey"
+            columns: ["organization_id", "requested_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_requested_by_membership_id_organization_i_fkey"
+            columns: ["requested_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_requested_by_person_profile_id_organizati_fkey"
+            columns: ["requested_by_person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_reviewed_by_membership_id_organization_id_fkey"
+            columns: ["reviewed_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_reviewed_by_person_profile_id_organizatio_fkey"
+            columns: ["reviewed_by_person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_subject_coach_profile_id_organization_id_fkey"
+            columns: ["subject_coach_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "coach_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "absence_requests_subject_person_profile_id_organization_id_fkey"
+            columns: ["subject_person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       center_time_location_settings: {
         Row: {
           activated_at: string | null
@@ -847,6 +1108,114 @@ export type Database = {
           },
         ]
       }
+      document_programming_links: {
+        Row: {
+          center_id: string | null
+          class_type_id: string | null
+          created_at: string
+          created_by_user_id: string
+          document_id: string
+          document_version_id: string
+          ends_on: string
+          id: string
+          organization_id: string
+          schedule_block_id: string | null
+          starts_on: string
+          status: string
+          updated_at: string
+          updated_by_user_id: string
+        }
+        Insert: {
+          center_id?: string | null
+          class_type_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          document_id: string
+          document_version_id: string
+          ends_on: string
+          id?: string
+          organization_id: string
+          schedule_block_id?: string | null
+          starts_on: string
+          status?: string
+          updated_at?: string
+          updated_by_user_id: string
+        }
+        Update: {
+          center_id?: string | null
+          class_type_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          document_id?: string
+          document_version_id?: string
+          ends_on?: string
+          id?: string
+          organization_id?: string
+          schedule_block_id?: string | null
+          starts_on?: string
+          status?: string
+          updated_at?: string
+          updated_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_programming_links_center_id_organization_id_fkey"
+            columns: ["center_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_class_type_id_organization_id_fkey"
+            columns: ["class_type_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "class_types"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_document_id_organization_id_fkey"
+            columns: ["document_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_document_version_id_document_id_fkey"
+            columns: ["document_version_id", "document_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id", "document_id", "organization_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_organization_id_created_by_user_fkey"
+            columns: ["organization_id", "created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_organization_id_updated_by_user_fkey"
+            columns: ["organization_id", "updated_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "document_programming_links_schedule_block_id_organization__fkey"
+            columns: ["schedule_block_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_blocks"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       document_subjects: {
         Row: {
           center_id: string | null
@@ -1174,6 +1543,104 @@ export type Database = {
           },
         ]
       }
+      operational_events: {
+        Row: {
+          all_day: boolean
+          archived_at: string | null
+          cancelled_at: string | null
+          center_id: string | null
+          created_at: string
+          created_by_membership_id: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          impact_level: string
+          notes: string | null
+          organization_id: string
+          retain_until: string
+          starts_at: string
+          status: string
+          timezone: string
+          title: string
+          updated_at: string
+          updated_by_membership_id: string | null
+          visibility: string
+        }
+        Insert: {
+          all_day?: boolean
+          archived_at?: string | null
+          cancelled_at?: string | null
+          center_id?: string | null
+          created_at?: string
+          created_by_membership_id?: string | null
+          ends_at?: string | null
+          event_type: string
+          id?: string
+          impact_level?: string
+          notes?: string | null
+          organization_id: string
+          retain_until?: string
+          starts_at: string
+          status?: string
+          timezone: string
+          title: string
+          updated_at?: string
+          updated_by_membership_id?: string | null
+          visibility?: string
+        }
+        Update: {
+          all_day?: boolean
+          archived_at?: string | null
+          cancelled_at?: string | null
+          center_id?: string | null
+          created_at?: string
+          created_by_membership_id?: string | null
+          ends_at?: string | null
+          event_type?: string
+          id?: string
+          impact_level?: string
+          notes?: string | null
+          organization_id?: string
+          retain_until?: string
+          starts_at?: string
+          status?: string
+          timezone?: string
+          title?: string
+          updated_at?: string
+          updated_by_membership_id?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_events_center_id_organization_id_fkey"
+            columns: ["center_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "operational_events_created_by_membership_id_organization_i_fkey"
+            columns: ["created_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "operational_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_events_updated_by_membership_id_organization_i_fkey"
+            columns: ["updated_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       organization_memberships: {
         Row: {
           created_at: string
@@ -1256,6 +1723,234 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      overtime_candidate_events: {
+        Row: {
+          actor_membership_id: string
+          actor_person_profile_id: string | null
+          actor_user_id: string
+          changed_fields: Json
+          created_at: string
+          event_type: string
+          id: string
+          new_status: string | null
+          organization_id: string
+          overtime_candidate_id: string
+          previous_status: string | null
+          result: string
+          retain_until: string
+        }
+        Insert: {
+          actor_membership_id: string
+          actor_person_profile_id?: string | null
+          actor_user_id: string
+          changed_fields?: Json
+          created_at?: string
+          event_type: string
+          id?: string
+          new_status?: string | null
+          organization_id: string
+          overtime_candidate_id: string
+          previous_status?: string | null
+          result?: string
+          retain_until?: string
+        }
+        Update: {
+          actor_membership_id?: string
+          actor_person_profile_id?: string | null
+          actor_user_id?: string
+          changed_fields?: Json
+          created_at?: string
+          event_type?: string
+          id?: string
+          new_status?: string | null
+          organization_id?: string
+          overtime_candidate_id?: string
+          previous_status?: string | null
+          result?: string
+          retain_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overtime_candidate_events_actor_membership_id_organization_fkey"
+            columns: ["actor_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_events_actor_person_profile_id_organiza_fkey"
+            columns: ["actor_person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_events_organization_id_actor_user_id_fkey"
+            columns: ["organization_id", "actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_events_overtime_candidate_id_organizati_fkey"
+            columns: ["overtime_candidate_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "overtime_candidates"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      overtime_candidate_sources: {
+        Row: {
+          created_at: string
+          created_by_membership_id: string
+          id: string
+          organization_id: string
+          overtime_candidate_id: string
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_membership_id: string
+          id?: string
+          organization_id: string
+          overtime_candidate_id: string
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by_membership_id?: string
+          id?: string
+          organization_id?: string
+          overtime_candidate_id?: string
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overtime_candidate_sources_created_by_membership_id_organi_fkey"
+            columns: ["created_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_sources_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overtime_candidate_sources_overtime_candidate_id_organizat_fkey"
+            columns: ["overtime_candidate_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "overtime_candidates"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      overtime_candidates: {
+        Row: {
+          candidate_minutes: number | null
+          closed_at: string | null
+          created_at: string
+          created_by_membership_id: string
+          detection_source: string
+          id: string
+          organization_id: string
+          period_end_date: string
+          period_start_date: string
+          person_profile_id: string
+          planned_minutes_snapshot: number
+          retain_until: string
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          status: string
+          timezone: string
+          updated_at: string
+          worked_minutes_snapshot: number
+        }
+        Insert: {
+          candidate_minutes?: number | null
+          closed_at?: string | null
+          created_at?: string
+          created_by_membership_id: string
+          detection_source?: string
+          id?: string
+          organization_id: string
+          period_end_date: string
+          period_start_date: string
+          person_profile_id: string
+          planned_minutes_snapshot: number
+          retain_until?: string
+          reviewed_at?: string | null
+          reviewed_by_membership_id?: string | null
+          status?: string
+          timezone: string
+          updated_at?: string
+          worked_minutes_snapshot: number
+        }
+        Update: {
+          candidate_minutes?: number | null
+          closed_at?: string | null
+          created_at?: string
+          created_by_membership_id?: string
+          detection_source?: string
+          id?: string
+          organization_id?: string
+          period_end_date?: string
+          period_start_date?: string
+          person_profile_id?: string
+          planned_minutes_snapshot?: number
+          retain_until?: string
+          reviewed_at?: string | null
+          reviewed_by_membership_id?: string | null
+          status?: string
+          timezone?: string
+          updated_at?: string
+          worked_minutes_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overtime_candidates_created_by_membership_id_organization__fkey"
+            columns: ["created_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overtime_candidates_person_profile_id_organization_id_fkey"
+            columns: ["person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "overtime_candidates_reviewed_by_membership_id_organization_fkey"
+            columns: ["reviewed_by_membership_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
       }
       person_profiles: {
         Row: {
@@ -1779,6 +2474,76 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_work_windows: {
+        Row: {
+          center_id: string | null
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          notes: string | null
+          organization_id: string
+          person_profile_id: string
+          start_time: string
+          status: string
+          updated_at: string
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          center_id?: string | null
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          person_profile_id: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          valid_from: string
+          valid_until?: string | null
+        }
+        Update: {
+          center_id?: string | null
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          person_profile_id?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_work_windows_center_id_organization_id_fkey"
+            columns: ["center_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "staff_work_windows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_work_windows_person_profile_id_organization_id_fkey"
+            columns: ["person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -2852,6 +3617,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      absence_request_changed_fields_is_safe: {
+        Args: { target_changed_fields: Json }
+        Returns: boolean
+      }
+      absence_request_summary_is_safe: {
+        Args: { target_summary: string }
+        Returns: boolean
+      }
       accept_team_invitation: {
         Args: { raw_invitation_token: string; target_invitation_id: string }
         Returns: {
@@ -2937,6 +3710,29 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "profile_signatures"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      add_overtime_candidate_source: {
+        Args: {
+          target_organization_id: string
+          target_overtime_candidate_id: string
+          target_source_id?: string
+          target_source_type: string
+        }
+        Returns: {
+          created_at: string
+          created_by_membership_id: string
+          id: string
+          organization_id: string
+          overtime_candidate_id: string
+          source_id: string | null
+          source_type: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "overtime_candidate_sources"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3206,6 +4002,10 @@ export type Database = {
         Args: { target_organization_id: string }
         Returns: boolean
       }
+      can_manage_absence_requests: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
       can_manage_change_requests: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -3222,12 +4022,31 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_manage_document_programming_link: {
+        Args: {
+          target_document_id: string
+          target_document_version_id: string
+          target_organization_id: string
+        }
+        Returns: boolean
+      }
+      can_manage_operational_events: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
       can_manage_time_location_settings: {
         Args: { target_organization_id: string }
         Returns: boolean
       }
       can_manage_time_tracking: {
         Args: { target_organization_id: string }
+        Returns: boolean
+      }
+      can_read_absence_request: {
+        Args: {
+          target_absence_request_id: string
+          target_organization_id: string
+        }
         Returns: boolean
       }
       can_read_change_request: {
@@ -3237,6 +4056,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_read_coverage_trace_events: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
       can_read_document_access_events: {
         Args: { target_document_id: string; target_organization_id: string }
         Returns: boolean
@@ -3244,6 +4067,64 @@ export type Database = {
       can_read_operational_audit_events: {
         Args: { target_organization_id: string }
         Returns: boolean
+      }
+      can_read_operational_event: {
+        Args: {
+          target_operational_event_id: string
+          target_organization_id: string
+        }
+        Returns: boolean
+      }
+      can_read_overtime_candidate: {
+        Args: {
+          target_organization_id: string
+          target_overtime_candidate_id: string
+        }
+        Returns: boolean
+      }
+      can_review_overtime_candidates: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
+      can_use_absence_self_service: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
+      cancel_absence_request: {
+        Args: {
+          target_absence_request_id: string
+          target_organization_id: string
+        }
+        Returns: {
+          absence_type: string
+          cancelled_at: string | null
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          reason_summary: string | null
+          requested_at: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at: string | null
+          retain_until: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          reviewed_by_person_profile_id: string | null
+          status: string
+          subject_coach_profile_id: string | null
+          subject_person_profile_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "absence_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       cancel_change_request: {
         Args: {
@@ -3368,7 +4249,41 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_own_change_request: {
+      create_document_programming_link: {
+        Args: {
+          target_center_id?: string
+          target_class_type_id?: string
+          target_document_id: string
+          target_document_version_id: string
+          target_ends_on?: string
+          target_organization_id: string
+          target_schedule_block_id?: string
+          target_starts_on: string
+        }
+        Returns: {
+          center_id: string | null
+          class_type_id: string | null
+          created_at: string
+          created_by_user_id: string
+          document_id: string
+          document_version_id: string
+          ends_on: string
+          id: string
+          organization_id: string
+          schedule_block_id: string | null
+          starts_on: string
+          status: string
+          updated_at: string
+          updated_by_user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "document_programming_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_managed_change_request_with_targets: {
         Args: {
           target_expires_at?: string
           target_organization_id: string
@@ -3376,6 +4291,7 @@ export type Database = {
           target_request_type?: string
           target_schedule_block_assignment_id: string
           target_schedule_block_id: string
+          target_target_coach_profile_ids: string[]
         }
         Returns: {
           accepted_target_id: string | null
@@ -3404,7 +4320,130 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_managed_change_request_with_targets: {
+      create_operational_event: {
+        Args: {
+          target_all_day?: boolean
+          target_center_id?: string
+          target_ends_at?: string
+          target_event_type: string
+          target_impact_level?: string
+          target_notes?: string
+          target_organization_id: string
+          target_starts_at: string
+          target_timezone?: string
+          target_title: string
+          target_visibility?: string
+        }
+        Returns: {
+          all_day: boolean
+          archived_at: string | null
+          cancelled_at: string | null
+          center_id: string | null
+          created_at: string
+          created_by_membership_id: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          impact_level: string
+          notes: string | null
+          organization_id: string
+          retain_until: string
+          starts_at: string
+          status: string
+          timezone: string
+          title: string
+          updated_at: string
+          updated_by_membership_id: string | null
+          visibility: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "operational_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_overtime_candidate_signal: {
+        Args: {
+          target_detection_source?: string
+          target_organization_id: string
+          target_period_end_date: string
+          target_period_start_date: string
+          target_person_profile_id: string
+          target_planned_minutes?: number
+          target_timezone?: string
+          target_worked_minutes?: number
+        }
+        Returns: {
+          candidate_minutes: number | null
+          closed_at: string | null
+          created_at: string
+          created_by_membership_id: string
+          detection_source: string
+          id: string
+          organization_id: string
+          period_end_date: string
+          period_start_date: string
+          person_profile_id: string
+          planned_minutes_snapshot: number
+          retain_until: string
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          status: string
+          timezone: string
+          updated_at: string
+          worked_minutes_snapshot: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "overtime_candidates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_own_absence_request: {
+        Args: {
+          target_absence_type: string
+          target_all_day?: boolean
+          target_ends_at: string
+          target_expires_at?: string
+          target_organization_id: string
+          target_reason_summary?: string
+          target_starts_at: string
+          target_timezone?: string
+        }
+        Returns: {
+          absence_type: string
+          cancelled_at: string | null
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          reason_summary: string | null
+          requested_at: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at: string | null
+          retain_until: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          reviewed_by_person_profile_id: string | null
+          status: string
+          subject_coach_profile_id: string | null
+          subject_person_profile_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "absence_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_own_change_request: {
         Args: {
           target_expires_at?: string
           target_organization_id: string
@@ -3412,7 +4451,6 @@ export type Database = {
           target_request_type?: string
           target_schedule_block_assignment_id: string
           target_schedule_block_id: string
-          target_target_coach_profile_ids: string[]
         }
         Returns: {
           accepted_target_id: string | null
@@ -3529,6 +4567,42 @@ export type Database = {
         Args: { target_file_extension: string; target_mime_type: string }
         Returns: boolean
       }
+      expire_absence_request: {
+        Args: {
+          target_absence_request_id: string
+          target_organization_id: string
+        }
+        Returns: {
+          absence_type: string
+          cancelled_at: string | null
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          reason_summary: string | null
+          requested_at: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at: string | null
+          retain_until: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          reviewed_by_person_profile_id: string | null
+          status: string
+          subject_coach_profile_id: string | null
+          subject_person_profile_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "absence_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       expire_change_request: {
         Args: {
           target_change_request_id: string
@@ -3620,6 +4694,48 @@ export type Database = {
         Args: never
         Returns: boolean
       }
+      list_absence_schedule_impacts: {
+        Args: {
+          target_absence_request_id: string
+          target_organization_id: string
+        }
+        Returns: {
+          absence_request_id: string
+          absence_request_period_id: string
+          impact_status: string
+          organization_id: string
+          schedule_block_assignment_id: string
+          schedule_block_id: string
+          subject_coach_profile_id: string
+        }[]
+      }
+      list_coverage_trace_audit_events: {
+        Args: {
+          target_limit?: number
+          target_organization_id: string
+          target_schedule_block_ids?: string[]
+        }
+        Returns: {
+          action: string
+          actor_membership_id: string
+          actor_person_profile_id: string | null
+          actor_user_id: string
+          changed_fields: Json
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+          result: string
+          retain_until: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "operational_audit_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_document_access_events_for_document: {
         Args: {
           target_document_id: string
@@ -3647,6 +4763,72 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_document_programming_for_block: {
+        Args: {
+          target_access_level?: string
+          target_limit?: number
+          target_organization_id: string
+          target_schedule_block_id: string
+        }
+        Returns: {
+          can_download: boolean
+          can_preview: boolean
+          center_id: string
+          class_type_id: string
+          created_at: string
+          document_id: string
+          document_status: string
+          document_title: string
+          document_type: string
+          document_version_id: string
+          ends_on: string
+          link_status: string
+          mime_type: string
+          organization_id: string
+          original_filename: string
+          programming_link_id: string
+          schedule_block_id: string
+          size_bytes: number
+          starts_on: string
+          updated_at: string
+          version_number: number
+          version_status: string
+        }[]
+      }
+      list_document_programming_for_context: {
+        Args: {
+          target_access_level?: string
+          target_center_id?: string
+          target_class_type_id?: string
+          target_limit?: number
+          target_organization_id: string
+          target_service_date: string
+        }
+        Returns: {
+          can_download: boolean
+          can_preview: boolean
+          center_id: string
+          class_type_id: string
+          created_at: string
+          document_id: string
+          document_status: string
+          document_title: string
+          document_type: string
+          document_version_id: string
+          ends_on: string
+          link_status: string
+          mime_type: string
+          organization_id: string
+          original_filename: string
+          programming_link_id: string
+          schedule_block_id: string
+          size_bytes: number
+          starts_on: string
+          updated_at: string
+          version_number: number
+          version_status: string
+        }[]
+      }
       list_operational_audit_events: {
         Args: {
           target_entity_type?: string
@@ -3670,6 +4852,42 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "operational_audit_events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_overtime_candidates: {
+        Args: {
+          target_limit?: number
+          target_organization_id: string
+          target_period_end_date?: string
+          target_period_start_date?: string
+          target_person_profile_id?: string
+          target_status?: string
+        }
+        Returns: {
+          candidate_minutes: number | null
+          closed_at: string | null
+          created_at: string
+          created_by_membership_id: string
+          detection_source: string
+          id: string
+          organization_id: string
+          period_end_date: string
+          period_start_date: string
+          person_profile_id: string
+          planned_minutes_snapshot: number
+          retain_until: string
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          status: string
+          timezone: string
+          updated_at: string
+          worked_minutes_snapshot: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "overtime_candidates"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -3800,9 +5018,67 @@ export type Database = {
         Args: { target_entity_type: string }
         Returns: number
       }
+      operational_event_notes_are_safe: {
+        Args: { target_notes: string }
+        Returns: boolean
+      }
+      operational_event_retain_until: {
+        Args: {
+          target_closed_at?: string
+          target_ends_at: string
+          target_starts_at: string
+          target_status: string
+        }
+        Returns: string
+      }
+      operational_event_title_is_safe: {
+        Args: { target_title: string }
+        Returns: boolean
+      }
+      overtime_candidate_changed_fields_is_safe: {
+        Args: { target_changed_fields: Json }
+        Returns: boolean
+      }
+      overtime_candidate_source_belongs_to_org: {
+        Args: {
+          target_organization_id: string
+          target_overtime_candidate_id: string
+          target_source_id: string
+          target_source_type: string
+        }
+        Returns: boolean
+      }
       purge_expired_operational_audit_events: {
         Args: { target_batch_size?: number }
         Returns: number
+      }
+      record_absence_request_event_internal: {
+        Args: {
+          target_absence_request_id: string
+          target_changed_fields: Json
+          target_event_type: string
+          target_organization_id: string
+          target_result: string
+        }
+        Returns: {
+          absence_request_id: string
+          actor_membership_id: string
+          actor_person_profile_id: string | null
+          actor_user_id: string
+          changed_fields: Json
+          created_at: string
+          event_type: string
+          id: string
+          organization_id: string
+          result: string
+          retain_until: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "absence_request_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_change_request_application_failure_internal: {
         Args: {
@@ -3960,6 +5236,38 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "operational_audit_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_overtime_candidate_event_internal: {
+        Args: {
+          target_changed_fields?: Json
+          target_event_type: string
+          target_new_status?: string
+          target_organization_id: string
+          target_overtime_candidate_id: string
+          target_previous_status?: string
+          target_result?: string
+        }
+        Returns: {
+          actor_membership_id: string
+          actor_person_profile_id: string | null
+          actor_user_id: string
+          changed_fields: Json
+          created_at: string
+          event_type: string
+          id: string
+          new_status: string | null
+          organization_id: string
+          overtime_candidate_id: string
+          previous_status: string | null
+          result: string
+          retain_until: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "overtime_candidate_events"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4138,6 +5446,43 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      resolve_time_record_for_correction_punch: {
+        Args: {
+          target_center_id: string
+          target_correction_id: string
+          target_local_work_date: string
+          target_membership_id: string
+          target_organization_id: string
+          target_person_profile_id: string
+          target_source: string
+          target_timezone: string
+          target_user_id: string
+        }
+        Returns: {
+          center_id: string | null
+          created_at: string
+          created_by_membership_id: string | null
+          created_by_user_id: string
+          id: string
+          local_work_date: string
+          metadata: Json
+          organization_id: string
+          person_profile_id: string
+          planned_end_at: string | null
+          planned_start_at: string | null
+          schedule_block_assignment_id: string | null
+          schedule_block_id: string | null
+          status: string
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_records"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       respond_to_change_request_target: {
         Args: {
           target_change_request_target_id: string
@@ -4160,6 +5505,43 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "change_request_targets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      review_absence_request: {
+        Args: {
+          target_absence_request_id: string
+          target_decision: string
+          target_organization_id: string
+        }
+        Returns: {
+          absence_type: string
+          cancelled_at: string | null
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          organization_id: string
+          reason_summary: string | null
+          requested_at: string
+          requested_by_membership_id: string
+          requested_by_person_profile_id: string
+          requested_by_user_id: string
+          resolved_at: string | null
+          retain_until: string
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          reviewed_by_person_profile_id: string | null
+          status: string
+          subject_coach_profile_id: string | null
+          subject_person_profile_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "absence_requests"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4202,6 +5584,103 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "center_time_location_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_document_programming_link_status: {
+        Args: {
+          target_document_programming_link_id: string
+          target_organization_id: string
+          target_status: string
+        }
+        Returns: {
+          center_id: string | null
+          class_type_id: string | null
+          created_at: string
+          created_by_user_id: string
+          document_id: string
+          document_version_id: string
+          ends_on: string
+          id: string
+          organization_id: string
+          schedule_block_id: string | null
+          starts_on: string
+          status: string
+          updated_at: string
+          updated_by_user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "document_programming_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_operational_event_status: {
+        Args: {
+          target_operational_event_id: string
+          target_organization_id: string
+          target_status: string
+        }
+        Returns: {
+          all_day: boolean
+          archived_at: string | null
+          cancelled_at: string | null
+          center_id: string | null
+          created_at: string
+          created_by_membership_id: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          impact_level: string
+          notes: string | null
+          organization_id: string
+          retain_until: string
+          starts_at: string
+          status: string
+          timezone: string
+          title: string
+          updated_at: string
+          updated_by_membership_id: string | null
+          visibility: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "operational_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_overtime_candidate_status: {
+        Args: {
+          target_organization_id: string
+          target_overtime_candidate_id: string
+          target_status: string
+        }
+        Returns: {
+          candidate_minutes: number | null
+          closed_at: string | null
+          created_at: string
+          created_by_membership_id: string
+          detection_source: string
+          id: string
+          organization_id: string
+          period_end_date: string
+          period_start_date: string
+          person_profile_id: string
+          planned_minutes_snapshot: number
+          retain_until: string
+          reviewed_at: string | null
+          reviewed_by_membership_id: string | null
+          status: string
+          timezone: string
+          updated_at: string
+          worked_minutes_snapshot: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "overtime_candidates"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4320,8 +5799,8 @@ export type Database = {
         Args: {
           target_category: string
           target_class_type_id: string
-          target_color: string | null
-          target_effective_from?: string | null
+          target_color: string
+          target_effective_from?: string
           target_name: string
           target_organization_id: string
           target_required_coaches: number
@@ -4330,6 +5809,50 @@ export type Database = {
           target_status: string
         }
         Returns: Json
+      }
+      update_operational_event: {
+        Args: {
+          target_all_day?: boolean
+          target_center_id?: string
+          target_ends_at?: string
+          target_event_type: string
+          target_impact_level?: string
+          target_notes?: string
+          target_operational_event_id: string
+          target_organization_id: string
+          target_starts_at: string
+          target_timezone?: string
+          target_title: string
+          target_visibility?: string
+        }
+        Returns: {
+          all_day: boolean
+          archived_at: string | null
+          cancelled_at: string | null
+          center_id: string | null
+          created_at: string
+          created_by_membership_id: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          impact_level: string
+          notes: string | null
+          organization_id: string
+          retain_until: string
+          starts_at: string
+          status: string
+          timezone: string
+          title: string
+          updated_at: string
+          updated_by_membership_id: string | null
+          visibility: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "operational_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_organization_time_tracking_config: {
         Args: {

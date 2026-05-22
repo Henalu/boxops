@@ -157,12 +157,26 @@ npm run dev
 npm run build
 npm run lint
 npm run test:smoke
+npm run test:smoke:e2e-auth
+npm run test:smoke:protected
+npm run test:smoke:protected:owner
+npm run test:smoke:protected:admin
+npm run test:smoke:protected:manager
+npm run test:smoke:protected:coach
+npm run test:smoke:protected:roles
+npm run test:smoke:e2e-local
 npm run typecheck
 npm run supabase:start
 npm run supabase:status
 npm run supabase:reset
+npm run supabase:reset:danger
+npm run supabase:setup:e2e-auth
+npm run supabase:setup:e2e-auth:commit
 npm run supabase:types
 ```
+
+La lista anterior incluye comandos disponibles; `supabase:reset:danger` y
+`supabase:setup:e2e-auth:commit` no forman parte del flujo por defecto.
 
 Smoke tests:
 
@@ -170,7 +184,41 @@ Smoke tests:
 npm run test:smoke
 ```
 
-Por defecto usan `http://127.0.0.1:3000` o `E2E_BASE_URL`. No arrancan el dev server salvo opt-in explicito con `E2E_START_SERVER=1`. Los flujos autenticados usan variables opcionales `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_COACH_EMAIL`, `E2E_COACH_PASSWORD`, `E2E_ORGANIZATION_ID` y `E2E_WEEK`.
+Por defecto usan `http://127.0.0.1:3000` o `E2E_BASE_URL`. No arrancan el dev server salvo opt-in explicito con `E2E_START_SERVER=1`. Los flujos autenticados usan variables opcionales `E2E_OWNER_EMAIL`, `E2E_OWNER_PASSWORD`, `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD`, `E2E_MANAGER_EMAIL`, `E2E_MANAGER_PASSWORD`, `E2E_COACH_EMAIL`, `E2E_COACH_PASSWORD`, `E2E_ORGANIZATION_ID` y `E2E_WEEK`.
+
+Antes de una regresion local autenticada, ejecuta
+`npm run supabase:setup:e2e-auth` como dry-run con `ROLLBACK`. Usa
+`npm run supabase:setup:e2e-auth:commit` solo si esa evidencia cuadra y hay que
+crear o reparar usuarios E2E locales persistentes.
+
+Para validar solo el fixture Auth local con login real y pocas rutas por rol:
+
+```bash
+npm run test:smoke:e2e-auth
+```
+
+Para validar el recorrido amplio de rutas protegidas sin mezclar todos los
+roles en una sola ejecucion:
+
+```bash
+npm run test:smoke:protected:owner
+npm run test:smoke:protected:admin
+npm run test:smoke:protected:manager
+npm run test:smoke:protected:coach
+```
+
+El atajo secuencial equivalente para los cuatro roles es:
+
+```bash
+npm run test:smoke:protected:roles
+```
+
+Para una regresion local autenticada completa, ejecuta primero el preflight Auth
+minimo y despues el recorrido amplio aislado por roles:
+
+```bash
+npm run test:smoke:e2e-local
+```
 
 Supabase local:
 
@@ -178,8 +226,24 @@ Supabase local:
 npm run supabase:start
 npm run supabase:status
 npm run supabase:reset
+npm run supabase:setup:e2e-auth
 npm run supabase:types
 ```
+
+`npm run supabase:reset` esta protegido: no ejecuta `supabase db reset`
+directamente porque ese comando borra la base local, incluyendo
+`auth.users`, memberships y datos de prueba creados manualmente. Para un reset
+local intencional usa `npm run supabase:reset:danger`.
+
+Despues de un reset, los seeds no recrean usuarios de Supabase Auth. Para
+preparar usuarios locales E2E reproducibles desde `.env.local`, ejecuta primero
+`npm run supabase:setup:e2e-auth` en modo dry-run y, si la evidencia cuadra,
+`npm run supabase:setup:e2e-auth:commit`.
+Despues del commit, `npm run test:smoke:e2e-auth` valida owner, admin, manager
+y coach con un recorrido minimo antes del recorrido amplio. Para el mapa de
+producto protegido, usa `npm run test:smoke:protected:roles`, que ejecuta
+owner, admin, manager y coach aislados y en orden. El flujo completo local es
+`npm run test:smoke:e2e-local`.
 
 ## Auth y tenancy MVP 1
 

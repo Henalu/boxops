@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
-import { canManageOperationalData } from "@/lib/auth/permissions";
+import {
+  canManageOperationalData,
+  canManageStaffWorkWindows,
+} from "@/lib/auth/permissions";
 import {
   getActiveMemberships,
   getAuthenticatedUser,
@@ -12,7 +15,6 @@ import {
 import { getSchedulePath } from "@/lib/navigation/app-paths";
 import {
   isCoverageActiveBlock,
-  isScheduleBlockStatus,
   isScheduleFilterCoverageState,
   isScheduleUuid,
   resolveWeek,
@@ -21,6 +23,11 @@ import {
   validateScheduleBlockForm,
   type ScheduleBlockFormValues,
 } from "@/lib/schedule-blocks";
+import {
+  validateStaffWorkWindowForm,
+  validateStaffWorkWindowReferences,
+  type StaffWorkWindowFormValues,
+} from "@/lib/staff-work-windows";
 import {
   addAuditFieldChange,
   auditFieldChange,
@@ -33,7 +40,6 @@ import { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type ScheduleRedirectFilters = {
-  blockStatus?: string | null;
   centerId?: string | null;
   classTypeId?: string | null;
   coachProfileId?: string | null;
@@ -41,6 +47,7 @@ type ScheduleRedirectFilters = {
   day?: string | null;
   mineOnly?: boolean | null;
   risksOnly?: boolean | null;
+  showWorkWindows?: boolean | null;
   view?: string | null;
 };
 
@@ -119,15 +126,14 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
   const centerId = getRequiredFormString(formData, "center_id");
   const coachProfileId = getRequiredFormString(formData, "coach_profile_id");
   const classTypeId = getRequiredFormString(formData, "class_type_id");
-  const blockStatus = getRequiredFormString(formData, "block_status");
   const coverageState = getRequiredFormString(formData, "coverage_state");
   const mineOnly = getRequiredFormString(formData, "mine");
   const risksOnly = getRequiredFormString(formData, "risks_only");
+  const workWindows = getRequiredFormString(formData, "work_windows");
   const view = getRequiredFormString(formData, "view");
   const day = getRequiredFormString(formData, "day");
 
   return {
-    blockStatus: isScheduleBlockStatus(blockStatus) ? blockStatus : null,
     centerId: isScheduleUuid(centerId) ? centerId : null,
     classTypeId: isScheduleUuid(classTypeId) ? classTypeId : null,
     coachProfileId: isScheduleUuid(coachProfileId) ? coachProfileId : null,
@@ -136,6 +142,8 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
       : null,
     mineOnly: mineOnly === "1" || mineOnly === "true",
     risksOnly: risksOnly === "1" || risksOnly === "true",
+    showWorkWindows:
+      workWindows === "0" || workWindows === "false" ? false : null,
     view: SCHEDULE_ACTION_VIEWS.includes(
       view as (typeof SCHEDULE_ACTION_VIEWS)[number],
     )
@@ -145,7 +153,10 @@ function getScheduleRedirectFilters(formData: FormData): ScheduleRedirectFilters
   };
 }
 
-async function getOperationalActionContext(formData: FormData) {
+async function getOperationalActionContext(
+  formData: FormData,
+  permission: "schedule" | "staff-work-windows" = "schedule",
+) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
   const filters = getScheduleRedirectFilters(formData);
@@ -174,7 +185,12 @@ async function getOperationalActionContext(formData: FormData) {
     );
   }
 
-  if (!canManageOperationalData(resolution.membership.role)) {
+  const canManage =
+    permission === "staff-work-windows"
+      ? canManageStaffWorkWindows(resolution.membership.role)
+      : canManageOperationalData(resolution.membership.role);
+
+  if (!canManage) {
     redirect(
       getActionResultPath({
         key: "error",
@@ -221,6 +237,18 @@ function getAssignmentMutationError(errorCode?: string) {
 
   if (errorCode === "23503") {
     return "invalid-assignment-reference";
+  }
+
+  return "save-failed";
+}
+
+function getStaffWorkWindowMutationError(errorCode?: string) {
+  if (errorCode === "23503") {
+    return "invalid-reference";
+  }
+
+  if (errorCode === "23514") {
+    return "invalid-time";
   }
 
   return "save-failed";
@@ -368,6 +396,87 @@ function getScheduleBlockChangedAuditFields({
   addAuditFieldChange(changedFields, "status", block.status, values.status);
 
   if ((block.notes ?? null) !== values.notes) {
+    changedFields.notes = auditFieldTouched();
+  }
+
+  return changedFields;
+}
+
+function getStaffWorkWindowCreatedAuditFields(
+  values: StaffWorkWindowFormValues,
+): OperationalAuditChangedFields {
+  return {
+    center_id: auditFieldSet(values.centerId),
+    day_of_week: auditFieldSet(values.dayOfWeek),
+    end_time: auditFieldSet(values.endTime),
+    ...(values.notes ? { notes: auditFieldTouched() } : {}),
+    person_profile_id: auditFieldSet(values.personProfileId),
+    start_time: auditFieldSet(values.startTime),
+    status: auditFieldSet(values.status),
+    valid_from: auditFieldSet(values.validFrom),
+    valid_until: auditFieldSet(values.validUntil),
+  };
+}
+
+function getStaffWorkWindowChangedAuditFields({
+  values,
+  window,
+}: {
+  values: StaffWorkWindowFormValues;
+  window: {
+    center_id: string | null;
+    day_of_week: number;
+    end_time: string;
+    notes: string | null;
+    person_profile_id: string;
+    start_time: string;
+    status: string;
+    valid_from: string;
+    valid_until: string | null;
+  };
+}): OperationalAuditChangedFields {
+  const changedFields: OperationalAuditChangedFields = {};
+
+  addAuditFieldChange(
+    changedFields,
+    "person_profile_id",
+    window.person_profile_id,
+    values.personProfileId,
+  );
+  addAuditFieldChange(changedFields, "center_id", window.center_id, values.centerId);
+  addAuditFieldChange(
+    changedFields,
+    "day_of_week",
+    window.day_of_week,
+    values.dayOfWeek,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "start_time",
+    normalizeComparableTime(window.start_time),
+    values.startTime,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "end_time",
+    normalizeComparableTime(window.end_time),
+    values.endTime,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "valid_from",
+    window.valid_from,
+    values.validFrom,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "valid_until",
+    window.valid_until,
+    values.validUntil,
+  );
+  addAuditFieldChange(changedFields, "status", window.status, values.status);
+
+  if ((window.notes ?? null) !== values.notes) {
     changedFields.notes = auditFieldTouched();
   }
 
@@ -993,6 +1102,271 @@ export async function cancelScheduleBlock(formData: FormData) {
       key: "status",
       returnPath: context.returnPath,
       value: "cancelled",
+    }),
+  );
+}
+
+export async function createStaffWorkWindow(formData: FormData) {
+  const context = await getOperationalActionContext(
+    formData,
+    "staff-work-windows",
+  );
+  const validation = validateStaffWorkWindowForm(formData);
+
+  if (!validation.ok) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
+    );
+  }
+
+  const supabase = await createClient();
+  const referenceError = await validateStaffWorkWindowReferences({
+    organizationId: context.organization.id,
+    supabase,
+    values: validation.values,
+  });
+
+  if (referenceError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: referenceError,
+      }),
+    );
+  }
+
+  const { data: window, error } = await supabase
+    .from("staff_work_windows")
+    .insert({
+      center_id: validation.values.centerId,
+      day_of_week: validation.values.dayOfWeek,
+      end_time: validation.values.endTime,
+      notes: validation.values.notes,
+      organization_id: context.organization.id,
+      person_profile_id: validation.values.personProfileId,
+      start_time: validation.values.startTime,
+      status: validation.values.status,
+      valid_from: validation.values.validFrom,
+      valid_until: validation.values.validUntil,
+    })
+    .select("id")
+    .single();
+
+  if (error || !window) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getStaffWorkWindowMutationError(error?.code),
+      }),
+    );
+  }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: getStaffWorkWindowCreatedAuditFields(validation.values),
+    entityId: window.id,
+    entityType: "staff_work_windows",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "work-window-created",
+    }),
+  );
+}
+
+export async function updateStaffWorkWindow(formData: FormData) {
+  const context = await getOperationalActionContext(
+    formData,
+    "staff-work-windows",
+  );
+  const staffWorkWindowId = getRequiredFormString(formData, "staffWorkWindowId");
+  const validation = validateStaffWorkWindowForm(formData);
+
+  if (!staffWorkWindowId || !isScheduleUuid(staffWorkWindowId)) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-required",
+      }),
+    );
+  }
+
+  if (!validation.ok) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: validation.error,
+      }),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: existingWindow, error: existingWindowError } = await supabase
+    .from("staff_work_windows")
+    .select(
+      "id, person_profile_id, center_id, day_of_week, start_time, end_time, valid_from, valid_until, status, notes",
+    )
+    .eq("id", staffWorkWindowId)
+    .eq("organization_id", context.organization.id)
+    .maybeSingle();
+
+  if (existingWindowError || !existingWindow) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-required",
+      }),
+    );
+  }
+
+  const referenceError = await validateStaffWorkWindowReferences({
+    organizationId: context.organization.id,
+    supabase,
+    values: validation.values,
+  });
+
+  if (referenceError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: referenceError,
+      }),
+    );
+  }
+
+  const { error } = await supabase
+    .from("staff_work_windows")
+    .update({
+      center_id: validation.values.centerId,
+      day_of_week: validation.values.dayOfWeek,
+      end_time: validation.values.endTime,
+      notes: validation.values.notes,
+      person_profile_id: validation.values.personProfileId,
+      start_time: validation.values.startTime,
+      status: validation.values.status,
+      valid_from: validation.values.validFrom,
+      valid_until: validation.values.validUntil,
+    })
+    .eq("id", existingWindow.id)
+    .eq("organization_id", context.organization.id)
+    .select("id")
+    .single();
+
+  if (error) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getStaffWorkWindowMutationError(error.code),
+      }),
+    );
+  }
+
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields: getStaffWorkWindowChangedAuditFields({
+      values: validation.values,
+      window: existingWindow,
+    }),
+    entityId: existingWindow.id,
+    entityType: "staff_work_windows",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "work-window-updated",
+    }),
+  );
+}
+
+export async function deactivateStaffWorkWindow(formData: FormData) {
+  const context = await getOperationalActionContext(
+    formData,
+    "staff-work-windows",
+  );
+  const staffWorkWindowId = getRequiredFormString(formData, "staffWorkWindowId");
+
+  if (!staffWorkWindowId || !isScheduleUuid(staffWorkWindowId)) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-required",
+      }),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: existingWindow, error: existingWindowError } = await supabase
+    .from("staff_work_windows")
+    .select("id, status")
+    .eq("id", staffWorkWindowId)
+    .eq("organization_id", context.organization.id)
+    .maybeSingle();
+
+  if (existingWindowError || !existingWindow) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-required",
+      }),
+    );
+  }
+
+  const { error } = await supabase
+    .from("staff_work_windows")
+    .update({ status: "inactive" })
+    .eq("id", existingWindow.id)
+    .eq("organization_id", context.organization.id)
+    .select("id")
+    .single();
+
+  if (error) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getStaffWorkWindowMutationError(error.code),
+      }),
+    );
+  }
+
+  await recordOperationalAuditEvent({
+    action: "deactivated",
+    changedFields: {
+      status: auditFieldChange(existingWindow.status, "inactive"),
+    },
+    entityId: existingWindow.id,
+    entityType: "staff_work_windows",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value: "work-window-deactivated",
     }),
   );
 }

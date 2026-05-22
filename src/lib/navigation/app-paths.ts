@@ -5,17 +5,21 @@ type AppPathOptions = {
   absenceType?: string | null;
   assignmentId?: string | null;
   blockId?: string | null;
-  blockStatus?: string | null;
   centerId?: string | null;
   classTypeId?: string | null;
   coachProfileId?: string | null;
   coverageState?: string | null;
   day?: string | null;
+  documentScope?: string | null;
   organizationId?: string | null;
   error?: string | null;
   editTemplateBlockId?: string | null;
   mineOnly?: boolean | null;
+  overtimeCreated?: number | string | null;
+  overtimeExisting?: number | string | null;
+  overtimeIgnored?: number | string | null;
   risksOnly?: boolean | null;
+  showWorkWindows?: boolean | null;
   status?: string | null;
   timeRecordId?: string | null;
   view?: string | null;
@@ -65,6 +69,10 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
     params.set("day", options.day);
   }
 
+  if (options.documentScope) {
+    params.set("scope", options.documentScope);
+  }
+
   if (options.view) {
     params.set("view", options.view);
   }
@@ -81,10 +89,6 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
     params.set("class_type_id", options.classTypeId);
   }
 
-  if (options.blockStatus) {
-    params.set("block_status", options.blockStatus);
-  }
-
   if (options.coverageState) {
     params.set("coverage_state", options.coverageState);
   }
@@ -93,12 +97,31 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
     params.set("record_id", options.timeRecordId);
   }
 
+  if (options.overtimeCreated !== undefined && options.overtimeCreated !== null) {
+    params.set("overtime_created", String(options.overtimeCreated));
+  }
+
+  if (
+    options.overtimeExisting !== undefined &&
+    options.overtimeExisting !== null
+  ) {
+    params.set("overtime_existing", String(options.overtimeExisting));
+  }
+
+  if (options.overtimeIgnored !== undefined && options.overtimeIgnored !== null) {
+    params.set("overtime_ignored", String(options.overtimeIgnored));
+  }
+
   if (options.mineOnly) {
     params.set("mine", "1");
   }
 
   if (options.risksOnly) {
     params.set("risks_only", "1");
+  }
+
+  if (options.showWorkWindows === false) {
+    params.set("work_windows", "0");
   }
 
   const query = params.toString();
@@ -132,6 +155,10 @@ export function getRequestsPath(options: AppPathOptions = {}) {
 
 export function getAbsencesPath(options: AppPathOptions = {}) {
   return getAppPath("/app/absences", options);
+}
+
+export function getDocumentsPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/documents", options);
 }
 
 export function getScheduleTemplatesPath(options: AppPathOptions = {}) {

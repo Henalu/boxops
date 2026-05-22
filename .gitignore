@@ -18,5 +18,29 @@ playwright-report/
 *.tsbuildinfo
 *.log
 
+# Local QA/evidence artifacts; keep redacted summaries in docs instead.
+/.local-evidence/
+/evidence/
+/qa-evidence/
+/screenshots/
+/videos/
+/traces/
+/dumps/
+/exports/
+/controlled-documents/
+/tmp/
+/temp/
+*.trace
+*.trace.zip
+*.har
+*.webm
+*.mp4
+*.dump
+*.sql.gz
+*.sqlite
+*.db
+*.bak
+*.tmp
+
 # Supabase Studio scratch queries; keep named snippets explicit.
 supabase/snippets/Untitled query *.sql

@@ -1,5 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+// Playwright workers force FORCE_COLOR=1; remove NO_COLOR to avoid Node warning noise.
+if (process.env.NO_COLOR) {
+  delete process.env.NO_COLOR;
+}
+
 const port = Number(process.env.E2E_PORT ?? 3000);
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
 const shouldStartLocalServer = process.env.E2E_START_SERVER === "1";

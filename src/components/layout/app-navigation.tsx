@@ -7,6 +7,7 @@ import {
   CalendarOff,
   CalendarRange,
   Dumbbell,
+  FileText,
   Home,
   Inbox,
   LayoutGrid,
@@ -29,6 +30,7 @@ import {
   getClassTypesPath,
   getCoachesPath,
   getCoveragePath,
+  getDocumentsPath,
   getMorePath,
   getRequestsPath,
   getSchedulePath,
@@ -113,6 +115,11 @@ const personalItems = [
     label: "Solicitudes",
   },
   {
+    href: "/app/documents",
+    icon: FileText,
+    label: "Documentos",
+  },
+  {
     href: "/app/account",
     icon: UserRound,
     label: "Mi cuenta",
@@ -127,6 +134,7 @@ const personalItems = [
 const mobileMorePaths = [
   "/app/absences",
   "/app/requests",
+  "/app/documents",
   "/app/account",
   "/app/time",
   "/app/centers",
@@ -229,6 +237,10 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
 
     if (href === "/app/absences") {
       return getAbsencesPath({ organizationId });
+    }
+
+    if (href === "/app/documents") {
+      return getDocumentsPath({ organizationId });
     }
 
     if (href === "/app/time") {

@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Clock,
   Download,
+  FileSearch,
   FileClock,
   LogIn,
   LogOut,
@@ -23,7 +24,9 @@ import {
 import {
   applyTimeCorrectionFromForm,
   createOwnTimePunchFromForm,
+  detectOvertimeCandidatesFromForm,
   reviewTimeCorrectionFromForm,
+  setOvertimeCandidateStatusFromForm,
   submitOwnTimeCorrectionFromForm,
 } from "./actions";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
@@ -34,6 +37,7 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,9 +50,18 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canReviewOvertimeCandidates,
   canReviewTimeTracking,
   canUsePersonalFeatures,
   getApplicationRoleLabel,
@@ -59,6 +72,12 @@ import {
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
 import { getTimePath } from "@/lib/navigation/app-paths";
+import {
+  listOvertimeCandidates,
+  type OvertimeCandidateReviewStatus,
+  type OvertimeCandidateRow,
+  type OvertimeCandidateStatus,
+} from "@/lib/overtime-candidates";
 import { resolveOrganizationTimeTrackingSettings } from "@/lib/organizations";
 import { getAdjacentWeekStart, resolveWeek } from "@/lib/schedule-blocks";
 import { createClient } from "@/lib/supabase/server";
@@ -83,6 +102,9 @@ type TimePageProps = {
   searchParams: Promise<{
     error?: string | string[];
     organizationId?: string | string[];
+    overtime_created?: string | string[];
+    overtime_existing?: string | string[];
+    overtime_ignored?: string | string[];
     record_id?: string | string[];
     status?: string | string[];
     week?: string | string[];
@@ -94,6 +116,10 @@ type ReviewPerson = Pick<
   Tables<"person_profiles">,
   "display_name" | "full_name" | "id" | "preferred_alias" | "status"
 >;
+type OvertimeCandidateReferences = {
+  errors: string[];
+  people: Map<string, ReviewPerson>;
+};
 type ExportPersonOption = Pick<
   Tables<"person_profiles">,
   "display_name" | "full_name" | "id" | "preferred_alias" | "status"
@@ -141,6 +167,9 @@ type ReviewReferences = {
 const successMessages: Record<string, string> = {
   "clock-in-created": "Entrada registrada.",
   "clock-out-created": "Salida registrada.",
+  "overtime-detection-complete": "Deteccion terminada.",
+  "overtime-candidate-updated":
+    "Candidato operativo actualizado. La cola muestra el estado disponible.",
   "correction-approved":
     "Corrección aprobada. El histórico no se modifica automáticamente en este corte.",
   "correction-applied":
@@ -186,10 +215,47 @@ const errorMessages: Record<string, string> = {
     "El fichaje seleccionado no pertenece al registro propio indicado.",
   invalid_time_record: "El registro seleccionado no está disponible.",
   invalid_timestamp: "La fecha y hora del fichaje no son válidas.",
+  invalid_overtime_candidate:
+    "El candidato operativo de posible exceso no esta disponible.",
+  invalid_overtime_candidate_status:
+    "El estado operativo elegido no es valido para esta revision.",
   load_failed: "No se han podido cargar los registros de fichaje.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required: "Elige una organización antes de fichar.",
+  overtime_forbidden:
+    "Tu rol no permite revisar candidatos operativos de posible exceso.",
+  overtime_detection_authentication_required:
+    "Inicia sesion de nuevo para detectar posibles excesos.",
+  overtime_detection_date_range_invalid:
+    "El rango de deteccion no es valido para esta accion.",
+  overtime_detection_forbidden:
+    "Tu rol no permite detectar candidatos operativos de posible exceso.",
+  overtime_detection_invalid_organization:
+    "La organizacion activa no es valida para esta deteccion.",
+  overtime_detection_invalid_period:
+    "La semana enviada no es valida para esta deteccion.",
+  overtime_detection_load_failed:
+    "No se ha podido leer el contexto operativo para detectar posibles excesos.",
+  overtime_detection_no_active_memberships:
+    "No hay accesos activos para detectar posibles excesos.",
+  overtime_detection_organization_not_found:
+    "La organizacion solicitada no esta disponible.",
+  overtime_detection_organization_required:
+    "Elige una organizacion antes de detectar posibles excesos.",
+  overtime_detection_save_failed:
+    "No se ha podido guardar la deteccion de candidatos operativos.",
+  overtime_invalid_candidate:
+    "El candidato operativo de posible exceso no esta disponible.",
+  overtime_invalid_status:
+    "El estado operativo elegido no es valido para esta revision.",
+  overtime_load_failed:
+    "No se ha podido cargar la cola de candidatos operativos de posible exceso.",
+  overtime_not_actionable:
+    "Este candidato operativo esta cerrado o sustituido y ya no acepta cambios.",
+  overtime_permission_denied:
+    "Tu rol no permite revisar candidatos operativos de posible exceso.",
+  overtime_save_failed: "No se ha podido actualizar el candidato operativo.",
   profile_missing:
     "Tu cuenta todavía no tiene una ficha de persona vinculada en esta organización.",
   review_failed:
@@ -201,6 +267,35 @@ const errorMessages: Record<string, string> = {
 
 const selectClassName =
   "h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-8";
+const overtimeCandidateTerminalStatuses = new Set<OvertimeCandidateStatus>([
+  "closed",
+  "superseded",
+]);
+const overtimeCandidateStatusOptions = [
+  {
+    label: "Pendiente de revision",
+    value: "needs_review",
+  },
+  {
+    label: "En revision operativa",
+    value: "under_review",
+  },
+  {
+    label: "Validado operativo",
+    value: "operationally_validated",
+  },
+  {
+    label: "Rechazado operativo",
+    value: "operationally_rejected",
+  },
+  {
+    label: "Cerrar candidato",
+    value: "closed",
+  },
+] as const satisfies readonly {
+  label: string;
+  value: OvertimeCandidateReviewStatus;
+}[];
 const CHANGE_HISTORY_RETENTION_DAYS = 30;
 const CHANGE_HISTORY_RETENTION_MS =
   CHANGE_HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -216,6 +311,34 @@ const blockingErrorCodes = new Set([
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function getNonNegativeCountParam(value: string | string[] | undefined) {
+  const rawValue = getParam(value);
+
+  if (!rawValue) {
+    return 0;
+  }
+
+  const count = Number(rawValue);
+
+  return Number.isInteger(count) && count >= 0 ? count : 0;
+}
+
+function getOvertimeDetectionDescription({
+  created,
+  existing,
+  ignored,
+}: {
+  created: number;
+  existing: number;
+  ignored: number;
+}) {
+  return [
+    `Creados: ${created}`,
+    `ya existentes: ${existing}`,
+    `ignorados por datos insuficientes: ${ignored}`,
+  ].join(" / ");
 }
 
 function isVisibleTimePunch(punch: TimePunchRow) {
@@ -332,6 +455,39 @@ async function getExportPersonOptions(
   return {
     data: data ?? [],
     ok: true,
+  };
+}
+
+async function getOvertimeCandidateReferences({
+  candidates,
+  organizationId,
+}: {
+  candidates: OvertimeCandidateRow[];
+  organizationId: string;
+}): Promise<OvertimeCandidateReferences> {
+  const supabase = await createClient();
+  const personIds = uniqueIds(
+    candidates.map((candidate) => candidate.person_profile_id),
+  );
+
+  if (personIds.length === 0) {
+    return {
+      errors: [],
+      people: new Map<string, ReviewPerson>(),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("person_profiles")
+    .select("id, display_name, preferred_alias, full_name, status")
+    .eq("organization_id", organizationId)
+    .in("id", personIds);
+
+  return {
+    errors: error ? ["No se han podido cargar algunas personas."] : [],
+    people: new Map(
+      ((data ?? []) as ReviewPerson[]).map((person) => [person.id, person]),
+    ),
   };
 }
 
@@ -472,10 +628,10 @@ function getPunchStatusLabel(status: string) {
 
 function getCorrectionTypeLabel(type: string) {
   const labels: Record<string, string> = {
-    punch_add: "Anadir fichaje omitido",
+    punch_add: "Fichaje añadido",
     punch_update: "Corregir hora de entrada/salida",
     punch_void: "Anular fichaje erroneo",
-    record_update: "Nota o corrección de registro",
+    record_update: "Registro actualizado",
   };
 
   return labels[type] ?? type;
@@ -527,6 +683,54 @@ function getStatusTone(status: string) {
   }
 
   return "neutral";
+}
+
+function getOvertimeCandidateStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    closed: "Cerrado",
+    detected: "Detectado",
+    needs_review: "Pendiente de revision",
+    operationally_rejected: "Rechazado operativo",
+    operationally_validated: "Validado operativo",
+    superseded: "Sustituido",
+    under_review: "En revision operativa",
+  };
+
+  return labels[status] ?? status;
+}
+
+function getOvertimeCandidateStatusTone(status: string) {
+  if (status === "operationally_validated") {
+    return "success";
+  }
+
+  if (status === "operationally_rejected") {
+    return "critical";
+  }
+
+  if (status === "under_review") {
+    return "info";
+  }
+
+  if (status === "detected" || status === "needs_review") {
+    return "pending";
+  }
+
+  return "neutral";
+}
+
+function getOvertimeCandidateDetectionSourceLabel(source: string) {
+  const labels: Record<string, string> = {
+    absence_context: "Contexto de ausencia",
+    event_context: "Contexto de evento",
+    manual_signal: "Senal manual",
+    schedule_difference: "Diferencia de horario",
+    staff_work_window_context: "Jornada prevista",
+    time_difference: "Diferencia de fichaje",
+    weekly_review: "Revision semanal",
+  };
+
+  return labels[source] ?? source;
 }
 
 function getWeekDayStatusLabel(status: TimeWeekDayOverview["status"]) {
@@ -594,6 +798,14 @@ function formatWeekRange(weekStart: string, weekEnd: string) {
   return `${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}`;
 }
 
+function formatCandidatePeriod(candidate: OvertimeCandidateRow) {
+  return candidate.period_start_date === candidate.period_end_date
+    ? formatShortDate(candidate.period_start_date)
+    : `${formatShortDate(candidate.period_start_date)} - ${formatShortDate(
+        candidate.period_end_date,
+      )}`;
+}
+
 function formatWeekday(value: string) {
   try {
     return new Intl.DateTimeFormat("es-ES", {
@@ -623,6 +835,10 @@ function formatDuration(minutes: number) {
   }
 
   return `${sign}${hours} h ${remainder} min`;
+}
+
+function formatPositiveDuration(minutes: number) {
+  return `+${formatDuration(Math.max(0, minutes))}`;
 }
 
 function formatHourStat(minutes: number | null) {
@@ -1102,7 +1318,15 @@ function TimeCorrectionForm({
   selectedRecordId?: string | null;
   weekStart: string;
 }) {
-  const hasRecords = records.length > 0;
+  const recordsWithVisiblePunches = records.filter(
+    (record) => (punchesByRecordId.get(record.id) ?? []).length > 0,
+  );
+  const hasCorrectablePunches = recordsWithVisiblePunches.length > 0;
+  const defaultRecordId =
+    selectedRecordId &&
+    recordsWithVisiblePunches.some((record) => record.id === selectedRecordId)
+      ? selectedRecordId
+      : recordsWithVisiblePunches[0]?.id;
   const actionLabel = correctionApprovalRequired
     ? "Solicitar corrección"
     : "Aplicar corrección";
@@ -1121,10 +1345,9 @@ function TimeCorrectionForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!hasRecords ? (
+        {!hasCorrectablePunches ? (
           <p className="text-sm text-muted-foreground">
-            Necesitas tener al menos un registro reciente para hacer una
-            corrección.
+            No hay entradas o salidas visibles para corregir.
           </p>
         ) : (
           <form
@@ -1143,14 +1366,10 @@ function TimeCorrectionForm({
                   name="correctionType"
                   required
                 >
-                  <option value="punch_add">Anadir fichaje omitido</option>
                   <option value="punch_update">
                     Corregir hora de entrada/salida
                   </option>
                   <option value="punch_void">Anular fichaje erroneo</option>
-                  <option value="record_update">
-                    Nota o corrección de registro
-                  </option>
                 </select>
               </div>
 
@@ -1158,12 +1377,12 @@ function TimeCorrectionForm({
                 <Label htmlFor="timeRecordId">Registro reciente</Label>
                 <select
                   className={selectClassName}
-                  defaultValue={selectedRecordId ?? records[0]?.id}
+                  defaultValue={defaultRecordId}
                   id="timeRecordId"
                   name="timeRecordId"
                   required
                 >
-                  {records.map((record) => (
+                  {recordsWithVisiblePunches.map((record) => (
                     <option key={record.id} value={record.id}>
                       {formatShortDate(record.local_work_date)} -{" "}
                       {getRecordStatusLabel(record.status)}
@@ -1179,14 +1398,10 @@ function TimeCorrectionForm({
                 className={selectClassName}
                 id="timePunchId"
                 name="timePunchId"
+                required
               >
-                <option value="">Sin fichaje asociado</option>
-                {records.map((record) => {
+                {recordsWithVisiblePunches.map((record) => {
                   const recordPunches = punchesByRecordId.get(record.id) ?? [];
-
-                  if (recordPunches.length === 0) {
-                    return null;
-                  }
 
                   return (
                     <optgroup
@@ -1204,39 +1419,21 @@ function TimeCorrectionForm({
                 })}
               </select>
               <p className="text-xs text-muted-foreground">
-                Necesario para corregir o anular un fichaje. Para anadir uno
-                omitido o corregir el registro, dejalo vacío.
+                Elige la entrada o salida que quieres corregir o anular.
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="punchType">Tipo si falta fichaje</Label>
-                <select className={selectClassName} id="punchType" name="punchType">
-                  <option value="clock_in">Entrada</option>
-                  <option value="clock_out">Salida</option>
-                </select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="occurredAtLocal">Hora solicitada</Label>
-                <Input
-                  id="occurredAtLocal"
-                  name="occurredAtLocal"
-                  type="datetime-local"
-                />
-              </div>
-            </div>
-
             <div className="grid gap-2">
-              <Label htmlFor="correctionNote">Cambio del registro</Label>
-              <Textarea
-                id="correctionNote"
-                maxLength={1000}
-                name="correctionNote"
-                placeholder="Ej. marcar el registro como jornada correcta sin tocar fichajes"
-                rows={3}
+              <Label htmlFor="occurredAtLocal">Nueva hora</Label>
+              <Input
+                id="occurredAtLocal"
+                name="occurredAtLocal"
+                type="datetime-local"
               />
+              <p className="text-xs text-muted-foreground">
+                Solo para corregir la hora. Si vas a anular un fichaje, dejala
+                vacia.
+              </p>
             </div>
 
             <div className="grid gap-2">
@@ -1533,26 +1730,23 @@ function TimeWeekDayColumn({
         )}
       </div>
 
-      <div className="mt-auto pt-4">
-        {correctionHref && canSubmit ? (
-          <Button asChild className="w-full" variant="outline">
-            <Link href={correctionHref}>
+      {correctionHref ? (
+        <div className="mt-auto pt-4">
+          {canSubmit ? (
+            <Button asChild className="w-full" variant="outline">
+              <Link href={correctionHref}>
+                <FileClock aria-hidden="true" />
+                {correctionApprovalRequired ? "Solicitar ajuste" : "Corregir día"}
+              </Link>
+            </Button>
+          ) : (
+            <Button className="w-full" disabled variant="outline">
               <FileClock aria-hidden="true" />
-              {correctionApprovalRequired ? "Solicitar ajuste" : "Corregir día"}
-            </Link>
-          </Button>
-        ) : correctionHref ? (
-          <Button className="w-full" disabled variant="outline">
-            <FileClock aria-hidden="true" />
-            Sin permiso de corrección
-          </Button>
-        ) : (
-          <p className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-            Aún no hay registro de jornada para corregir este día. Crear una
-            corrección histórica desde cero queda pendiente de una RPC segura.
-          </p>
-        )}
-      </div>
+              Sin permiso de corrección
+            </Button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1610,27 +1804,6 @@ function TimeWeekOverviewSection({
       {overview ? (
         <>
           <TimeWeekSummaryCards overview={overview} />
-
-          {overview.totals.warningCount > 0 ? (
-            <Alert>
-              <AlertTriangle aria-hidden="true" />
-              <AlertTitle>Avisos de la semana</AlertTitle>
-              <AlertDescription>
-                Estos avisos comparan fichajes activos con bloques asignados.
-                Sirven para corregir o solicitar revisión si tu organización lo exige;
-                no aprueban horas extra ni cierran nómina.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Alert>
-              <CheckCircle2 aria-hidden="true" />
-              <AlertTitle>Semana sin avisos operativos</AlertTitle>
-              <AlertDescription>
-                Las horas fichadas cuadran con las asignaciones visibles de la
-                semana dentro del margen operativo.
-              </AlertDescription>
-            </Alert>
-          )}
 
           <Card>
             <CardContent className="p-0">
@@ -1722,7 +1895,7 @@ function TimeRecordCard({
           <p className="text-sm font-medium">Fichajes del día</p>
           {visiblePunches.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Este registro no tiene entradas o salidas visibles.
+              Sin entradas o salidas visibles.
             </p>
           ) : (
             <div className="grid gap-2">
@@ -1754,18 +1927,25 @@ function TimeRecordCard({
         </div>
 
         {changeHistoryPunches.length > 0 ? (
-          <div className="space-y-2 border-t border-border pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium">Historial de cambios</p>
-              <Badge variant="outline">
-                {CHANGE_HISTORY_RETENTION_DAYS} días visibles
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Fichajes sustituidos o anulados por corrección. Salen de la vista
-              principal y solo aparecen aquí durante 30 días.
-            </p>
-            <div className="grid gap-2">
+          <details className="group border-t border-border pt-4">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <span className="text-sm font-medium">Historial de cambios</span>
+              <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                <Badge variant="outline">
+                  {changeHistoryPunches.length} cambios
+                </Badge>
+                <Badge variant="outline">
+                  {CHANGE_HISTORY_RETENTION_DAYS} días visibles
+                </Badge>
+                <span className="text-sm font-medium text-foreground underline underline-offset-4 group-open:hidden">
+                  Ver
+                </span>
+                <span className="hidden text-sm font-medium text-foreground underline underline-offset-4 group-open:inline-flex">
+                  Ocultar
+                </span>
+              </span>
+            </summary>
+            <div className="mt-3 grid gap-2">
               {changeHistoryPunches.map((punch) => (
                 <div
                   className="grid gap-2 rounded-lg border border-dashed border-border bg-muted/10 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
@@ -1799,7 +1979,7 @@ function TimeRecordCard({
                 </div>
               ))}
             </div>
-          </div>
+          </details>
         ) : null}
       </CardContent>
     </Card>
@@ -2009,6 +2189,244 @@ function TimeExportSection({
           </p>
         </CardContent>
       </Card>
+    </section>
+  );
+}
+
+function DetectOvertimeCandidatesForm({
+  organizationId,
+  weekStart,
+}: {
+  organizationId: string;
+  weekStart: string;
+}) {
+  return (
+    <form
+      action={detectOvertimeCandidatesFromForm}
+      className="w-full sm:w-auto"
+      data-overtime-candidate-detection-form
+    >
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="weekStart" type="hidden" value={weekStart} />
+      <Button className="w-full sm:w-auto" size="sm" type="submit" variant="outline">
+        <FileSearch aria-hidden="true" />
+        Detectar posibles excesos
+      </Button>
+    </form>
+  );
+}
+
+function OvertimeCandidateStatusForm({
+  candidate,
+  organizationId,
+  weekStart,
+}: {
+  candidate: OvertimeCandidateRow;
+  organizationId: string;
+  weekStart: string;
+}) {
+  if (overtimeCandidateTerminalStatuses.has(candidate.status)) {
+    return <Badge variant="outline">Sin acciones</Badge>;
+  }
+
+  const defaultStatus =
+    candidate.status === "detected" ? "needs_review" : candidate.status;
+
+  return (
+    <form
+      action={setOvertimeCandidateStatusFromForm}
+      className="flex min-w-[17rem] items-center gap-2"
+      data-overtime-candidate-status-form
+    >
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="candidateId" type="hidden" value={candidate.id} />
+      <input name="weekStart" type="hidden" value={weekStart} />
+      <Label className="sr-only" htmlFor={`overtime-status-${candidate.id}`}>
+        Estado operativo
+      </Label>
+      <select
+        className={selectClassName}
+        defaultValue={defaultStatus}
+        id={`overtime-status-${candidate.id}`}
+        name="overtimeCandidateStatus"
+      >
+        {overtimeCandidateStatusOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <Button size="sm" type="submit" variant="outline">
+        Actualizar
+      </Button>
+    </form>
+  );
+}
+
+function OvertimeCandidateReviewSection({
+  candidates,
+  error,
+  organizationId,
+  references,
+  weekStart,
+}: {
+  candidates: OvertimeCandidateRow[] | null;
+  error?: string;
+  organizationId: string;
+  references: OvertimeCandidateReferences | null;
+  weekStart: string;
+}) {
+  const candidateCount = candidates?.length ?? 0;
+  const actionableCount =
+    candidates?.filter(
+      (candidate) => !overtimeCandidateTerminalStatuses.has(candidate.status),
+    ).length ?? 0;
+
+  return (
+    <section className="space-y-3" data-overtime-candidates-review>
+      <SectionHeader
+        action={
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <Badge variant="outline">{actionableCount} revisables</Badge>
+            <DetectOvertimeCandidatesForm
+              organizationId={organizationId}
+              weekStart={weekStart}
+            />
+          </div>
+        }
+        description="Primera cola visible de posible exceso como candidato operativo, pendiente de revisión humana."
+        title="Candidatos operativos de posible exceso"
+      />
+
+      {error ? (
+        <Alert variant="destructive">
+          <AlertTriangle aria-hidden="true" />
+          <AlertTitle>No se ha podido cargar la cola</AlertTitle>
+          <AlertDescription>
+            {errorMessages[error] ??
+              "La revision de candidatos operativos no esta disponible."}
+          </AlertDescription>
+        </Alert>
+      ) : references?.errors.length ? (
+        <Alert>
+          <AlertTriangle aria-hidden="true" />
+          <AlertTitle>Carga parcial</AlertTitle>
+          <AlertDescription>{references.errors.join(" ")}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!error && candidates && candidateCount === 0 ? (
+        <EmptyState
+          description="Cuando exista un posible exceso pendiente de revision, aparecera aqui como candidato operativo revisable."
+          title="Sin candidatos operativos pendientes"
+        />
+      ) : null}
+
+      {!error && candidates && candidateCount > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileClock aria-hidden="true" className="size-4" />
+              Revision operativa
+            </CardTitle>
+            <CardDescription>
+              Esta tabla muestra snapshots operativos y permite cambiar solo el
+              estado del candidato operativo. No modifica fichajes, bloques ni
+              asignaciones.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Persona afectada</TableHead>
+                  <TableHead>Rango</TableHead>
+                  <TableHead className="text-right">Planificado</TableHead>
+                  <TableHead className="text-right">Trabajado</TableHead>
+                  <TableHead className="text-right">Diferencia</TableHead>
+                  <TableHead>Estado operativo</TableHead>
+                  <TableHead>Fuente de deteccion</TableHead>
+                  <TableHead>Fechas</TableHead>
+                  <TableHead>Accion</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {candidates.map((candidate) => {
+                  const person = references?.people.get(
+                    candidate.person_profile_id,
+                  );
+                  const timezone = candidate.timezone || "UTC";
+                  const candidateMinutes =
+                    candidate.candidate_minutes ??
+                    candidate.worked_minutes_snapshot -
+                      candidate.planned_minutes_snapshot;
+
+                  return (
+                    <TableRow key={candidate.id}>
+                      <TableCell className="min-w-48 max-w-64">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {getPersonLabel(person)}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {formatShortId(candidate.person_profile_id)}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {formatCandidatePeriod(candidate)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatDuration(candidate.planned_minutes_snapshot)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatDuration(candidate.worked_minutes_snapshot)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        {formatPositiveDuration(candidateMinutes)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          tone={getOvertimeCandidateStatusTone(candidate.status)}
+                        >
+                          {getOvertimeCandidateStatusLabel(candidate.status)}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell>
+                        {getOvertimeCandidateDetectionSourceLabel(
+                          candidate.detection_source,
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-56 text-xs text-muted-foreground">
+                        <div>Creado {formatDateTime(candidate.created_at, timezone)}</div>
+                        <div>
+                          Revisado{" "}
+                          {candidate.reviewed_at
+                            ? formatDateTime(candidate.reviewed_at, timezone)
+                            : "pendiente"}
+                        </div>
+                        <div>
+                          Cerrado{" "}
+                          {candidate.closed_at
+                            ? formatDateTime(candidate.closed_at, timezone)
+                            : "pendiente"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <OvertimeCandidateStatusForm
+                          candidate={candidate}
+                          organizationId={organizationId}
+                          weekStart={weekStart}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }
@@ -2436,6 +2854,11 @@ export default async function TimePage({ searchParams }: TimePageProps) {
   const status = getParam(params.status);
   const error = getParam(params.error);
   const weekParam = getParam(params.week);
+  const overtimeDetectionCounts = {
+    created: getNonNegativeCountParam(params.overtime_created),
+    existing: getNonNegativeCountParam(params.overtime_existing),
+    ignored: getNonNegativeCountParam(params.overtime_ignored),
+  };
   const memberships = await getActiveMemberships(user.id);
   const resolution = resolveActiveOrganization(memberships, organizationId);
 
@@ -2463,6 +2886,9 @@ export default async function TimePage({ searchParams }: TimePageProps) {
   };
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
   const canReviewCorrections = canReviewTimeTracking(resolution.membership.role);
+  const canReviewOvertime = canReviewOvertimeCandidates(
+    resolution.membership.role,
+  );
   const timeTrackingSettings = resolveOrganizationTimeTrackingSettings(
     resolution.organization.time_tracking_config,
   );
@@ -2476,6 +2902,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
     reviewCorrectionsResult,
     approvedCorrectionsResult,
     exportPeopleResult,
+    overtimeCandidatesResult,
     ownCoachPrimaryCenterId,
   ] = await Promise.all([
     getCenterOptions(resolution.organization.id),
@@ -2513,6 +2940,12 @@ export default async function TimePage({ searchParams }: TimePageProps) {
     canReviewCorrections
       ? getExportPersonOptions(resolution.organization.id)
       : Promise.resolve(null),
+    canReviewOvertime
+      ? listOvertimeCandidates({
+          limit: 50,
+          organizationId: resolution.organization.id,
+        })
+      : Promise.resolve(null),
     getOwnCoachPrimaryCenterId({
       organizationId: resolution.organization.id,
       userId: user.id,
@@ -2546,6 +2979,13 @@ export default async function TimePage({ searchParams }: TimePageProps) {
     exportPeopleResult && !exportPeopleResult.ok
       ? exportPeopleResult.error
       : undefined;
+  const overtimeCandidates = overtimeCandidatesResult?.ok
+    ? overtimeCandidatesResult.data
+    : null;
+  const overtimeCandidatesError =
+    overtimeCandidatesResult && !overtimeCandidatesResult.ok
+      ? `overtime_${overtimeCandidatesResult.error.replaceAll("-", "_")}`
+      : undefined;
   const reviewError =
     reviewCorrectionsResult && !reviewCorrectionsResult.ok
       ? reviewCorrectionsResult.error
@@ -2568,6 +3008,18 @@ export default async function TimePage({ searchParams }: TimePageProps) {
             people: new Map<string, ReviewPerson>(),
             punches: new Map<string, ReviewTimePunch>(),
             records: new Map<string, ReviewTimeRecord>(),
+          }
+        : null;
+  const overtimeCandidateReferences =
+    canReviewOvertime && overtimeCandidates
+      ? await getOvertimeCandidateReferences({
+          candidates: overtimeCandidates,
+          organizationId: resolution.organization.id,
+        })
+      : canReviewOvertime && overtimeCandidatesResult
+        ? {
+            errors: [],
+            people: new Map<string, ReviewPerson>(),
           }
         : null;
   const punchesByRecordId = groupPunchesByRecordId(punches);
@@ -2609,7 +3061,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
         meta={
           <>
             <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
             <Badge variant="outline">
               {formatWeekRange(week.weekStart, week.weekEnd)}
             </Badge>
@@ -2659,22 +3111,26 @@ export default async function TimePage({ searchParams }: TimePageProps) {
         </details>
       </PageHeader>
 
-      {status && successMessages[status] ? (
-        <Alert>
-          <CheckCircle2 aria-hidden="true" />
-          <AlertTitle>{successMessages[status]}</AlertTitle>
-          <AlertDescription>
-            La semana seleccionada ya muestra la informacion disponible.
-          </AlertDescription>
-        </Alert>
+      {status === "overtime-detection-complete" ? (
+        <TransientFeedbackBanner
+          description={getOvertimeDetectionDescription(overtimeDetectionCounts)}
+          title={successMessages[status]}
+          tone="success"
+        />
+      ) : status && successMessages[status] ? (
+        <TransientFeedbackBanner
+          description="La semana seleccionada ya muestra la informacion disponible."
+          title={successMessages[status]}
+          tone="success"
+        />
       ) : null}
 
       {error && errorMessages[error] ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden="true" />
-          <AlertTitle>No se ha completado la acción</AlertTitle>
-          <AlertDescription>{errorMessages[error]}</AlertDescription>
-        </Alert>
+        <TransientFeedbackBanner
+          description={errorMessages[error]}
+          title="No se ha completado la accion"
+          tone="error"
+        />
       ) : null}
 
       {loadErrors.length > 0 ? (
@@ -2741,6 +3197,16 @@ export default async function TimePage({ searchParams }: TimePageProps) {
           error={exportPeopleError}
           organizationId={resolution.organization.id}
           people={exportPeople}
+        />
+      ) : null}
+
+      {canReviewOvertime ? (
+        <OvertimeCandidateReviewSection
+          candidates={overtimeCandidates}
+          error={overtimeCandidatesError}
+          organizationId={resolution.organization.id}
+          references={overtimeCandidateReferences}
+          weekStart={week.weekStart}
         />
       ) : null}
 
@@ -2814,7 +3280,6 @@ export default async function TimePage({ searchParams }: TimePageProps) {
       <section className="space-y-3">
         <SectionHeader
           action={<Badge variant="outline">{records.length} de la semana</Badge>}
-          description="Registros de jornada propios y entradas/salidas de la semana seleccionada."
           title="Registros de la semana"
         />
 

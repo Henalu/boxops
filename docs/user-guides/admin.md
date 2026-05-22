@@ -428,7 +428,6 @@ La URL de `/app/schedule` puede conservar filtros:
 center_id=<uuid>
 coach_profile_id=<uuid>
 class_type_id=<uuid>
-block_status=scheduled
 coverage_state=uncovered
 risks_only=1
 mine=1

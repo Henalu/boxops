@@ -51,6 +51,7 @@ import {
   getCentersPath,
   getClassTypesPath,
   getCoachesPath,
+  getDocumentsPath,
   getRequestsPath,
   getSchedulePath,
   getScheduleTemplatesPath,
@@ -103,60 +104,6 @@ function MobileHubLink({
   );
 }
 
-function MobileHubNote({
-  description,
-  icon: Icon,
-  title,
-}: {
-  description: string;
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <div className="flex min-h-16 items-center gap-3 rounded-xl bg-muted/35 px-4 py-2.5 text-left ring-1 ring-foreground/10 md:hidden">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-        <Icon aria-hidden="true" className="size-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{title}</span>
-        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
-          {description}
-        </span>
-      </span>
-      <Badge variant="outline">Pendiente</Badge>
-    </div>
-  );
-}
-
-function InfoCard({
-  description,
-  icon: Icon,
-  title,
-}: {
-  description: string;
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <Card size="sm">
-      <CardContent className="flex h-full flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-            <Icon aria-hidden="true" className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-medium">{title}</h3>
-              <Badge variant="outline">Pendiente</Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default async function MorePage({ searchParams }: MorePageProps) {
   const user = await getAuthenticatedUser();
 
@@ -201,7 +148,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
-            <Badge variant="outline">Rol {roleLabel}</Badge>
+            <Badge variant="outline">{roleLabel}</Badge>
           </>
         }
         title="Más"
@@ -313,8 +260,9 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                 icon={BarChart3}
                 title="Estadísticas personales"
               />
-              <MobileHubNote
-                description="Bandeja documental futura"
+              <MobileHubLink
+                description="Versiones visibles por permiso"
+                href={getDocumentsPath(baseOptions)}
                 icon={FileText}
                 title="Documentos"
               />
@@ -334,9 +282,11 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                 label="Abrir fichaje"
                 title="Estadísticas personales"
               />
-              <InfoCard
-                description="La bandeja documental visible todavía no está abierta en este corte. Mi cuenta mantiene tu perfil, avatar y firma privada."
+              <ActionCard
+                description="Consulta versiones documentales visibles por grants, sujetos o capacidades."
+                href={getDocumentsPath(baseOptions)}
                 icon={FileText}
+                label="Abrir documentos"
                 title="Documentos"
               />
             </div>
@@ -408,6 +358,12 @@ export default async function MorePage({ searchParams }: MorePageProps) {
           title="Solicitudes"
         />
         <MobileHubLink
+          description="Versiones visibles"
+          href={getDocumentsPath(baseOptions)}
+          icon={FileText}
+          title="Documentos"
+        />
+        <MobileHubLink
           description="Perfil visible y cuenta"
           href={getAccountPath(baseOptions)}
           icon={UserRound}
@@ -427,7 +383,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                   {resolution.organization.name}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Rol {roleLabel}
+                  {roleLabel}
                 </p>
               </div>
               <Badge variant="outline">Activo</Badge>
@@ -458,6 +414,13 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             icon={Inbox}
             label="Abrir solicitudes"
             title="Solicitudes"
+          />
+          <ActionCard
+            description="Consulta las versiones documentales visibles para tu permiso."
+            href={getDocumentsPath(baseOptions)}
+            icon={FileText}
+            label="Abrir documentos"
+            title="Documentos"
           />
           <ActionCard
             description="Revisa tu cuenta, perfil visible y frontera personal segura."

@@ -1,0 +1,67 @@
+-- BoxOps - S.77 tenant direct grants minimal hardening draft
+--
+-- DRAFT ONLY. Do not run this file against local, QA, staging or production as
+-- part of S.77. This is a future migration body candidate, kept as a snippet on
+-- purpose instead of supabase/migrations/00044... because S.77 does not apply
+-- hardening, does not change grants, and does not validate runtime behavior.
+--
+-- Scope intentionally limited to the minimum table-grant hardening candidate
+-- prepared by S.75/S.76:
+--
+--   1. remove all direct table privileges from anon on current public tables
+--      covered by ON ALL TABLES IN SCHEMA public;
+--   2. remove only TRUNCATE, REFERENCES and TRIGGER from authenticated;
+--   3. do not touch authenticated INSERT, UPDATE or DELETE in this draft.
+--
+-- Why authenticated DML is not touched here:
+--
+-- Current src still uses direct PostgREST table DML through RLS for several
+-- MVP/runtime surfaces: centers, class_types, coach_profiles,
+-- organization_memberships, organizations, person_profiles,
+-- schedule_block_assignments, schedule_blocks, schedule_template_blocks,
+-- schedule_templates, staff_work_windows, team_invitations, time_exports and
+-- time_record_corrections. Reducing authenticated to SELECT table by table is a
+-- separate future task that needs route/action/PostgREST runtime evidence.
+--
+-- Default privileges are also separate:
+--
+-- This draft does not change ALTER DEFAULT PRIVILEGES. Future table default ACLs
+-- for both postgres-owned and supabase_admin-owned objects must be handled in a
+-- separate owner/operator migration step, with the effective migration owner
+-- verified before claiming the default-privilege gap is closed.
+--
+-- Separation of concerns:
+--
+-- - RLS behavior: row policies still decide normal row visibility and normal
+--   row-level DML for authenticated users.
+-- - Direct SQL grant posture: table privileges such as TRUNCATE, REFERENCES and
+--   TRIGGER are separate from row-level RLS behavior.
+-- - PostgREST/runtime app behavior: must be validated with route/action smoke
+--   and controlled users before applying this in a real environment.
+-- - SECURITY DEFINER RPC behavior: function EXECUTE grants are not table grants
+--   and must be probed separately, especially public invitation preview and
+--   authenticated invitation acceptance.
+--
+-- Post-application probe checklist based on S.76:
+--
+-- - Inventory pg_class.relacl, information_schema.role_table_grants,
+--   pg_default_acl and pg_policies in the target environment.
+-- - Confirm all public app tables still have RLS enabled and no anon RLS policy
+--   has been introduced.
+-- - Confirm anon has zero direct table privileges on public app tables.
+-- - Confirm authenticated has zero TRUNCATE, REFERENCES and TRIGGER privileges
+--   on public app tables.
+-- - Confirm authenticated SELECT/INSERT/UPDATE/DELETE privileges needed by
+--   current direct-DML runtime paths remain granted.
+-- - Confirm SECURITY DEFINER RPC EXECUTE grants still work independently from
+--   table grants, at least get_team_invitation_public(uuid,text) for anon and
+--   accept_team_invitation(uuid,text) for authenticated.
+-- - Run PostgREST/Server Action/browser smoke on the affected runtime surfaces
+--   before marking hardening applied in any environment.
+-- - Keep default privileges for postgres and supabase_admin as a separate
+--   owner/operator migration checklist item.
+-- - Do not mark beta ready, staging ready, ASVS conformant or legal compliance
+--   complete from this draft.
+
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;

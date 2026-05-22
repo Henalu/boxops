@@ -21,6 +21,20 @@ Prefer reusing or adapting shared design-system references before creating new p
 
 Use the workspace skill rules from `../../_workspace/AIContext/09_SKILL_ROUTING.md`.
 
+## Codex Finish Signal
+
+Use `../../_workspace/AIContext/11_CODEX_FINISH_SIGNAL.md` when the user asks to use the Codex jingle at the end.
+
+## Next Phase Prompting
+
+When the user asks for a "prompt siguiente fase" or equivalent, propose a manageable executable cut, not a one-checkbox prompt by default and not a megablock.
+
+- Group related tasks only when they share module, evidence, verification and risk profile.
+- Keep the prompt small enough to preserve context quality and avoid mixing unrelated domains.
+- Include objective, context, scope, out of scope, verification and expected summary.
+- Prefer real local/runtime evidence over repeated documentation.
+- Be efficient, but do not reduce quality, tenant safety, guardrails or verification depth.
+
 Relevant defaults for this project:
 
 - New visible UI or app surface: `frontend-design`.

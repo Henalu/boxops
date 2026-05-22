@@ -9,7 +9,8 @@ export function getSafeRedirectPath(
   if (
     typeof redirectTo !== "string" ||
     !redirectTo.startsWith("/") ||
-    redirectTo.startsWith("//")
+    redirectTo.startsWith("//") ||
+    redirectTo.includes("\\")
   ) {
     return fallback;
   }

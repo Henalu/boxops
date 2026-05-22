@@ -9,6 +9,7 @@ Estado 2026-05-12. Este runbook es el gate minimo antes de probar BoxOps con STL
 - Configurar Supabase Auth para redirects, reset y SMTP si se envian emails Auth reales.
 - Ejecutar verificacion tecnica antes de una prueba controlada.
 - Dejar la purga de `operational_audit_events` como gate pre-produccion.
+- En S.8/A.1, usar `docs/operations/beta-operational-readiness-runbook.md` para convertir estos bloqueos en checklist de beta interna controlada con evidencia.
 
 ## 1. Preflight de repo y secretos
 
@@ -191,6 +192,8 @@ No probar con STL ni emails reales hasta cerrar esta lista:
 - Scratch SQL `Untitled query` fuera del commit o convertido a snippet nombrado y revisado.
 - Resultado claro de typecheck, lint, build, smoke, Supabase lint/migration list y verificacion RLS.
 
+Para cierre S.8/A.1, esta lista se ejecuta dentro de `docs/operations/beta-operational-readiness-runbook.md`, que anade validacion oficial de datos reales del primer tenant, credenciales E2E por rol (`owner`, `admin`, `manager`, `coach`), smoke autenticado/no autenticado, criterios de `bloqueado`/`listo para beta interna`/`no apto para produccion` y evidencia minima.
+
 ## 8. Resultado S.3 2026-05-12
 
 - `.env.local` sigue ignorado y no trackeado.
@@ -253,6 +256,18 @@ Minimo necesario para el siguiente intento:
 - acceso DB/scheduler real u operador DB para ejecutar el job de `purge_expired_operational_audit_events(1000)` y registrar primer resultado/alerta;
 - remitente Resend verificado o confirmacion explicita de prueba limitada con `onboarding@resend.dev` y destinatario permitido;
 - email interno controlado y credenciales E2E/admin/owner fuera del repo para ejecutar invitacion, aceptacion en `/invite/accept`, validacion de vinculaciones y reset hacia `/reset-password`.
+
+## 13. S.8/A.1 - Cierre de realidad operativa para beta interna
+
+S.8/A.1 no sustituye este runbook: lo toma como preflight y lo eleva a checklist de beta interna controlada en `docs/operations/beta-operational-readiness-runbook.md`.
+
+Estado esperado:
+
+- si faltan acceso Supabase real/staging, email interno permitido, remitente permitido, credenciales E2E por rol o job/fallback de purga: `bloqueado`;
+- si invitacion, aceptacion, reset, smokes por rol, datos reales validados y evidencia minima pasan: `listo para beta interna`;
+- aunque beta interna pase, produccion sigue `no apta` hasta hardening/ASVS/backups/observabilidad y revision legal/privacidad de datos sensibles.
+
+S.8/A.1 sigue sin abrir IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, service worker, push, caches privadas, migraciones ni UI funcional nueva.
 
 ## 12. Resultado S.7 2026-05-13
 
