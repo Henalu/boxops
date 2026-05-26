@@ -466,7 +466,7 @@ async function getReferenceData(organizationId: string): Promise<ReferenceData> 
     coachProfiles,
     memberships,
     persons,
-  });
+  }).filter((coach) => coach.isAssignable);
 
   return {
     centers: centersResult.data satisfies CenterRow[],
@@ -580,7 +580,7 @@ function getCoachDisplay({
   const isAssignable =
     coachProfile.status === "active" &&
     hasActiveMembership &&
-    Boolean(hasVisiblePerson || coachProfile.user_id);
+    hasVisiblePerson;
 
   if (hasVisiblePerson) {
     return {
@@ -788,11 +788,15 @@ function buildWorkloadRows({
 
   const rows = [...rowsByCoach.values()]
     .filter((row) => {
+      if (!row.coach.isAssignable) {
+        return false;
+      }
+
       if (selectedCoachId) {
         return row.coach.id === selectedCoachId;
       }
 
-      return row.coach.isAssignable || row.classes > 0;
+      return true;
     })
     .map((row) => {
       const utilizationPercent =

@@ -134,8 +134,6 @@ const statusMessages: Record<string, string> = {
 
 const errorMessages: Record<AbsenceRequestErrorCode | string, string> = {
   "authentication-required": "Inicia sesion para revisar ausencias.",
-  "confirmation-required":
-    "Confirma que el resumen no incluye datos sensibles antes de enviar.",
   "date-range-invalid": "El periodo recibido no es valido.",
   forbidden: "Tu rol o perfil no permite esa accion.",
   "invalid-absence-request": "La solicitud recibida no es valida.",
@@ -670,9 +668,6 @@ function AbsenceCreationForm({
               <div className="space-y-2">
                 <Label htmlFor="absenceTimezone">Zona horaria</Label>
                 <Input id="absenceTimezone" readOnly value={timeZone} />
-                <p className="text-xs text-muted-foreground">
-                  Se toma de la organizacion activa en servidor.
-                </p>
               </div>
             </div>
 
@@ -680,7 +675,6 @@ function AbsenceCreationForm({
               <div className="space-y-2">
                 <Label htmlFor="absenceStartsAt">Inicio</Label>
                 <Input
-                  aria-describedby="absencePeriodHint"
                   id="absenceStartsAt"
                   name="startsAt"
                   required
@@ -691,7 +685,6 @@ function AbsenceCreationForm({
               <div className="space-y-2">
                 <Label htmlFor="absenceEndsAt">Fin</Label>
                 <Input
-                  aria-describedby="absencePeriodHint"
                   id="absenceEndsAt"
                   name="endsAt"
                   required
@@ -709,13 +702,6 @@ function AbsenceCreationForm({
                 <span>Dia completo</span>
               </label>
             </div>
-            <p
-              className="-mt-2 text-xs text-muted-foreground"
-              id="absencePeriodHint"
-            >
-              Inicio y fin se interpretan con la zona horaria de la
-              organizacion activa. La duracion maxima visible es de 366 dias.
-            </p>
 
             <div className="space-y-2">
               <Label htmlFor="reasonSummary">Resumen operativo opcional</Label>
@@ -732,19 +718,6 @@ function AbsenceCreationForm({
                 tokens ni datos familiares.
               </p>
             </div>
-
-            <label className="flex items-start gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-              <input
-                className="mt-0.5 size-4 rounded border-input"
-                name="sensitiveSummaryConfirmation"
-                required
-                type="checkbox"
-              />
-              <span className="text-muted-foreground">
-                Confirmo que el resumen no incluye datos sensibles ni
-                justificantes. Se usara solo para gestionar esta solicitud.
-              </span>
-            </label>
 
             <div className="flex flex-wrap items-center gap-3">
               <AbsenceCreationSubmitButton />
@@ -1240,7 +1213,6 @@ export default async function AbsencesPage({
   const creationFormError =
     error &&
     [
-      "confirmation-required",
       "date-range-invalid",
       "invalid-absence-type",
       "invalid-period",
@@ -1299,11 +1271,11 @@ export default async function AbsencesPage({
           </summary>
 
           <Alert className="mt-3">
-            <AlertTitle>Alcance operativo</AlertTitle>
+            <AlertTitle>Como afecta al horario</AlertTitle>
             <AlertDescription>
-              Aprobar una ausencia no toca horario ni asignaciones. Crear una
-              solicitud propia no resuelve cobertura, saldos legales ni
-              cumplimiento definitivo; el impacto se calcula en lectura.
+              Registrar o aprobar una ausencia no cambia el horario ni las
+              asignaciones por si solo. La pantalla muestra posibles impactos
+              para revisar cobertura; los saldos legales se gestionan aparte.
             </AlertDescription>
           </Alert>
         </details>
@@ -1439,16 +1411,6 @@ export default async function AbsencesPage({
         </section>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Uso de esta vista</CardTitle>
-          <CardDescription>
-            Aqui puedes crear y consultar tus propias solicitudes. Para una
-            ausencia de otra persona, adjuntos o casos especiales, contacta con
-            el equipo responsable.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   );
 }

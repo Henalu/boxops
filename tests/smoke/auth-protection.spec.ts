@@ -18,6 +18,7 @@ const protectedRoutes = [
   "/app/stats?week=2026-05-04",
   "/app/templates?week=2026-05-04",
   "/app/time",
+  "/app/work-windows?week=2026-05-04",
   "/app/time/export?organizationId=00000000-0000-0000-0000-000000000000&from=2026-05-04&to=2026-05-10",
 ];
 

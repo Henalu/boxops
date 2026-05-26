@@ -20,16 +20,23 @@ function collectSourceFiles(directory: string): string[] {
 }
 
 test.describe("staff work windows source guardrails", () => {
-  test("keeps planned presence separate from schedule blocks and time tracking", () => {
+  test("keeps planned presence separate from schedule blocks and safely linked to time automation", () => {
     const migration = readProjectFile(
       "supabase/migrations/00036_staff_work_windows.sql",
     );
     const sharedReadMigration = readProjectFile(
       "supabase/migrations/00038_staff_work_windows_shared_read.sql",
     );
+    const autoTimePunchMigration = readProjectFile(
+      "supabase/migrations/00047_staff_work_window_auto_time_punches.sql",
+    );
     const helper = readProjectFile("src/lib/staff-work-windows.ts");
     const actions = readProjectFile("src/app/(app)/app/schedule/actions.ts");
+    const appPaths = readProjectFile("src/lib/navigation/app-paths.ts");
     const schedulePage = readProjectFile("src/app/(app)/app/schedule/page.tsx");
+    const workWindowsPage = readProjectFile(
+      "src/app/(app)/app/work-windows/page.tsx",
+    );
     const visibilityControls = readProjectFile(
       "src/app/(app)/app/schedule/staff-work-windows-visibility.tsx",
     );
@@ -53,10 +60,31 @@ test.describe("staff work windows source guardrails", () => {
     );
     expect(migration).toContain("owner', 'admin', 'manager");
     expect(migration).not.toMatch(/\bEXCLUDE\b|tsrange|tstzrange/i);
+    expect(autoTimePunchMigration).toContain(
+      "generate_staff_work_window_auto_time_punches",
+    );
+    expect(autoTimePunchMigration).toContain(
+      "generate_due_staff_work_window_auto_time_punches",
+    );
+    expect(autoTimePunchMigration).toContain(
+      "metadata ->> 'generatedFrom' = 'staff_work_window'",
+    );
+    expect(autoTimePunchMigration).toContain("'presenceVerified'");
+    expect(autoTimePunchMigration).toContain("false");
+    expect(autoTimePunchMigration).toContain(
+      "Generated from planned staff work window; does not verify real presence.",
+    );
+    expect(autoTimePunchMigration).not.toMatch(
+      /navigator\.geolocation|latitude|longitude|gps|payroll_|salary|compensation|document-files|service_role/i,
+    );
 
     expect(helper).toContain("listStaffWorkWindowsForWeek");
     expect(helper).toContain("expandStaffWorkWindow");
     expect(helper).toContain("validateStaffWorkWindowForm");
+    expect(helper).toContain("person-profile-without-active-coach");
+    expect(helper).toMatch(
+      /export async function listStaffWorkWindowPersonOptions[\s\S]+\.from\("coach_profiles"\)[\s\S]+\.eq\("status", "active"\)[\s\S]+\.not\("person_profile_id", "is", null\)[\s\S]+\.from\("person_profiles"\)[\s\S]+\.eq\("status", "active"\)[\s\S]+\.eq\("visibility_status", "visible"\)/,
+    );
     expect(helper).not.toContain("schedule_blocks");
     expect(helper).not.toContain("schedule_block_assignments");
     expect(helper).not.toContain("time_records");
@@ -66,8 +94,22 @@ test.describe("staff work windows source guardrails", () => {
     expect(actions).toContain("updateStaffWorkWindow");
     expect(actions).toContain("deactivateStaffWorkWindow");
     expect(actions).toContain("canManageStaffWorkWindows");
+    expect(actions).toContain('"/app/work-windows"');
 
-    expect(schedulePage).toContain("Jornada prevista");
+    expect(appPaths).toContain("getWorkWindowsPath");
+    // Horario conserva la lectura contextual de jornadas previstas, pero la
+    // gestion vive en /app/work-windows para no duplicar secciones.
+    expect(schedulePage).toContain("listStaffWorkWindowsForWeek");
+    expect(schedulePage).toContain("includeInactive: false");
+    expect(schedulePage).toContain("StaffWorkWindowHourSummary");
+    expect(schedulePage).not.toContain("Gestionar jornadas");
+    expect(schedulePage).not.toContain("getWorkWindowsPath");
+    expect(workWindowsPage).toContain("Jornadas previstas");
+    expect(workWindowsPage).toContain("canManageStaffWorkWindows");
+    expect(workWindowsPage).toContain("listStaffWorkWindowsForWeek");
+    expect(workWindowsPage).toContain("includeInactive: true");
+    expect(workWindowsPage).toContain("updateStaffWorkWindow");
+    expect(workWindowsPage).toContain("deactivateStaffWorkWindow");
     expect(schedulePage).toContain("work_windows");
     expect(visibilityControls).toContain("StaffWorkWindowHourSummary");
     expect(visibilityControls).toContain("Jornada");

@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import {
   Image as ImageIcon,
   LockKeyhole,
-  Mail,
-  MapPin,
   PenLine,
   Save,
   ShieldCheck,
@@ -397,10 +395,10 @@ function AccountSummaryCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck aria-hidden="true" className="size-4" />
-          Cuenta Auth
+          Acceso a tu cuenta
         </CardTitle>
         <CardDescription>
-          Identidad de acceso gestionada por Supabase Auth.
+          Consulta tu email de acceso, organización activa y rol.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -445,7 +443,7 @@ function PersonProfileForm({
           Perfil visible
         </CardTitle>
         <CardDescription>
-          Datos operativos que pueden aparecer dentro de la organización.
+          Así te verá el equipo dentro de BoxOps.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -500,8 +498,8 @@ function PersonProfileForm({
           <LockKeyhole aria-hidden="true" className="size-4" />
           <AlertTitle>Avatar privado</AlertTitle>
           <AlertDescription>
-            La imagen se guarda de forma privada para esta organización. No se
-            publica como enlace permanente.
+            Tu foto se usa dentro de BoxOps para que el equipo te reconozca. No
+            se muestra como perfil público.
           </AlertDescription>
         </Alert>
 
@@ -574,11 +572,23 @@ function PersonProfileForm({
   );
 }
 
-function PersonProfileMissingCard() {
+function PersonProfileMissingCard({
+  hasLinkedCoachProfile = false,
+}: {
+  hasLinkedCoachProfile?: boolean;
+}) {
   return (
     <EmptyState
-      description="Tu cuenta tiene acceso a la organización, pero todavía no hay un perfil de persona vinculado a tu usuario. Propietario o Administrador pueden vincularlo desde Equipo."
-      title="Perfil visible pendiente"
+      description={
+        hasLinkedCoachProfile
+          ? "Tu cuenta ya tiene una ficha de entrenador asociada, pero falta enlazarla con tu persona visible. Pide a un Propietario o Administrador que complete la vinculacion desde Equipo."
+          : "Tu cuenta tiene acceso a la organizacion, pero todavia no esta vinculada con una persona visible del equipo. Pide a un Propietario o Administrador que lo revise desde Equipo."
+      }
+      title={
+        hasLinkedCoachProfile
+          ? "Ficha pendiente de vinculacion"
+          : "Vinculacion pendiente"
+      }
     />
   );
 }
@@ -645,7 +655,7 @@ function CoachProfileSection({
     <section className="space-y-3">
       <SectionHeader
         action={<Badge variant="outline">{profiles.length} fichas</Badge>}
-        description="Capacidad operativa propia, en lectura."
+        description="Tus fichas de entrenador vinculadas a esta cuenta."
         title="Perfil de entrenador"
       />
 
@@ -879,11 +889,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
           <Alert className="mt-3">
             <ShieldCheck aria-hidden="true" className="size-4" />
-            <AlertTitle>Datos personales básicos</AlertTitle>
+            <AlertTitle>Tu información en BoxOps</AlertTitle>
             <AlertDescription>
-              Aquí solo verás información de cuenta y perfil. Los datos
-              laborales sensibles se gestionarán en módulos separados con
-              permisos específicos.
+              Mantén al día cómo apareces para el equipo y revisa con qué rol
+              entras en esta organización.
             </AlertDescription>
           </Alert>
         </details>
@@ -920,7 +929,9 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             timezone={resolution.organization.timezone}
           />
         ) : (
-          <PersonProfileMissingCard />
+          <PersonProfileMissingCard
+            hasLinkedCoachProfile={coachProfiles.length > 0}
+          />
         )}
       </section>
 
@@ -939,27 +950,51 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             timezone={resolution.organization.timezone}
           />
         ) : (
-          <PersonProfileMissingCard />
+          <PersonProfileMissingCard
+            hasLinkedCoachProfile={coachProfiles.length > 0}
+          />
         )}
 
         <Card size="sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Mail aria-hidden="true" className="size-4" />
-              Información laboral sensible
+              <LockKeyhole aria-hidden="true" className="size-4" />
+              Datos laborales
             </CardTitle>
             <CardDescription>
-              No se muestra en esta pantalla.
+              Puesto, antigüedad y jornada aparecerán aquí cuando el módulo
+              laboral esté activado.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Puesto
+                </p>
+                <p className="mt-1 text-sm font-medium">Por configurar</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Antigüedad
+                </p>
+                <p className="mt-1 text-sm font-medium">Por configurar</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Jornada
+                </p>
+                <p className="mt-1 text-sm font-medium">Por configurar</p>
+              </div>
+            </div>
             <Alert>
-              <MapPin aria-hidden="true" className="size-4" />
-              <AlertTitle>No disponible aquí</AlertTitle>
+              <LockKeyhole aria-hidden="true" className="size-4" />
+              <AlertTitle>Desbloqueo seguro pendiente</AlertTitle>
               <AlertDescription>
-                Puesto legal, antigüedad laboral, jornada, salario, contrato,
-                documentos y datos bancarios necesitarán modelo y permisos
-                específicos.
+                El botón para ver datos protegidos debe pedir reautenticación
+                real y leer desde un modelo con permisos y auditoría. Salario,
+                contratos, documentos y datos bancarios irán en una vista
+                separada.
               </AlertDescription>
             </Alert>
           </CardContent>

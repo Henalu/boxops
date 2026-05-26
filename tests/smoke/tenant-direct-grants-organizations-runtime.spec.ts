@@ -38,6 +38,8 @@ type OrganizationSnapshot = {
   updatedAt: string;
 };
 
+type JsonObject = { [key: string]: Json | undefined };
+
 const tenantSettingsCredentials = hasCredentials(ownerCredentials)
   ? ownerCredentials
   : adminCredentials;
@@ -214,7 +216,7 @@ function getForeignOrganizationSnapshotNotManagedByUser(userId: string) {
   `);
 }
 
-function asJsonObject(value: Json): Record<string, Json> {
+function asJsonObject(value: Json): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value)
     ? { ...value }
     : {};

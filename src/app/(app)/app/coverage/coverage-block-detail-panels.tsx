@@ -100,7 +100,7 @@ const traceSourceLabels: Record<CoverageTraceItem["source"], string> = {
   absence_requests: "Ausencias",
   change_request_events: "Solicitudes",
   change_requests: "Solicitudes",
-  operational_audit_events: "Auditoria",
+  operational_audit_events: "Cambios",
 };
 
 function formatServiceDate(value: string) {
@@ -135,6 +135,18 @@ function formatTraceDate(value: string | null) {
   } catch {
     return value;
   }
+}
+
+function formatTraceMeta(item: CoverageTraceItem) {
+  const dateLabel = formatTraceDate(item.occurredAt);
+
+  if (item.source === "operational_audit_events") {
+    return dateLabel === "Impacto actual"
+      ? "Cambio reciente"
+      : `Actualizado el ${dateLabel}`;
+  }
+
+  return `${traceSourceLabels[item.source]} / ${dateLabel}`;
 }
 
 function shortId(value: string) {
@@ -372,11 +384,11 @@ function CoverageTraceList({
     >
       <div className="flex items-center gap-2">
         <History aria-hidden="true" className="size-4 shrink-0" />
-        <h4 className="text-sm font-medium">Trazabilidad operativa</h4>
+        <h4 className="text-sm font-medium">Cambios recientes</h4>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">
-        Lectura reciente de cambios, solicitudes y ausencias. No modifica
-        horario ni resuelve cobertura.
+        Ultimos movimientos relacionados con este bloque. No cambia el horario
+        ni asigna cobertura por si solo.
       </p>
       {loadError ? (
         <p className="text-sm text-muted-foreground">
@@ -396,8 +408,7 @@ function CoverageTraceList({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{item.title}</span>
                 <span className="text-xs opacity-80">
-                  {traceSourceLabels[item.source]} /{" "}
-                  {formatTraceDate(item.occurredAt)}
+                  {formatTraceMeta(item)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-5 opacity-90">{item.detail}</p>

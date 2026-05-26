@@ -145,12 +145,15 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
 };
 
 const AUDIT_FIELD_LABELS: Record<string, string> = {
-  assignment_status: "estado",
+  assignment_status: "estado de asignacion",
   center_id: "centro",
   class_type_id: "tipo",
   coach_profile_id: "entrenador",
+  default_coach_profile_id: "entrenador por defecto",
   end_time: "fin",
-  required_coaches: "requisito",
+  notes: "notas",
+  required_coaches: "entrenadores necesarios",
+  schedule_block_id: "bloque",
   service_date: "fecha",
   source: "origen",
   start_time: "inicio",
@@ -408,7 +411,41 @@ function getChangedFieldNames(changedFields: Json) {
     .slice(0, 6);
 }
 
+function hasChangedField(changedFields: Json, field: string) {
+  return (
+    Boolean(changedFields) &&
+    typeof changedFields === "object" &&
+    !Array.isArray(changedFields) &&
+    Object.prototype.hasOwnProperty.call(changedFields, field)
+  );
+}
+
+function formatAuditFieldList(fields: string[]) {
+  if (fields.length <= 2) {
+    return fields.join(" y ");
+  }
+
+  return `${fields.slice(0, -1).join(", ")} y ${fields[fields.length - 1]}`;
+}
+
 function getAuditTitle(event: OperationalAuditEventRow) {
+  if (event.entity_type === "schedule_block_assignments") {
+    if (event.action === "assigned") {
+      return "Entrenador asignado";
+    }
+
+    if (event.action === "removed") {
+      return "Entrenador retirado";
+    }
+  }
+
+  if (
+    event.action === "updated" &&
+    hasChangedField(event.changed_fields, "default_coach_profile_id")
+  ) {
+    return "Entrenador por defecto actualizado";
+  }
+
   const entityLabel =
     AUDIT_ENTITY_LABELS[event.entity_type] ?? "Elemento operativo";
   const actionLabel = AUDIT_ACTION_LABELS[event.action] ?? event.action;
@@ -420,10 +457,10 @@ function getAuditDetail(event: OperationalAuditEventRow) {
   const fields = getChangedFieldNames(event.changed_fields);
 
   if (fields.length === 0) {
-    return "Cambio operativo reciente con campos minimizados.";
+    return "Se guardo un cambio reciente.";
   }
 
-  return `Campos minimizados: ${fields.join(", ")}.`;
+  return `Cambio guardado: ${formatAuditFieldList(fields)}.`;
 }
 
 function getAuditBlockIds({

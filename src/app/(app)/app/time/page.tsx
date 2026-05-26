@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -31,12 +32,12 @@ import {
 } from "./actions";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
-  EmptyState,
   PageHeader,
   SectionHeader,
   StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
+import { CollapsibleSection } from "@/components/features/collapsible-section";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -215,22 +216,20 @@ const errorMessages: Record<string, string> = {
     "El fichaje seleccionado no pertenece al registro propio indicado.",
   invalid_time_record: "El registro seleccionado no está disponible.",
   invalid_timestamp: "La fecha y hora del fichaje no son válidas.",
-  invalid_overtime_candidate:
-    "El candidato operativo de posible exceso no esta disponible.",
+  invalid_overtime_candidate: "Ese posible exceso ya no esta disponible.",
   invalid_overtime_candidate_status:
     "El estado operativo elegido no es valido para esta revision.",
   load_failed: "No se han podido cargar los registros de fichaje.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required: "Elige una organización antes de fichar.",
-  overtime_forbidden:
-    "Tu rol no permite revisar candidatos operativos de posible exceso.",
+  overtime_forbidden: "Tu rol no permite revisar posibles excesos.",
   overtime_detection_authentication_required:
     "Inicia sesion de nuevo para detectar posibles excesos.",
   overtime_detection_date_range_invalid:
     "El rango de deteccion no es valido para esta accion.",
   overtime_detection_forbidden:
-    "Tu rol no permite detectar candidatos operativos de posible exceso.",
+    "Tu rol no permite buscar posibles excesos.",
   overtime_detection_invalid_organization:
     "La organizacion activa no es valida para esta deteccion.",
   overtime_detection_invalid_period:
@@ -244,18 +243,17 @@ const errorMessages: Record<string, string> = {
   overtime_detection_organization_required:
     "Elige una organizacion antes de detectar posibles excesos.",
   overtime_detection_save_failed:
-    "No se ha podido guardar la deteccion de candidatos operativos.",
-  overtime_invalid_candidate:
-    "El candidato operativo de posible exceso no esta disponible.",
+    "No se ha podido guardar la deteccion de posibles excesos.",
+  overtime_invalid_candidate: "Ese posible exceso ya no esta disponible.",
   overtime_invalid_status:
     "El estado operativo elegido no es valido para esta revision.",
   overtime_load_failed:
-    "No se ha podido cargar la cola de candidatos operativos de posible exceso.",
+    "No se ha podido cargar la lista de posibles excesos.",
   overtime_not_actionable:
-    "Este candidato operativo esta cerrado o sustituido y ya no acepta cambios.",
+    "Este posible exceso esta cerrado o sustituido y ya no acepta cambios.",
   overtime_permission_denied:
-    "Tu rol no permite revisar candidatos operativos de posible exceso.",
-  overtime_save_failed: "No se ha podido actualizar el candidato operativo.",
+    "Tu rol no permite revisar posibles excesos.",
+  overtime_save_failed: "No se ha podido actualizar el posible exceso.",
   profile_missing:
     "Tu cuenta todavía no tiene una ficha de persona vinculada en esta organización.",
   review_failed:
@@ -764,7 +762,7 @@ function getWeekDayStatusTone(status: TimeWeekDayOverview["status"]) {
 
 function getWeekBalanceCopy(balanceMinutes: number) {
   if (Math.abs(balanceMinutes) <= 5) {
-    return "Correcto";
+    return "OK";
   }
 
   return balanceMinutes > 0
@@ -839,6 +837,10 @@ function formatDuration(minutes: number) {
 
 function formatPositiveDuration(minutes: number) {
   return `+${formatDuration(Math.max(0, minutes))}`;
+}
+
+function formatDayDurationStat(minutes: number) {
+  return minutes === 0 ? "0" : formatDuration(minutes);
 }
 
 function formatHourStat(minutes: number | null) {
@@ -1332,23 +1334,29 @@ function TimeCorrectionForm({
     : "Aplicar corrección";
 
   return (
-    <Card id="correccion">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileClock aria-hidden="true" className="size-4" />
-          {actionLabel}
-        </CardTitle>
-        <CardDescription>
-          {correctionApprovalRequired
-            ? "Selecciona un registro propio reciente. La solicitud queda pendiente hasta revisión."
-            : "Selecciona un registro propio reciente. La corrección se aplica al enviar de forma trazada."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div id="correccion">
+      <CollapsibleTimeSection
+        defaultOpen={Boolean(selectedRecordId && hasCorrectablePunches)}
+        description={
+          correctionApprovalRequired
+            ? "Selecciona un registro propio reciente. La solicitud queda pendiente hasta revision."
+            : "Selecciona un registro propio reciente. La correccion se aplica al enviar."
+        }
+        summary={
+          <Badge variant="outline">
+            {hasCorrectablePunches
+              ? `${recordsWithVisiblePunches.length} corregibles`
+              : "Sin fichajes corregibles"}
+          </Badge>
+        }
+        title={actionLabel}
+        tone="action"
+      >
         {!hasCorrectablePunches ? (
-          <p className="text-sm text-muted-foreground">
-            No hay entradas o salidas visibles para corregir.
-          </p>
+          <CompactEmptyState
+            description="Cuando exista una entrada o salida visible, podras solicitar o aplicar una correccion desde aqui."
+            title="No hay fichajes corregibles"
+          />
         ) : (
           <form
             action={submitOwnTimeCorrectionFromForm}
@@ -1458,8 +1466,8 @@ function TimeCorrectionForm({
             </Button>
           </form>
         )}
-      </CardContent>
-    </Card>
+      </CollapsibleTimeSection>
+    </div>
   );
 }
 
@@ -1661,7 +1669,7 @@ function TimeWeekDayColumn({
     : null;
 
   return (
-    <div className="flex min-h-[360px] min-w-0 flex-col border-border p-3 md:border-r md:last:border-r-0">
+    <div className="flex min-h-[300px] min-w-0 flex-col border-border p-2.5 md:border-r md:last:border-r-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">
@@ -1671,22 +1679,24 @@ function TimeWeekDayColumn({
             {formatShortDate(day.date)}
           </h3>
         </div>
-        <StatusBadge tone={getWeekDayStatusTone(day.status)}>
-          {getWeekDayStatusLabel(day.status)}
-        </StatusBadge>
+        {day.status === "empty" ? null : (
+          <StatusBadge tone={getWeekDayStatusTone(day.status)}>
+            {getWeekDayStatusLabel(day.status)}
+          </StatusBadge>
+        )}
       </div>
 
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
+      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
         <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Asign.</dt>
           <dd className="mt-1 truncate font-mono font-semibold">
-            {formatDuration(day.assignedMinutes)}
+            {formatDayDurationStat(day.assignedMinutes)}
           </dd>
         </div>
         <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Fich.</dt>
           <dd className="mt-1 truncate font-mono font-semibold">
-            {formatDuration(day.workedMinutes)}
+            {formatDayDurationStat(day.workedMinutes)}
           </dd>
         </div>
         <div className="min-w-0">
@@ -1697,13 +1707,13 @@ function TimeWeekDayColumn({
         </div>
       </dl>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-2">
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
           <span>{day.assignedBlockCount} bloques asignados</span>
           <span>{day.punchCount} fichajes</span>
         </div>
         {visibleDayPunches.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+          <p className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5 text-sm text-muted-foreground">
             Sin entradas o salidas visibles.
           </p>
         ) : (
@@ -1731,7 +1741,7 @@ function TimeWeekDayColumn({
       </div>
 
       {correctionHref ? (
-        <div className="mt-auto pt-4">
+        <div className="mt-auto pt-3">
           {canSubmit ? (
             <Button asChild className="w-full" variant="outline">
               <Link href={correctionHref}>
@@ -1772,41 +1782,53 @@ function TimeWeekOverviewSection({
   records: TimeRecordRow[];
   weekStart: string;
 }) {
+  const summary = overview ? (
+    <>
+      <Badge variant="outline">{records.length} registros</Badge>
+      <Badge variant={overview.totals.warningCount > 0 ? "secondary" : "outline"}>
+        {overview.totals.warningCount} avisos
+      </Badge>
+    </>
+  ) : (
+    <Badge variant="outline">Sin datos</Badge>
+  );
+
   return (
-    <section className="space-y-3">
-      <SectionHeader
-        action={
-          <TimeWeekNavigation
-            currentWeekStart={currentWeekStart}
-            organizationId={organizationId}
-            weekStart={weekStart}
-          />
-        }
-        description={
-          overview
-            ? formatWeekRange(overview.weekStart, overview.weekEnd)
-            : "No se ha podido cargar la semana seleccionada."
-        }
-        title="Semana de fichaje"
-      />
+    <CollapsibleTimeSection
+      action={
+        <TimeWeekNavigation
+          currentWeekStart={currentWeekStart}
+          organizationId={organizationId}
+          weekStart={weekStart}
+        />
+      }
+      defaultOpen={Boolean(overview || error)}
+      description={
+        overview
+          ? formatWeekRange(overview.weekStart, overview.weekEnd)
+          : "No se ha podido cargar la semana seleccionada."
+      }
+      summary={summary}
+      title="Semana de fichaje"
+      tone="history"
+    >
+      <div className="grid gap-3">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>Semana no disponible</AlertTitle>
+            <AlertDescription>
+              {errorMessages[error] ??
+                "No se han podido comparar fichajes y asignaciones."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTriangle aria-hidden="true" />
-          <AlertTitle>Semana no disponible</AlertTitle>
-          <AlertDescription>
-            {errorMessages[error] ??
-              "No se han podido comparar fichajes y asignaciones."}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+        {overview ? (
+          <>
+            <TimeWeekSummaryCards overview={overview} />
 
-      {overview ? (
-        <>
-          <TimeWeekSummaryCards overview={overview} />
-
-          <Card>
-            <CardContent className="p-0">
+            <div className="overflow-hidden rounded-lg border border-border bg-background">
               <div className="overflow-x-auto">
                 <div className="grid min-w-[980px] grid-cols-7 md:min-w-0">
                   {overview.days.map((day) => (
@@ -1823,11 +1845,11 @@ function TimeWeekOverviewSection({
                   ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
-    </section>
+            </div>
+          </>
+        ) : null}
+      </div>
+    </CollapsibleTimeSection>
   );
 }
 
@@ -1997,8 +2019,8 @@ function CorrectionsAndApprovals({
 }) {
   if (corrections.length === 0 && approvals.length === 0) {
     return (
-      <EmptyState
-        description="Cuando existan correcciones solicitadas o semanas revisadas aparecerán aquí."
+      <CompactEmptyState
+        description="Cuando existan correcciones solicitadas o semanas revisadas apareceran aqui."
         title="Sin correcciones ni aprobaciones"
       />
     );
@@ -2009,9 +2031,9 @@ function CorrectionsAndApprovals({
       <Card size="sm">
         <CardHeader>
           <CardTitle>Correcciones propias</CardTitle>
-        <CardDescription>
-          Correcciones y solicitudes recientes sobre tus registros.
-        </CardDescription>
+          <CardDescription>
+            Correcciones y solicitudes recientes sobre tus registros.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {corrections.length === 0 ? (
@@ -2103,7 +2125,7 @@ function TimeExportSection({
     <section className="space-y-3">
       <SectionHeader
         action={<Badge variant="outline">CSV interno</Badge>}
-        description="Descarga un rango de fichajes para revision humana. No es payroll ni cumplimiento legal definitivo."
+        description="Descarga los fichajes de un periodo para revisarlos con el equipo responsable."
         title="Exporte interno revisable"
       />
 
@@ -2183,9 +2205,9 @@ function TimeExportSection({
           </form>
 
           <p className="text-sm leading-6 text-muted-foreground">
-            Cada descarga queda registrada en los metadatos de exportes de la
-            organización. El contenido es revisable y operativo; cualquier uso
-            laboral formal requiere validacion externa.
+            La descarga queda registrada para trazabilidad de la organizacion.
+            Usa el CSV como apoyo interno y revisalo antes de compartirlo fuera
+            del equipo.
           </p>
         </CardContent>
       </Card>
@@ -2213,6 +2235,90 @@ function DetectOvertimeCandidatesForm({
         Detectar posibles excesos
       </Button>
     </form>
+  );
+}
+
+function CollapsibleTimeSection({
+  action,
+  children,
+  contentClassName,
+  defaultOpen = false,
+  description,
+  summary,
+  title,
+  tone = "default",
+}: {
+  action?: ReactNode;
+  children: ReactNode;
+  contentClassName?: string;
+  defaultOpen?: boolean;
+  description: string;
+  summary?: ReactNode;
+  title: string;
+  tone?: "action" | "default" | "history" | "review";
+}) {
+  return (
+    <CollapsibleSection
+      action={action}
+      contentClassName={contentClassName}
+      dataCollapsibleSection={title}
+      dataTimeCollapsibleDetails={title}
+      defaultOpen={defaultOpen}
+      description={description}
+      summary={summary}
+      title={title}
+      tone={tone}
+    >
+      {children}
+    </CollapsibleSection>
+  );
+}
+
+function CollapsibleReviewQueue({
+  badge,
+  children,
+  defaultOpen = false,
+  title,
+}: {
+  badge: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  title: string;
+}) {
+  return (
+    <CollapsibleSection
+      className="rounded-lg shadow-none"
+      contentClassName="p-3"
+      dataTimeCollapsibleDetails={title}
+      dataTimeCollapsibleQueue={title}
+      defaultOpen={defaultOpen}
+      summary={badge}
+      title={title}
+    >
+      {children}
+    </CollapsibleSection>
+  );
+}
+
+function CompactEmptyState({
+  description,
+  title,
+}: {
+  description: string;
+  title: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-muted/15 px-3 py-3">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <CheckCircle2 aria-hidden="true" className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold tracking-tight">{title}</p>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {description}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -2281,22 +2387,24 @@ function OvertimeCandidateReviewSection({
     candidates?.filter(
       (candidate) => !overtimeCandidateTerminalStatuses.has(candidate.status),
     ).length ?? 0;
+  const shouldOpen =
+    Boolean(error || references?.errors.length) || candidateCount > 0;
 
   return (
-    <section className="space-y-3" data-overtime-candidates-review>
-      <SectionHeader
+    <div data-overtime-candidates-review>
+      <CollapsibleTimeSection
         action={
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <Badge variant="outline">{actionableCount} revisables</Badge>
-            <DetectOvertimeCandidatesForm
-              organizationId={organizationId}
-              weekStart={weekStart}
-            />
-          </div>
+          <DetectOvertimeCandidatesForm
+            organizationId={organizationId}
+            weekStart={weekStart}
+          />
         }
-        description="Primera cola visible de posible exceso como candidato operativo, pendiente de revisión humana."
-        title="Candidatos operativos de posible exceso"
-      />
+        defaultOpen={shouldOpen}
+        description="Revisa posibles diferencias entre lo previsto y lo fichado antes de tomar una decision."
+        summary={<Badge variant="outline">{actionableCount} por revisar</Badge>}
+        title="Posibles excesos de horas"
+        tone="review"
+      >
 
       {error ? (
         <Alert variant="destructive">
@@ -2316,26 +2424,25 @@ function OvertimeCandidateReviewSection({
       ) : null}
 
       {!error && candidates && candidateCount === 0 ? (
-        <EmptyState
-          description="Cuando exista un posible exceso pendiente de revision, aparecera aqui como candidato operativo revisable."
-          title="Sin candidatos operativos pendientes"
+        <CompactEmptyState
+          description="Cuando detectemos una diferencia que necesite revision, aparecera aqui."
+          title="No hay posibles excesos por revisar"
         />
       ) : null}
 
       {!error && candidates && candidateCount > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-background">
+          <div className="border-b border-border px-3 py-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
               <FileClock aria-hidden="true" className="size-4" />
-              Revision operativa
-            </CardTitle>
-            <CardDescription>
-              Esta tabla muestra snapshots operativos y permite cambiar solo el
-              estado del candidato operativo. No modifica fichajes, bloques ni
-              asignaciones.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+              Revision de posibles excesos
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Revisa cada caso y marca su estado. Cambiar el estado no modifica
+              fichajes, bloques ni asignaciones.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -2424,10 +2531,11 @@ function OvertimeCandidateReviewSection({
                 })}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : null}
-    </section>
+      </CollapsibleTimeSection>
+    </div>
   );
 }
 
@@ -2711,24 +2819,28 @@ function TimeCorrectionReviewSection({
 }) {
   const approvedCount = approvedCorrections?.length ?? 0;
   const pendingCount = pendingCorrections?.length ?? 0;
+  const shouldOpen =
+    Boolean(error || references?.errors.length) ||
+    approvedCount + pendingCount > 0;
 
   return (
-    <section className="space-y-3">
-      <SectionHeader
-        action={
-          <Badge variant={canReview ? "secondary" : "outline"}>
-            {canReview
-              ? `${approvedCount} aprobadas / ${pendingCount} pendientes`
-              : "Sin permiso"}
-          </Badge>
-        }
-        description={
-          correctionApprovalRequired
-            ? "Propietario, Administrador y Responsable pueden aprobar, rechazar y aplicar correcciones dentro de la organización activa."
-            : "La aprobación de nuevas correcciones está desactivada; esta cola conserva solicitudes existentes o heredadas."
-        }
-        title="Revisión de correcciones"
-      />
+    <CollapsibleTimeSection
+      defaultOpen={shouldOpen}
+      description={
+        correctionApprovalRequired
+          ? "Revisa solicitudes de ajuste y aplica las aprobadas cuando corresponda."
+          : "La revision de nuevas correcciones esta desactivada. Puedes consultar solicitudes anteriores si existen."
+      }
+      summary={
+        <Badge variant={canReview ? "secondary" : "outline"}>
+          {canReview
+            ? `${approvedCount} para aplicar / ${pendingCount} por revisar`
+            : "Sin permiso"}
+        </Badge>
+      }
+      title="Correcciones del equipo"
+      tone="review"
+    >
 
       {!canReview || error === "forbidden" ? (
         <Alert variant="destructive">
@@ -2757,29 +2869,26 @@ function TimeCorrectionReviewSection({
       ) : null}
 
       {canReview && !error && references ? (
-        <div className="grid gap-5">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold tracking-tight">
-                Aprobadas para aplicar
-              </h3>
-              <Badge variant="outline">{approvedCount} listas</Badge>
-            </div>
+        <div className="grid gap-3">
+          <CollapsibleReviewQueue
+            badge={<Badge variant="outline">{approvedCount} para aplicar</Badge>}
+            defaultOpen={approvedCount > 0}
+            title="Listas para aplicar"
+          >
 
             {approvedCount === 0 ? (
-              <EmptyState
-                description="Las correcciones ya aplicadas no vuelven a mostrarse aquí. Las pendientes deben aprobarse primero."
-                title="Sin correcciones aprobadas para aplicar"
+              <CompactEmptyState
+                description="Cuando una correccion este aprobada y pendiente de aplicar, aparecera aqui."
+                title="No hay correcciones listas"
               />
             ) : (
               <div className="grid gap-3">
                 <Alert>
                   <ClipboardCheck aria-hidden="true" />
-                  <AlertTitle>Aplicación trazada</AlertTitle>
+                  <AlertTitle>Aplicar correcciones</AlertTitle>
                   <AlertDescription>
-                    Aplicar una corrección aprobada puede crear un fichaje de
-                    origen corrección, sustituir el original o anularlo. No es
-                    payroll ni cierre legal definitivo.
+                    Al aplicar una correccion aprobada, el historial de fichajes
+                    se actualiza segun la decision registrada.
                   </AlertDescription>
                 </Alert>
 
@@ -2795,18 +2904,16 @@ function TimeCorrectionReviewSection({
                 ))}
               </div>
             )}
-          </div>
+          </CollapsibleReviewQueue>
 
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold tracking-tight">
-                Solicitudes pendientes
-              </h3>
-              <Badge variant="outline">{pendingCount} pendientes</Badge>
-            </div>
+          <CollapsibleReviewQueue
+            badge={<Badge variant="outline">{pendingCount} pendientes</Badge>}
+            defaultOpen={pendingCount > 0}
+            title="Solicitudes pendientes"
+          >
 
             {pendingCount === 0 ? (
-              <EmptyState
+              <CompactEmptyState
                 description="Cuando alguien solicite una corrección pendiente, aparecerá aquí para revisarla con trazabilidad."
                 title="Sin correcciones pendientes"
               />
@@ -2834,10 +2941,10 @@ function TimeCorrectionReviewSection({
                 ))}
               </div>
             )}
-          </div>
+          </CollapsibleReviewQueue>
         </div>
       ) : null}
-    </section>
+    </CollapsibleTimeSection>
   );
 }
 
@@ -3086,25 +3193,20 @@ export default async function TimePage({ searchParams }: TimePageProps) {
           <div className="mt-3 grid gap-3">
             <Alert>
               <ShieldCheck aria-hidden="true" />
-              <AlertTitle>Fichaje manual auditable</AlertTitle>
+              <AlertTitle>Tus fichajes de la semana</AlertTitle>
               <AlertDescription>
-                Registra entradas y salidas propias sin geolocalización. Este
-                corte no calcula payroll ni horas extra, y no garantiza
-                cumplimiento legal definitivo sin revisión laboral.
+                Marca entradas y salidas desde la web y revisa el historial
+                semanal. Esta pantalla no solicita ubicacion.
               </AlertDescription>
             </Alert>
 
             <Alert>
               <FileClock aria-hidden="true" />
-              <AlertTitle>
-                {timeTrackingSettings.correctionApprovalRequired
-                  ? "Correcciones con aprobación"
-                  : "Correcciones directas"}
-              </AlertTitle>
+              <AlertTitle>Corregir fichajes</AlertTitle>
               <AlertDescription>
                 {timeTrackingSettings.correctionApprovalRequired
-                  ? "Las correcciones propias quedan como solicitud pendiente hasta revisión administrativa."
-                  : "Las correcciones propias se aplican al enviar mediante un flujo trazado; no son payroll ni cierre legal definitivo."}
+                  ? "Si necesitas ajustar una hora, envia la correccion y el equipo la revisara."
+                  : "Si necesitas ajustar una hora, envia la correccion y quedara reflejada en el historial."}
               </AlertDescription>
             </Alert>
           </div>
@@ -3226,66 +3328,28 @@ export default async function TimePage({ searchParams }: TimePageProps) {
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Limites seguros</CardTitle>
-              <CardDescription>
-                Fichaje propio, manual y sin datos de ubicacion.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <ShieldCheck aria-hidden="true" className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Solo tu fichaje</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Esta pantalla no permite elegir otra persona ni fichar en
-                    nombre de alguien más.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                  <MapPin aria-hidden="true" className="size-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Contexto opcional</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Puedes dejar el fichaje sin centro, bloque ni asignacion si
-                    no hay contexto seguro que vincular.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <TimeCorrectionForm
+        canSubmit={canSubmitPunch}
+        correctionApprovalRequired={
+          timeTrackingSettings.correctionApprovalRequired
+        }
+        organizationId={resolution.organization.id}
+        punchesByRecordId={visiblePunchesByRecordId}
+        records={records}
+        selectedRecordId={selectedRecordId}
+        weekStart={week.weekStart}
+      />
 
-          <TimeCorrectionForm
-            canSubmit={canSubmitPunch}
-            correctionApprovalRequired={
-              timeTrackingSettings.correctionApprovalRequired
-            }
-            organizationId={resolution.organization.id}
-            punchesByRecordId={visiblePunchesByRecordId}
-            records={records}
-            selectedRecordId={selectedRecordId}
-            weekStart={week.weekStart}
-        />
-      </div>
-
-      <section className="space-y-3">
-        <SectionHeader
-          action={<Badge variant="outline">{records.length} de la semana</Badge>}
-          title="Registros de la semana"
-        />
-
+      <CollapsibleTimeSection
+        defaultOpen={records.length > 0}
+        description="Entradas, salidas y registros visibles de la semana seleccionada."
+        summary={<Badge variant="outline">{records.length} de la semana</Badge>}
+        title="Registros de la semana"
+        tone="history"
+      >
         {records.length === 0 ? (
-          <EmptyState
-            description="Cuando exista una entrada o salida en esta semana, BoxOps mostrara aquí su registro de jornada."
+          <CompactEmptyState
+            description="Cuando exista una entrada o salida en esta semana, BoxOps mostrara aqui su registro de jornada."
             title="Sin fichajes en esta semana"
           />
         ) : (
@@ -3304,19 +3368,25 @@ export default async function TimePage({ searchParams }: TimePageProps) {
             ))}
           </div>
         )}
-      </section>
+      </CollapsibleTimeSection>
 
-      <section className="space-y-3">
-        <SectionHeader
-          description="Vista propia de solicitudes y cierres cuando existan."
-          title="Correcciones y aprobaciones"
-        />
+      <CollapsibleTimeSection
+        defaultOpen={corrections.length + approvals.length > 0}
+        description="Vista propia de solicitudes y cierres cuando existan."
+        summary={
+          <Badge variant="outline">
+            {corrections.length + approvals.length} movimientos
+          </Badge>
+        }
+        title="Correcciones y aprobaciones"
+        tone="history"
+      >
         <CorrectionsAndApprovals
           approvals={approvals}
           corrections={corrections}
           timezone={resolution.organization.timezone}
         />
-      </section>
+      </CollapsibleTimeSection>
     </div>
   );
 }

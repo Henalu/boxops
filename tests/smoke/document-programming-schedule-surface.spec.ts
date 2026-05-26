@@ -48,9 +48,9 @@ test.describe("document programming E.8/I.29 schedule surface guardrails", () =>
     expect(schedulePanel).toContain(
       'data-document-programming-surface="schedule-block"',
     );
-    expect(schedulePanel).toContain("Programacion autorizada");
+    expect(schedulePanel).toContain("Material de apoyo");
     expect(schedulePanel).toContain(
-      "No hay programacion disponible para tu permiso en este bloque.",
+      "No hay material visible para esta sesion.",
     );
     expect(schedulePanel).toContain("can_preview");
     expect(schedulePanel).toContain("can_download");
@@ -58,17 +58,22 @@ test.describe("document programming E.8/I.29 schedule surface guardrails", () =>
       "/app/documents/${documentId}/versions/${documentVersionId}/${mode}",
     );
     expect(schedulePanel).toContain("organizationId");
-    expect(schedulePanel).toContain("El horario no");
-    expect(schedulePanel).toContain("Solo metadata");
+    expect(schedulePanel).toContain("Archivos para preparar esta sesion");
+    expect(schedulePanel).toContain("Solo informacion");
+    expect(schedulePanel).not.toContain("Programacion autorizada");
+    expect(schedulePanel).not.toContain("Fuente documental versionada");
+    expect(schedulePanel).not.toContain("Solo metadata");
 
     expect(appSource).not.toContain("createDocumentProgrammingLink");
     expect(appSource).not.toContain("setDocumentProgrammingLinkStatus");
-    expect(appSource).not.toMatch(
+    expect(`${schedulePage}\n${schedulePanel}`).not.toMatch(
       /begin_document_version_upload|activate_document_version_upload|cancel_document_version_upload/,
     );
     expect(documentRouteFiles).toEqual([
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/download/route.ts",
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/preview/route.ts",
+      "src/app/(app)/app/documents/actions.ts",
+      "src/app/(app)/app/documents/document-upload-submit-button.tsx",
       "src/app/(app)/app/documents/page.tsx",
     ]);
     expect(source).not.toMatch(/\bservice_role\b/);

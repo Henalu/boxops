@@ -2,6 +2,10 @@
 
 import { redirect } from "next/navigation";
 
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from "@/lib/auth/required-password-change";
 import { getSafeRedirectPath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,13 +34,17 @@ export async function signInWithPassword(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: normalizedEmail,
     password,
   });
 
   if (error) {
     redirect(getErrorRedirect("invalid-credentials", redirectTo));
+  }
+
+  if (data.user && isPasswordChangeRequired(data.user)) {
+    redirect(getRequiredPasswordChangePath());
   }
 
   redirect(redirectTo);

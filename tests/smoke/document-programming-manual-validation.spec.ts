@@ -44,6 +44,10 @@ test.describe("document programming E.10/I.31 manual validation guardrails", () 
     const appSource = appFiles
       .map((filePath) => readFileSync(filePath, "utf8"))
       .join("\n");
+    const nonDocumentAppSource = appFiles
+      .filter((filePath) => !filePath.split(path.sep).includes("documents"))
+      .map((filePath) => readFileSync(filePath, "utf8"))
+      .join("\n");
     const source = collectSourceFiles(path.join(process.cwd(), "src"))
       .map((filePath) => readFileSync(filePath, "utf8"))
       .join("\n");
@@ -95,12 +99,16 @@ test.describe("document programming E.10/I.31 manual validation guardrails", () 
 
     expect(appSource).not.toContain("createDocumentProgrammingLink");
     expect(appSource).not.toContain("setDocumentProgrammingLinkStatus");
-    expect(appSource).not.toMatch(
+    // E.19 legitimately opened minimal uploads only in /app/documents; E.10 still
+    // forbids upload controls on schedule/manual-validation surfaces.
+    expect(nonDocumentAppSource).not.toMatch(
       /begin_document_version_upload|activate_document_version_upload|cancel_document_version_upload/,
     );
     expect(documentRouteFiles).toEqual([
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/download/route.ts",
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/preview/route.ts",
+      "src/app/(app)/app/documents/actions.ts",
+      "src/app/(app)/app/documents/document-upload-submit-button.tsx",
       "src/app/(app)/app/documents/page.tsx",
     ]);
     expect(source).not.toMatch(/\bservice_role\b/);

@@ -1,6 +1,10 @@
 import Link from "next/link";
 
 import { signInWithPassword } from "@/app/(auth)/login/actions";
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from "@/lib/auth/required-password-change";
 import { getSafeRedirectPath } from "@/lib/auth/redirects";
 import {
   getActiveMemberships,
@@ -38,6 +42,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const status = getParam(params.status);
   const user = await getAuthenticatedUser();
   const memberships = user ? await getActiveMemberships(user.id) : [];
+  const passwordChangeRequired = user ? isPasswordChangeRequired(user) : false;
 
   return (
     <main className="flex min-h-screen items-center bg-slate-50 px-4 py-12 text-slate-950 sm:px-6">
@@ -71,7 +76,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 </p>
               </div>
 
-              {memberships.length > 0 ? (
+              {passwordChangeRequired ? (
+                <Link
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
+                  href={getRequiredPasswordChangePath()}
+                >
+                  Cambiar contraseña
+                </Link>
+              ) : memberships.length > 0 ? (
                 <Link
                   className="inline-flex w-full items-center justify-center rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"
                   href={redirectTo}
@@ -84,6 +96,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   ningún box.
                 </p>
               )}
+
+              {passwordChangeRequired ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+                  Esta cuenta se creó con una contraseña temporal. Cámbiala
+                  antes de entrar en BoxOps.
+                </p>
+              ) : null}
 
               <form action="/auth/sign-out" method="post">
                 <button

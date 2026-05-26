@@ -59,6 +59,12 @@ function readEnv(name: string): string | null {
   return value ? value : null;
 }
 
+function readProcessEnv(name: string): string | null {
+  const value = process.env[name]?.trim();
+
+  return value ? value : null;
+}
+
 function readCredentials(prefix: string): SmokeCredentials | null {
   const email = readEnv(`${prefix}_EMAIL`);
   const password = readEnv(`${prefix}_PASSWORD`);
@@ -70,8 +76,26 @@ function readCredentials(prefix: string): SmokeCredentials | null {
   return { email, password };
 }
 
+function readProcessCredentials(
+  emailName: string,
+  passwordName: string,
+): SmokeCredentials | null {
+  const email = readProcessEnv(emailName);
+  const password = readProcessEnv(passwordName);
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return { email, password };
+}
+
 export const adminCredentials = readCredentials("E2E_ADMIN");
 export const coachCredentials = readCredentials("E2E_COACH");
+export const crossTenantCredentials = readProcessCredentials(
+  "E2E_CROSS_TENANT_EMAIL",
+  "E2E_CROSS_TENANT_PASSWORD",
+);
 export const managerCredentials = readCredentials("E2E_MANAGER");
 export const organizationId = readEnv("E2E_ORGANIZATION_ID");
 export const ownerCredentials = readCredentials("E2E_OWNER");

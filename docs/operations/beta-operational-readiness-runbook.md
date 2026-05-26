@@ -1,6 +1,6 @@
 # Beta Operational Readiness Runbook - BoxOps
 
-Estado 2026-05-18. Este runbook documenta S.8 / A.1: cierre de realidad operativa para beta interna controlada. Es una fase operativa/pre-beta, no desarrollo funcional nuevo.
+Estado actualizado 2026-05-25. Este runbook documenta S.8 / A.1: cierre de realidad operativa para beta interna controlada. Es una fase operativa/pre-beta, no desarrollo funcional nuevo.
 
 No abre IA, app nativa, geofencing, payroll, documentos firmables, subida documental visible, service worker, push, caches privadas, nuevas migraciones ni nuevas rutas/UI. Tampoco desbloquea por si solo el piloto con el primer tenant: deja claro que falta comprobar en entorno real/staging antes de invitar usuarios reales.
 
@@ -76,6 +76,43 @@ Hallazgos redacted:
 - No hay email interno controlado, invitacion real, aceptacion `/invite/accept`, reset real, job/fallback real de purga ni evidencia staging.
 
 No se repite otro corte documental ni validacion local del repositorio documental: E.18 ya confirmo que no hay acceso real completo a QA/staging para `/app/documents`, preview/download E.5 ni auditoria backend real.
+
+## Revision Local 2026-05-25
+
+Resultado: `bloqueado para publicacion/user testing no tecnico`. La revision actual cambia la foto local respecto a 2026-05-18: ahora existen variables E2E locales en `.env.local`, pero no existe target QA/staging/online ni acceso Supabase real/staging. Por tanto la validacion local mejora, pero sigue sin desbloquear beta interna.
+
+Hallazgos redacted:
+
+- `.env.local` sigue ignorado por git y no se imprimen valores.
+- Existen variables locales/E2E/Resend para desarrollo, pero faltan `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_URL`, `DATABASE_URL`, `POSTGRES_URL`, `E2E_BASE_URL`, `QA_APP_URL`, `STAGING_APP_URL`, `VERCEL_URL`, `QA_ORGANIZATION_ID` y `STAGING_ORGANIZATION_ID`.
+- Supabase local esta levantado y `npx supabase db lint --local` pasa sin errores.
+- No hay evidencia desde este entorno de Auth Site URL, Redirect URLs, SMTP/Resend verificado, scheduler real, backups, observabilidad ni datos reales/staging controlados.
+- `npm run build` pasa y las rutas protegidas actuales se generan como server-rendered on demand.
+- `npm run lint` pasa con un warning conocido no bloqueante en `scripts/setup-local-e2e-auth.mjs:86`.
+- `npm run typecheck -- --pretty false` falla en 3 specs de smoke conocidas.
+- `E2E_START_SERVER=1 E2E_PORT=3000 npm run test:smoke` ejecuta 247 tests: 204 passed, 21 skipped, 5 not run y 17 failed.
+- `npm audit --omit=dev --audit-level=high` reporta 8 vulnerabilidades en dependencias de produccion: 2 high y 6 moderate.
+- Guardrails `rg` sobre `src` no encuentran STL, `service_role`, IA, geolocalizacion, push, service worker ni caches privadas.
+
+Decision: antes de invitar usuarios no tecnicos hay que cerrar los fallos de typecheck/smoke, resolver o aceptar explicitamente el audit de dependencias, desplegar un entorno online controlado, configurar Supabase/Auth/email/secretos por entorno, preparar datos y usuarios por rol, y guardar evidencia redacted. Publicar ahora generaria feedback sobre un entorno todavia inestable, no sobre el producto.
+
+## Revision Online 2026-05-26
+
+Resultado: `bloqueado para QA online controlado`. Cambia la foto respecto a la revision local del 2026-05-25: ya existe un proyecto/despliegue Vercel conectado a GitHub, pero el entorno online no esta conectado todavia con Supabase ni tiene evidencia de configuracion Auth/email real. La validacion local queda verde; la URL online no queda usable para QA.
+
+Hallazgos redacted:
+
+- `git status --short --branch` revisado en `main` sobre commit `24a490c`; el worktree sigue amplio con cambios locales y untracked recientes. No se revierte nada.
+- Dependencias esperadas confirmadas: `next@16.2.6` y `fast-uri@3.1.2` transitivo.
+- Vercel existe como proyecto conectado a GitHub segun dashboard, pero desde este entorno la CLI local `vercel` responde token invalido, no hay `.vercel/project.json` y no hay `VERCEL_TOKEN`, `VERCEL_ORG_ID` ni `VERCEL_PROJECT_ID` en proceso o `.env.local`. No se ejecuta nuevo deploy local.
+- El dominio online controlado responde, pero no esta operativo: `/login` en el dominio de proyecto devuelve HTTP 500 y la URL de deployment directa devuelve HTTP 401. La revision Playwright desktop/mobile de `/login`, `/app`, `/app/schedule`, `/app/work-windows`, `/app/coaches` y `/app/time` sobre el dominio de proyecto devuelve HTTP 500 en todas las rutas.
+- Supabase remoto sigue bloqueado desde este entorno: `npx supabase projects list --output json` falla por falta de `SUPABASE_ACCESS_TOKEN`; no hay `SUPABASE_PROJECT_REF`, `SUPABASE_DB_URL`, `DATABASE_URL` ni `POSTGRES_URL` en proceso o `.env.local`. El usuario confirma que Vercel aun no esta conectado con Supabase.
+- `.env.local` sigue ignorado/no trackeado y no se imprimen valores. `NEXT_PUBLIC_SITE_URL` y `NEXT_PUBLIC_SUPABASE_URL` son locales; `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, Resend y credenciales E2E locales existen solo como presencia redacted. `SUPABASE_SERVICE_ROLE_KEY` queda permitido solo como excepcion server-only para `src/lib/supabase/admin.ts`.
+- No hay variables SMTP reales (`SMTP_*` o `SUPABASE_SMTP_*`) disponibles desde este entorno ni evidencia de Redirect URLs, Site URL, password policy o Custom SMTP configurados en Supabase real.
+- `E2E_BASE_URL=https://boxops-pi.vercel.app npm run test:smoke:e2e-auth` falla 4/4 porque la pagina de login online no renderiza el heading esperado.
+- Gate local repetido: `npm audit --omit=dev --audit-level=high` pasa con 6 moderate; `npm run typecheck -- --pretty false` pasa; `npm run lint` pasa con el warning conocido en `scripts/setup-local-e2e-auth.mjs:86`; `npm run build` pasa con Next.js 16.2.6; `npx supabase db lint --local` pasa; `git diff --check` pasa con warnings LF/CRLF; `E2E_START_SERVER=1 E2E_PORT=3000 npm run test:smoke` pasa con 226 passed y 22 skipped; guardrails `rg` de STL, `service_role`, IA y APIs web prohibidas no encuentran coincidencias en `src`.
+
+Decision: no desplegar de nuevo ni declarar QA online listo hasta enlazar/configurar Supabase en Vercel, definir secrets de preview/QA, configurar Auth Site URL y Redirect URLs, confirmar email/SMTP o limitacion `resend.dev`, preparar credenciales E2E online por rol y repetir smoke online. La URL actual sirve como evidencia de deployment Vercel existente, no como entorno QA funcional.
 
 ## Que Requiere Acceso Real O Staging
 

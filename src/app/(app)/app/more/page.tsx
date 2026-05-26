@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BarChart3,
+  CalendarClock,
   CalendarDays,
   CalendarOff,
   CalendarRange,
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageStaffWorkWindows,
   canManageOperationalData,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
@@ -58,6 +60,7 @@ import {
   getSettingsPath,
   getStatsPath,
   getTimePath,
+  getWorkWindowsPath,
 } from "@/lib/navigation/app-paths";
 import { resolveWeek } from "@/lib/schedule-blocks";
 
@@ -135,6 +138,9 @@ export default async function MorePage({ searchParams }: MorePageProps) {
   const canManageOperational = canManageOperationalData(
     resolution.membership.role,
   );
+  const canManageWorkWindows = canManageStaffWorkWindows(
+    resolution.membership.role,
+  );
 
   return (
     <div className="space-y-5 md:space-y-6">
@@ -182,6 +188,14 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               icon={CalendarRange}
               title="Plantillas"
             />
+            {canManageWorkWindows ? (
+              <MobileHubLink
+                description="Franjas previstas del equipo"
+                href={getWorkWindowsPath(baseOptions)}
+                icon={CalendarClock}
+                title="Jornadas"
+              />
+            ) : null}
             <MobileHubLink
               description="Carga, clases y cobertura"
               href={getStatsPath(baseOptions)}
@@ -224,6 +238,15 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               label="Abrir plantillas"
               title="Plantillas"
             />
+            {canManageWorkWindows ? (
+              <ActionCard
+                description="Gestiona franjas previstas por persona, dia, centro y vigencia."
+                href={getWorkWindowsPath(baseOptions)}
+                icon={CalendarClock}
+                label="Abrir jornadas"
+                title="Jornadas"
+              />
+            ) : null}
             <ActionCard
               description="Compara carga de coaches, tipos de clase y riesgos de cobertura."
               href={getStatsPath(baseOptions)}

@@ -141,7 +141,7 @@ const traceSourceLabels: Record<CoverageTraceItem["source"], string> = {
   absence_requests: "Ausencias",
   change_request_events: "Solicitudes",
   change_requests: "Solicitudes",
-  operational_audit_events: "Auditoria",
+  operational_audit_events: "Cambios",
 };
 
 function selectClassName(className = "") {
@@ -187,6 +187,18 @@ function formatTraceDate(value: string | null) {
   } catch {
     return value;
   }
+}
+
+function formatTraceMeta(item: CoverageTraceItem) {
+  const dateLabel = formatTraceDate(item.occurredAt);
+
+  if (item.source === "operational_audit_events") {
+    return dateLabel === "Impacto actual"
+      ? "Cambio reciente"
+      : `Actualizado el ${dateLabel}`;
+  }
+
+  return `${traceSourceLabels[item.source]} / ${dateLabel}`;
 }
 
 function formatDocumentDate(value: string) {
@@ -258,6 +270,57 @@ function getUnavailableCoachSummaries({
   }
 
   return [...summaries.values()];
+}
+
+function getActiveScheduleAssignments(
+  assignments: ScheduleBlockAssignmentRow[],
+) {
+  return assignments.filter(
+    (assignment) => assignment.assignment_status !== "removed",
+  );
+}
+
+function getScheduleCoachAvailability({
+  activeAssignments,
+  allAssignments,
+  assignableCoaches,
+  block,
+  blocks,
+  coachDisplaysById,
+}: {
+  activeAssignments: ScheduleBlockAssignmentRow[];
+  allAssignments: ScheduleBlockAssignmentRow[];
+  assignableCoaches: CoachDisplay[];
+  block: ScheduleBlockRow;
+  blocks: ScheduleBlockRow[];
+  coachDisplaysById: Map<string, CoachDisplay>;
+}) {
+  const logicalCoachProfileIds = new Set(
+    activeAssignments.map((assignment) => assignment.coach_profile_id),
+  );
+  const unavailableCoachAssignments = getUnavailableScheduleCoachAssignments({
+    assignments: allAssignments,
+    blocks,
+    targetBlock: block,
+  });
+  const unavailableCoachProfileIds = new Set(
+    unavailableCoachAssignments.map((assignment) => assignment.coachProfileId),
+  );
+  const unavailableCoachSummaries = getUnavailableCoachSummaries({
+    coachDisplaysById,
+    unavailableAssignments: unavailableCoachAssignments,
+  });
+  const availableCoaches = assignableCoaches.filter(
+    (coach) =>
+      !logicalCoachProfileIds.has(coach.id) &&
+      !unavailableCoachProfileIds.has(coach.id),
+  );
+
+  return {
+    availableCoaches,
+    unavailableCoachProfileIds,
+    unavailableCoachSummaries,
+  };
 }
 
 function getSafeColor(value: string | null) {
@@ -651,6 +714,222 @@ function AssignmentStatusBadge({ status }: { status: string }) {
   );
 }
 
+function CurrentAssignmentsSummary({
+  activeAssignments,
+  block,
+  coachDisplaysById,
+  filters,
+  organizationId,
+  requiredCoaches,
+  returnPath,
+  view,
+  weekStart,
+}: {
+  activeAssignments: ScheduleBlockAssignmentRow[];
+  block: ScheduleBlockRow;
+  coachDisplaysById: Map<string, CoachDisplay>;
+  filters: ScheduleFilters;
+  organizationId: string;
+  requiredCoaches: number;
+  returnPath: string;
+  view: ScheduleView;
+  weekStart: string;
+}) {
+  return (
+    <div className="grid gap-2 rounded-md border border-border/70 bg-muted/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <UserRound aria-hidden="true" className="size-4 shrink-0" />
+          <span className="text-sm font-medium">Asignaciones actuales</span>
+        </span>
+        <Badge variant="outline">
+          {activeAssignments.length}/{requiredCoaches} entrenador
+          {requiredCoaches === 1 ? "" : "es"}
+        </Badge>
+      </div>
+
+      {activeAssignments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nadie asignado todavia.
+        </p>
+      ) : (
+        <ul className="grid gap-2">
+          {activeAssignments.map((assignment) => {
+            const coachDisplay = coachDisplaysById.get(
+              assignment.coach_profile_id,
+            );
+            const coachLabel =
+              coachDisplay?.label ??
+              `Entrenador ${shortId(assignment.coach_profile_id)}`;
+
+            return (
+              <li
+                className="flex min-w-0 flex-col gap-2 rounded-md bg-background px-3 py-2 text-sm ring-1 ring-border/70 sm:flex-row sm:items-center sm:justify-between"
+                key={assignment.id}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">
+                    {coachLabel}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {coachDisplay?.detail ??
+                      "Perfil tecnico sin nombre visible"}
+                  </span>
+                </span>
+                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  <AssignmentStatusBadge status={assignment.assignment_status} />
+                  <Badge variant="outline">{assignment.source}</Badge>
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      href={getRequestsPath({
+                        assignmentId: assignment.id,
+                        blockId: block.id,
+                        organizationId,
+                      })}
+                    >
+                      Solicitar cobertura
+                      <ArrowRight aria-hidden="true" />
+                    </Link>
+                  </Button>
+                  <form action={removeScheduleBlockAssignment}>
+                    <input
+                      name="organizationId"
+                      type="hidden"
+                      value={organizationId}
+                    />
+                    <input name="weekStart" type="hidden" value={weekStart} />
+                    <input name="returnPath" type="hidden" value={returnPath} />
+                    <ScheduleFilterHiddenInputs filters={filters} view={view} />
+                    <input
+                      name="assignmentId"
+                      type="hidden"
+                      value={assignment.id}
+                    />
+                    <Button
+                      aria-label={`Retirar ${coachLabel}`}
+                      size="icon-sm"
+                      type="submit"
+                      variant="destructive"
+                    >
+                      <UserMinus aria-hidden="true" />
+                    </Button>
+                  </form>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ScheduleCoachAssignForm({
+  activeAssignments,
+  allAssignments,
+  assignableCoaches,
+  block,
+  blocks,
+  coachDisplaysById,
+  filters,
+  organizationId,
+  returnPath,
+  view,
+  weekStart,
+}: {
+  activeAssignments: ScheduleBlockAssignmentRow[];
+  allAssignments: ScheduleBlockAssignmentRow[];
+  assignableCoaches: CoachDisplay[];
+  block: ScheduleBlockRow;
+  blocks: ScheduleBlockRow[];
+  coachDisplaysById: Map<string, CoachDisplay>;
+  filters: ScheduleFilters;
+  organizationId: string;
+  returnPath: string;
+  view: ScheduleView;
+  weekStart: string;
+}) {
+  const { availableCoaches, unavailableCoachProfileIds } =
+    getScheduleCoachAvailability({
+      activeAssignments,
+      allAssignments,
+      assignableCoaches,
+      block,
+      blocks,
+      coachDisplaysById,
+    });
+  const isActiveBlock = isCoverageActiveBlock(block.status);
+  const canAssign = isActiveBlock && availableCoaches.length > 0;
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-border/70 p-3">
+      <CurrentAssignmentsSummary
+        activeAssignments={activeAssignments}
+        block={block}
+        coachDisplaysById={coachDisplaysById}
+        filters={filters}
+        organizationId={organizationId}
+        requiredCoaches={block.required_coaches}
+        returnPath={returnPath}
+        view={view}
+        weekStart={weekStart}
+      />
+      <form
+        action={assignScheduleBlockCoach}
+        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <input name="organizationId" type="hidden" value={organizationId} />
+        <input name="weekStart" type="hidden" value={weekStart} />
+        <input name="returnPath" type="hidden" value={returnPath} />
+        <ScheduleFilterHiddenInputs filters={filters} view={view} />
+        <input name="scheduleBlockId" type="hidden" value={block.id} />
+        <label className="grid min-w-0 gap-2">
+          <span className="text-sm font-medium">Añadir entrenador</span>
+          <select
+            className={selectClassName()}
+            defaultValue={availableCoaches[0]?.id ?? ""}
+            disabled={!canAssign}
+            name="coachProfileId"
+            required
+          >
+            {availableCoaches.length === 0 ? (
+              <option value="">
+                {unavailableCoachProfileIds.size > 0
+                  ? "Sin entrenadores libres en esta franja"
+                  : "Sin entrenadores disponibles"}
+              </option>
+            ) : null}
+            {availableCoaches.map((coach) => (
+              <option key={coach.id} value={coach.id}>
+                {coach.label}
+                {coach.isFallback ? " (sin perfil visible)" : ""}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">
+            Solo aparecen entrenadores libres en esta franja.
+          </span>
+        </label>
+        <div className="flex items-end">
+          <Button
+            className="w-full sm:w-auto"
+            disabled={!canAssign}
+            type="submit"
+          >
+            <Plus aria-hidden="true" />
+            Asignar entrenador
+          </Button>
+        </div>
+      </form>
+      {!isActiveBlock ? (
+        <p className="text-sm text-muted-foreground">
+          Los bloques cancelados o completados no admiten nuevas asignaciones.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function DocumentProgrammingPanel({
   entries,
   loadError,
@@ -667,20 +946,20 @@ function DocumentProgrammingPanel({
     >
       <div className="flex min-w-0 items-center gap-2">
         <FileText aria-hidden="true" className="size-4 shrink-0" />
-        <h4 className="text-sm font-medium">Programacion autorizada</h4>
+        <h4 className="text-sm font-medium">Material de apoyo</h4>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">
-        Fuente documental versionada para preparar este bloque. El horario no
-        copia contenido documental.
+        Archivos para preparar esta sesion, si el equipo los ha vinculado al
+        horario.
       </p>
 
       {loadError ? (
         <p className="text-sm text-muted-foreground">
-          No se pudo consultar la programacion autorizada para este bloque.
+          No hemos podido cargar el material de esta sesion.
         </p>
       ) : entries.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No hay programacion disponible para tu permiso en este bloque.
+          No hay material visible para esta sesion.
         </p>
       ) : (
         <ul className="grid gap-2">
@@ -709,7 +988,7 @@ function DocumentProgrammingPanel({
                       {entry.document_title}
                     </p>
                     <p className="break-words text-xs text-muted-foreground">
-                      Fuente: {entry.original_filename || entry.document_type}
+                      Archivo: {entry.original_filename || entry.document_type}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Version {entry.version_number} /{" "}
@@ -720,13 +999,13 @@ function DocumentProgrammingPanel({
                     </p>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {entry.can_preview ? (
-                        <Badge variant="secondary">Preview disponible</Badge>
+                        <Badge variant="secondary">Vista previa</Badge>
                       ) : null}
                       {entry.can_download ? (
-                        <Badge variant="outline">Descarga disponible</Badge>
+                        <Badge variant="outline">Descarga</Badge>
                       ) : null}
                       {!entry.can_preview && !entry.can_download ? (
-                        <Badge variant="outline">Solo metadata</Badge>
+                        <Badge variant="outline">Solo informacion</Badge>
                       ) : null}
                     </div>
                   </div>
@@ -741,7 +1020,7 @@ function DocumentProgrammingPanel({
                             target="_blank"
                           >
                             <Eye aria-hidden="true" />
-                            Preview
+                            Vista previa
                           </a>
                         </Button>
                       ) : null}
@@ -787,11 +1066,11 @@ function CoverageTraceList({
     >
       <div className="flex items-center gap-2">
         <History aria-hidden="true" className="size-4 shrink-0" />
-        <h4 className="text-sm font-medium">Trazabilidad operativa</h4>
+        <h4 className="text-sm font-medium">Cambios recientes</h4>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">
-        Lectura reciente de cambios, solicitudes y ausencias. No modifica
-        horario ni resuelve cobertura.
+        Ultimos movimientos relacionados con este bloque. No cambia el horario
+        ni asigna cobertura por si solo.
       </p>
       {loadError ? (
         <p className="text-sm text-muted-foreground">
@@ -811,8 +1090,7 @@ function CoverageTraceList({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{item.title}</span>
                 <span className="text-xs opacity-80">
-                  {traceSourceLabels[item.source]} /{" "}
-                  {formatTraceDate(item.occurredAt)}
+                  {formatTraceMeta(item)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-5 opacity-90">{item.detail}</p>
@@ -936,7 +1214,7 @@ function ScheduleAssignmentPanel({
   filters,
   organizationId,
   returnPath,
-  staffWorkWindows,
+  showActiveAssignments = true,
   traceItems,
   view,
   weekStart,
@@ -953,58 +1231,54 @@ function ScheduleAssignmentPanel({
   filters?: ScheduleFilters;
   organizationId?: string;
   returnPath?: string;
-  staffWorkWindows: StaffWorkWindowOccurrence[];
+  showActiveAssignments?: boolean;
   traceItems?: CoverageTraceItem[];
   view?: ScheduleView;
   weekStart?: string;
 }) {
-  const activeAssignments = assignments.filter(
-    (assignment) => assignment.assignment_status !== "removed",
-  );
+  const activeAssignments = getActiveScheduleAssignments(assignments);
   const removedAssignments = assignments.filter(
     (assignment) => assignment.assignment_status === "removed",
   );
-  const logicalCoachProfileIds = new Set(
-    activeAssignments.map((assignment) => assignment.coach_profile_id),
-  );
-  const unavailableCoachAssignments = getUnavailableScheduleCoachAssignments({
-    assignments: allAssignments ?? assignments,
-    blocks,
-    targetBlock: block,
-  });
-  const unavailableCoachProfileIds = new Set(
-    unavailableCoachAssignments.map((assignment) => assignment.coachProfileId),
-  );
-  const unavailableCoachSummaries = getUnavailableCoachSummaries({
-    coachDisplaysById,
-    unavailableAssignments: unavailableCoachAssignments,
-  });
-  const availableCoaches = assignableCoaches.filter(
-    (coach) =>
-      !logicalCoachProfileIds.has(coach.id) &&
-      !unavailableCoachProfileIds.has(coach.id),
-  );
+  const { unavailableCoachProfileIds, unavailableCoachSummaries } =
+    getScheduleCoachAvailability({
+      activeAssignments,
+      allAssignments: allAssignments ?? assignments,
+      assignableCoaches,
+      block,
+      blocks,
+      coachDisplaysById,
+    });
   const assignmentMutationContext =
     canManageSchedule && organizationId && weekStart
       ? { organizationId, weekStart }
       : null;
-  const canAssign =
-    Boolean(assignmentMutationContext) &&
-    isCoverageActiveBlock(block.status) &&
-    availableCoaches.length > 0;
   const conflictCoachNames = coverage.conflictCoachProfileIds.map(
     (coachProfileId) =>
       coachDisplaysById.get(coachProfileId)?.label ??
       `Entrenador ${shortId(coachProfileId)}`,
   );
   const absenceImpactMessage = getAbsenceImpactMessage(coverage);
+  const hasCoverageTrace =
+    canManageSchedule && (coverageTraceLoadError || (traceItems?.length ?? 0) > 0);
+  const hasAssignmentPanelContent =
+    showActiveAssignments ||
+    (coverage.state === "conflict" && conflictCoachNames.length > 0) ||
+    Boolean(absenceImpactMessage) ||
+    hasCoverageTrace ||
+    removedAssignments.length > 0 ||
+    Boolean(assignmentMutationContext && unavailableCoachSummaries.length > 0);
+
+  if (!hasAssignmentPanelContent) {
+    return null;
+  }
 
   return (
     <div className="space-y-3 rounded-lg border border-border/70 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <UserRound aria-hidden="true" className="size-4 shrink-0" />
-          <h4 className="text-sm font-medium">Asignaciones</h4>
+          <h4 className="text-sm font-medium">Historial de asignaciones</h4>
         </div>
       </div>
 
@@ -1025,12 +1299,13 @@ function ScheduleAssignmentPanel({
         />
       ) : null}
 
-      {activeAssignments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No hay entrenadores asignados que cuenten para esta fila de trabajo.
-        </p>
-      ) : (
-        <div className="grid gap-2">
+      {showActiveAssignments ? (
+        activeAssignments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay entrenadores asignados que cuenten para esta fila de trabajo.
+          </p>
+        ) : (
+          <div className="grid gap-2">
           {activeAssignments.map((assignment) => {
             const coachDisplay = coachDisplaysById.get(
               assignment.coach_profile_id,
@@ -1115,15 +1390,9 @@ function ScheduleAssignmentPanel({
               </div>
             );
           })}
-        </div>
-      )}
-
-      <StaffWorkWindowContext
-        activeAssignments={activeAssignments}
-        block={block}
-        coachDisplaysById={coachDisplaysById}
-        staffWorkWindows={staffWorkWindows}
-      />
+          </div>
+        )
+      ) : null}
 
       {removedAssignments.length > 0 ? (
         <details className="text-sm text-muted-foreground">
@@ -1166,66 +1435,6 @@ function ScheduleAssignmentPanel({
         </details>
       ) : null}
 
-      {assignmentMutationContext ? (
-        <form
-          action={assignScheduleBlockCoach}
-          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-        >
-          <input
-            name="organizationId"
-            type="hidden"
-            value={assignmentMutationContext.organizationId}
-          />
-          <input
-            name="weekStart"
-            type="hidden"
-            value={assignmentMutationContext.weekStart}
-          />
-          {returnPath ? (
-            <input name="returnPath" type="hidden" value={returnPath} />
-          ) : null}
-          {filters ? (
-            <ScheduleFilterHiddenInputs filters={filters} view={view} />
-          ) : null}
-          <input name="scheduleBlockId" type="hidden" value={block.id} />
-          <label className="grid min-w-0 gap-2">
-            <span className="text-sm font-medium">Entrenador asignable</span>
-            <select
-              className={selectClassName()}
-              defaultValue={availableCoaches[0]?.id ?? ""}
-              disabled={!canAssign}
-              name="coachProfileId"
-              required
-            >
-              {availableCoaches.length === 0 ? (
-                <option value="">
-                  {unavailableCoachProfileIds.size > 0
-                    ? "Sin entrenadores libres en esta franja"
-                    : "Sin entrenadores asignables disponibles"}
-                </option>
-              ) : null}
-              {availableCoaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.label}
-                  {coach.isFallback ? " (sin perfil visible)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-end">
-            <Button disabled={!canAssign} type="submit">
-              <Plus aria-hidden="true" />
-              Asignar entrenador
-            </Button>
-          </div>
-        </form>
-      ) : null}
-
-      {assignmentMutationContext && !isCoverageActiveBlock(block.status) ? (
-        <p className="text-sm text-muted-foreground">
-          Los bloques cancelados o completados no admiten nuevas asignaciones.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -1255,6 +1464,8 @@ function ScheduleBlockReadOnlyCard({
   organizationId: string;
   staffWorkWindows: StaffWorkWindowOccurrence[];
 }) {
+  const activeAssignments = getActiveScheduleAssignments(assignments);
+
   return (
     <Card className="border-0 bg-transparent shadow-none ring-0">
       <CardContent className="space-y-4 pt-0">
@@ -1290,6 +1501,12 @@ function ScheduleBlockReadOnlyCard({
           loadError={documentProgrammingLoadError}
           organizationId={organizationId}
         />
+        <StaffWorkWindowContext
+          activeAssignments={activeAssignments}
+          block={block}
+          coachDisplaysById={coachDisplaysById}
+          staffWorkWindows={staffWorkWindows}
+        />
         <ScheduleAssignmentPanel
           assignableCoaches={assignableCoaches}
           assignments={assignments}
@@ -1298,7 +1515,6 @@ function ScheduleBlockReadOnlyCard({
           coachDisplaysById={coachDisplaysById}
           coverage={coverage}
           organizationId={organizationId}
-          staffWorkWindows={staffWorkWindows}
         />
       </CardContent>
     </Card>
@@ -1348,6 +1564,8 @@ function ScheduleBlockAdminCard({
   weekEnd: string;
   weekStart: string;
 }) {
+  const activeAssignments = getActiveScheduleAssignments(assignments);
+
   return (
     <Card className="border-0 bg-transparent shadow-none ring-0">
       <CardContent className="space-y-5 pt-0">
@@ -1378,6 +1596,20 @@ function ScheduleBlockAdminCard({
           </div>
         </form>
 
+        <ScheduleCoachAssignForm
+          activeAssignments={activeAssignments}
+          allAssignments={allAssignments}
+          assignableCoaches={assignableCoaches}
+          block={block}
+          blocks={blocks}
+          coachDisplaysById={coachDisplaysById}
+          filters={filters}
+          organizationId={organizationId}
+          returnPath={returnPath}
+          view={view}
+          weekStart={weekStart}
+        />
+
         {block.status !== "cancelled" ? (
           <form action={cancelScheduleBlock}>
             <input name="organizationId" type="hidden" value={organizationId} />
@@ -1398,6 +1630,13 @@ function ScheduleBlockAdminCard({
           organizationId={organizationId}
         />
 
+        <StaffWorkWindowContext
+          activeAssignments={activeAssignments}
+          block={block}
+          coachDisplaysById={coachDisplaysById}
+          staffWorkWindows={staffWorkWindows}
+        />
+
         <ScheduleAssignmentPanel
           assignableCoaches={assignableCoaches}
           allAssignments={allAssignments}
@@ -1411,7 +1650,7 @@ function ScheduleBlockAdminCard({
           filters={filters}
           organizationId={organizationId}
           returnPath={returnPath}
-          staffWorkWindows={staffWorkWindows}
+          showActiveAssignments={false}
           traceItems={traceItems}
           view={view}
           weekStart={weekStart}

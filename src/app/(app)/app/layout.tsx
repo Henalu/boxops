@@ -13,6 +13,10 @@ import {
 } from "@/components/layout/onboarding-tour";
 import { TenantThemeScope } from "@/components/layout/tenant-theme-scope";
 import { Button } from "@/components/ui/button";
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from "@/lib/auth/required-password-change";
 import { getLoginPath } from "@/lib/auth/redirects";
 import { getActiveMemberships, getAuthenticatedUser } from "@/lib/auth/tenant";
 import { getOwnNextAssignedScheduleBlock } from "@/lib/own-schedule";
@@ -28,6 +32,10 @@ export default async function ProtectedAppLayout({
 
   if (!user) {
     redirect(getLoginPath("/app"));
+  }
+
+  if (isPasswordChangeRequired(user)) {
+    redirect(getRequiredPasswordChangePath());
   }
 
   const memberships = await getActiveMemberships(user.id);
@@ -66,7 +74,7 @@ export default async function ProtectedAppLayout({
       <div className="min-h-screen bg-muted/35 text-foreground">
         <div className="md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)]">
           <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-background/95 px-4 py-5 md:flex">
-            <div className="mb-7">
+            <div className="mb-5">
               <Link
                 className="flex min-w-0 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 href="/app"
@@ -86,12 +94,12 @@ export default async function ProtectedAppLayout({
             </div>
 
             <NextAssignedShellLink
-              className="mb-5"
+              className="mb-4"
               items={nextAssignedShellItems}
               placement="sidebar"
             />
 
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-1">
               <Suspense
                 fallback={
                   <nav aria-label="Navegación principal" className="h-40" />
@@ -104,7 +112,7 @@ export default async function ProtectedAppLayout({
               </Suspense>
             </div>
 
-            <div className="grid gap-3 border-t border-border pt-4">
+            <div className="mt-4 grid gap-2 border-t border-border pt-4">
               <OnboardingLaunchButton className="justify-start" />
               <p className="truncate text-xs text-muted-foreground">
                 {user.email ?? user.id}
@@ -139,7 +147,7 @@ export default async function ProtectedAppLayout({
               </div>
             </header>
 
-            <main className="mx-auto w-full max-w-6xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-8 lg:px-8">
+            <main className="mx-auto w-full max-w-7xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-5 md:pb-8 md:pt-8 lg:px-6 2xl:px-8">
               {children}
             </main>
           </div>

@@ -71,9 +71,43 @@ test.describe("coverage traceability I.25 source guardrails", () => {
     );
     expect(schedulePage).toContain("canManageSchedule && scheduleView !== \"month\"");
     expect(coveragePage).toContain("includeCoverageTrace: canManageSchedule");
-    expect(traceSurfaces).toContain("Trazabilidad operativa");
+    expect(helper).toContain("Cambio guardado");
+    expect(helper).toContain("Entrenador por defecto actualizado");
+    expect(helper).not.toContain("Campos minimizados");
+    expect(helper).not.toContain("Cambio operativo reciente");
+
+    expect(schedulePanel).toContain("Historial de asignaciones");
+    expect(schedulePanel).toContain("ScheduleCoachAssignForm");
+    expect(schedulePanel).not.toContain("Entrenador asignable");
+
+    const scheduleAdminCard = schedulePanel.slice(
+      schedulePanel.indexOf("function ScheduleBlockAdminCard"),
+      schedulePanel.indexOf("export function ScheduleBlockDetailPanels"),
+    );
+    const scheduleAssignmentPanel = schedulePanel.slice(
+      schedulePanel.indexOf("function ScheduleAssignmentPanel"),
+      schedulePanel.indexOf("function ScheduleBlockReadOnlyCard"),
+    );
+
+    expect(scheduleAdminCard).toContain("<ScheduleCoachAssignForm");
+    expect(scheduleAdminCard).toContain("<StaffWorkWindowContext");
+    expect(scheduleAdminCard).toContain("<ScheduleAssignmentPanel");
+    expect(scheduleAdminCard.indexOf("<ScheduleCoachAssignForm")).toBeLessThan(
+      scheduleAdminCard.indexOf("<StaffWorkWindowContext"),
+    );
+    expect(scheduleAdminCard.indexOf("<StaffWorkWindowContext")).toBeLessThan(
+      scheduleAdminCard.indexOf("<ScheduleAssignmentPanel"),
+    );
+    expect(scheduleAssignmentPanel).not.toContain("StaffWorkWindowContext");
+
+    expect(traceSurfaces).toContain("Cambios recientes");
+    expect(traceSurfaces).toContain("Actualizado el");
     expect(traceSurfaces).toContain("data-coverage-traceability");
-    expect(traceSurfaces).toContain("No modifica");
+    expect(traceSurfaces).toContain("No cambia el horario");
+    expect(traceSurfaces).not.toContain("Trazabilidad operativa");
+    expect(traceSurfaces).not.toContain("Auditoria");
+    expect(traceSurfaces).not.toContain("Campos minimizados");
+    expect(traceSurfaces).not.toContain("default_coach_profile_id");
     expect(traceSurfaces).not.toMatch(/\breason_summary\b/);
 
     for (const table of [

@@ -1,47 +1,34 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  Archive,
-  BriefcaseBusiness,
-  CalendarClock,
   CalendarDays,
   CalendarRange,
-  CircleOff,
+  ChevronDown,
   Filter,
   ListChecks,
   PanelRightOpen,
-  Plus,
   RotateCcw,
-  Save,
 } from "lucide-react";
 
-import {
-  createScheduleBlock,
-  createStaffWorkWindow,
-  deactivateStaffWorkWindow,
-  updateStaffWorkWindow,
-} from "./actions";
-import {
-  createOperationalEventFromForm,
-  setOperationalEventStatusFromForm,
-  updateOperationalEventFromForm,
-} from "./operational-event-actions";
-import { ScheduleCreateBlockDialog } from "./schedule-create-block-dialog";
 import { ScheduleBlockDetailPanels } from "./schedule-block-detail-panels";
-import { StaffWorkWindowPersonCenterSelects } from "./staff-work-window-person-center-selects";
+import { ScheduleOperationalEventPanels } from "./schedule-operational-event-panels";
+import { ScheduleSlotCreateDialog } from "./schedule-slot-create-dialog";
 import {
   StaffWorkWindowsHiddenInput,
-  StaffWorkWindowsVisibilityCard,
   StaffWorkWindowHourSummary,
+  type StaffWorkWindowHourSummaryItem,
 } from "./staff-work-windows-visibility";
+import { ScheduleCenterSwitcher } from "./schedule-center-switcher";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { RouteStateButton } from "@/components/features/route-state-link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -50,13 +37,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
   canManageAbsenceRequests,
   canManageOperationalData,
   canManageOperationalEvents,
-  canManageStaffWorkWindows,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
 import {
@@ -75,6 +60,15 @@ import {
 } from "@/lib/document-programming";
 import { getSchedulePath } from "@/lib/navigation/app-paths";
 import {
+  listOperationalEvents,
+  type OperationalEventRow,
+} from "@/lib/operational-events";
+import {
+  getScheduleCenterPreferenceCookieName,
+  isScheduleCenterPreferenceValue,
+} from "@/lib/schedule-center-preferences";
+import { cn } from "@/lib/utils";
+import {
   SCHEDULE_FILTER_COVERAGE_STATES,
   calculateScheduleCoverageByBlock,
   formatTimeForInput,
@@ -90,27 +84,8 @@ import {
   type ScheduleFilterCoverageState,
 } from "@/lib/schedule-blocks";
 import {
-  listOperationalEvents,
-  OPERATIONAL_EVENT_IMPACT_LEVELS,
-  OPERATIONAL_EVENT_TYPES,
-  OPERATIONAL_EVENT_VISIBILITIES,
-  type OperationalEventImpactLevel,
-  type OperationalEventRow,
-  type OperationalEventStatus,
-  type OperationalEventType,
-  type OperationalEventVisibility,
-} from "@/lib/operational-events";
-import {
-  STAFF_WORK_WINDOW_STATUSES,
-  formatStaffWorkWindowTime,
-  getStaffWorkWindowDayLabel,
-  getStaffWorkWindowStatusLabel,
-  listStaffWorkWindowPersonOptions,
   listStaffWorkWindowsForWeek,
-  type StaffWorkWindowCenterOption,
-  type StaffWorkWindowDisplay,
   type StaffWorkWindowOccurrence,
-  type StaffWorkWindowPersonOption,
 } from "@/lib/staff-work-windows";
 import { ensureActiveScheduleTemplatesForWindow } from "@/lib/schedule-template-application";
 import { createClient } from "@/lib/supabase/server";
@@ -128,6 +103,7 @@ type ScheduleSearchParams = {
   coverage_state?: string | string[];
   day?: string | string[];
   error?: string | string[];
+  event_id?: string | string[];
   mine?: string | string[];
   organizationId?: string | string[];
   risks_only?: string | string[];
@@ -252,6 +228,7 @@ const successMessages: Record<string, string> = {
   "operational-event-updated": "Evento actualizado.",
   updated: "Bloque actualizado.",
   "work-window-created": "Jornada prevista creada.",
+  "work-windows-created": "Jornadas previstas creadas.",
   "work-window-deactivated": "Jornada prevista desactivada.",
   "work-window-updated": "Jornada prevista actualizada.",
 };
@@ -319,6 +296,8 @@ const errorMessages: Record<string, string> = {
   "person-profile-inactive": "El perfil visible seleccionado no está activo.",
   "person-profile-internal":
     "Los perfiles internos no pueden asignarse como entrenadores operativos.",
+  "person-profile-without-active-coach":
+    "Elige una ficha de entrenador activa para crear jornadas previstas.",
   "save-failed": "No se han podido guardar los cambios.",
   "template-out-of-range":
     "La semana seleccionada no cruza el rango de validez de esa plantilla.",
@@ -336,6 +315,8 @@ const successDescriptions: Partial<Record<keyof typeof successMessages, string>>
     "Solo se ha sustituido la semana seleccionada. Las demas semanas conservan su plantilla base.",
   "work-window-created":
     "La franja queda como presencia prevista del personal, sin crear bloques ni fichajes.",
+  "work-windows-created":
+    "Las franjas quedan como presencia prevista del personal, sin crear bloques ni fichajes.",
   "work-window-deactivated":
     "La franja deja de mostrarse como activa, sin borrar historial operativo.",
   "work-window-updated":
@@ -376,63 +357,24 @@ const scheduleViews = [
 
 const mobileWeekdayLabels = ["L", "M", "X", "J", "V", "S", "D"];
 
-const operationalEventTypeLabels: Record<OperationalEventType, string> = {
+const operationalEventTypeLabels: Record<string, string> = {
   closure: "Cierre",
   community_event: "Comunidad",
   competition: "Competicion",
   external_event: "Evento externo",
   holiday: "Festivo",
-  internal_event: "Evento interno",
+  internal_event: "Evento",
   maintenance: "Mantenimiento",
-  open_day: "Open day",
+  open_day: "Jornada abierta",
   seminar: "Seminario",
 };
 
-const operationalEventVisibilityLabels: Record<
-  OperationalEventVisibility,
-  string
-> = {
-  all_staff: "Todo el equipo",
-  management: "Gestion",
-  staff: "Equipo",
-};
-
-const operationalEventImpactLabels: Record<
-  OperationalEventImpactLevel,
-  string
-> = {
+const operationalEventImpactLabels: Record<string, string> = {
   context_only: "Contexto",
   coverage_review_needed: "Revisar cobertura",
   schedule_review_needed: "Revisar horario",
   staffing_needed: "Necesita personal",
 };
-
-const operationalEventStatusLabels: Record<OperationalEventStatus, string> = {
-  active: "Activo",
-  archived: "Archivado",
-  cancelled: "Cancelado",
-};
-
-function getOperationalEventTypeLabel(value: string) {
-  return operationalEventTypeLabels[value as OperationalEventType] ?? value;
-}
-
-function getOperationalEventVisibilityLabel(value: string) {
-  return (
-    operationalEventVisibilityLabels[value as OperationalEventVisibility] ??
-    value
-  );
-}
-
-function getOperationalEventImpactLabel(value: string) {
-  return (
-    operationalEventImpactLabels[value as OperationalEventImpactLevel] ?? value
-  );
-}
-
-function getOperationalEventStatusLabel(value: string) {
-  return operationalEventStatusLabels[value as OperationalEventStatus] ?? value;
-}
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -613,9 +555,12 @@ function getScheduleFilterPathOptions(
   };
 }
 
-function getActiveFilterCount(filters: ScheduleFilters) {
+function getActiveFilterCount(
+  filters: ScheduleFilters,
+  { includeCenter = true }: { includeCenter?: boolean } = {},
+) {
   return [
-    filters.centerId,
+    includeCenter ? filters.centerId : null,
     filters.coachProfileId,
     filters.classTypeId,
     filters.coverageState,
@@ -661,6 +606,10 @@ function applyScheduleFilters({
     : null;
 
   return blocks.filter((block) => {
+    if (block.status === "cancelled") {
+      return false;
+    }
+
     if (filters.centerId && block.center_id !== filters.centerId) {
       return false;
     }
@@ -892,13 +841,24 @@ async function getScheduleCoachContext(organizationId: string) {
     ),
   ];
 
-  const [personProfilesResult, membershipsResult] = await Promise.all([
+  const [
+    linkedPersonProfilesResult,
+    userPersonProfilesResult,
+    membershipsResult,
+  ] = await Promise.all([
     personProfileIds.length > 0
       ? supabase
           .from("person_profiles")
           .select("id, display_name, status, user_id, visibility_status")
           .eq("organization_id", organizationId)
           .in("id", personProfileIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0
+      ? supabase
+          .from("person_profiles")
+          .select("id, display_name, status, user_id, visibility_status")
+          .eq("organization_id", organizationId)
+          .in("user_id", userIds)
       : Promise.resolve({ data: [], error: null }),
     userIds.length > 0
       ? supabase
@@ -909,9 +869,15 @@ async function getScheduleCoachContext(organizationId: string) {
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (personProfilesResult.error) {
+  if (linkedPersonProfilesResult.error) {
     throw new Error(
-      `Could not load person profiles: ${personProfilesResult.error.message}`,
+      `Could not load person profiles: ${linkedPersonProfilesResult.error.message}`,
+    );
+  }
+
+  if (userPersonProfilesResult.error) {
+    throw new Error(
+      `Could not load user person profiles: ${userPersonProfilesResult.error.message}`,
     );
   }
 
@@ -921,10 +887,21 @@ async function getScheduleCoachContext(organizationId: string) {
     );
   }
 
+  const linkedPersonProfiles =
+    linkedPersonProfilesResult.data satisfies PersonProfileRow[];
+  const userPersonProfiles =
+    userPersonProfilesResult.data satisfies PersonProfileRow[];
+  const personProfilesById = new Map(
+    [...linkedPersonProfiles, ...userPersonProfiles].map((personProfile) => [
+      personProfile.id,
+      personProfile,
+    ]),
+  );
+
   return {
     coachProfiles: coachProfiles satisfies CoachProfileRow[],
     memberships: membershipsResult.data satisfies MembershipStatusRow[],
-    personProfiles: personProfilesResult.data satisfies PersonProfileRow[],
+    personProfiles: [...personProfilesById.values()],
   };
 }
 
@@ -1063,6 +1040,26 @@ function toDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function addDaysToDateString(value: string, days: number) {
+  const { day, month, year } = parseDateParts(value);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+
+  return toDateString(date);
+}
+
+function getBufferedEventRange({
+  rangeEnd,
+  rangeStart,
+}: {
+  rangeEnd: string;
+  rangeStart: string;
+}) {
+  return {
+    rangeEnd: `${addDaysToDateString(rangeEnd, 1)}T23:59:59.999Z`,
+    rangeStart: `${addDaysToDateString(rangeStart, -1)}T00:00:00.000Z`,
+  };
+}
+
 function getMonthResolution(referenceDate: string) {
   const { month, year } = parseDateParts(referenceDate);
   const monthStartDate = new Date(Date.UTC(year, month - 1, 1));
@@ -1089,37 +1086,261 @@ function formatTime(value: string) {
   return formatTimeForInput(value) || value;
 }
 
+function getSafeTimeZone(timezone: string | null | undefined) {
+  if (!timezone) {
+    return "UTC";
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return "UTC";
+  }
+}
+
+function getDatePartsInTimeZone(value: Date | string, timezone: string) {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: getSafeTimeZone(timezone),
+    year: "numeric",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+
+  return {
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    month: Number(parts.month),
+    year: Number(parts.year),
+  };
+}
+
+function getDateStringInTimeZone(value: Date | string, timezone: string) {
+  const parts = getDatePartsInTimeZone(value, timezone);
+
+  if (!parts) {
+    return "";
+  }
+
+  return [
+    String(parts.year).padStart(4, "0"),
+    String(parts.month).padStart(2, "0"),
+    String(parts.day).padStart(2, "0"),
+  ].join("-");
+}
+
+function getMinutesInTimeZone(value: Date | string, timezone: string) {
+  const parts = getDatePartsInTimeZone(value, timezone);
+
+  return parts ? parts.hour * 60 + parts.minute : 0;
+}
+
+function formatOperationalEventClock(value: string, timezone: string) {
+  try {
+    return new Intl.DateTimeFormat("es-ES", {
+      hour: "2-digit",
+      hourCycle: "h23",
+      minute: "2-digit",
+      timeZone: getSafeTimeZone(timezone),
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
 function timeToMinutes(value: string) {
   const [hours, minutes] = formatTime(value).split(":").map(Number);
 
   return hours * 60 + minutes;
 }
 
-function getHourSlots(blocks: ScheduleBlockRow[]) {
-  if (blocks.length === 0) {
+function getHourSlots(
+  blocks: ScheduleBlockRow[],
+  timedEventRanges: { end: number; start: number }[] = [],
+) {
+  if (blocks.length === 0 && timedEventRanges.length === 0) {
     return Array.from({ length: 15 }, (_, index) => index + 6);
   }
 
+  const starts = [
+    ...blocks.map((block) => timeToMinutes(block.start_time)),
+    ...timedEventRanges.map((range) => range.start),
+  ];
+  const ends = [
+    ...blocks.map((block) => timeToMinutes(block.end_time)),
+    ...timedEventRanges.map((range) => range.end),
+  ];
   const minHour = Math.max(
     0,
-    Math.min(...blocks.map((block) => Math.floor(timeToMinutes(block.start_time) / 60))) -
-      1,
+    Math.min(...starts.map((start) => Math.floor(start / 60))) - 1,
   );
   const maxHour = Math.min(
     23,
-    Math.max(...blocks.map((block) => Math.ceil(timeToMinutes(block.end_time) / 60))) +
-      1,
+    Math.max(...ends.map((end) => Math.ceil(end / 60))) + 1,
   );
 
   return Array.from({ length: maxHour - minHour + 1 }, (_, index) => minHour + index);
 }
 
-function getBlockHour(block: ScheduleBlockRow) {
-  return Math.floor(timeToMinutes(block.start_time) / 60);
+const WEEKLY_TIMELINE_HOUR_HEIGHT = 112;
+const WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT = 76;
+const WEEKLY_TIMELINE_STACKED_BLOCK_GAP = 8;
+const WEEKLY_TIMELINE_HOUR_INSET = 8;
+
+function minutesToTime(value: number) {
+  const bounded = Math.max(0, Math.min(23 * 60 + 59, value));
+  const hours = Math.floor(bounded / 60);
+  const minutes = bounded % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getFreeRangesForHour(blocks: ScheduleBlockRow[], hour: number) {
+  const slotStart = hour * 60;
+  const slotEnd = Math.min((hour + 1) * 60, 24 * 60);
+  const occupiedRanges = blocks
+    .map((block) => ({
+      end: Math.min(timeToMinutes(block.end_time), slotEnd),
+      start: Math.max(timeToMinutes(block.start_time), slotStart),
+    }))
+    .filter((range) => range.start < range.end)
+    .sort((a, b) => a.start - b.start);
+  const freeRanges: { end: number; start: number }[] = [];
+  let cursor = slotStart;
+
+  for (const range of occupiedRanges) {
+    if (range.start > cursor) {
+      freeRanges.push({ end: range.start, start: cursor });
+    }
+
+    cursor = Math.max(cursor, range.end);
+  }
+
+  if (cursor < slotEnd) {
+    freeRanges.push({ end: slotEnd, start: cursor });
+  }
+
+  return freeRanges.filter((range) => range.end - range.start >= 15);
 }
 
 function dedupeBlocks(blocks: ScheduleBlockRow[]) {
   return [...new Map(blocks.map((block) => [block.id, block])).values()];
+}
+
+function sortScheduleBlocksByTime(blocks: ScheduleBlockRow[]) {
+  return [...blocks].sort((first, second) => {
+    const startDifference =
+      timeToMinutes(first.start_time) - timeToMinutes(second.start_time);
+
+    if (startDifference !== 0) {
+      return startDifference;
+    }
+
+    return timeToMinutes(first.end_time) - timeToMinutes(second.end_time);
+  });
+}
+
+function groupBlocksByStartHour(blocks: ScheduleBlockRow[]) {
+  return sortScheduleBlocksByTime(blocks).reduce((groups, block) => {
+    const hour = Math.floor(timeToMinutes(block.start_time) / 60);
+    const group = groups.get(hour) ?? [];
+    group.push(block);
+    groups.set(hour, group);
+
+    return groups;
+  }, new Map<number, ScheduleBlockRow[]>());
+}
+
+type WeeklyTimelineHourLayout = {
+  height: number;
+  hour: number;
+  top: number;
+};
+
+function getWeeklyTimelineLayout({
+  blocksByDate,
+  days,
+  hourSlots,
+}: {
+  blocksByDate: Map<string, ScheduleBlockRow[]>;
+  days: string[];
+  hourSlots: number[];
+}) {
+  const layouts: WeeklyTimelineHourLayout[] = [];
+  let top = 0;
+
+  for (const hour of hourSlots) {
+    const maxStackCount = Math.max(
+      0,
+      ...days.map((day) => {
+        const blocks = blocksByDate.get(day) ?? [];
+
+        return blocks.filter(
+          (block) => Math.floor(timeToMinutes(block.start_time) / 60) === hour,
+        ).length;
+      }),
+    );
+    const stackedHeight =
+      maxStackCount > 1
+        ? WEEKLY_TIMELINE_HOUR_INSET * 2 +
+          maxStackCount * WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT +
+          (maxStackCount - 1) * WEEKLY_TIMELINE_STACKED_BLOCK_GAP
+        : WEEKLY_TIMELINE_HOUR_HEIGHT;
+    const height = Math.max(WEEKLY_TIMELINE_HOUR_HEIGHT, stackedHeight);
+
+    layouts.push({ height, hour, top });
+    top += height;
+  }
+
+  return {
+    layouts,
+    layoutsByHour: new Map(layouts.map((layout) => [layout.hour, layout])),
+    totalHeight: top,
+  };
+}
+
+function getTimelineTopForMinute({
+  layoutsByHour,
+  minute,
+}: {
+  layoutsByHour: Map<number, WeeklyTimelineHourLayout>;
+  minute: number;
+}) {
+  const hour = Math.floor(minute / 60);
+  const layout = layoutsByHour.get(hour);
+
+  if (!layout) {
+    const layouts = [...layoutsByHour.values()].sort(
+      (first, second) => first.hour - second.hour,
+    );
+    const previousLayout = [...layouts]
+      .reverse()
+      .find((item) => item.hour < hour);
+
+    if (previousLayout) {
+      return previousLayout.top + previousLayout.height;
+    }
+
+    return 0;
+  }
+
+  return (
+    layout.top +
+    ((minute - hour * 60) / 60) * WEEKLY_TIMELINE_HOUR_HEIGHT
+  );
 }
 
 function getBlockCoachSummary({
@@ -1181,7 +1402,22 @@ function getScheduleBlockPanelPath({
   blockId: string;
 }) {
   const url = new URL(basePath, "http://boxops.local");
+  url.searchParams.delete("event_id");
   url.searchParams.set("block_id", blockId);
+
+  return `${url.pathname}${url.search}`;
+}
+
+function getOperationalEventPanelPath({
+  basePath,
+  eventId,
+}: {
+  basePath: string;
+  eventId: string;
+}) {
+  const url = new URL(basePath, "http://boxops.local");
+  url.searchParams.delete("block_id");
+  url.searchParams.set("event_id", eventId);
 
   return `${url.pathname}${url.search}`;
 }
@@ -1204,6 +1440,217 @@ function groupBlocksByDate(blocks: ScheduleBlockRow[]) {
 
     return groups;
   }, new Map<string, ScheduleBlockRow[]>());
+}
+
+function getOperationalEventTypeLabel(eventType: string) {
+  return operationalEventTypeLabels[eventType] ?? "Evento";
+}
+
+function getOperationalEventImpactLabel(impactLevel: string) {
+  return operationalEventImpactLabels[impactLevel] ?? "Contexto";
+}
+
+function getOperationalEventTimeZone(
+  event: OperationalEventRow,
+  fallbackTimeZone: string,
+) {
+  return getSafeTimeZone(event.timezone || fallbackTimeZone);
+}
+
+function getOperationalEventEndForDayRange(event: OperationalEventRow) {
+  if (!event.ends_at) {
+    return new Date(event.starts_at);
+  }
+
+  const endsAt = new Date(event.ends_at);
+
+  return Number.isNaN(endsAt.getTime())
+    ? new Date(event.starts_at)
+    : new Date(endsAt.getTime() - 1);
+}
+
+function getOperationalEventVisibleDays({
+  days,
+  event,
+  timezone,
+}: {
+  days: string[];
+  event: OperationalEventRow;
+  timezone: string;
+}) {
+  const eventTimeZone = getOperationalEventTimeZone(event, timezone);
+  const startDay = getDateStringInTimeZone(event.starts_at, eventTimeZone);
+  const endDay = getDateStringInTimeZone(
+    getOperationalEventEndForDayRange(event),
+    eventTimeZone,
+  );
+
+  if (!startDay || !endDay) {
+    return [];
+  }
+
+  return days.filter((day) => day >= startDay && day <= endDay);
+}
+
+function groupOperationalEventsByDate({
+  days,
+  events,
+  timezone,
+}: {
+  days: string[];
+  events: OperationalEventRow[];
+  timezone: string;
+}) {
+  const groups = new Map<string, OperationalEventRow[]>(
+    days.map((day) => [day, []]),
+  );
+
+  for (const event of events) {
+    for (const day of getOperationalEventVisibleDays({ days, event, timezone })) {
+      const dayEvents = groups.get(day) ?? [];
+      dayEvents.push(event);
+      groups.set(day, dayEvents);
+    }
+  }
+
+  for (const [day, dayEvents] of groups.entries()) {
+    groups.set(
+      day,
+      dayEvents.sort((first, second) => {
+        if (first.all_day !== second.all_day) {
+          return first.all_day ? -1 : 1;
+        }
+
+        const firstZone = getOperationalEventTimeZone(first, timezone);
+        const secondZone = getOperationalEventTimeZone(second, timezone);
+        const firstMinutes = getMinutesInTimeZone(first.starts_at, firstZone);
+        const secondMinutes = getMinutesInTimeZone(second.starts_at, secondZone);
+
+        if (firstMinutes !== secondMinutes) {
+          return firstMinutes - secondMinutes;
+        }
+
+        return first.title.localeCompare(second.title, "es");
+      }),
+    );
+  }
+
+  return groups;
+}
+
+function filterOperationalEvents({
+  events,
+  filters,
+}: {
+  events: OperationalEventRow[];
+  filters: ScheduleFilters;
+}) {
+  if (!filters.centerId) {
+    return events;
+  }
+
+  return events.filter(
+    (event) => !event.center_id || event.center_id === filters.centerId,
+  );
+}
+
+function getTimedOperationalEventRangeForDay({
+  day,
+  event,
+  timezone,
+}: {
+  day: string;
+  event: OperationalEventRow;
+  timezone: string;
+}) {
+  if (event.all_day) {
+    return null;
+  }
+
+  const eventTimeZone = getOperationalEventTimeZone(event, timezone);
+  const startDay = getDateStringInTimeZone(event.starts_at, eventTimeZone);
+  const endDay = getDateStringInTimeZone(
+    getOperationalEventEndForDayRange(event),
+    eventTimeZone,
+  );
+
+  if (!startDay || !endDay || day < startDay || day > endDay) {
+    return null;
+  }
+
+  const originalEndDay = event.ends_at
+    ? getDateStringInTimeZone(event.ends_at, eventTimeZone)
+    : startDay;
+  const start = day === startDay
+    ? getMinutesInTimeZone(event.starts_at, eventTimeZone)
+    : 0;
+  const end = event.ends_at && day === originalEndDay
+    ? getMinutesInTimeZone(event.ends_at, eventTimeZone)
+    : 24 * 60;
+
+  if (end <= start) {
+    return null;
+  }
+
+  return { end, start };
+}
+
+function getTimedOperationalEventRanges({
+  days,
+  events,
+  timezone,
+}: {
+  days: string[];
+  events: OperationalEventRow[];
+  timezone: string;
+}) {
+  return events.flatMap((event) =>
+    days.flatMap((day) => {
+      const range = getTimedOperationalEventRangeForDay({
+        day,
+        event,
+        timezone,
+      });
+
+      return range ? [range] : [];
+    }),
+  );
+}
+
+function formatOperationalEventTimeLabel({
+  event,
+  timezone,
+}: {
+  event: OperationalEventRow;
+  timezone: string;
+}) {
+  const eventTimeZone = getOperationalEventTimeZone(event, timezone);
+
+  if (event.all_day) {
+    return "Todo el dia";
+  }
+
+  const start = formatOperationalEventClock(event.starts_at, eventTimeZone);
+  const end = event.ends_at
+    ? formatOperationalEventClock(event.ends_at, eventTimeZone)
+    : "";
+
+  return end ? `${start}-${end}` : start;
+}
+
+function getOperationalEventToneClasses(event: OperationalEventRow) {
+  if (event.event_type === "holiday" || event.event_type === "closure") {
+    return "border-primary/25 bg-primary/10 text-primary";
+  }
+
+  if (
+    event.impact_level === "coverage_review_needed" ||
+    event.impact_level === "staffing_needed"
+  ) {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+
+  return "border-sky-200 bg-sky-50 text-sky-950";
 }
 
 function getSafeColor(value: string | null) {
@@ -1235,7 +1682,7 @@ function getCoachDisplay({
       id: coachProfile.id,
       isFallback: false,
       label: personProfile.display_name,
-      personProfileId: coachProfile.person_profile_id,
+      personProfileId: coachProfile.person_profile_id ?? personProfile.id,
     };
   }
 
@@ -1245,7 +1692,7 @@ function getCoachDisplay({
       id: coachProfile.id,
       isFallback: true,
       label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
-      personProfileId: coachProfile.person_profile_id,
+      personProfileId: coachProfile.person_profile_id ?? null,
     };
   }
 
@@ -1254,7 +1701,7 @@ function getCoachDisplay({
     id: coachProfile.id,
     isFallback: true,
     label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
-    personProfileId: coachProfile.person_profile_id,
+    personProfileId: coachProfile.person_profile_id ?? null,
   };
 }
 
@@ -1273,6 +1720,13 @@ function buildCoachDisplays({
   const personProfilesById = new Map(
     personProfiles.map((personProfile) => [personProfile.id, personProfile]),
   );
+  const personProfilesByUserId = new Map(
+    personProfiles.flatMap((personProfile) =>
+      personProfile.user_id
+        ? [[personProfile.user_id, personProfile] as const]
+        : [],
+    ),
+  );
   const displays = coachProfiles.map((coachProfile) =>
     getCoachDisplay({
       coachProfile,
@@ -1281,7 +1735,9 @@ function buildCoachDisplays({
         : undefined,
       personProfile: coachProfile.person_profile_id
         ? personProfilesById.get(coachProfile.person_profile_id)
-        : undefined,
+        : coachProfile.user_id
+          ? personProfilesByUserId.get(coachProfile.user_id)
+          : undefined,
     }),
   );
   const displaysById = new Map(displays.map((display) => [display.id, display]));
@@ -1296,7 +1752,9 @@ function buildCoachDisplays({
 
       const personProfile = coachProfile.person_profile_id
         ? personProfilesById.get(coachProfile.person_profile_id)
-        : undefined;
+        : coachProfile.user_id
+          ? personProfilesByUserId.get(coachProfile.user_id)
+          : undefined;
       const membership = coachProfile.user_id
         ? membershipsByUserId.get(coachProfile.user_id)
         : undefined;
@@ -1412,7 +1870,7 @@ function getScheduleBlockToneClasses(tone: ScheduleBlockTone) {
     pending:
       "border-amber-200 bg-amber-50 text-amber-950 ring-amber-200/70 hover:bg-amber-100",
     uncovered:
-      "border-destructive/35 bg-destructive/10 text-destructive ring-destructive/20 hover:bg-destructive/15",
+      "border-red-200 bg-red-50 text-red-950 ring-red-200/70 hover:bg-red-100",
   };
 
   return classes[tone];
@@ -1480,1213 +1938,69 @@ function getScheduleBlockToneLabel({
   return getScheduleCoverageStateLabel(coverage.state);
 }
 
-function CenterSelect({
-  centers,
-  defaultValue,
-  disabled,
+function ScheduleCollapsibleCard({
+  children,
+  className,
+  contentClassName,
+  description,
+  icon,
+  summary,
+  title,
 }: {
-  centers: CenterRow[];
-  defaultValue?: string;
-  disabled?: boolean;
+  children: ReactNode;
+  className?: string;
+  contentClassName?: string;
+  description: string;
+  icon: ReactNode;
+  summary?: ReactNode;
+  title: string;
 }) {
   return (
-    <select
-      className={selectClassName()}
-      defaultValue={defaultValue ?? centers[0]?.id ?? ""}
-      disabled={disabled}
-      name="centerId"
-      required
+    <details
+      className={cn(
+        "group rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10",
+        className,
+      )}
     >
-      {centers.length === 0 ? (
-        <option value="">Sin centros activos</option>
-      ) : null}
-      {centers.map((center) => (
-        <option key={center.id} value={center.id}>
-          {center.name}
-          {center.status === "inactive" ? " (inactivo)" : ""}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function ClassTypeSelect({
-  classTypes,
-  defaultValue,
-  disabled,
-}: {
-  classTypes: ClassTypeRow[];
-  defaultValue?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <select
-      className={selectClassName()}
-      defaultValue={defaultValue ?? classTypes[0]?.id ?? ""}
-      disabled={disabled}
-      name="classTypeId"
-      required
-    >
-      {classTypes.length === 0 ? (
-        <option value="">Sin tipos activos</option>
-      ) : null}
-      {classTypes.map((classType) => (
-        <option key={classType.id} value={classType.id}>
-          {classType.name}
-          {classType.status === "inactive" ? " (inactivo)" : ""}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function ScheduleBlockFields({
-  block,
-  centers,
-  classTypes,
-  disabled,
-  weekEnd,
-  weekStart,
-}: {
-  block?: ScheduleBlockRow;
-  centers: CenterRow[];
-  classTypes: ClassTypeRow[];
-  disabled?: boolean;
-  weekEnd: string;
-  weekStart: string;
-}) {
-  return (
-    <>
-      <input name="status" type="hidden" value={block?.status ?? "scheduled"} />
-
-      <label className="grid min-w-0 gap-2 sm:col-span-2">
-        <span className="text-sm font-medium">Fecha</span>
-        <Input
-          defaultValue={block?.service_date ?? weekStart}
-          disabled={disabled}
-          max={weekEnd}
-          min={weekStart}
-          name="serviceDate"
-          required
-          type="date"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-2">
-        <span className="text-sm font-medium">Inicio</span>
-        <Input
-          defaultValue={block ? formatTimeForInput(block.start_time) : ""}
-          disabled={disabled}
-          name="startTime"
-          required
-          type="time"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-2">
-        <span className="text-sm font-medium">Fin</span>
-        <Input
-          defaultValue={block ? formatTimeForInput(block.end_time) : ""}
-          disabled={disabled}
-          name="endTime"
-          required
-          type="time"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-3">
-        <span className="text-sm font-medium">Centro</span>
-        <CenterSelect
-          centers={centers}
-          defaultValue={block?.center_id}
-          disabled={disabled}
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-3">
-        <span className="text-sm font-medium">Tipo de actividad</span>
-        <ClassTypeSelect
-          classTypes={classTypes}
-          defaultValue={block?.class_type_id}
-          disabled={disabled}
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-2">
-        <span className="text-sm font-medium">Entrenadores necesarios</span>
-        <Input
-          defaultValue={block?.required_coaches ?? 1}
-          disabled={disabled}
-          max="20"
-          min="0"
-          name="requiredCoaches"
-          required
-          type="number"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2 sm:col-span-4">
-        <span className="text-sm font-medium">Notas</span>
-        <Textarea
-          defaultValue={block?.notes ?? ""}
-          disabled={disabled}
-          maxLength={1000}
-          name="notes"
-          placeholder="Contexto operativo del bloque"
-        />
-      </label>
-    </>
-  );
-}
-
-function ScheduleCreateForm({
-  activeCenters,
-  activeClassTypes,
-  day,
-  filters,
-  organizationId,
-  view,
-  weekEnd,
-  weekStart,
-}: {
-  activeCenters: CenterRow[];
-  activeClassTypes: ClassTypeRow[];
-  day?: string | null;
-  filters: ScheduleFilters;
-  organizationId: string;
-  view: ScheduleView;
-  weekEnd: string;
-  weekStart: string;
-}) {
-  const canCreate = activeCenters.length > 0 && activeClassTypes.length > 0;
-
-  return (
-    <ScheduleCreateBlockDialog triggerDescription="Clase, open box, evento u otra actividad de la semana.">
-      <form
-        action={createScheduleBlock}
-        className="grid gap-4 sm:grid-cols-6"
-      >
-        <input name="organizationId" type="hidden" value={organizationId} />
-        <input name="weekStart" type="hidden" value={weekStart} />
-        <ScheduleFilterHiddenInputs day={day} filters={filters} view={view} />
-        <ScheduleBlockFields
-          centers={activeCenters}
-          classTypes={activeClassTypes}
-          disabled={!canCreate}
-          weekEnd={weekEnd}
-          weekStart={weekStart}
-        />
-        <div className="flex items-end sm:col-span-6">
-          <Button disabled={!canCreate} type="submit">
-            <Plus aria-hidden="true" />
-            Crear bloque
-          </Button>
-        </div>
-      </form>
-
-      {!canCreate ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Hace falta al menos un centro activo y un tipo de actividad activo
-          antes de crear bloques.
-        </p>
-      ) : null}
-    </ScheduleCreateBlockDialog>
-  );
-}
-
-function groupStaffWorkWindowsByDate(
-  occurrences: StaffWorkWindowOccurrence[],
-) {
-  return occurrences.reduce((groups, occurrence) => {
-    const dayWindows = groups.get(occurrence.serviceDate) ?? [];
-    dayWindows.push(occurrence);
-    groups.set(occurrence.serviceDate, dayWindows);
-
-    return groups;
-  }, new Map<string, StaffWorkWindowOccurrence[]>());
-}
-
-function formatStaffWorkWindowChip(window: StaffWorkWindowOccurrence) {
-  return `${formatStaffWorkWindowTime(window.start_time)}-${formatStaffWorkWindowTime(
-    window.end_time,
-  )} · ${window.personDisplayName}`;
-}
-
-function StaffWorkWindowDaySummary({
-  occurrences,
-  serviceDate,
-}: {
-  occurrences: StaffWorkWindowOccurrence[];
-  serviceDate: string;
-}) {
-  const visibleWindows = occurrences.slice(0, 3);
-  const remainingCount = Math.max(0, occurrences.length - visibleWindows.length);
-
-  return (
-    <div className="min-w-0 rounded-lg border border-border/70 bg-muted/20 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">
-            {formatWeekdayShort(serviceDate)}
-          </p>
-          <p className="font-mono text-xs text-muted-foreground">
-            {formatDayNumber(serviceDate)}
-          </p>
-        </div>
-        <Badge variant="outline">{occurrences.length}</Badge>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {visibleWindows.length === 0 ? (
-          <span className="text-xs text-muted-foreground">Sin jornada</span>
-        ) : (
-          visibleWindows.map((occurrence) => (
-            <span
-              className="max-w-full truncate rounded-full border border-border bg-background/70 px-2 py-1 text-[11px] font-medium"
-              key={`${occurrence.id}-${occurrence.serviceDate}`}
-              title={[
-                formatStaffWorkWindowChip(occurrence),
-                occurrence.centerName ? `Centro: ${occurrence.centerName}` : null,
-              ]
-                .filter(Boolean)
-                .join(" / ")}
-            >
-              {formatStaffWorkWindowChip(occurrence)}
-            </span>
-          ))
-        )}
-        {remainingCount > 0 ? (
-          <span className="rounded-full border border-border bg-background/70 px-2 py-1 text-[11px] font-medium">
-            +{remainingCount}
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+            {icon}
           </span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function StaffWorkWindowSelects({
-  activeCenters,
-  defaultValidFrom,
-  people,
-  window,
-}: {
-  activeCenters: StaffWorkWindowCenterOption[];
-  defaultValidFrom?: string;
-  people: StaffWorkWindowPersonOption[];
-  window?: StaffWorkWindowDisplay;
-}) {
-  return (
-    <>
-      <StaffWorkWindowPersonCenterSelects
-        activeCenters={activeCenters}
-        defaultCenterId={window ? window.center_id ?? "" : undefined}
-        defaultPersonProfileId={window?.person_profile_id ?? people[0]?.id ?? ""}
-        people={people}
-        preferPersonCenterOnInitial={!window}
-      />
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Dia</span>
-        <select
-          className={selectClassName()}
-          defaultValue={String(window?.day_of_week ?? 1)}
-          name="dayOfWeek"
-          required
-        >
-          {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => (
-            <option key={day} value={day}>
-              {getStaffWorkWindowDayLabel(day)}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Inicio</span>
-        <Input
-          defaultValue={
-            window ? formatStaffWorkWindowTime(window.start_time) : ""
-          }
-          name="startTime"
-          required
-          type="time"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Fin</span>
-        <Input
-          defaultValue={window ? formatStaffWorkWindowTime(window.end_time) : ""}
-          name="endTime"
-          required
-          type="time"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Desde</span>
-        <Input
-          defaultValue={window?.valid_from ?? defaultValidFrom ?? ""}
-          name="validFrom"
-          required
-          type="date"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Hasta</span>
-        <Input
-          defaultValue={window?.valid_until ?? ""}
-          name="validUntil"
-          type="date"
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Estado</span>
-        <select
-          className={selectClassName()}
-          defaultValue={window?.status ?? "active"}
-          name="status"
-        >
-          {STAFF_WORK_WINDOW_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {getStaffWorkWindowStatusLabel(status)}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="grid min-w-0 gap-2 md:col-span-2 xl:col-span-4">
-        <span className="text-sm font-medium">Notas</span>
-        <Input
-          defaultValue={window?.notes ?? ""}
-          maxLength={240}
-          name="notes"
-          placeholder="Nota operativa corta, sin datos sensibles"
-        />
-      </label>
-    </>
-  );
-}
-
-function StaffWorkWindowActionHiddenInputs({
-  filters,
-  organizationId,
-  returnPath,
-  view,
-  weekStart,
-}: {
-  filters: ScheduleFilters;
-  organizationId: string;
-  returnPath: string;
-  view: ScheduleView;
-  weekStart: string;
-}) {
-  return (
-    <>
-      <input name="organizationId" type="hidden" value={organizationId} />
-      <input name="weekStart" type="hidden" value={weekStart} />
-      <input name="returnPath" type="hidden" value={returnPath} />
-      <ScheduleFilterHiddenInputs filters={filters} view={view} />
-    </>
-  );
-}
-
-function StaffWorkWindowsCard({
-  activeCenters,
-  canManage,
-  days,
-  filters,
-  organizationId,
-  people,
-  returnPath,
-  selectedDay,
-  view,
-  weekStart,
-  windows,
-}: {
-  activeCenters: StaffWorkWindowCenterOption[];
-  canManage: boolean;
-  days: string[];
-  filters: ScheduleFilters;
-  organizationId: string;
-  people: StaffWorkWindowPersonOption[];
-  returnPath: string;
-  selectedDay: string;
-  view: ScheduleView;
-  weekStart: string;
-  windows: {
-    occurrences: StaffWorkWindowOccurrence[];
-    windows: StaffWorkWindowDisplay[];
-  };
-}) {
-  const occurrencesByDate = groupStaffWorkWindowsByDate(windows.occurrences);
-  const selectedDayOccurrences = occurrencesByDate.get(selectedDay) ?? [];
-  const visibleWindows = windows.windows.filter(
-    (window) => window.status === "active",
-  );
-  const showPath = getSchedulePath({
-    day: selectedDay,
-    organizationId,
-    week: weekStart,
-    ...getScheduleFilterPathOptions(
-      {
-        ...filters,
-        showWorkWindows: true,
-      },
-      view,
-    ),
-  });
-  const hidePath = getSchedulePath({
-    day: selectedDay,
-    organizationId,
-    week: weekStart,
-    ...getScheduleFilterPathOptions(
-      {
-        ...filters,
-        showWorkWindows: false,
-      },
-      view,
-    ),
-  });
-
-  return (
-    <StaffWorkWindowsVisibilityCard
-      description="Presencia planificada del personal, separada de bloques y fichaje."
-      hideHref={hidePath}
-      initialVisible={filters.showWorkWindows}
-      showHref={showPath}
-      title={
-        <>
-          <BriefcaseBusiness aria-hidden="true" className="size-4" />
-          Jornada prevista
-        </>
-      }
-    >
-          <div className="hidden grid-cols-7 gap-2 md:grid">
-            {days.map((day) => (
-              <StaffWorkWindowDaySummary
-                key={day}
-                occurrences={occurrencesByDate.get(day) ?? []}
-                serviceDate={day}
-              />
-            ))}
-          </div>
-
-          <details className="rounded-lg border border-border/70 bg-muted/20 md:hidden" open>
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-              <span>{formatServiceDate(selectedDay)}</span>
-              <Badge variant="outline">{selectedDayOccurrences.length}</Badge>
-            </summary>
-            <div className="border-t border-border/70 p-3">
-              <StaffWorkWindowDaySummary
-                occurrences={selectedDayOccurrences}
-                serviceDate={selectedDay}
-              />
-            </div>
-          </details>
-
-          {canManage ? (
-            <details className="group rounded-lg border border-border/70">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-                <span>Gestionar franjas</span>
-                <Badge variant="outline">
-                  {visibleWindows.length} activa
-                  {visibleWindows.length === 1 ? "" : "s"}
-                </Badge>
-              </summary>
-              <div className="space-y-4 border-t border-border/70 p-3">
-                <form
-                  action={createStaffWorkWindow}
-                  className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                >
-                  <StaffWorkWindowActionHiddenInputs
-                    filters={filters}
-                    organizationId={organizationId}
-                    returnPath={returnPath}
-                    view={view}
-                    weekStart={weekStart}
-                  />
-                  <StaffWorkWindowSelects
-                    activeCenters={activeCenters}
-                    defaultValidFrom={weekStart}
-                    people={people}
-                  />
-                  <div className="flex items-end xl:col-span-4">
-                    <Button disabled={people.length === 0} type="submit">
-                      <Plus aria-hidden="true" />
-                      Crear franja
-                    </Button>
-                  </div>
-                </form>
-
-                {windows.windows.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-                    No hay jornadas previstas para esta semana.
-                  </div>
-                ) : (
-                  <div className="grid gap-3">
-                    {windows.windows.map((window) => (
-                      <div
-                        className="rounded-lg border border-border/70 bg-background/70 p-3"
-                        key={window.id}
-                      >
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
-                              {window.personDisplayName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {getStaffWorkWindowDayLabel(window.day_of_week)} ·{" "}
-                              {formatStaffWorkWindowTime(window.start_time)}-
-                              {formatStaffWorkWindowTime(window.end_time)}
-                            </p>
-                          </div>
-                          <Badge variant={window.status === "active" ? "secondary" : "outline"}>
-                            {getStaffWorkWindowStatusLabel(window.status)}
-                          </Badge>
-                        </div>
-                        <form
-                          action={updateStaffWorkWindow}
-                          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                        >
-                          <StaffWorkWindowActionHiddenInputs
-                            filters={filters}
-                            organizationId={organizationId}
-                            returnPath={returnPath}
-                            view={view}
-                            weekStart={weekStart}
-                          />
-                          <input
-                            name="staffWorkWindowId"
-                            type="hidden"
-                            value={window.id}
-                          />
-                          <StaffWorkWindowSelects
-                            activeCenters={activeCenters}
-                            people={people}
-                            window={window}
-                          />
-                          <div className="flex flex-wrap items-end gap-2 xl:col-span-4">
-                            <Button type="submit" variant="outline">
-                              <Save aria-hidden="true" />
-                              Guardar
-                            </Button>
-                          </div>
-                        </form>
-                        {window.status === "active" ? (
-                          <form action={deactivateStaffWorkWindow} className="mt-2">
-                            <StaffWorkWindowActionHiddenInputs
-                              filters={filters}
-                              organizationId={organizationId}
-                              returnPath={returnPath}
-                              view={view}
-                              weekStart={weekStart}
-                            />
-                            <input
-                              name="staffWorkWindowId"
-                              type="hidden"
-                              value={window.id}
-                            />
-                            <Button size="sm" type="submit" variant="outline">
-                              <CircleOff aria-hidden="true" />
-                              Desactivar
-                            </Button>
-                          </form>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </details>
-          ) : null}
-    </StaffWorkWindowsVisibilityCard>
-  );
-}
-
-function getUtcDateForDay(value: string, offsetDays = 0) {
-  const { day, month, year } = parseDateParts(value);
-
-  return new Date(Date.UTC(year, month - 1, day + offsetDays));
-}
-
-function getDateTimePartsInTimeZone(value: string, timeZone: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    month: "2-digit",
-    timeZone,
-    year: "numeric",
-  });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(new Date(value)).map((part) => [
-      part.type,
-      part.value,
-    ]),
-  );
-  const year = parts.year ?? "0000";
-  const month = parts.month ?? "01";
-  const day = parts.day ?? "01";
-  const hour = parts.hour ?? "00";
-  const minute = parts.minute ?? "00";
-
-  return {
-    date: `${year}-${month}-${day}`,
-    time: `${hour}:${minute}`,
-  };
-}
-
-function getOperationalEventDayKeys(
-  event: OperationalEventRow,
-  days: string[],
-) {
-  const start = getDateTimePartsInTimeZone(
-    event.starts_at,
-    event.timezone,
-  ).date;
-  const end = event.ends_at
-    ? getDateTimePartsInTimeZone(event.ends_at, event.timezone).date
-    : start;
-
-  return days.filter((day) => day >= start && day <= end);
-}
-
-function groupOperationalEventsByDate({
-  days,
-  events,
-}: {
-  days: string[];
-  events: OperationalEventRow[];
-}) {
-  return events.reduce((groups, event) => {
-    for (const day of getOperationalEventDayKeys(event, days)) {
-      const dayEvents = groups.get(day) ?? [];
-      dayEvents.push(event);
-      groups.set(day, dayEvents);
-    }
-
-    return groups;
-  }, new Map<string, OperationalEventRow[]>());
-}
-
-function formatOperationalEventRange(event: OperationalEventRow) {
-  const start = getDateTimePartsInTimeZone(event.starts_at, event.timezone);
-  const end = event.ends_at
-    ? getDateTimePartsInTimeZone(event.ends_at, event.timezone)
-    : null;
-
-  if (event.all_day) {
-    return end && end.date !== start.date
-      ? `${formatServiceDate(start.date)} - ${formatServiceDate(end.date)}`
-      : `${formatServiceDate(start.date)} / todo el dia`;
-  }
-
-  if (!end) {
-    return `${formatServiceDate(start.date)} / ${start.time}`;
-  }
-
-  if (end.date === start.date) {
-    return `${formatServiceDate(start.date)} / ${start.time}-${end.time}`;
-  }
-
-  return `${formatServiceDate(start.date)} ${start.time} - ${formatServiceDate(
-    end.date,
-  )} ${end.time}`;
-}
-
-function getOperationalEventStatusBadgeVariant(status: string) {
-  if (status === "cancelled") {
-    return "destructive" as const;
-  }
-
-  if (status === "active") {
-    return "secondary" as const;
-  }
-
-  return "outline" as const;
-}
-
-function OperationalEventActionHiddenInputs({
-  organizationId,
-  returnPath,
-  weekStart,
-}: {
-  organizationId: string;
-  returnPath: string;
-  weekStart: string;
-}) {
-  return (
-    <>
-      <input name="organizationId" type="hidden" value={organizationId} />
-      <input name="weekStart" type="hidden" value={weekStart} />
-      <input name="returnPath" type="hidden" value={returnPath} />
-    </>
-  );
-}
-
-function OperationalEventFields({
-  centers,
-  event,
-  selectedDay,
-}: {
-  centers: CenterRow[];
-  event?: OperationalEventRow;
-  selectedDay: string;
-}) {
-  const start = event
-    ? getDateTimePartsInTimeZone(event.starts_at, event.timezone)
-    : { date: selectedDay, time: "09:00" };
-  const end = event?.ends_at
-    ? getDateTimePartsInTimeZone(event.ends_at, event.timezone)
-    : { date: "", time: "" };
-
-  return (
-    <>
-      <label className="grid min-w-0 gap-2 md:col-span-2">
-        <span className="text-sm font-medium">Titulo</span>
-        <Input
-          defaultValue={event?.title ?? ""}
-          maxLength={120}
-          name="title"
-          placeholder="Festivo, competicion o seminario"
-          required
-        />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Tipo</span>
-        <select
-          className={selectClassName()}
-          defaultValue={event?.event_type ?? "holiday"}
-          name="eventType"
-          required
-        >
-          {OPERATIONAL_EVENT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {operationalEventTypeLabels[type]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Centro</span>
-        <select
-          className={selectClassName()}
-          defaultValue={event?.center_id ?? ""}
-          name="centerId"
-        >
-          <option value="">Toda la organizacion</option>
-          {centers.map((center) => (
-            <option key={center.id} value={center.id}>
-              {center.name}
-              {center.status === "inactive" ? " (inactivo)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Fecha</span>
-        <Input defaultValue={start.date} name="startsOn" required type="date" />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Hora inicio</span>
-        <Input defaultValue={start.time} name="startsAtTime" type="time" />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Fin</span>
-        <Input defaultValue={end.date} name="endsOn" type="date" />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Hora fin</span>
-        <Input defaultValue={end.time} name="endsAtTime" type="time" />
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Visibilidad</span>
-        <select
-          className={selectClassName()}
-          defaultValue={event?.visibility ?? "staff"}
-          name="visibility"
-          required
-        >
-          {OPERATIONAL_EVENT_VISIBILITIES.map((visibility) => (
-            <option key={visibility} value={visibility}>
-              {operationalEventVisibilityLabels[visibility]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="grid min-w-0 gap-2">
-        <span className="text-sm font-medium">Impacto</span>
-        <select
-          className={selectClassName()}
-          defaultValue={event?.impact_level ?? "context_only"}
-          name="impactLevel"
-          required
-        >
-          {OPERATIONAL_EVENT_IMPACT_LEVELS.map((impactLevel) => (
-            <option key={impactLevel} value={impactLevel}>
-              {operationalEventImpactLabels[impactLevel]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="flex min-h-11 items-center gap-2 self-end rounded-md border border-input px-3 py-2 text-sm md:min-h-9">
-        <input
-          className="size-4 accent-primary"
-          defaultChecked={event?.all_day ?? true}
-          name="allDay"
-          type="checkbox"
-        />
-        <span>Todo el dia</span>
-      </label>
-
-      <label className="grid min-w-0 gap-2 md:col-span-4">
-        <span className="text-sm font-medium">Notas</span>
-        <Textarea
-          defaultValue={event?.notes ?? ""}
-          maxLength={500}
-          name="notes"
-          placeholder="Nota operativa corta, sin datos sensibles"
-        />
-      </label>
-    </>
-  );
-}
-
-function OperationalEventCard({
-  canManage,
-  centersById,
-  event,
-  organizationId,
-  returnPath,
-  weekStart,
-}: {
-  canManage: boolean;
-  centersById: Map<string, CenterRow>;
-  event: OperationalEventRow;
-  organizationId: string;
-  returnPath: string;
-  weekStart: string;
-}) {
-  const center = event.center_id ? centersById.get(event.center_id) : null;
-
-  return (
-    <div className="rounded-lg border border-border/70 bg-background/70 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant={getOperationalEventStatusBadgeVariant(event.status)}>
-              {getOperationalEventStatusLabel(event.status)}
-            </Badge>
-            <Badge variant="outline">
-              {getOperationalEventTypeLabel(event.event_type)}
-            </Badge>
-            <Badge variant="outline">
-              {getOperationalEventImpactLabel(event.impact_level)}
-            </Badge>
-          </div>
-          <p className="break-words text-sm font-semibold">{event.title}</p>
-          <p className="text-xs text-muted-foreground">
-            {formatOperationalEventRange(event)}
-            {center ? ` / ${center.name}` : " / Toda la organizacion"}
-          </p>
-        </div>
-        <Badge variant="secondary">
-          {getOperationalEventVisibilityLabel(event.visibility)}
-        </Badge>
-      </div>
-
-      {event.notes ? (
-        <p className="mt-3 break-words rounded-md bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
-          {event.notes}
-        </p>
-      ) : null}
-
-      {canManage ? (
-        <details className="mt-3 rounded-md border border-border/70">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-            <span>Gestionar evento</span>
-            <Badge variant="outline">Editar</Badge>
-          </summary>
-          <div className="space-y-3 border-t border-border/70 p-3">
-            <form
-              action={updateOperationalEventFromForm}
-              className="grid gap-3 md:grid-cols-4"
-            >
-              <OperationalEventActionHiddenInputs
-                organizationId={organizationId}
-                returnPath={returnPath}
-                weekStart={weekStart}
-              />
-              <input
-                name="operationalEventId"
-                type="hidden"
-                value={event.id}
-              />
-              <OperationalEventFields
-                centers={[...centersById.values()]}
-                event={event}
-                selectedDay={getDateTimePartsInTimeZone(
-                  event.starts_at,
-                  event.timezone,
-                ).date}
-              />
-              <div className="flex flex-wrap items-end gap-2 md:col-span-4">
-                <Button type="submit" variant="outline">
-                  <Save aria-hidden="true" />
-                  Guardar
-                </Button>
-              </div>
-            </form>
-
-            <div className="flex flex-wrap gap-2">
-              {event.status === "active" ? (
-                <form action={setOperationalEventStatusFromForm}>
-                  <OperationalEventActionHiddenInputs
-                    organizationId={organizationId}
-                    returnPath={returnPath}
-                    weekStart={weekStart}
-                  />
-                  <input
-                    name="operationalEventId"
-                    type="hidden"
-                    value={event.id}
-                  />
-                  <input name="eventStatus" type="hidden" value="cancelled" />
-                  <Button size="sm" type="submit" variant="outline">
-                    <CircleOff aria-hidden="true" />
-                    Cancelar
-                  </Button>
-                </form>
+          <span className="min-w-0 space-y-1">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-heading text-base font-medium leading-snug">
+              <span className="truncate">{title}</span>
+              {summary ? (
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  {summary}
+                </span>
               ) : null}
-
-              {event.status === "cancelled" ? (
-                <form action={setOperationalEventStatusFromForm}>
-                  <OperationalEventActionHiddenInputs
-                    organizationId={organizationId}
-                    returnPath={returnPath}
-                    weekStart={weekStart}
-                  />
-                  <input
-                    name="operationalEventId"
-                    type="hidden"
-                    value={event.id}
-                  />
-                  <input name="eventStatus" type="hidden" value="active" />
-                  <Button size="sm" type="submit" variant="outline">
-                    <RotateCcw aria-hidden="true" />
-                    Reactivar
-                  </Button>
-                </form>
-              ) : null}
-
-              <form action={setOperationalEventStatusFromForm}>
-                <OperationalEventActionHiddenInputs
-                  organizationId={organizationId}
-                  returnPath={returnPath}
-                  weekStart={weekStart}
-                />
-                <input
-                  name="operationalEventId"
-                  type="hidden"
-                  value={event.id}
-                />
-                <input name="eventStatus" type="hidden" value="archived" />
-                <Button size="sm" type="submit" variant="outline">
-                  <Archive aria-hidden="true" />
-                  Archivar
-                </Button>
-              </form>
-            </div>
-          </div>
-        </details>
-      ) : null}
-    </div>
-  );
-}
-
-function OperationalEventsCard({
-  canManage,
-  centers,
-  days,
-  events,
-  organizationId,
-  returnPath,
-  selectedDay,
-  weekStart,
-}: {
-  canManage: boolean;
-  centers: CenterRow[];
-  days: string[];
-  events: OperationalEventRow[];
-  organizationId: string;
-  returnPath: string;
-  selectedDay: string;
-  weekStart: string;
-}) {
-  if (events.length === 0 && !canManage) {
-    return null;
-  }
-
-  const centersById = new Map(centers.map((center) => [center.id, center]));
-  const eventsByDate = groupOperationalEventsByDate({ days, events });
-  const selectedDayEvents = eventsByDate.get(selectedDay) ?? [];
-  const activeEvents = events.filter((event) => event.status === "active");
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarClock aria-hidden="true" className="size-4" />
-              Eventos y festivos
-            </CardTitle>
-            <CardDescription>
-              Contexto operativo de la semana.
-            </CardDescription>
-          </div>
-          <Badge variant="outline">
-            {activeEvents.length} activo
-            {activeEvents.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="hidden grid-cols-7 gap-2 md:grid">
-          {days.map((day) => {
-            const dayEvents = eventsByDate.get(day) ?? [];
-
-            return (
-              <div
-                className="min-w-0 rounded-lg border border-border/70 bg-muted/20 p-3"
-                key={day}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">
-                    {formatWeekdayShort(day)}
-                  </span>
-                  <Badge variant="outline">{dayEvents.length}</Badge>
-                </div>
-                <p className="font-mono text-xs text-muted-foreground">
-                  {formatDayNumber(day)}
-                </p>
-                <div className="mt-3 grid gap-1">
-                  {dayEvents.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">
-                      Sin eventos
-                    </span>
-                  ) : (
-                    dayEvents.slice(0, 2).map((event) => (
-                      <span
-                        className="truncate rounded-full border border-border bg-background/70 px-2 py-1 text-[11px] font-medium"
-                        key={`${event.id}-${day}`}
-                        title={event.title}
-                      >
-                        {getOperationalEventTypeLabel(event.event_type)} /{" "}
-                        {event.title}
-                      </span>
-                    ))
-                  )}
-                  {dayEvents.length > 2 ? (
-                    <span className="rounded-full border border-border bg-background/70 px-2 py-1 text-[11px] font-medium">
-                      +{dayEvents.length - 2}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <details className="rounded-lg border border-border/70 bg-muted/20 md:hidden" open>
-          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-            <span>{formatServiceDate(selectedDay)}</span>
-            <Badge variant="outline">{selectedDayEvents.length}</Badge>
-          </summary>
-          <div className="grid gap-2 border-t border-border/70 p-3">
-            {selectedDayEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Sin eventos visibles este dia.
-              </p>
-            ) : (
-              selectedDayEvents.map((event) => (
-                <OperationalEventCard
-                  canManage={canManage}
-                  centersById={centersById}
-                  event={event}
-                  key={event.id}
-                  organizationId={organizationId}
-                  returnPath={returnPath}
-                  weekStart={weekStart}
-                />
-              ))
-            )}
-          </div>
-        </details>
-
-        <div className="hidden gap-3 md:grid">
-          {events.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-              No hay eventos visibles para esta semana.
-            </div>
-          ) : (
-            events.map((event) => (
-              <OperationalEventCard
-                canManage={canManage}
-                centersById={centersById}
-                event={event}
-                key={event.id}
-                organizationId={organizationId}
-                returnPath={returnPath}
-                weekStart={weekStart}
-              />
-            ))
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              {description}
+            </span>
+          </span>
+        </span>
+        <span
+          className={cn(
+            buttonVariants({ size: "sm", variant: "outline" }),
+            "min-h-11 shrink-0 px-3 md:min-h-0 md:px-2.5 group-open:bg-muted",
           )}
-        </div>
-
-        {canManage ? (
-          <details className="rounded-lg border border-border/70">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-              <span>Crear evento</span>
-              <Badge variant="outline">Gestion</Badge>
-            </summary>
-            <form
-              action={createOperationalEventFromForm}
-              className="grid gap-3 border-t border-border/70 p-3 md:grid-cols-4"
-            >
-              <OperationalEventActionHiddenInputs
-                organizationId={organizationId}
-                returnPath={returnPath}
-                weekStart={weekStart}
-              />
-              <OperationalEventFields
-                centers={centers.filter((center) => center.status === "active")}
-                selectedDay={selectedDay}
-              />
-              <div className="flex items-end md:col-span-4">
-                <Button type="submit">
-                  <Plus aria-hidden="true" />
-                  Crear evento
-                </Button>
-              </div>
-            </form>
-          </details>
-        ) : null}
-      </CardContent>
-    </Card>
+        >
+          <span className="group-open:hidden">Mostrar</span>
+          <span className="hidden group-open:inline">Ocultar</span>
+          <ChevronDown
+            aria-hidden="true"
+            className="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+          />
+        </span>
+      </summary>
+      <div
+        className={cn("border-t border-border px-4 py-4", contentClassName)}
+      >
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -2797,7 +2111,9 @@ function MobileScheduleFilters({
               defaultValue={filters.centerId ?? ""}
               name="center_id"
             >
-              <option value="">Todos</option>
+              {centers.length === 0 ? (
+                <option value="">Sin centros</option>
+              ) : null}
               {centers.map((center) => (
                 <option key={center.id} value={center.id}>
                   {center.name}
@@ -2930,7 +2246,9 @@ function ScheduleFiltersCard({
   view: ScheduleView;
   weekStart: string;
 }) {
-  const activeFilterCount = getActiveFilterCount(filters);
+  const activeFilterCount = getActiveFilterCount(filters, {
+    includeCenter: false,
+  });
   const clearFiltersPath = getSchedulePath({
     day: selectedDay,
     organizationId,
@@ -2957,27 +2275,21 @@ function ScheduleFiltersCard({
         weekStart={weekStart}
       />
 
-      <Card className="hidden md:flex">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <Filter aria-hidden="true" className="size-4" />
-              Filtros operativos
-            </CardTitle>
-            <CardDescription>
-              {filteredBlockCount} de {totalBlockCount} bloque
-              {totalBlockCount === 1 ? "" : "s"} visibles en la vista.
-            </CardDescription>
-          </div>
-          {activeFilterCount > 0 ? (
+      <ScheduleCollapsibleCard
+        className="hidden md:block"
+        description={`${filteredBlockCount} de ${totalBlockCount} bloque${
+          totalBlockCount === 1 ? "" : "s"
+        } visibles en la vista.`}
+        icon={<Filter aria-hidden="true" className="size-4" />}
+        summary={
+          activeFilterCount > 0 ? (
             <Badge variant="outline">
               {activeFilterCount} filtro{activeFilterCount === 1 ? "" : "s"}
             </Badge>
-          ) : null}
-        </div>
-      </CardHeader>
-      <CardContent>
+          ) : null
+        }
+        title="Filtros"
+      >
         <form
           action="/app/schedule"
           className="grid gap-3 md:grid-cols-2 xl:grid-cols-6"
@@ -2998,7 +2310,9 @@ function ScheduleFiltersCard({
               defaultValue={filters.centerId ?? ""}
               name="center_id"
             >
-              <option value="">Todos</option>
+              {centers.length === 0 ? (
+                <option value="">Sin centros</option>
+              ) : null}
               {centers.map((center) => (
                 <option key={center.id} value={center.id}>
                   {center.name}
@@ -3099,8 +2413,7 @@ function ScheduleFiltersCard({
             {getMyScheduleFilterDescription(myScheduleFilter)}
           </p>
         ) : null}
-      </CardContent>
-      </Card>
+      </ScheduleCollapsibleCard>
     </>
   );
 }
@@ -3179,16 +2492,28 @@ function MyScheduleEmptyCard({
 }
 
 function WeekControls({
+  activeCenters,
+  activeClassTypes,
+  canCreateEvents,
+  canCreateScheduleBlocks,
   currentWeekStart,
+  defaultCreationDate,
   filters,
   organizationId,
+  returnPath,
   view,
   weekEnd,
   weekStart,
 }: {
+  activeCenters: CenterRow[];
+  activeClassTypes: ClassTypeRow[];
+  canCreateEvents: boolean;
+  canCreateScheduleBlocks: boolean;
   currentWeekStart: string;
+  defaultCreationDate: string;
   filters: ScheduleFilters;
   organizationId: string;
+  returnPath: string;
   view: ScheduleView;
   weekEnd: string;
   weekStart: string;
@@ -3197,20 +2522,44 @@ function WeekControls({
   const nextWeek = getAdjacentWeekStart(weekStart, 1);
   const filterPathOptions = getScheduleFilterPathOptions(filters, view);
   const weekLabel = formatWeekRange(weekStart, weekEnd);
+  const canCreateWork =
+    canCreateScheduleBlocks &&
+    activeCenters.length > 0 &&
+    activeClassTypes.length > 0;
+  const canCreateAny = canCreateEvents || canCreateWork;
 
   return (
-    <div className="sticky top-3 z-30 rounded-xl border border-border/70 bg-background/95 p-2 shadow-sm backdrop-blur md:top-4 md:p-3">
+    <div className="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-20 rounded-xl border border-border/70 bg-background/95 p-2 shadow-sm backdrop-blur md:top-4 md:z-30 md:p-3">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-2 px-1 md:px-0">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <CalendarDays aria-hidden="true" className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">Semana</p>
             <p className="truncate text-sm font-semibold text-foreground">
               {weekLabel}
             </p>
           </div>
+          {canCreateAny ? (
+            <ScheduleSlotCreateDialog
+              activeCenters={activeCenters}
+              activeClassTypes={activeClassTypes}
+              canCreateEvents={canCreateEvents}
+              canCreateScheduleBlocks={canCreateScheduleBlocks}
+              className="ml-auto"
+              defaultEndTime="08:00"
+              defaultStartTime="07:00"
+              filters={filters}
+              organizationId={organizationId}
+              returnPath={returnPath}
+              serviceDate={defaultCreationDate}
+              tooltipLabel="Crear bloques"
+              triggerLabel="Crear bloque, evento o festivo"
+              triggerVariant="button"
+              view={view}
+              weekStart={weekStart}
+            />
+          ) : null}
         </div>
 
         <div className="grid gap-2 md:grid-cols-[minmax(220px,260px)_auto] lg:min-w-[560px] lg:grid-cols-[minmax(220px,260px)_auto_auto] lg:items-end">
@@ -3222,9 +2571,7 @@ function WeekControls({
             <input name="organizationId" type="hidden" value={organizationId} />
             <ScheduleFilterHiddenInputs filters={filters} view={view} />
             <label className="grid gap-1 md:gap-2">
-              <span className="sr-only md:not-sr-only md:text-sm md:font-medium">
-                Semana
-              </span>
+              <span className="sr-only">Semana</span>
               <Input
                 aria-label="Semana"
                 className="h-11 rounded-lg md:h-10"
@@ -3235,7 +2582,6 @@ function WeekControls({
             </label>
             <Button className="min-h-11 md:min-h-10" type="submit">
               Ver
-              <span className="hidden md:inline"> semana</span>
             </Button>
           </form>
 
@@ -3342,12 +2688,14 @@ function ScheduleViewTabs({
 function getDayCoverageDotClass({
   blocks,
   coverageByBlock,
+  eventCount = 0,
 }: {
   blocks: ScheduleBlockRow[];
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
+  eventCount?: number;
 }) {
   if (blocks.length === 0) {
-    return "bg-muted-foreground/40";
+    return eventCount > 0 ? "bg-primary" : "bg-muted-foreground/40";
   }
 
   const coverages = blocks
@@ -3383,19 +2731,28 @@ function MobileWeekDayPicker({
   coverageByBlock,
   days,
   filters,
+  operationalEvents,
   organizationId,
   selectedDay,
+  timezone,
   weekStart,
 }: {
   blocks: ScheduleBlockRow[];
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
   days: string[];
   filters: ScheduleFilters;
+  operationalEvents: OperationalEventRow[];
   organizationId: string;
   selectedDay: string;
+  timezone: string;
   weekStart: string;
 }) {
   const blocksByDate = groupBlocksByDate(blocks);
+  const eventsByDate = groupOperationalEventsByDate({
+    days,
+    events: operationalEvents,
+    timezone,
+  });
 
   return (
     <div className="md:hidden">
@@ -3403,6 +2760,7 @@ function MobileWeekDayPicker({
         <div className="grid grid-cols-7 gap-1.5">
           {days.map((day, index) => {
             const dayBlocks = blocksByDate.get(day) ?? [];
+            const dayEvents = eventsByDate.get(day) ?? [];
             const active = day === selectedDay;
 
             return (
@@ -3410,7 +2768,9 @@ function MobileWeekDayPicker({
                 aria-current={active ? "date" : undefined}
                 aria-label={`${formatServiceDate(day)}. ${
                   dayBlocks.length
-                } bloque${dayBlocks.length === 1 ? "" : "s"}`}
+                } bloque${dayBlocks.length === 1 ? "" : "s"}. ${
+                  dayEvents.length
+                } contexto${dayEvents.length === 1 ? "" : "s"}`}
                 className={[
                   "flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border text-center transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   active
@@ -3436,7 +2796,11 @@ function MobileWeekDayPicker({
                   aria-hidden="true"
                   className={[
                     "size-2 rounded-full",
-                    getDayCoverageDotClass({ blocks: dayBlocks, coverageByBlock }),
+                    getDayCoverageDotClass({
+                      blocks: dayBlocks,
+                      coverageByBlock,
+                      eventCount: dayEvents.length,
+                    }),
                   ].join(" ")}
                 />
               </Link>
@@ -3453,6 +2817,7 @@ function ScheduleBlockSummaryLink({
   basePath,
   block,
   center,
+  className,
   classType,
   coachDisplaysById,
   compact = false,
@@ -3462,6 +2827,7 @@ function ScheduleBlockSummaryLink({
   basePath: string;
   block: ScheduleBlockRow;
   center?: CenterRow;
+  className?: string;
   classType?: ClassTypeRow;
   coachDisplaysById: Map<string, CoachDisplay>;
   compact?: boolean;
@@ -3474,11 +2840,12 @@ function ScheduleBlockSummaryLink({
 
   return (
     <RouteStateButton
-      className={[
-        "group relative flex min-h-[76px] min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-xl border p-3 text-left text-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-24 md:rounded-lg",
-        compact ? "md:min-h-20 md:p-2.5" : "",
+      className={cn(
+        "group relative isolate flex min-h-[76px] min-w-0 cursor-pointer flex-col justify-between gap-2 overflow-hidden rounded-xl border p-3 text-left text-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-24 md:rounded-lg",
+        compact ? "md:min-h-0 md:gap-1.5 md:p-2" : "",
         getScheduleBlockToneClasses(tone),
-      ].join(" ")}
+        className,
+      )}
       data-operational-detail-trigger="schedule-block"
       href={getScheduleBlockPanelPath({
         basePath,
@@ -3492,30 +2859,30 @@ function ScheduleBlockSummaryLink({
           getScheduleBlockRailClasses(tone),
         ].join(" ")}
       />
-      <span className="flex min-w-0 flex-col gap-2 pl-3">
-        <span className="flex flex-wrap items-center gap-1.5">
+      <span className="flex min-w-0 flex-col gap-1.5 pl-3">
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="font-mono text-xs font-semibold tabular-nums">
             {formatTime(block.start_time)}-{formatTime(block.end_time)}
           </span>
-          <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
+          <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
             {stateLabel}
           </span>
           {absenceImpactLabel && absenceImpactLabel !== stateLabel ? (
-            <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
+            <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
               {absenceImpactLabel}
             </span>
           ) : null}
           {block.is_template_exception ? (
-            <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-medium">
+            <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
               Cambiado
             </span>
           ) : null}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-semibold tracking-tight">
+          <span className="block truncate text-[13px] font-semibold leading-5 tracking-tight">
             {classType?.name ?? "Actividad"}
           </span>
-          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs opacity-80">
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs opacity-80">
             <ColorSwatch color={classType?.color ?? null} />
             <span className="truncate">
               {center?.name ?? "Centro no disponible"}
@@ -3523,7 +2890,7 @@ function ScheduleBlockSummaryLink({
           </span>
         </span>
       </span>
-      <span className="flex min-w-0 items-center justify-between gap-2 pl-3 text-xs opacity-80">
+      <span className="flex min-w-0 items-center justify-between gap-2 pl-3 text-xs leading-4 opacity-80">
         <span className="truncate">{coachSummary}</span>
         <PanelRightOpen
           aria-hidden="true"
@@ -3531,6 +2898,146 @@ function ScheduleBlockSummaryLink({
         />
       </span>
     </RouteStateButton>
+  );
+}
+
+function OperationalEventContextPill({
+  center,
+  className,
+  event,
+  href,
+  timezone,
+}: {
+  center?: CenterRow;
+  className?: string;
+  event: OperationalEventRow;
+  href?: string;
+  timezone: string;
+}) {
+  const content = (
+    <>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-mono font-semibold tabular-nums">
+          {formatOperationalEventTimeLabel({ event, timezone })}
+        </span>
+        <span className="rounded-full bg-background px-1.5 py-0.5 font-medium ring-1 ring-foreground/5">
+          {getOperationalEventTypeLabel(event.event_type)}
+        </span>
+        <span className="truncate font-semibold">{event.title}</span>
+      </div>
+      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 opacity-80">
+        <span>{getOperationalEventImpactLabel(event.impact_level)}</span>
+        {center ? <span className="truncate">{center.name}</span> : null}
+      </div>
+    </>
+  );
+  const pillClassName = cn(
+    "min-w-0 rounded-lg border px-2.5 py-2 text-left text-xs shadow-sm",
+    href &&
+      "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+    getOperationalEventToneClasses(event),
+    className,
+  );
+
+  if (href) {
+    return (
+      <RouteStateButton
+        aria-label={`Abrir evento ${event.title}`}
+        className={pillClassName}
+        data-operational-event-context="true"
+        data-operational-event-trigger="true"
+        href={href}
+      >
+        {content}
+      </RouteStateButton>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 rounded-lg border px-2.5 py-2 text-left text-xs shadow-sm",
+        getOperationalEventToneClasses(event),
+        className,
+      )}
+      data-operational-event-context="true"
+    >
+      {content}
+    </div>
+  );
+}
+
+function OperationalEventsDayStrip({
+  basePath,
+  centersById,
+  events,
+}: {
+  basePath: string;
+  centersById: Map<string, CenterRow>;
+  events: OperationalEventRow[];
+}) {
+  if (events.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="mt-2 flex min-w-0 flex-wrap gap-1"
+      data-operational-event-day-strip="true"
+    >
+      {events.slice(0, 3).map((event) => (
+        <RouteStateButton
+          aria-label={`Abrir evento ${event.title}`}
+          className={cn(
+            "min-w-0 truncate rounded-full border px-2 py-0.5 text-left text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+            getOperationalEventToneClasses(event),
+          )}
+          data-operational-event-trigger="true"
+          href={getOperationalEventPanelPath({ basePath, eventId: event.id })}
+          key={event.id}
+        >
+          {getOperationalEventTypeLabel(event.event_type)} · {event.title}
+          {event.center_id && centersById.get(event.center_id)
+            ? ` · ${centersById.get(event.center_id)?.name}`
+            : ""}
+        </RouteStateButton>
+      ))}
+      {events.length > 3 ? (
+        <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          +{events.length - 3}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function OperationalEventsList({
+  basePath,
+  centersById,
+  events,
+  timezone,
+}: {
+  basePath: string;
+  centersById: Map<string, CenterRow>;
+  events: OperationalEventRow[];
+  timezone: string;
+}) {
+  if (events.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-2" data-operational-event-list="true">
+      {events.map((event) => (
+        <OperationalEventContextPill
+          center={event.center_id ? centersById.get(event.center_id) : undefined}
+          event={event}
+          href={getOperationalEventPanelPath({ basePath, eventId: event.id })}
+          key={event.id}
+          timezone={timezone}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -3543,6 +3050,8 @@ function BlocksByDay({
   coachDisplaysById,
   coverageByBlock,
   days,
+  operationalEvents,
+  timezone,
 }: {
   assignments: ScheduleBlockAssignmentRow[];
   basePath: string;
@@ -3552,18 +3061,26 @@ function BlocksByDay({
   coachDisplaysById: Map<string, CoachDisplay>;
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
   days: string[];
+  operationalEvents: OperationalEventRow[];
+  timezone: string;
 }) {
   const centersById = new Map(centers.map((center) => [center.id, center]));
   const classTypesById = new Map(
     classTypes.map((classType) => [classType.id, classType]),
   );
   const groupedBlocks = groupBlocksByDate(blocks);
+  const groupedEvents = groupOperationalEventsByDate({
+    days,
+    events: operationalEvents,
+    timezone,
+  });
   const assignmentsByBlockId = groupAssignmentsByBlockId(assignments);
 
   return (
     <div className="space-y-5">
       {days.map((serviceDate) => {
         const dayBlocks = groupedBlocks.get(serviceDate) ?? [];
+        const dayEvents = groupedEvents.get(serviceDate) ?? [];
 
         return (
         <section className="space-y-3" key={serviceDate}>
@@ -3577,24 +3094,39 @@ function BlocksByDay({
                   {formatServiceDate(serviceDate)}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  {dayBlocks.length === 0
-                    ? "Sin bloques programados"
+                  {dayBlocks.length === 0 && dayEvents.length === 0
+                    ? "Sin bloques ni contexto operativo"
                     : `${dayBlocks.length} bloque${
                         dayBlocks.length === 1 ? "" : "s"
+                      } · ${dayEvents.length} contexto${
+                        dayEvents.length === 1 ? "" : "s"
                       }`}
                 </p>
               </div>
             </div>
-            <Badge variant="outline">
-              {dayBlocks.length} bloque{dayBlocks.length === 1 ? "" : "s"}
-            </Badge>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline">
+                {dayBlocks.length} bloque{dayBlocks.length === 1 ? "" : "s"}
+              </Badge>
+              {dayEvents.length > 0 ? (
+                <Badge variant="secondary">
+                  {dayEvents.length} contexto{dayEvents.length === 1 ? "" : "s"}
+                </Badge>
+              ) : null}
+            </div>
           </div>
-          {dayBlocks.length === 0 ? (
+          {dayBlocks.length === 0 && dayEvents.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-5 text-sm text-muted-foreground">
               No hay clases ni bloques en este día.
             </div>
           ) : (
             <div className="grid gap-3">
+              <OperationalEventsList
+                basePath={basePath}
+                centersById={centersById}
+                events={dayEvents}
+                timezone={timezone}
+              />
               {dayBlocks.map((block) => {
               const coverage = coverageByBlock.get(block.id);
 
@@ -3632,7 +3164,9 @@ function MobileWeeklyDayView({
   classTypes,
   coachDisplaysById,
   coverageByBlock,
+  operationalEvents,
   selectedDay,
+  timezone,
 }: {
   assignments: ScheduleBlockAssignmentRow[];
   basePath: string;
@@ -3641,7 +3175,9 @@ function MobileWeeklyDayView({
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
+  operationalEvents: OperationalEventRow[];
   selectedDay: string;
+  timezone: string;
 }) {
   const centersById = new Map(centers.map((center) => [center.id, center]));
   const classTypesById = new Map(
@@ -3649,6 +3185,12 @@ function MobileWeeklyDayView({
   );
   const assignmentsByBlockId = groupAssignmentsByBlockId(assignments);
   const dayBlocks = blocks.filter((block) => block.service_date === selectedDay);
+  const dayEvents =
+    groupOperationalEventsByDate({
+      days: [selectedDay],
+      events: operationalEvents,
+      timezone,
+    }).get(selectedDay) ?? [];
 
   return (
     <div className="space-y-3 md:hidden">
@@ -3661,12 +3203,18 @@ function MobileWeeklyDayView({
         </Badge>
       </div>
 
-      {dayBlocks.length === 0 ? (
+      {dayBlocks.length === 0 && dayEvents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-6 text-sm text-muted-foreground">
           No hay clases ni bloques visibles en este día.
         </div>
       ) : (
         <div className="grid gap-3">
+          <OperationalEventsList
+            basePath={basePath}
+            centersById={centersById}
+            events={dayEvents}
+            timezone={timezone}
+          />
           {dayBlocks.map((block) => {
             const coverage = coverageByBlock.get(block.id);
 
@@ -3693,7 +3241,27 @@ function MobileWeeklyDayView({
   );
 }
 
-function listStaffWorkWindowNamesForHourRow({
+function getStaffWorkWindowSummaryTooltip({
+  details,
+  name,
+}: {
+  details: StaffWorkWindowHourSummaryItem["details"];
+  name: string;
+}) {
+  const timeRanges = [...new Set(details.map((detail) => detail.timeRange))];
+
+  if (timeRanges.length === 1) {
+    return `${name}: ${details
+      .map((detail) => detail.dayLabel)
+      .join(", ")} / ${timeRanges[0]}`;
+  }
+
+  return `${name}: ${details
+    .map((detail) => `${detail.dayLabel} ${detail.timeRange}`)
+    .join("; ")}`;
+}
+
+function listStaffWorkWindowSummariesForHourRow({
   days,
   hour,
   staffWorkWindows,
@@ -3701,13 +3269,17 @@ function listStaffWorkWindowNamesForHourRow({
   days: string[];
   hour: number;
   staffWorkWindows: StaffWorkWindowOccurrence[];
-}) {
+}): StaffWorkWindowHourSummaryItem[] {
   const slotStart = hour * 60;
   const slotEnd = slotStart + 60;
   const daySet = new Set(days);
   const peopleInSlot = new Map<
     string,
     {
+      details: Map<
+        string,
+        StaffWorkWindowHourSummaryItem["details"][number]
+      >;
       name: string;
       startMinute: number;
     }
@@ -3725,51 +3297,104 @@ function listStaffWorkWindowNamesForHourRow({
       slotStart < timeToMinutes(window.end_time)
     ) {
       const current = peopleInSlot.get(window.person_profile_id);
+      const nextDetails =
+        current?.details ??
+        new Map<string, StaffWorkWindowHourSummaryItem["details"][number]>();
+      const detail = {
+        centerLabel: window.centerName ?? "Toda la organizacion",
+        dayLabel: formatServiceDate(window.serviceDate),
+        sortKey: `${window.serviceDate}-${formatTime(window.start_time)}`,
+        timeRange: `${formatTime(window.start_time)}-${formatTime(
+          window.end_time,
+        )}`,
+      };
+      nextDetails.set(
+        `${window.serviceDate}-${detail.timeRange}-${detail.centerLabel}`,
+        detail,
+      );
 
       if (!current || startMinute < current.startMinute) {
         peopleInSlot.set(window.person_profile_id, {
+          details: nextDetails,
           name: window.personDisplayName,
           startMinute,
+        });
+      } else {
+        peopleInSlot.set(window.person_profile_id, {
+          ...current,
+          details: nextDetails,
         });
       }
     }
   }
 
-  return [...peopleInSlot.values()]
+  return [...peopleInSlot.entries()]
     .sort((first, second) => {
-      if (first.startMinute !== second.startMinute) {
-        return first.startMinute - second.startMinute;
+      if (first[1].startMinute !== second[1].startMinute) {
+        return first[1].startMinute - second[1].startMinute;
       }
 
-      return first.name.localeCompare(second.name);
+      return first[1].name.localeCompare(second[1].name);
     })
-    .map((person) => person.name);
+    .map(([personProfileId, person]) => {
+      const details = [...person.details.values()].sort((first, second) => {
+        return first.sortKey.localeCompare(second.sortKey);
+      });
+
+      return {
+        details,
+        id: `${personProfileId}-${hour}`,
+        name: person.name,
+        tooltip: getStaffWorkWindowSummaryTooltip({
+          details,
+          name: person.name,
+        }),
+      };
+    });
 }
 
 function WeeklyScheduleView({
+  activeCenters,
+  activeClassTypes,
   assignments,
   basePath,
   blocks,
+  canCreateEvents,
+  canManageSchedule,
   centers,
   classTypes,
   coachDisplaysById,
   coverageByBlock,
   days,
+  filters,
+  operationalEvents,
+  organizationId,
   selectedDay,
   showStaffWorkWindows,
   staffWorkWindows,
+  timezone,
+  weekStart,
 }: {
+  activeCenters: CenterRow[];
+  activeClassTypes: ClassTypeRow[];
   assignments: ScheduleBlockAssignmentRow[];
   basePath: string;
   blocks: ScheduleBlockRow[];
+  canCreateEvents: boolean;
+  canManageSchedule: boolean;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
   days: string[];
+  filters: ScheduleFilters;
+  operationalEvents: OperationalEventRow[];
+  organizationId: string;
   selectedDay: string;
   showStaffWorkWindows: boolean;
   staffWorkWindows: StaffWorkWindowOccurrence[];
+  timezone: string;
+  weekStart: string;
 }) {
   const centersById = new Map(centers.map((center) => [center.id, center]));
   const classTypesById = new Map(
@@ -3777,7 +3402,24 @@ function WeeklyScheduleView({
   );
   const assignmentsByBlockId = groupAssignmentsByBlockId(assignments);
   const blocksByDate = groupBlocksByDate(blocks);
-  const hourSlots = getHourSlots(blocks);
+  const eventsByDate = groupOperationalEventsByDate({
+    days,
+    events: operationalEvents,
+    timezone,
+  });
+  const hourSlots = getHourSlots(
+    blocks,
+    getTimedOperationalEventRanges({
+      days,
+      events: operationalEvents,
+      timezone,
+    }),
+  );
+  const timelineLayout = getWeeklyTimelineLayout({
+    blocksByDate,
+    days,
+    hourSlots,
+  });
 
   return (
     <>
@@ -3789,7 +3431,9 @@ function WeeklyScheduleView({
         classTypes={classTypes}
         coachDisplaysById={coachDisplaysById}
         coverageByBlock={coverageByBlock}
+        operationalEvents={operationalEvents}
         selectedDay={selectedDay}
+        timezone={timezone}
       />
 
       <div className="hidden md:block xl:hidden">
@@ -3802,18 +3446,24 @@ function WeeklyScheduleView({
           coachDisplaysById={coachDisplaysById}
           coverageByBlock={coverageByBlock}
           days={days}
+          operationalEvents={operationalEvents}
+          timezone={timezone}
         />
       </div>
 
-      <Card className="hidden overflow-x-auto bg-background xl:block">
-        <CardContent className="min-w-[1300px] p-0">
-          <div className="grid grid-cols-[96px_repeat(7,minmax(0,1fr))] border-b border-border">
-            <div className="border-r border-border bg-muted/45 px-3 py-3 text-xs font-medium text-muted-foreground">
+      <Card
+        className="hidden overflow-hidden bg-background xl:block"
+        data-schedule-week-grid="desktop"
+      >
+        <CardContent className="p-0">
+          <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-border">
+            <div className="border-r border-border bg-muted/45 px-2.5 py-3 text-xs font-medium text-muted-foreground">
               Hora
             </div>
-            {days.map((day) => (
+            {days.map((day, index) => (
               <div
-                className="border-r border-border px-3 py-3 last:border-r-0"
+                className="border-r border-border px-2.5 py-3 last:border-r-0"
+                data-schedule-week-day={index}
                 key={day}
               >
                 <p className="text-xs font-medium uppercase text-muted-foreground">
@@ -3822,75 +3472,252 @@ function WeeklyScheduleView({
                 <p className="mt-1 font-mono text-lg font-semibold">
                   {formatDayNumber(day)}
                 </p>
+                <OperationalEventsDayStrip
+                  basePath={basePath}
+                  centersById={centersById}
+                  events={eventsByDate.get(day) ?? []}
+                />
               </div>
             ))}
           </div>
 
-          {hourSlots.map((hour) => (
-            <div
-              className="grid min-h-32 grid-cols-[96px_repeat(7,minmax(0,1fr))] border-b border-border last:border-b-0"
-              key={hour}
-            >
-              <div className="min-w-0 border-r border-border bg-muted/30 px-3 py-3 text-muted-foreground">
-                <p className="font-mono text-xs">
-                  {String(hour).padStart(2, "0")}:00
-                </p>
-                <StaffWorkWindowHourSummary
-                  initialVisible={showStaffWorkWindows}
-                  names={listStaffWorkWindowNamesForHourRow({
-                    days,
-                    hour,
-                    staffWorkWindows,
-                  })}
-                />
-              </div>
-              {days.map((day) => {
-                const dayBlocks = blocksByDate.get(day) ?? [];
-                const slotBlocks = dayBlocks.filter(
-                  (block) => getBlockHour(block) === hour,
-                );
-
-                return (
-                  <div
-                    className="min-w-0 border-r border-border/80 p-2 last:border-r-0"
-                    key={`${day}-${hour}`}
-                  >
-                    {slotBlocks.length === 0 ? (
-                      <div className="h-full min-h-20 rounded-md border border-dashed border-border/70" />
-                    ) : (
-                      <div className="grid gap-2">
-                        {slotBlocks.map((block) => {
-                          const coverage = coverageByBlock.get(block.id);
-
-                          if (!coverage) {
-                            throw new Error(
-                              "Missing coverage state for schedule block.",
-                            );
-                          }
-
-                          return (
-                            <ScheduleBlockSummaryLink
-                              assignments={
-                                assignmentsByBlockId.get(block.id) ?? []
-                              }
-                              basePath={basePath}
-                              block={block}
-                              center={centersById.get(block.center_id)}
-                              classType={classTypesById.get(block.class_type_id)}
-                              coachDisplaysById={coachDisplaysById}
-                              compact
-                              coverage={coverage}
-                              key={block.id}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          <div
+            className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]"
+            style={{
+              minHeight: timelineLayout.totalHeight,
+            }}
+          >
+            <div className="relative border-r border-border bg-muted/30">
+              {timelineLayout.layouts.map((layout) => (
+                <div
+                  className="absolute inset-x-0 border-b border-border px-2.5 py-3 text-muted-foreground"
+                  key={layout.hour}
+                  style={{
+                    height: layout.height,
+                    top: layout.top,
+                  }}
+                >
+                  <p className="font-mono text-xs">
+                    {String(layout.hour).padStart(2, "0")}:00
+                  </p>
+                  <StaffWorkWindowHourSummary
+                    initialVisible={showStaffWorkWindows}
+                    items={listStaffWorkWindowSummariesForHourRow({
+                      days,
+                      hour: layout.hour,
+                      staffWorkWindows,
+                    })}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+            {days.map((day) => {
+              const dayBlocks = blocksByDate.get(day) ?? [];
+              const dayEvents = eventsByDate.get(day) ?? [];
+
+              return (
+                <div
+                  className="relative min-w-0 border-r border-border/80 last:border-r-0"
+                  key={day}
+                  style={{
+                    minHeight: timelineLayout.totalHeight,
+                  }}
+                >
+                  {timelineLayout.layouts.map((layout) => {
+                    return (
+                      <div
+                        className="absolute inset-x-0 border-b border-border/80"
+                        key={`${day}-${layout.hour}`}
+                        style={{
+                          height: layout.height,
+                          top: layout.top,
+                        }}
+                      />
+                    );
+                  })}
+
+                  {hourSlots.map((hour) =>
+                    getFreeRangesForHour(dayBlocks, hour).map((range) => {
+                      const rangeTop =
+                        getTimelineTopForMinute({
+                          layoutsByHour: timelineLayout.layoutsByHour,
+                          minute: range.start,
+                        }) + 4;
+                      const rangeHeight = Math.max(
+                        24,
+                        getTimelineTopForMinute({
+                          layoutsByHour: timelineLayout.layoutsByHour,
+                          minute: range.end,
+                        }) -
+                          getTimelineTopForMinute({
+                            layoutsByHour: timelineLayout.layoutsByHour,
+                            minute: range.start,
+                          }) -
+                          8,
+                      );
+
+                      return (
+                        <div
+                          className="absolute inset-x-2 z-0"
+                          key={`${day}-${range.start}-${range.end}`}
+                          style={{
+                            height: rangeHeight,
+                            top: rangeTop,
+                          }}
+                        >
+                          <ScheduleSlotCreateDialog
+                            activeCenters={activeCenters}
+                            activeClassTypes={activeClassTypes}
+                            canCreateEvents={canCreateEvents}
+                            canCreateScheduleBlocks={canManageSchedule}
+                            className="min-h-0"
+                            defaultEndTime={minutesToTime(range.end)}
+                            defaultStartTime={minutesToTime(range.start)}
+                            filters={filters}
+                            organizationId={organizationId}
+                            returnPath={basePath}
+                            serviceDate={day}
+                            view="week"
+                            weekStart={weekStart}
+                          />
+                        </div>
+                      );
+                    }),
+                  )}
+
+                  {dayEvents.map((event) => {
+                    const range = getTimedOperationalEventRangeForDay({
+                      day,
+                      event,
+                      timezone,
+                    });
+
+                    if (!range) {
+                      return null;
+                    }
+
+                    const top =
+                      getTimelineTopForMinute({
+                        layoutsByHour: timelineLayout.layoutsByHour,
+                        minute: range.start,
+                      }) +
+                      10;
+                    const height = Math.max(
+                      34,
+                      getTimelineTopForMinute({
+                        layoutsByHour: timelineLayout.layoutsByHour,
+                        minute: range.end,
+                      }) -
+                        getTimelineTopForMinute({
+                          layoutsByHour: timelineLayout.layoutsByHour,
+                          minute: range.start,
+                        }) -
+                        16,
+                    );
+
+                    return (
+                      <div
+                        className="absolute inset-x-3 z-20"
+                        key={event.id}
+                        style={{
+                          height,
+                          top,
+                        }}
+                      >
+                        <OperationalEventContextPill
+                          center={
+                            event.center_id
+                              ? centersById.get(event.center_id)
+                              : undefined
+                          }
+                          className="h-full w-full overflow-hidden py-1.5 shadow-none"
+                          event={event}
+                          href={getOperationalEventPanelPath({
+                            basePath,
+                            eventId: event.id,
+                          })}
+                          timezone={timezone}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  {[...groupBlocksByStartHour(dayBlocks).entries()].flatMap(
+                    ([hour, hourBlocks]) =>
+                      hourBlocks.map((block, stackIndex) => ({
+                        block,
+                        hour,
+                        stackIndex,
+                        stackCount: hourBlocks.length,
+                      })),
+                  ).map(({ block, hour, stackIndex, stackCount }) => {
+                    const coverage = coverageByBlock.get(block.id);
+
+                    if (!coverage) {
+                      throw new Error(
+                        "Missing coverage state for schedule block.",
+                      );
+                    }
+
+                    const startMinute = timeToMinutes(block.start_time);
+                    const endMinute = timeToMinutes(block.end_time);
+                    const layout = timelineLayout.layoutsByHour.get(hour);
+                    const stacked = stackCount > 1 && Boolean(layout);
+                    const top = stacked
+                      ? (layout?.top ?? 0) +
+                        WEEKLY_TIMELINE_HOUR_INSET +
+                        stackIndex *
+                          (WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT +
+                            WEEKLY_TIMELINE_STACKED_BLOCK_GAP)
+                      : getTimelineTopForMinute({
+                          layoutsByHour: timelineLayout.layoutsByHour,
+                          minute: startMinute,
+                        }) + 8;
+                    const height = stacked
+                      ? WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT
+                      : Math.max(
+                          58,
+                          getTimelineTopForMinute({
+                            layoutsByHour: timelineLayout.layoutsByHour,
+                            minute: endMinute,
+                          }) -
+                            getTimelineTopForMinute({
+                              layoutsByHour: timelineLayout.layoutsByHour,
+                              minute: startMinute,
+                            }) -
+                            12,
+                        );
+
+                    return (
+                      <div
+                        className="absolute inset-x-2 z-10"
+                        key={block.id}
+                        style={{
+                          height,
+                          top,
+                        }}
+                      >
+                        <ScheduleBlockSummaryLink
+                          assignments={assignmentsByBlockId.get(block.id) ?? []}
+                          basePath={basePath}
+                          block={block}
+                          center={centersById.get(block.center_id)}
+                          className={cn(
+                            "h-full md:min-h-0",
+                            stacked && "md:gap-1 md:px-2 md:pb-2 md:pt-1.5",
+                          )}
+                          classType={classTypesById.get(block.class_type_id)}
+                          coachDisplaysById={coachDisplaysById}
+                          compact
+                          coverage={coverage}
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            );
+            })}
+          </div>
         </CardContent>
       </Card>
     </>
@@ -3904,7 +3731,9 @@ function MonthlyScheduleView({
   coverageByBlock,
   filters,
   month,
+  operationalEvents,
   organizationId,
+  timezone,
 }: {
   blocks: ScheduleBlockRow[];
   centers: CenterRow[];
@@ -3912,13 +3741,20 @@ function MonthlyScheduleView({
   coverageByBlock: Map<string, ScheduleBlockCoverage>;
   filters: ScheduleFilters;
   month: ReturnType<typeof getMonthResolution>;
+  operationalEvents: OperationalEventRow[];
   organizationId: string;
+  timezone: string;
 }) {
   const centersById = new Map(centers.map((center) => [center.id, center]));
   const classTypesById = new Map(
     classTypes.map((classType) => [classType.id, classType]),
   );
   const blocksByDate = groupBlocksByDate(blocks);
+  const eventsByDate = groupOperationalEventsByDate({
+    days: month.days,
+    events: operationalEvents,
+    timezone,
+  });
   const emptyCells = Array.from({ length: month.leadingEmptyDays });
 
   return (
@@ -3933,7 +3769,15 @@ function MonthlyScheduleView({
               Overview de riesgos, eventos y días con actividad.
             </CardDescription>
           </div>
-          <Badge variant="outline">{blocks.length} bloques visibles</Badge>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="outline">{blocks.length} bloques visibles</Badge>
+            {operationalEvents.length > 0 ? (
+              <Badge variant="secondary">
+                {operationalEvents.length} contexto
+                {operationalEvents.length === 1 ? "" : "s"}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -3952,17 +3796,22 @@ function MonthlyScheduleView({
           ))}
           {month.days.map((day) => {
             const dayBlocks = blocksByDate.get(day) ?? [];
+            const dayEvents = eventsByDate.get(day) ?? [];
             const dayRisks = dayBlocks.filter((block) => {
               const coverage = coverageByBlock.get(block.id);
 
               return coverage ? isScheduleCoverageRisk(coverage) : false;
             });
-            const hasEvent = dayBlocks.some((block) => {
+            const hasEvent = dayEvents.some(
+              (event) => event.event_type !== "holiday",
+            ) || dayBlocks.some((block) => {
               const classType = classTypesById.get(block.class_type_id);
 
               return classType?.category === "event" || classType?.category === "competition";
             });
-            const hasHoliday = dayBlocks.some((block) => {
+            const hasHoliday = dayEvents.some(
+              (event) => event.event_type === "holiday",
+            ) || dayBlocks.some((block) => {
               const classType = classTypesById.get(block.class_type_id);
 
               return classType?.category === "holiday";
@@ -3970,9 +3819,12 @@ function MonthlyScheduleView({
             const hasChange = dayBlocks.some(
               (block) => block.is_template_exception || block.status === "changed",
             );
+            const firstEventWithCenter = dayEvents.find((event) => event.center_id);
             const firstCenter = dayBlocks[0]
               ? centersById.get(dayBlocks[0].center_id)
-              : undefined;
+              : firstEventWithCenter?.center_id
+                ? centersById.get(firstEventWithCenter.center_id)
+                : undefined;
 
             return (
               <Link
@@ -4004,6 +3856,10 @@ function MonthlyScheduleView({
                   {dayBlocks.length > 0 ? (
                     <span className="truncate text-xs font-medium">
                       {dayBlocks.length} bloque{dayBlocks.length === 1 ? "" : "s"}
+                    </span>
+                  ) : dayEvents.length > 0 ? (
+                    <span className="truncate text-xs font-medium">
+                      {dayEvents.length} contexto{dayEvents.length === 1 ? "" : "s"}
                     </span>
                   ) : (
                     <span className="text-xs text-muted-foreground">Libre</span>
@@ -4057,6 +3913,12 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     selectedBlockIdParam && isScheduleUuid(selectedBlockIdParam)
       ? selectedBlockIdParam
       : null;
+  const selectedOperationalEventIdParam = getParam(params.event_id);
+  const selectedOperationalEventId =
+    selectedOperationalEventIdParam &&
+    isScheduleUuid(selectedOperationalEventIdParam)
+      ? selectedOperationalEventIdParam
+      : null;
   const scheduleView = resolveScheduleView(params.view);
   const explicitScheduleView = resolveExplicitScheduleView(params.view);
   const memberships = await getActiveMemberships(user.id);
@@ -4081,13 +3943,14 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   const canManageSchedule = canManageOperationalData(
     resolution.membership.role,
   );
-  const canManageWorkWindows = canManageStaffWorkWindows(
-    resolution.membership.role,
-  );
   const canManageEvents = canManageOperationalEvents(resolution.membership.role);
   const canReviewAbsenceImpact = canManageAbsenceRequests(
     resolution.membership.role,
   );
+  const eventWindow = getBufferedEventRange({
+    rangeEnd: scheduleView === "month" ? month.monthEnd : week.weekEnd,
+    rangeStart: scheduleView === "month" ? month.monthStart : week.weekStart,
+  });
 
   if (canManageSchedule) {
     const supabase = await createClient();
@@ -4106,11 +3969,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     centers,
     classTypes,
     coachContext,
-    operationalEventsResult,
     staffWorkWindowResult,
-    staffWorkWindowPeople,
-  ] =
-    await Promise.all([
+    operationalEventsResult,
+  ] = await Promise.all([
     getScheduleBlocks({
       organizationId: resolution.organization.id,
       weekEnd: week.weekEnd,
@@ -4126,23 +3987,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     getCenters(resolution.organization.id),
     getClassTypes(resolution.organization.id),
     getScheduleCoachContext(resolution.organization.id),
-    scheduleView !== "month"
-      ? listOperationalEvents({
-          includeArchived: false,
-          limit: 100,
-          organizationId: resolution.organization.id,
-          rangeEnd: getUtcDateForDay(week.weekEnd, 1).toISOString(),
-          rangeStart: getUtcDateForDay(week.weekStart, -1).toISOString(),
-        }).catch(() => ({
-          data: [],
-          ok: false as const,
-        }))
-      : Promise.resolve({
-          data: [],
-          ok: true as const,
-        }),
     listStaffWorkWindowsForWeek({
-      includeInactive: canManageWorkWindows,
+      includeInactive: false,
       organizationId: resolution.organization.id,
       weekEnd: week.weekEnd,
       weekStart: week.weekStart,
@@ -4155,11 +4001,13 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         },
         ok: false as const,
       })),
-    canManageWorkWindows
-      ? listStaffWorkWindowPersonOptions({
-          organizationId: resolution.organization.id,
-        }).catch(() => [])
-      : Promise.resolve<StaffWorkWindowPersonOption[]>([]),
+    listOperationalEvents({
+      limit: 200,
+      organizationId: resolution.organization.id,
+      rangeEnd: eventWindow.rangeEnd,
+      rangeStart: eventWindow.rangeStart,
+      statuses: ["active"],
+    }).catch(() => ({ error: "load-failed", ok: false as const })),
   ]);
   const coverageBlocks = dedupeBlocks([...blocks, ...monthBlocks]);
   const assignments = await getScheduleBlockAssignments({
@@ -4221,11 +4069,33 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     coachProfiles: coachContext.coachProfiles,
     params,
   });
+  const activeCenters = centers.filter((center) => center.status === "active");
+  const calendarCenterOptions =
+    activeCenters.length > 0 ? activeCenters : centers;
+  const explicitCenterIdParam = getParam(params.center_id);
+  const rememberedCenterId = explicitCenterIdParam
+    ? null
+    : (await cookies())
+        .get(getScheduleCenterPreferenceCookieName(resolution.organization.id))
+        ?.value;
+  const validRememberedCenterId =
+    isScheduleCenterPreferenceValue(rememberedCenterId) &&
+    calendarCenterOptions.some((center) => center.id === rememberedCenterId)
+      ? rememberedCenterId
+      : null;
+  const scheduleFilters = {
+    ...filters,
+    centerId:
+      filters.centerId ??
+      validRememberedCenterId ??
+      calendarCenterOptions[0]?.id ??
+      null,
+  } satisfies ScheduleFilters;
   const filteredBlocks = applyScheduleFilters({
     assignments,
     blocks,
     coverageByBlock,
-    filters,
+    filters: scheduleFilters,
     myScheduleCoachProfileId:
       myScheduleFilter.status === "matched"
         ? myScheduleFilter.coachProfileId
@@ -4235,20 +4105,32 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     assignments,
     blocks: monthBlocks,
     coverageByBlock,
-    filters,
+    filters: scheduleFilters,
     myScheduleCoachProfileId:
       myScheduleFilter.status === "matched"
         ? myScheduleFilter.coachProfileId
         : null,
   });
-  const activeCenters = centers.filter((center) => center.status === "active");
+  const operationalEvents = operationalEventsResult.ok
+    ? operationalEventsResult.data
+    : [];
+  const filteredOperationalEvents = filterOperationalEvents({
+    events: operationalEvents,
+    filters: scheduleFilters,
+  });
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
   );
+  const activeWorkClassTypes = activeClassTypes.filter(
+    (classType) =>
+      !["competition", "event", "holiday"].includes(classType.category),
+  );
+  const scheduleCreationClassTypes =
+    activeWorkClassTypes.length > 0 ? activeWorkClassTypes : activeClassTypes;
   const scheduleBasePath = getScheduleBasePath({
     day: scheduleView === "week" ? selectedDay : null,
     error: null,
-    filters,
+    filters: scheduleFilters,
     organizationId: resolution.organization.id,
     status: null,
     view: explicitScheduleView,
@@ -4258,24 +4140,30 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   return (
     <div className="space-y-6">
       <PageHeader
-        blockCount={blocks.length}
+        blockCount={
+          scheduleView === "month" ? filteredMonthBlocks.length : filteredBlocks.length
+        }
         organizationName={resolution.organization.name}
         role={resolution.membership.role}
-        weekEnd={week.weekEnd}
-        weekStart={week.weekStart}
       />
 
       <WeekControls
+        activeCenters={activeCenters}
+        activeClassTypes={scheduleCreationClassTypes}
+        canCreateEvents={canManageEvents}
+        canCreateScheduleBlocks={canManageSchedule}
         currentWeekStart={currentWeek.weekStart}
-        filters={filters}
+        defaultCreationDate={selectedDay}
+        filters={scheduleFilters}
         organizationId={resolution.organization.id}
+        returnPath={scheduleBasePath}
         view={scheduleView}
         weekEnd={week.weekEnd}
         weekStart={week.weekStart}
       />
 
       <ScheduleViewTabs
-        filters={filters}
+        filters={scheduleFilters}
         organizationId={resolution.organization.id}
         view={scheduleView}
         weekStart={week.weekStart}
@@ -4286,21 +4174,23 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
           blocks={filteredBlocks}
           coverageByBlock={coverageByBlock}
           days={week.days}
-          filters={filters}
+          filters={scheduleFilters}
+          operationalEvents={filteredOperationalEvents}
           organizationId={resolution.organization.id}
           selectedDay={selectedDay}
+          timezone={resolution.organization.timezone}
           weekStart={week.weekStart}
         />
       ) : null}
 
       <ScheduleFiltersCard
         allCoaches={allCoaches}
-        centers={centers}
+        centers={calendarCenterOptions}
         classTypes={classTypes}
         filteredBlockCount={
           scheduleView === "month" ? filteredMonthBlocks.length : filteredBlocks.length
         }
-        filters={filters}
+        filters={scheduleFilters}
         myScheduleFilter={myScheduleFilter}
         organizationId={resolution.organization.id}
         selectedDay={scheduleView === "week" ? selectedDay : null}
@@ -4367,79 +4257,47 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
 
       {!operationalEventsResult.ok ? (
         <Alert>
-          <AlertTitle>Eventos no disponibles</AlertTitle>
+          <AlertTitle>Contexto operativo no disponible</AlertTitle>
           <AlertDescription>
-            El horario se muestra sin el contexto de eventos y festivos.
+            El horario se muestra sin eventos ni festivos hasta que se pueda
+            recargar esa informacion.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      {scheduleView !== "month" ? (
-        <StaffWorkWindowsCard
-          activeCenters={activeCenters}
-          canManage={canManageWorkWindows}
-          days={week.days}
-          filters={filters}
-          organizationId={resolution.organization.id}
-          people={staffWorkWindowPeople}
-          returnPath={scheduleBasePath}
-          selectedDay={selectedDay}
-          view={scheduleView}
-          weekStart={week.weekStart}
-          windows={staffWorkWindowResult.data}
-        />
-      ) : null}
-
-      {scheduleView !== "month" ? (
-        <OperationalEventsCard
-          canManage={canManageEvents}
-          centers={centers}
-          days={week.days}
-          events={operationalEventsResult.ok ? operationalEventsResult.data : []}
-          organizationId={resolution.organization.id}
-          returnPath={scheduleBasePath}
-          selectedDay={selectedDay}
-          weekStart={week.weekStart}
-        />
-      ) : null}
-
       <section className="scroll-mt-24 space-y-3" id="schedule-board">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold tracking-tight">
+        <div
+          className={cn(
+            "flex flex-wrap items-start gap-3",
+            scheduleView === "week" ? "justify-end" : "justify-between",
+          )}
+        >
+          {scheduleView !== "week" ? (
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  {scheduleView === "month" ? "Mes" : "Agenda"}
+                </h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
                 {scheduleView === "month"
-                  ? "Mes"
-                  : scheduleView === "agenda"
-                    ? "Agenda"
-                    : "Semana"}
-              </h2>
-              {canManageSchedule ? (
-                <ScheduleCreateForm
-                  activeCenters={activeCenters}
-                  activeClassTypes={activeClassTypes}
-                  day={scheduleView === "week" ? selectedDay : null}
-                  filters={filters}
-                  organizationId={resolution.organization.id}
-                  view={scheduleView}
-                  weekEnd={week.weekEnd}
-                  weekStart={week.weekStart}
-                />
-              ) : null}
+                  ? "Overview para navegar días con riesgos, eventos o cambios."
+                  : "Lista limpia por día para revisar bloques sin perder contexto."}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {scheduleView === "month"
-                ? "Overview para navegar días con riesgos, eventos o cambios."
-                : scheduleView === "agenda"
-                  ? "Lista limpia por día para revisar bloques sin perder contexto."
-                  : "Vista semanal visual para comparar días y franjas horarias."}
-            </p>
+          ) : null}
+          <div className={scheduleView === "week" ? "ml-auto" : undefined}>
+            <ScheduleCenterSwitcher
+              centers={calendarCenterOptions}
+              defaultCenterId={calendarCenterOptions[0]?.id ?? null}
+              filters={scheduleFilters}
+              organizationId={resolution.organization.id}
+              selectedCenterId={scheduleFilters.centerId}
+              selectedDay={scheduleView === "week" ? selectedDay : null}
+              view={scheduleView}
+              weekStart={week.weekStart}
+            />
           </div>
-          <Badge variant="outline">
-            {scheduleView === "month"
-              ? `${filteredMonthBlocks.length}/${monthBlocks.length} bloques`
-              : `${filteredBlocks.length}/${blocks.length} bloques`}
-          </Badge>
         </div>
 
         {scheduleView === "month" ? (
@@ -4448,17 +4306,23 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
             centers={centers}
             classTypes={classTypes}
             coverageByBlock={coverageByBlock}
-            filters={filters}
+            filters={scheduleFilters}
             month={month}
+            operationalEvents={filteredOperationalEvents}
             organizationId={resolution.organization.id}
+            timezone={resolution.organization.timezone}
           />
-        ) : filters.mineOnly && filteredBlocks.length === 0 ? (
+        ) : scheduleFilters.mineOnly &&
+          filteredBlocks.length === 0 &&
+          filteredOperationalEvents.length === 0 ? (
           <MyScheduleEmptyCard
             myScheduleFilter={myScheduleFilter}
             organizationId={resolution.organization.id}
             weekStart={week.weekStart}
           />
-        ) : blocks.length === 0 ? (
+        ) : blocks.length === 0 &&
+          filteredOperationalEvents.length === 0 &&
+          (scheduleView !== "week" || !canManageSchedule) ? (
           <Card>
             <CardHeader>
               <CardTitle>No hay bloques en esta semana</CardTitle>
@@ -4469,7 +4333,10 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
               </CardDescription>
             </CardHeader>
           </Card>
-        ) : filteredBlocks.length === 0 ? (
+        ) : filteredBlocks.length === 0 &&
+          filteredOperationalEvents.length === 0 &&
+          blocks.length > 0 &&
+          (scheduleView !== "week" || !canManageSchedule) ? (
           <Card>
             <CardHeader>
               <CardTitle>No hay bloques con estos filtros</CardTitle>
@@ -4482,7 +4349,9 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
               <Button asChild variant="outline">
                 <Link
                   href={getSchedulePath({
+                    centerId: scheduleFilters.centerId,
                     organizationId: resolution.organization.id,
+                    showWorkWindows: scheduleFilters.showWorkWindows,
                     view: scheduleView,
                     week: week.weekStart,
                   })}
@@ -4505,20 +4374,31 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
                 coachDisplaysById={coachDisplaysById}
                 coverageByBlock={coverageByBlock}
                 days={week.days}
+                operationalEvents={filteredOperationalEvents}
+                timezone={resolution.organization.timezone}
               />
             ) : (
               <WeeklyScheduleView
+                activeCenters={activeCenters}
+                activeClassTypes={scheduleCreationClassTypes}
                 assignments={assignments}
                 basePath={scheduleBasePath}
                 blocks={filteredBlocks}
+                canCreateEvents={canManageEvents}
+                canManageSchedule={canManageSchedule}
                 centers={centers}
                 classTypes={classTypes}
                 coachDisplaysById={coachDisplaysById}
                 coverageByBlock={coverageByBlock}
                 days={week.days}
+                filters={scheduleFilters}
+                operationalEvents={filteredOperationalEvents}
+                organizationId={resolution.organization.id}
                 selectedDay={selectedDay}
-                showStaffWorkWindows={filters.showWorkWindows}
+                showStaffWorkWindows={scheduleFilters.showWorkWindows}
                 staffWorkWindows={staffWorkWindowResult.data.occurrences}
+                timezone={resolution.organization.timezone}
+                weekStart={week.weekStart}
               />
             )}
           </>
@@ -4545,7 +4425,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
               ...documentProgrammingResult.data.entries(),
             ]}
             documentProgrammingLoadError={!documentProgrammingResult.ok}
-            filters={filters}
+            filters={scheduleFilters}
             initialSelectedBlockId={selectedBlockId}
             organizationId={resolution.organization.id}
             staffWorkWindows={staffWorkWindowResult.data.occurrences}
@@ -4554,6 +4434,17 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
             weekStart={week.weekStart}
           />
         ) : null}
+
+        <ScheduleOperationalEventPanels
+          basePath={scheduleBasePath}
+          canManageEvents={canManageEvents}
+          centers={centers}
+          initialSelectedEventId={selectedOperationalEventId}
+          operationalEvents={filteredOperationalEvents}
+          organizationId={resolution.organization.id}
+          timezone={resolution.organization.timezone}
+          weekStart={week.weekStart}
+        />
       </section>
 
     </div>
@@ -4564,14 +4455,10 @@ function PageHeader({
   blockCount,
   organizationName,
   role,
-  weekEnd,
-  weekStart,
 }: {
   blockCount?: number;
   organizationName?: string;
   role?: string;
-  weekEnd?: string;
-  weekStart?: string;
 }) {
   const roleLabel = role ? getApplicationRoleLabel(role) : null;
 
@@ -4596,16 +4483,6 @@ function PageHeader({
           <p className="hidden text-sm leading-6 text-muted-foreground md:block md:text-base">
             Planifica la semana, detecta huecos y abre cada bloque sin perder contexto.
           </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-3xl">
-          <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
-            <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            <span>
-              {weekStart && weekEnd
-                ? formatWeekRange(weekStart, weekEnd)
-                : "Semana actual"}
-            </span>
-          </div>
         </div>
       </div>
     </section>

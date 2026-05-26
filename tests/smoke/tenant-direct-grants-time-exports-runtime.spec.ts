@@ -54,6 +54,8 @@ type TimeExportActor = {
   userId: string;
 };
 
+type JsonObject = { [key: string]: Json | undefined };
+
 const timeReviewCredentials = hasCredentials(ownerCredentials)
   ? ownerCredentials
   : hasCredentials(adminCredentials)
@@ -95,7 +97,7 @@ function getSyntheticMarker(purpose: string) {
   return `${runtimeTimeExportPrefix}-${purpose}-${getRuntimeStamp()}-${randomUUID().slice(0, 8)}`;
 }
 
-function getSyntheticMetadata(purpose: string, marker: string): Json {
+function getSyntheticMetadata(purpose: string, marker: string): JsonObject {
   return {
     internalReviewOnly: true,
     legalFinal: false,

@@ -24,6 +24,9 @@ test.describe("operational events I.19 schedule surface guardrails", () => {
     const schedulePage = readProjectFile(
       "src/app/(app)/app/schedule/page.tsx",
     );
+    const slotDialog = readProjectFile(
+      "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx",
+    );
     const actions = readProjectFile(
       "src/app/(app)/app/schedule/operational-event-actions.ts",
     );
@@ -33,16 +36,33 @@ test.describe("operational events I.19 schedule surface guardrails", () => {
       .map((filePath) => readFileSync(filePath, "utf8"))
       .join("\n");
 
+    // Eventos y festivos no vuelven como panel semanal separado: Horario los
+    // consulta y pinta como contexto minimo dentro de Semana/Agenda/Mes.
     expect(schedulePage).toContain("listOperationalEvents");
-    expect(schedulePage).toContain("OperationalEventsCard");
+    expect(schedulePage).toContain("groupOperationalEventsByDate");
+    expect(schedulePage).toContain('data-operational-event-context="true"');
+    expect(schedulePage).not.toContain("OperationalEventsCard");
     expect(schedulePage).toContain(
       "canManageOperationalEvents(resolution.membership.role)",
     );
-    expect(schedulePage).toContain("canManage={canManageEvents}");
-    expect(schedulePage).toContain("Eventos y festivos");
-    expect(schedulePage).toContain("Crear evento");
-    expect(schedulePage).toContain("Gestionar evento");
-    expect(schedulePage).toContain("events.length === 0 && !canManage");
+    expect(schedulePage).toContain("canCreateEvents={canManageEvents}");
+    expect(schedulePage).toContain("<ScheduleSlotCreateDialog");
+    // El alta tambien vive en el header sticky para no depender solo de
+    // franjas libres con doble clic, especialmente en movil.
+    expect(schedulePage).toContain('triggerVariant="button"');
+    expect(schedulePage).toContain('tooltipLabel="Crear bloques"');
+    expect(schedulePage).not.toContain("Eventos y festivos");
+    expect(slotDialog).toContain('"use client"');
+    expect(slotDialog).toContain("createOperationalEventFromForm");
+    expect(slotDialog).toContain("Haz doble clic para crear un bloque nuevo");
+    // El tooltip visual ya cubre esta pista; no usar title evita duplicar
+    // el tooltip nativo del navegador sobre las franjas libres.
+    expect(slotDialog).not.toContain('title="Haz doble clic para crear un bloque nuevo"');
+    expect(slotDialog).toContain("Crear en franja libre");
+    expect(slotDialog).toContain("Bloque de trabajo");
+    expect(slotDialog).toContain("Crear evento");
+    expect(slotDialog).toContain("Crear festivo");
+    expect(slotDialog).toContain('value="holiday"');
 
     expect(actions).toContain('"use server"');
     expect(actions).toContain("canManageOperationalEvents");

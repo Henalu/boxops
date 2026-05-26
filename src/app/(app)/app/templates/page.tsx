@@ -140,7 +140,7 @@ type CoachProfileRow = Pick<
 
 type PersonProfileRow = Pick<
   Tables<"person_profiles">,
-  "display_name" | "id" | "status" | "visibility_status"
+  "display_name" | "id" | "status" | "user_id" | "visibility_status"
 >;
 
 type MembershipStatusRow = Pick<
@@ -467,13 +467,24 @@ async function getScheduleCoachContext(organizationId: string) {
     ),
   ];
 
-  const [personProfilesResult, membershipsResult] = await Promise.all([
+  const [
+    linkedPersonProfilesResult,
+    userPersonProfilesResult,
+    membershipsResult,
+  ] = await Promise.all([
     personProfileIds.length > 0
       ? supabase
           .from("person_profiles")
-          .select("id, display_name, status, visibility_status")
+          .select("id, user_id, display_name, status, visibility_status")
           .eq("organization_id", organizationId)
           .in("id", personProfileIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0
+      ? supabase
+          .from("person_profiles")
+          .select("id, user_id, display_name, status, visibility_status")
+          .eq("organization_id", organizationId)
+          .in("user_id", userIds)
       : Promise.resolve({ data: [], error: null }),
     userIds.length > 0
       ? supabase
@@ -484,9 +495,15 @@ async function getScheduleCoachContext(organizationId: string) {
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (personProfilesResult.error) {
+  if (linkedPersonProfilesResult.error) {
     throw new Error(
-      `Could not load person profiles: ${personProfilesResult.error.message}`,
+      `Could not load person profiles: ${linkedPersonProfilesResult.error.message}`,
+    );
+  }
+
+  if (userPersonProfilesResult.error) {
+    throw new Error(
+      `Could not load user person profiles: ${userPersonProfilesResult.error.message}`,
     );
   }
 
@@ -496,10 +513,21 @@ async function getScheduleCoachContext(organizationId: string) {
     );
   }
 
+  const linkedPersonProfiles =
+    linkedPersonProfilesResult.data satisfies PersonProfileRow[];
+  const userPersonProfiles =
+    userPersonProfilesResult.data satisfies PersonProfileRow[];
+  const personProfilesById = new Map(
+    [...linkedPersonProfiles, ...userPersonProfiles].map((personProfile) => [
+      personProfile.id,
+      personProfile,
+    ]),
+  );
+
   return {
     coachProfiles: coachProfiles satisfies CoachProfileRow[],
     memberships: membershipsResult.data satisfies MembershipStatusRow[],
-    personProfiles: personProfilesResult.data satisfies PersonProfileRow[],
+    personProfiles: [...personProfilesById.values()],
   };
 }
 
@@ -694,6 +722,13 @@ function buildCoachDisplays({
   const personProfilesById = new Map(
     personProfiles.map((personProfile) => [personProfile.id, personProfile]),
   );
+  const personProfilesByUserId = new Map(
+    personProfiles.flatMap((personProfile) =>
+      personProfile.user_id
+        ? [[personProfile.user_id, personProfile] as const]
+        : [],
+    ),
+  );
   const displays = coachProfiles.map((coachProfile) =>
     getCoachDisplay({
       coachProfile,
@@ -702,7 +737,9 @@ function buildCoachDisplays({
         : undefined,
       personProfile: coachProfile.person_profile_id
         ? personProfilesById.get(coachProfile.person_profile_id)
-        : undefined,
+        : coachProfile.user_id
+          ? personProfilesByUserId.get(coachProfile.user_id)
+          : undefined,
     }),
   );
   const displaysById = new Map(displays.map((display) => [display.id, display]));
@@ -714,7 +751,9 @@ function buildCoachDisplays({
 
       const personProfile = coachProfile.person_profile_id
         ? personProfilesById.get(coachProfile.person_profile_id)
-        : undefined;
+        : coachProfile.user_id
+          ? personProfilesByUserId.get(coachProfile.user_id)
+          : undefined;
       const membership = coachProfile.user_id
         ? membershipsByUserId.get(coachProfile.user_id)
         : undefined;
@@ -1224,11 +1263,6 @@ function TemplateBlockFields({
             disabled={disabled}
           />
         )}
-        {templateCenterId ? (
-          <span className="text-xs leading-5 text-muted-foreground">
-            Lo marca el alcance de la plantilla.
-          </span>
-        ) : null}
       </label>
 
       <label className="grid min-w-0 gap-2">

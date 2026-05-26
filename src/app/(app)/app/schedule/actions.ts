@@ -24,6 +24,7 @@ import {
   type ScheduleBlockFormValues,
 } from "@/lib/schedule-blocks";
 import {
+  validateStaffWorkWindowCreateForm,
   validateStaffWorkWindowForm,
   validateStaffWorkWindowReferences,
   type StaffWorkWindowFormValues,
@@ -53,7 +54,11 @@ type ScheduleRedirectFilters = {
 
 const DATE_PARAM_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SCHEDULE_ACTION_VIEWS = ["week", "agenda", "month"] as const;
-const ACTION_RETURN_PATHS = ["/app/coverage", "/app/schedule"] as const;
+const ACTION_RETURN_PATHS = [
+  "/app/coverage",
+  "/app/schedule",
+  "/app/work-windows",
+] as const;
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -1111,7 +1116,7 @@ export async function createStaffWorkWindow(formData: FormData) {
     formData,
     "staff-work-windows",
   );
-  const validation = validateStaffWorkWindowForm(formData);
+  const validation = validateStaffWorkWindowCreateForm(formData);
 
   if (!validation.ok) {
     redirect(
@@ -1123,11 +1128,23 @@ export async function createStaffWorkWindow(formData: FormData) {
     );
   }
 
+  const referenceValues = validation.values[0];
+
+  if (!referenceValues) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "missing-fields",
+      }),
+    );
+  }
+
   const supabase = await createClient();
   const referenceError = await validateStaffWorkWindowReferences({
     organizationId: context.organization.id,
     supabase,
-    values: validation.values,
+    values: referenceValues,
   });
 
   if (referenceError) {
@@ -1140,24 +1157,23 @@ export async function createStaffWorkWindow(formData: FormData) {
     );
   }
 
-  const { data: window, error } = await supabase
+  const { data: windows, error } = await supabase
     .from("staff_work_windows")
-    .insert({
-      center_id: validation.values.centerId,
-      day_of_week: validation.values.dayOfWeek,
-      end_time: validation.values.endTime,
-      notes: validation.values.notes,
+    .insert(validation.values.map((values) => ({
+      center_id: values.centerId,
+      day_of_week: values.dayOfWeek,
+      end_time: values.endTime,
+      notes: values.notes,
       organization_id: context.organization.id,
-      person_profile_id: validation.values.personProfileId,
-      start_time: validation.values.startTime,
-      status: validation.values.status,
-      valid_from: validation.values.validFrom,
-      valid_until: validation.values.validUntil,
-    })
-    .select("id")
-    .single();
+      person_profile_id: values.personProfileId,
+      start_time: values.startTime,
+      status: values.status,
+      valid_from: values.validFrom,
+      valid_until: values.validUntil,
+    })))
+    .select("id, day_of_week");
 
-  if (error || !window) {
+  if (error || !windows || windows.length !== validation.values.length) {
     redirect(
       getActionResultPath({
         key: "error",
@@ -1167,20 +1183,33 @@ export async function createStaffWorkWindow(formData: FormData) {
     );
   }
 
-  await recordOperationalAuditEvent({
-    action: "created",
-    changedFields: getStaffWorkWindowCreatedAuditFields(validation.values),
-    entityId: window.id,
-    entityType: "staff_work_windows",
-    organizationId: context.organization.id,
-    supabase,
-  });
+  const valuesByDay = new Map(
+    validation.values.map((values) => [values.dayOfWeek, values]),
+  );
+
+  await Promise.all(
+    windows.map((window) => {
+      const values = valuesByDay.get(window.day_of_week);
+
+      return recordOperationalAuditEvent({
+        action: "created",
+        changedFields: values
+          ? getStaffWorkWindowCreatedAuditFields(values)
+          : {},
+        entityId: window.id,
+        entityType: "staff_work_windows",
+        organizationId: context.organization.id,
+        supabase,
+      });
+    }),
+  );
 
   redirect(
     getActionResultPath({
       key: "status",
       returnPath: context.returnPath,
-      value: "work-window-created",
+      value:
+        windows.length > 1 ? "work-windows-created" : "work-window-created",
     }),
   );
 }

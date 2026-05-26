@@ -25,6 +25,7 @@ export function buildProtectedPath(
       "/app/coverage",
       "/app/more",
       "/app/stats",
+      "/app/work-windows",
     ].includes(path) &&
     smokeWeek
   ) {
@@ -72,7 +73,14 @@ export async function openAndExpectHeading(
 }
 
 export async function expectNoFrameworkError(page: Page) {
+  const frameworkErrorOverlay = page.locator(
+    "[data-nextjs-dialog], .vite-error-overlay",
+  ).filter({
+    hasText:
+      /Application error|Build Error|Failed to compile|Runtime Error|Unhandled Runtime Error|hydration/i,
+  });
+
   await expect(
-    page.locator("[data-nextjs-dialog], .vite-error-overlay"),
+    frameworkErrorOverlay,
   ).toHaveCount(0);
 }

@@ -40,10 +40,21 @@ export type StaffWorkWindowValidationResult =
       ok: false;
     };
 
+export type StaffWorkWindowCreateValidationResult =
+  | {
+      ok: true;
+      values: StaffWorkWindowFormValues[];
+    }
+  | {
+      error: StaffWorkWindowValidationError;
+      ok: false;
+    };
+
 export type StaffWorkWindowReferenceError =
   | "center-inactive"
   | "invalid-center"
   | "invalid-person-profile"
+  | "person-profile-without-active-coach"
   | "person-profile-inactive"
   | "person-profile-internal";
 
@@ -76,6 +87,8 @@ type CoachProfileCenterRow = Pick<
   "person_profile_id" | "primary_center_id"
 >;
 
+type CoachProfilePersonRow = Pick<Tables<"coach_profiles">, "person_profile_id">;
+
 type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
 
 export type StaffWorkWindowPersonOption = PersonProfileRow & {
@@ -85,6 +98,7 @@ export type StaffWorkWindowCenterOption = CenterRow;
 
 export type StaffWorkWindowDisplay = StaffWorkWindowRow & {
   centerName: string | null;
+  personIsAssignable: boolean;
   personDisplayName: string;
 };
 
@@ -110,6 +124,13 @@ function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
 
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getFormStrings(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .flatMap((value) => (typeof value === "string" ? [value.trim()] : []))
+    .filter(Boolean);
 }
 
 function normalizeTime(value: string) {
@@ -215,9 +236,51 @@ export function formatStaffWorkWindowTime(value: string) {
 export function validateStaffWorkWindowForm(
   formData: FormData,
 ): StaffWorkWindowValidationResult {
+  return validateStaffWorkWindowFormForDay(
+    formData,
+    getFormString(formData, "dayOfWeek"),
+  );
+}
+
+export function validateStaffWorkWindowCreateForm(
+  formData: FormData,
+): StaffWorkWindowCreateValidationResult {
+  const rawDayOfWeeks = [...new Set(getFormStrings(formData, "dayOfWeek"))];
+
+  if (rawDayOfWeeks.length === 0) {
+    return {
+      error: "missing-fields",
+      ok: false,
+    };
+  }
+
+  const values: StaffWorkWindowFormValues[] = [];
+
+  for (const rawDayOfWeek of rawDayOfWeeks) {
+    const validation = validateStaffWorkWindowFormForDay(
+      formData,
+      rawDayOfWeek,
+    );
+
+    if (!validation.ok) {
+      return validation;
+    }
+
+    values.push(validation.values);
+  }
+
+  return {
+    ok: true,
+    values,
+  };
+}
+
+function validateStaffWorkWindowFormForDay(
+  formData: FormData,
+  rawDayOfWeek: string,
+): StaffWorkWindowValidationResult {
   const personProfileId = getFormString(formData, "personProfileId");
   const rawCenterId = getFormString(formData, "centerId");
-  const rawDayOfWeek = getFormString(formData, "dayOfWeek");
   const startTime = normalizeTime(getFormString(formData, "startTime"));
   const endTime = normalizeTime(getFormString(formData, "endTime"));
   const validFrom = parseDateInput(getFormString(formData, "validFrom"));
@@ -322,12 +385,20 @@ export async function validateStaffWorkWindowReferences({
   supabase: SupabaseServerClient;
   values: StaffWorkWindowFormValues;
 }): Promise<StaffWorkWindowReferenceError | null> {
-  const [personResult, centerResult] = await Promise.all([
+  const [personResult, coachResult, centerResult] = await Promise.all([
     supabase
       .from("person_profiles")
       .select("id, status, visibility_status")
       .eq("id", values.personProfileId)
       .eq("organization_id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("coach_profiles")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("person_profile_id", values.personProfileId)
+      .eq("status", "active")
+      .limit(1)
       .maybeSingle(),
     values.centerId
       ? supabase
@@ -351,6 +422,10 @@ export async function validateStaffWorkWindowReferences({
     return "person-profile-internal";
   }
 
+  if (coachResult.error || !coachResult.data) {
+    return "person-profile-without-active-coach";
+  }
+
   if (values.centerId) {
     if (centerResult.error || !centerResult.data) {
       return "invalid-center";
@@ -370,35 +445,16 @@ export async function listStaffWorkWindowPersonOptions({
   organizationId: string;
 }) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("person_profiles")
-    .select("id, display_name, status, visibility_status")
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .eq("visibility_status", "visible")
-    .order("display_name", { ascending: true });
-
-  if (error) {
-    throw new Error(`Could not load staff work window people: ${error.message}`);
-  }
-
-  const people = data ?? [];
-  const personIds = people.map((person) => person.id);
-
-  if (personIds.length === 0) {
-    return [] satisfies StaffWorkWindowPersonOption[];
-  }
-
   const { data: coachProfiles, error: coachError } = await supabase
     .from("coach_profiles")
     .select("person_profile_id, primary_center_id")
     .eq("organization_id", organizationId)
     .eq("status", "active")
-    .in("person_profile_id", personIds);
+    .not("person_profile_id", "is", null);
 
   if (coachError) {
     throw new Error(
-      `Could not load staff work window coach centers: ${coachError.message}`,
+      `Could not load staff work window coach profiles: ${coachError.message}`,
     );
   }
 
@@ -418,18 +474,39 @@ export async function listStaffWorkWindowPersonOptions({
     }
   }
 
-  return people.map((person) => ({
+  const personIds = [...primaryCenterByPersonId.keys()];
+
+  if (personIds.length === 0) {
+    return [] satisfies StaffWorkWindowPersonOption[];
+  }
+
+  const { data: people, error } = await supabase
+    .from("person_profiles")
+    .select("id, display_name, status, visibility_status")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .eq("visibility_status", "visible")
+    .in("id", personIds)
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load staff work window people: ${error.message}`);
+  }
+
+  return (people ?? []).map((person) => ({
     ...person,
     primary_center_id: primaryCenterByPersonId.get(person.id) ?? null,
   })) satisfies StaffWorkWindowPersonOption[];
 }
 
 export async function listStaffWorkWindowsForWeek({
+  currentDate,
   includeInactive = false,
   organizationId,
   weekEnd,
   weekStart,
 }: {
+  currentDate?: string;
   includeInactive?: boolean;
   organizationId: string;
   weekEnd: string;
@@ -457,6 +534,9 @@ export async function listStaffWorkWindowsForWeek({
     throw new Error(`Could not load staff work windows: ${error.message}`);
   }
 
+  const normalizedCurrentDate =
+    (currentDate ? parseDateInput(currentDate) : null) ??
+    new Date().toISOString().slice(0, 10);
   const personProfileIds = [
     ...new Set((windows ?? []).map((window) => window.person_profile_id)),
   ];
@@ -467,7 +547,7 @@ export async function listStaffWorkWindowsForWeek({
       ),
     ),
   ];
-  const [personResult, centerResult] = await Promise.all([
+  const [personResult, centerResult, activeCoachResult] = await Promise.all([
     personProfileIds.length > 0
       ? supabase
           .from("person_profiles")
@@ -481,6 +561,14 @@ export async function listStaffWorkWindowsForWeek({
           .select("id, name, status")
           .eq("organization_id", organizationId)
           .in("id", centerIds)
+      : Promise.resolve({ data: [], error: null }),
+    personProfileIds.length > 0
+      ? supabase
+          .from("coach_profiles")
+          .select("person_profile_id")
+          .eq("organization_id", organizationId)
+          .eq("status", "active")
+          .in("person_profile_id", personProfileIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -496,8 +584,19 @@ export async function listStaffWorkWindowsForWeek({
     );
   }
 
+  if (activeCoachResult.error) {
+    throw new Error(
+      `Could not load staff work window coach profiles: ${activeCoachResult.error.message}`,
+    );
+  }
+
   const peopleById = new Map(
     (personResult.data ?? []).map((person) => [person.id, person]),
+  );
+  const activeCoachPersonIds = new Set(
+    ((activeCoachResult.data ?? []) as CoachProfilePersonRow[]).flatMap(
+      (coach) => (coach.person_profile_id ? [coach.person_profile_id] : []),
+    ),
   );
   const centersById = new Map(
     (centerResult.data ?? []).map((center) => [center.id, center]),
@@ -508,13 +607,29 @@ export async function listStaffWorkWindowsForWeek({
       const center = window.center_id
         ? centersById.get(window.center_id)
         : null;
+      const personIsAssignable = Boolean(
+        person?.status === "active" &&
+          person.visibility_status === "visible" &&
+          activeCoachPersonIds.has(window.person_profile_id),
+      );
 
       return {
         ...window,
         centerName: center?.name ?? null,
+        personIsAssignable,
         personDisplayName:
-          person?.display_name?.trim() || `Persona ${window.person_profile_id.slice(0, 8)}`,
+          person?.display_name?.trim() ||
+          `Persona no disponible ${window.person_profile_id.slice(0, 8)}`,
       } satisfies StaffWorkWindowDisplay;
+    })
+    .filter((window) => {
+      if (window.personIsAssignable) {
+        return true;
+      }
+
+      const serviceDate = addDays(weekStart, window.day_of_week - 1);
+
+      return Boolean(serviceDate && serviceDate < normalizedCurrentDate);
     })
     .sort(
       (first, second) =>
@@ -537,7 +652,15 @@ export async function listStaffWorkWindowsForWeek({
         window,
       });
 
-      return occurrence ? [occurrence] : [];
+      if (!occurrence) {
+        return [];
+      }
+
+      if (!window.personIsAssignable && serviceDate >= normalizedCurrentDate) {
+        return [];
+      }
+
+      return [occurrence];
     })
     .sort(
       (first, second) =>

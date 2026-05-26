@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canDeleteOperationalTeamProfiles,
   canManageOperationalTeamProfiles,
   canManageTeamAccess,
 } from "@/lib/auth/permissions";
@@ -17,6 +18,7 @@ import {
   validateCoachAccountLinkForm,
   validateCoachProfileCreateForm,
   validateCoachProfileUpdateForm,
+  validateDirectTeamAccountCreateForm,
   validateMembershipForm,
 } from "@/lib/coaches";
 import { sendTransactionalEmail } from "@/lib/email/resend";
@@ -28,6 +30,8 @@ import {
   recordOperationalAuditEvent,
   type OperationalAuditChangedFields,
 } from "@/lib/operational-audit";
+import { buildRequiredPasswordChangeAppMetadata } from "@/lib/auth/required-password-change";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildTeamInvitationEmail,
@@ -56,7 +60,7 @@ function getErrorPath(organizationId: string | null, error: string) {
 
 async function getCoachActionContext(
   formData: FormData,
-  permission: "team-access" | "team-profiles",
+  permission: "team-access" | "team-profile-delete" | "team-profiles",
 ) {
   const organizationId = getRequiredFormString(formData, "organizationId");
   const redirectPath = getCoachesPath({ organizationId });
@@ -76,6 +80,8 @@ async function getCoachActionContext(
   const canManage =
     permission === "team-access"
       ? canManageTeamAccess(resolution.membership.role)
+      : permission === "team-profile-delete"
+        ? canDeleteOperationalTeamProfiles(resolution.membership.role)
       : canManageOperationalTeamProfiles(resolution.membership.role);
 
   if (!canManage) {
@@ -245,6 +251,14 @@ function getCoachProfileMutationError(errorCode?: string) {
   return "save-failed";
 }
 
+function getCoachProfileDeleteMutationError(errorCode?: string) {
+  if (errorCode === "23503") {
+    return "profile-delete-operational-history";
+  }
+
+  return getCoachProfileMutationError(errorCode);
+}
+
 function getCoachAccountLinkMutationError(errorCode?: string) {
   if (errorCode === "23505") {
     return "account-link-conflict";
@@ -255,6 +269,78 @@ function getCoachAccountLinkMutationError(errorCode?: string) {
   }
 
   return "save-failed";
+}
+
+function getDirectAccountAuthCreateError(error?: {
+  message?: string;
+  status?: number;
+} | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+
+  if (
+    error?.status === 422 ||
+    message.includes("already") ||
+    message.includes("exists") ||
+    message.includes("registered")
+  ) {
+    return "account-email-already-exists";
+  }
+
+  return "auth-account-create-failed";
+}
+
+async function rollbackDirectAccountCreation({
+  authAdmin,
+  coachProfileId,
+  membershipId,
+  organizationId,
+  personProfileId,
+  supabase,
+  userId,
+}: {
+  authAdmin: ReturnType<typeof createAdminClient>;
+  coachProfileId: string | null;
+  membershipId: string | null;
+  organizationId: string;
+  personProfileId: string | null;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  let ok = true;
+
+  if (coachProfileId) {
+    const { error } = await supabase
+      .from("coach_profiles")
+      .delete()
+      .eq("id", coachProfileId)
+      .eq("organization_id", organizationId);
+
+    ok = ok && !error;
+  }
+
+  if (personProfileId) {
+    const { error } = await supabase
+      .from("person_profiles")
+      .delete()
+      .eq("id", personProfileId)
+      .eq("organization_id", organizationId);
+
+    ok = ok && !error;
+  }
+
+  if (membershipId) {
+    const { error } = await supabase
+      .from("organization_memberships")
+      .delete()
+      .eq("id", membershipId)
+      .eq("organization_id", organizationId);
+
+    ok = ok && !error;
+  }
+
+  const { error } = await authAdmin.auth.admin.deleteUser(userId);
+
+  return ok && !error;
 }
 
 function getMembershipTimestamps(status: string, existing?: {
@@ -629,6 +715,203 @@ export async function createTeamInvitation(formData: FormData) {
   );
 }
 
+export async function createDirectTeamAccount(formData: FormData) {
+  const context = await getCoachActionContext(formData, "team-access");
+  const validation = validateDirectTeamAccountCreateForm(formData);
+
+  if (!validation.ok) {
+    redirect(getErrorPath(context.organization.id, validation.error));
+  }
+
+  const centerIsValid = await ensureCenterBelongsToOrganization(
+    context.organization.id,
+    validation.values.primaryCenterId,
+  );
+
+  if (!centerIsValid) {
+    redirect(getErrorPath(context.organization.id, "invalid-center"));
+  }
+
+  let authAdmin: ReturnType<typeof createAdminClient>;
+
+  try {
+    authAdmin = createAdminClient();
+  } catch {
+    redirect(getErrorPath(context.organization.id, "auth-admin-not-configured"));
+  }
+
+  const { data: authUserData, error: authUserError } =
+    await authAdmin.auth.admin.createUser({
+      app_metadata: buildRequiredPasswordChangeAppMetadata(),
+      email: validation.values.email,
+      email_confirm: true,
+      password: validation.values.password,
+      user_metadata: {
+        display_name: validation.values.displayName,
+      },
+    });
+
+  if (authUserError || !authUserData.user) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        getDirectAccountAuthCreateError(authUserError),
+      ),
+    );
+  }
+
+  const createdUserId = authUserData.user.id;
+  const supabase = await createClient();
+  let membershipId: string | null = null;
+  let personProfileId: string | null = null;
+  let coachProfileId: string | null = null;
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("organization_memberships")
+    .insert({
+      organization_id: context.organization.id,
+      role: validation.values.role,
+      status: validation.values.initialAccessStatus,
+      user_id: createdUserId,
+      ...getMembershipTimestamps(validation.values.initialAccessStatus),
+    })
+    .select("id")
+    .single();
+
+  if (membershipError || !membership) {
+    await authAdmin.auth.admin.deleteUser(createdUserId);
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        getMembershipMutationError(membershipError?.code),
+      ),
+    );
+  }
+
+  membershipId = membership.id;
+
+  const { data: personProfile, error: personProfileError } = await supabase
+    .from("person_profiles")
+    .insert({
+      display_name: validation.values.displayName,
+      organization_id: context.organization.id,
+      status: "active",
+      user_id: createdUserId,
+      visibility_status: "visible",
+    })
+    .select("id")
+    .single();
+
+  if (personProfileError || !personProfile) {
+    const rollbackOk = await rollbackDirectAccountCreation({
+      authAdmin,
+      coachProfileId,
+      membershipId,
+      organizationId: context.organization.id,
+      personProfileId,
+      supabase,
+      userId: createdUserId,
+    });
+
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        rollbackOk ? "save-failed" : "account-create-rollback-failed",
+      ),
+    );
+  }
+
+  personProfileId = personProfile.id;
+
+  const { data: coachProfile, error: coachProfileError } = await supabase
+    .from("coach_profiles")
+    .insert({
+      notes: validation.values.notes,
+      organization_id: context.organization.id,
+      person_profile_id: personProfile.id,
+      primary_center_id: validation.values.primaryCenterId,
+      status: "active",
+      user_id: createdUserId,
+      weekly_contracted_hours: validation.values.weeklyContractedHours,
+    })
+    .select("id")
+    .single();
+
+  if (coachProfileError || !coachProfile) {
+    const rollbackOk = await rollbackDirectAccountCreation({
+      authAdmin,
+      coachProfileId,
+      membershipId,
+      organizationId: context.organization.id,
+      personProfileId,
+      supabase,
+      userId: createdUserId,
+    });
+
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        rollbackOk
+          ? getCoachProfileMutationError(coachProfileError?.code)
+          : "account-create-rollback-failed",
+      ),
+    );
+  }
+
+  coachProfileId = coachProfile.id;
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      role: auditFieldSet(validation.values.role),
+      status: auditFieldSet(validation.values.initialAccessStatus),
+    },
+    entityId: membership.id,
+    entityType: "organization_memberships",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      display_name: auditFieldTouched(),
+      status: auditFieldSet("active"),
+      user_id: auditFieldTouched(),
+      visibility_status: auditFieldSet("visible"),
+    },
+    entityId: personProfile.id,
+    entityType: "person_profiles",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      ...getCoachProfileAuditFields({
+        notesChanged: Boolean(validation.values.notes),
+        primaryCenterId: validation.values.primaryCenterId,
+        status: "active",
+        weeklyContractedHours: validation.values.weeklyContractedHours,
+      }),
+      person_profile_id: auditFieldSet(personProfile.id),
+      user_id: auditFieldTouched(),
+    },
+    entityId: coachProfile.id,
+    entityType: "coach_profiles",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
+  redirect(
+    getCoachesPath({
+      organizationId: context.organization.id,
+      status: "account-created",
+    }),
+  );
+}
+
 export async function resendTeamInvitation(formData: FormData) {
   const context = await getCoachActionContext(formData, "team-access");
   const invitationId = getRequiredFormString(formData, "invitationId");
@@ -899,11 +1182,20 @@ export async function updateMembership(formData: FormData) {
 }
 
 export async function createCoachProfile(formData: FormData) {
-  const context = await getCoachActionContext(formData, "team-profiles");
+  const context = await getCoachActionContext(formData, "team-access");
   const validation = validateCoachProfileCreateForm(formData);
 
   if (!validation.ok) {
     redirect(getErrorPath(context.organization.id, validation.error));
+  }
+
+  const centerIsValid = await ensureCenterBelongsToOrganization(
+    context.organization.id,
+    validation.values.primaryCenterId,
+  );
+
+  if (!centerIsValid) {
+    redirect(getErrorPath(context.organization.id, "invalid-center"));
   }
 
   const supabase = await createClient();
@@ -922,10 +1214,94 @@ export async function createCoachProfile(formData: FormData) {
     redirect(getErrorPath(context.organization.id, "invalid-role"));
   }
 
+  const { data: existingCoachProfileByUser, error: existingCoachProfileError } =
+    await supabase
+      .from("coach_profiles")
+      .select("id")
+      .eq("organization_id", context.organization.id)
+      .eq("user_id", validation.values.userId)
+      .maybeSingle();
+
+  if (existingCoachProfileError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  if (existingCoachProfileByUser) {
+    redirect(getErrorPath(context.organization.id, "duplicate-profile"));
+  }
+
+  const { data: existingPersonProfile, error: existingPersonProfileError } =
+    await supabase
+      .from("person_profiles")
+      .select("id, display_name, status, user_id, visibility_status")
+      .eq("organization_id", context.organization.id)
+      .eq("user_id", validation.values.userId)
+      .maybeSingle();
+
+  if (existingPersonProfileError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  let personProfile = existingPersonProfile;
+  let createdPersonProfileId: string | null = null;
+
+  if (personProfile) {
+    if (personProfile.status !== "active") {
+      redirect(getErrorPath(context.organization.id, "person-profile-inactive"));
+    }
+
+    if (personProfile.visibility_status !== "visible") {
+      redirect(getErrorPath(context.organization.id, "person-profile-internal"));
+    }
+  } else {
+    if (!validation.values.displayName) {
+      redirect(getErrorPath(context.organization.id, "missing-fields"));
+    }
+
+    const { data: insertedPersonProfile, error: personProfileError } =
+      await supabase
+        .from("person_profiles")
+        .insert({
+          display_name: validation.values.displayName,
+          organization_id: context.organization.id,
+          status: "active",
+          user_id: validation.values.userId,
+          visibility_status: "visible",
+        })
+        .select("id, display_name, status, user_id, visibility_status")
+        .single();
+
+    if (personProfileError || !insertedPersonProfile) {
+      redirect(getErrorPath(context.organization.id, "save-failed"));
+    }
+
+    personProfile = insertedPersonProfile;
+    createdPersonProfileId = insertedPersonProfile.id;
+  }
+
+  const {
+    data: existingCoachProfileByPerson,
+    error: existingCoachProfileByPersonError,
+  } = await supabase
+    .from("coach_profiles")
+    .select("id")
+    .eq("organization_id", context.organization.id)
+    .eq("person_profile_id", personProfile.id)
+    .maybeSingle();
+
+  if (existingCoachProfileByPersonError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  if (existingCoachProfileByPerson) {
+    redirect(getErrorPath(context.organization.id, "duplicate-profile"));
+  }
+
   const { data: coachProfile, error } = await supabase
     .from("coach_profiles")
     .insert({
       organization_id: context.organization.id,
+      person_profile_id: personProfile.id,
       user_id: validation.values.userId,
       primary_center_id: validation.values.primaryCenterId,
       weekly_contracted_hours: validation.values.weeklyContractedHours,
@@ -944,14 +1320,34 @@ export async function createCoachProfile(formData: FormData) {
     );
   }
 
+  if (createdPersonProfileId) {
+    await recordOperationalAuditEvent({
+      action: "created",
+      changedFields: {
+        display_name: auditFieldTouched(),
+        status: auditFieldSet("active"),
+        user_id: auditFieldTouched(),
+        visibility_status: auditFieldSet("visible"),
+      },
+      entityId: createdPersonProfileId,
+      entityType: "person_profiles",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  }
+
   await recordOperationalAuditEvent({
     action: "created",
-    changedFields: getCoachProfileAuditFields({
-      notesChanged: Boolean(validation.values.notes),
-      primaryCenterId: validation.values.primaryCenterId,
-      status: validation.values.status,
-      weeklyContractedHours: validation.values.weeklyContractedHours,
-    }),
+    changedFields: {
+      ...getCoachProfileAuditFields({
+        notesChanged: Boolean(validation.values.notes),
+        primaryCenterId: validation.values.primaryCenterId,
+        status: validation.values.status,
+        weeklyContractedHours: validation.values.weeklyContractedHours,
+      }),
+      person_profile_id: auditFieldSet(personProfile.id),
+      user_id: auditFieldTouched(),
+    },
     entityId: coachProfile.id,
     entityType: "coach_profiles",
     organizationId: context.organization.id,
@@ -992,13 +1388,21 @@ export async function updateCoachProfile(formData: FormData) {
     redirect(getErrorPath(context.organization.id, "profile-required"));
   }
 
+  const canManageAccess = canManageTeamAccess(context.membership.role);
+  const nextStatus = canManageAccess
+    ? validation.values.status
+    : existingCoachProfile.status;
+  const nextNotes = canManageAccess
+    ? validation.values.notes
+    : existingCoachProfile.notes;
+
   const { error } = await supabase
     .from("coach_profiles")
     .update({
       primary_center_id: validation.values.primaryCenterId,
       weekly_contracted_hours: validation.values.weeklyContractedHours,
-      status: validation.values.status,
-      notes: validation.values.notes,
+      status: nextStatus,
+      notes: nextNotes,
     })
     .eq("id", coachProfileId)
     .eq("organization_id", context.organization.id)
@@ -1031,10 +1435,10 @@ export async function updateCoachProfile(formData: FormData) {
     changedFields,
     "status",
     existingCoachProfile.status,
-    validation.values.status,
+    nextStatus,
   );
 
-  if ((existingCoachProfile.notes ?? null) !== validation.values.notes) {
+  if ((existingCoachProfile.notes ?? null) !== nextNotes) {
     changedFields.notes = auditFieldTouched();
   }
 
@@ -1051,6 +1455,162 @@ export async function updateCoachProfile(formData: FormData) {
     getCoachesPath({
       organizationId: context.organization.id,
       status: "profile-updated",
+    }),
+  );
+}
+
+export async function deleteCoachProfile(formData: FormData) {
+  const context = await getCoachActionContext(formData, "team-profile-delete");
+  const coachProfileId = getRequiredFormString(formData, "coachProfileId");
+
+  if (!coachProfileId) {
+    redirect(getErrorPath(context.organization.id, "profile-required"));
+  }
+
+  if (!isPostgresUuid(coachProfileId)) {
+    redirect(getErrorPath(context.organization.id, "invalid-profile-id"));
+  }
+
+  const supabase = await createClient();
+  const { data: existingCoachProfile, error: existingCoachProfileError } =
+    await supabase
+      .from("coach_profiles")
+      .select("id, person_profile_id, status, user_id")
+      .eq("id", coachProfileId)
+      .eq("organization_id", context.organization.id)
+      .maybeSingle();
+
+  if (existingCoachProfileError || !existingCoachProfile) {
+    redirect(getErrorPath(context.organization.id, "profile-required"));
+  }
+
+  const { data: personProfile, error: personProfileError } =
+    existingCoachProfile.person_profile_id
+      ? await supabase
+          .from("person_profiles")
+          .select("id, user_id")
+          .eq("id", existingCoachProfile.person_profile_id)
+          .eq("organization_id", context.organization.id)
+          .maybeSingle()
+      : { data: null, error: null };
+
+  if (personProfileError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  const hasLinkedAccount = Boolean(
+    existingCoachProfile.user_id || personProfile?.user_id,
+  );
+
+  if (hasLinkedAccount) {
+    if (existingCoachProfile.status !== "inactive") {
+      const { error: archiveError } = await supabase
+        .from("coach_profiles")
+        .update({ status: "inactive" })
+        .eq("id", coachProfileId)
+        .eq("organization_id", context.organization.id)
+        .select("id")
+        .single();
+
+      if (archiveError) {
+        redirect(
+          getErrorPath(
+            context.organization.id,
+            getCoachProfileMutationError(archiveError.code),
+          ),
+        );
+      }
+
+      await recordOperationalAuditEvent({
+        action: "updated",
+        changedFields: {
+          status: auditFieldSet("inactive"),
+        },
+        entityId: coachProfileId,
+        entityType: "coach_profiles",
+        organizationId: context.organization.id,
+        supabase,
+      });
+    }
+
+    redirect(
+      getCoachesPath({
+        organizationId: context.organization.id,
+        status: "profile-archived",
+      }),
+    );
+  }
+
+  if (existingCoachProfile.status !== "inactive") {
+    redirect(
+      getErrorPath(context.organization.id, "profile-delete-requires-inactive"),
+    );
+  }
+
+  const { data: cleanedInvitations, error: invitationCleanupError } =
+    await supabase
+      .from("team_invitations")
+      .update({ coach_profile_id: null, status: "cancelled" })
+      .eq("coach_profile_id", coachProfileId)
+      .eq("organization_id", context.organization.id)
+      .in("status", ["pending", "sent", "failed", "expired", "cancelled"])
+      .select("id");
+
+  if (invitationCleanupError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  for (const invitation of cleanedInvitations ?? []) {
+    await recordOperationalAuditEvent({
+      action: "cancelled",
+      changedFields: {
+        coach_profile_id: auditFieldSet(null),
+        status: auditFieldSet("cancelled"),
+      },
+      entityId: invitation.id,
+      entityType: "team_invitations",
+      organizationId: context.organization.id,
+      supabase,
+    });
+  }
+
+  // A template default is reusable configuration, not worked history. Clear it
+  // before deleting an unlinked inactive ficha so stale defaults do not pin it.
+  const { error: templateDefaultCleanupError } = await supabase
+    .from("schedule_template_blocks")
+    .update({ default_coach_profile_id: null })
+    .eq("default_coach_profile_id", coachProfileId)
+    .eq("organization_id", context.organization.id);
+
+  if (templateDefaultCleanupError) {
+    redirect(getErrorPath(context.organization.id, "save-failed"));
+  }
+
+  const { data: deletedCoachProfile, error } = await supabase
+    .from("coach_profiles")
+    .delete()
+    .eq("id", coachProfileId)
+    .eq("organization_id", context.organization.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        getCoachProfileDeleteMutationError(error.code),
+      ),
+    );
+  }
+
+  if (!deletedCoachProfile) {
+    redirect(getErrorPath(context.organization.id, "profile-required"));
+  }
+
+  redirect(
+    getCoachesPath({
+      organizationId: context.organization.id,
+      status: "profile-deleted",
     }),
   );
 }
@@ -1165,87 +1725,9 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
   }
 
   const existingMembership = existingMembershipResult.data;
-  let linkedMembershipId = existingMembership?.id ?? null;
-  let membershipAuditAction: "created" | "updated" | null = null;
-  const membershipChangedFields: OperationalAuditChangedFields = {};
 
-  if (existingMembership) {
-    const protectsCurrentAdmin = existingMembership.user_id === context.user.id;
-    const wouldChangeMembership =
-      existingMembership.role !== validation.values.role ||
-      existingMembership.status !== validation.values.status;
-
-    if (protectsCurrentAdmin && wouldChangeMembership) {
-      redirect(getErrorPath(context.organization.id, "self-membership"));
-    }
-
-    if (!protectsCurrentAdmin) {
-      const { error: membershipUpdateError } = await supabase
-        .from("organization_memberships")
-        .update({
-          role: validation.values.role,
-          status: validation.values.status,
-          ...getMembershipTimestamps(
-            validation.values.status,
-            existingMembership,
-          ),
-        })
-        .eq("id", existingMembership.id)
-        .eq("organization_id", context.organization.id)
-        .select("id")
-        .single();
-
-      if (membershipUpdateError) {
-        redirect(
-          getErrorPath(
-            context.organization.id,
-            getCoachAccountLinkMutationError(membershipUpdateError.code),
-          ),
-        );
-      }
-
-      if (wouldChangeMembership) {
-        membershipAuditAction = "updated";
-        addAuditFieldChange(
-          membershipChangedFields,
-          "role",
-          existingMembership.role,
-          validation.values.role,
-        );
-        addAuditFieldChange(
-          membershipChangedFields,
-          "status",
-          existingMembership.status,
-          validation.values.status,
-        );
-      }
-    }
-  } else {
-    const { data: insertedMembership, error: membershipInsertError } = await supabase
-      .from("organization_memberships")
-      .insert({
-        organization_id: context.organization.id,
-        user_id: validation.values.userId,
-        role: validation.values.role,
-        status: validation.values.status,
-        ...getMembershipTimestamps(validation.values.status),
-      })
-      .select("id")
-      .single();
-
-    if (membershipInsertError || !insertedMembership) {
-      redirect(
-        getErrorPath(
-          context.organization.id,
-          getCoachAccountLinkMutationError(membershipInsertError?.code),
-        ),
-      );
-    }
-
-    linkedMembershipId = insertedMembership.id;
-    membershipAuditAction = "created";
-    membershipChangedFields.role = auditFieldSet(validation.values.role);
-    membershipChangedFields.status = auditFieldSet(validation.values.status);
+  if (!existingMembership) {
+    redirect(getErrorPath(context.organization.id, "membership-required"));
   }
 
   if (personProfile.user_id !== validation.values.userId) {
@@ -1284,17 +1766,6 @@ export async function linkCoachProfileToExistingAccount(formData: FormData) {
         ),
       );
     }
-  }
-
-  if (membershipAuditAction && linkedMembershipId) {
-    await recordOperationalAuditEvent({
-      action: membershipAuditAction,
-      changedFields: membershipChangedFields,
-      entityId: linkedMembershipId,
-      entityType: "organization_memberships",
-      organizationId: context.organization.id,
-      supabase,
-    });
   }
 
   if (personProfile.user_id !== validation.values.userId) {

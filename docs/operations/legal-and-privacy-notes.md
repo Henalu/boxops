@@ -199,8 +199,8 @@ Readiness beta F.15:
 
 - El cierre F.15 permite validar fichaje web en beta interna controlada, no vender cumplimiento legal definitivo.
 - La webapp actual no usa geolocalizacion y no debe pedir `navigator.geolocation`.
-- El fichaje automatico por planificacion no prueba presencia real; solo crea contexto corregible desde horario/asignaciones.
-- Jornada prevista (`staff_work_windows`) no es fichaje, contrato, payroll ni prueba definitiva de horas trabajadas.
+- El fichaje automatico por planificacion no prueba presencia real; solo crea contexto corregible desde horario/asignaciones y, si el tenant lo activa, desde `staff_work_windows`.
+- Jornada prevista (`staff_work_windows`) puede alimentar `schedule_auto`, pero no es contrato, payroll ni prueba definitiva de horas trabajadas.
 - Aprobar una semana con firma propia es confirmacion interna de cierre; no es firma electronica avanzada/cualificada.
 - Candidatos de posible exceso son senales de revision operativa; no son horas extra aprobadas, compensacion, saldo ni nomina.
 - El CSV actual es exporte interno revisable; no es exporte legal definitivo para representantes o Inspeccion hasta revision legal.

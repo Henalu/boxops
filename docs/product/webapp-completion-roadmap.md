@@ -34,7 +34,7 @@ Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues d
 |---|---|---|
 | Horario, bloques, plantillas y cobertura | Muy avanzado | Validacion oficial con datos reales, deuda UX menor y criterio final de piloto. |
 | Tenant, roles y configuracion | Parcialmente avanzado | B.4 deja checklist de tenant readiness; faltan logo/asset privado si se decide, colores por centro si aportan valor, permisos por centro con fase propia y onboarding guiado. |
-| Auth, email e invitaciones | Implementado tecnicamente | Configuracion real de Supabase/Auth/SMTP, remitente verificado, prueba completa de invitacion/reset y credenciales E2E. |
+| Auth, email e invitaciones | Implementado tecnicamente; Equipo tambien tiene creacion directa de cuenta con contrasena temporal y reset obligatorio en primer login | Configuracion real de Supabase/Auth/SMTP, remitente verificado, `SUPABASE_SERVICE_ROLE_KEY` server-only, prueba completa de invitacion/aceptacion/reset, prueba de creacion directa/reset obligatorio y credenciales E2E. |
 | Area personal, avatar y firma propia | Avanzado | Validacion QA real y posterior conexion con documentos firmables. |
 | Cambios y cobertura entre coaches | Workflow minimo avanzado | Completar experiencia si el piloto exige swap, candidatos mas ricos o automatismos de expiracion controlados. |
 | Ausencias | Bandeja y creacion propia avanzadas | Calendario, saldos/reglas si aplican, creacion gestionada para otra persona y cierre legal/privacidad. |
@@ -47,6 +47,23 @@ Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues d
 | App nativa/geofencing/push | Futuro | Decision comercial y legal especifica; no bloquea webapp v1. |
 | IA | Ultimo extra futuro | Solo despues de documentos/programacion/permisos/auditoria/legal y webapp vendible. |
 
+## Revision 2026-05-25 Para Publicacion Online
+
+Estado actual: `bloqueado para user testing no tecnico`. La webapp ya tiene suficiente superficie funcional para preparar una prueba guiada, pero no conviene publicarla online hasta que el entorno y la evidencia automatizada queden cerrados.
+
+Evidencia local:
+
+- `npm run build` pasa.
+- `npm run lint` pasa con el warning conocido de `scripts/setup-local-e2e-auth.mjs`.
+- `npx supabase db lint --local` pasa.
+- `git diff --check` no da errores, solo warnings LF/CRLF del worktree.
+- Los guardrails `rg` no encuentran hardcode STL, `service_role`, IA, geolocalizacion, push, service worker ni caches privadas en `src`.
+- `npm run typecheck -- --pretty false` falla en 3 specs de smoke.
+- `npm run test:smoke` con servidor local ejecuta 247 tests y queda en 204 passed, 21 skipped, 5 not run y 17 failed.
+- `npm audit --omit=dev --audit-level=high` reporta vulnerabilidades de produccion, incluidas 2 high.
+
+Lectura de producto: el siguiente objetivo no es abrir mas features. Es cerrar un entorno online controlado, arreglar las regresiones/guardrails que rompen smoke/typecheck, resolver o aceptar explicitamente el audit de dependencias, cargar datos de prueba validados y preparar una guia simple para testers no tecnicos. Hasta entonces, el estado correcto sigue siendo `preparando beta`, no `listo para publicar`.
+
 ## Mapa De Cierre Recomendado
 
 ### 0. Cierre De Realidad Operativa
@@ -58,6 +75,7 @@ Incluye:
 - validacion oficial del primer tenant con una semana real revisada bloque a bloque;
 - confirmacion de centros, coaches, roles, tipos, plantillas, huecos y casos de cobertura;
 - entorno real/staging con Supabase Auth, Redirect URLs, SMTP/Resend y remitente verificado;
+- `SUPABASE_SERVICE_ROLE_KEY` configurado solo en servidor para el flujo directo de creacion de cuenta, sin exposicion al cliente;
 - credenciales E2E de `owner`, `admin`, `manager` y `coach`;
 - job real o procedimiento aceptado de purga de auditoria operativa;
 - smoke suite con rutas criticas autenticadas y anonimas;

@@ -1,24 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  BadgeCheck,
-  CircleOff,
   Filter,
-  Link2,
+  KeyRound,
   Mail,
-  Plus,
   RotateCcw,
   Save,
-  UserPlus,
+  Trash2,
   XCircle,
 } from "lucide-react";
 
 import {
   cancelTeamInvitation,
   createCoachProfile,
-  createMembership,
+  createDirectTeamAccount,
   createTeamInvitation,
-  linkCoachProfileToExistingAccount,
+  deleteCoachProfile,
   resendTeamInvitation,
   updateCoachProfile,
   updateMembership,
@@ -33,6 +30,7 @@ import {
   EmptyState,
   PageHeader,
   SectionHeader,
+  StatusBadge,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
@@ -41,17 +39,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PATTERN_ATTRIBUTE,
+  PASSWORD_POLICY_DESCRIPTION,
+} from "@/lib/auth/password-policy";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canDeleteOperationalTeamProfiles,
   canManageOperationalTeamProfiles,
   canManageTeamAccess,
   getApplicationRoleLabel,
@@ -148,11 +144,30 @@ type PersonProfileMaps = {
 
 type CoachProfileLinkStatus = "incomplete" | "linked" | "pending";
 
+type TeamLinkingReviewSummary = {
+  incompleteCoachProfiles: number;
+  membershipsWithoutVisiblePerson: number;
+  openInvitations: number;
+  profilesWithoutLinkedAccount: number;
+};
+
 type CoachProfileFilters = {
   centerId: string | null;
   linkStatus: CoachProfileLinkStatus | null;
+  profileStatusIsDefault: boolean;
   profileStatus: string | null;
   query: string;
+  role: string | null;
+};
+
+type TeamUserRow = {
+  detail: string;
+  id: string;
+  label: string;
+  linkStatus: CoachProfileLinkStatus;
+  membership: MembershipRow | null;
+  personProfile?: PersonProfileRow;
+  profile: CoachProfileRow | null;
   role: string | null;
 };
 
@@ -163,75 +178,110 @@ const COACH_PROFILE_LINK_FILTERS: Array<{
   value: CoachProfileLinkStatus;
 }> = [
   { label: "Cuenta vinculada", value: "linked" },
-  { label: "Pendiente de cuenta", value: "pending" },
-  { label: "Ficha incompleta", value: "incomplete" },
+  { label: "Pendiente de vincular cuenta", value: "pending" },
+  { label: "Revisar vinculación", value: "incomplete" },
 ];
 
+const OPEN_TEAM_INVITATION_STATUSES = [
+  "pending",
+  "sent",
+  "failed",
+  "expired",
+] as const;
+
+const teamLinkStatusLabels: Record<CoachProfileLinkStatus, string> = {
+  incomplete: "Revisar vinculación",
+  linked: "Cuenta vinculada",
+  pending: "Pendiente de vincular cuenta",
+};
+
 const successMessages: Record<string, string> = {
+  "account-created": "Cuenta creada.",
   "account-linked": "Cuenta vinculada.",
-  "invitation-cancelled": "Invitacion cancelada.",
-  "invitation-resent": "Invitacion reenviada.",
-  "invitation-sent": "Invitacion enviada.",
-  "membership-created": "Acceso creado.",
-  "membership-updated": "Acceso actualizado.",
-  "profile-created": "Ficha de entrenador creada.",
-  "profile-updated": "Ficha de entrenador actualizada.",
+  "invitation-cancelled": "Invitación cancelada.",
+  "invitation-resent": "Invitación reenviada.",
+  "invitation-sent": "Invitación enviada.",
+  "membership-created": "Usuario creado.",
+  "membership-updated": "Usuario actualizado.",
+  "profile-archived": "Datos operativos archivados.",
+  "profile-created": "Datos operativos creados.",
+  "profile-deleted": "Datos operativos eliminados.",
+  "profile-updated": "Datos operativos actualizados.",
 };
 
 const errorMessages: Record<string, string> = {
+  "account-create-rollback-failed":
+    "No se ha podido completar el alta. Revisa Auth antes de reintentarlo.",
+  "account-email-already-exists":
+    "Ya existe una cuenta Auth con ese email. Usa invitacion o revisa sus accesos antes de crear otra alta.",
   "account-link-conflict":
-    "Esa cuenta ya está vinculada a otra persona o ficha del equipo.",
+    "Esa cuenta ya está vinculada a otra persona o datos operativos del equipo.",
   "account-linked-to-other-coach":
-    "Esa cuenta ya está vinculada a otra ficha de entrenador de esta organización.",
+    "Esa cuenta ya está vinculada a otros datos operativos de esta organización.",
   "account-linked-to-other-person":
     "Esa cuenta ya está vinculada a otra persona de esta organización.",
   "auth-user-not-found":
-    "Esa cuenta no existe en Supabase Auth. Crea o confirma primero la cuenta real.",
+    "No se ha encontrado esa cuenta. Para altas nuevas, envia una invitacion o crea una cuenta directa.",
+  "auth-account-create-failed":
+    "No se ha podido crear la cuenta Auth con esos datos.",
+  "auth-admin-not-configured":
+    "La creacion directa requiere configurar la clave server-side de Supabase Auth en este entorno.",
   "coach-user-conflict":
-    "La ficha de entrenador ya está vinculada a otra cuenta.",
+    "Los datos operativos ya están vinculados a otra cuenta.",
   "duplicate-membership":
     "Esa persona ya tiene acceso en esta organización.",
   "duplicate-invitation":
-    "Ya existe una invitacion pendiente para ese email o esa ficha.",
+    "Ya existe una invitación pendiente para ese email o esos datos operativos.",
   "duplicate-profile":
-    "Ese entrenador ya tiene una ficha operativa en esta organización.",
+    "Ese usuario ya tiene datos operativos en esta organización.",
+  "display-name-too-long": "El nombre visible no puede superar 80 caracteres.",
   "email-not-configured":
-    "El envio de email no esta configurado para este entorno.",
+    "El envío de email no está configurado para este entorno.",
   "email-send-failed":
     "No se ha podido enviar el email. Revisa la configuracion segura del proveedor transaccional.",
   forbidden: "Tu rol no permite gestionar usuarios ni perfiles.",
   "invalid-center": "El centro principal seleccionado no es válido.",
-  "invalid-email": "Introduce un email valido para enviar la invitacion.",
+  "invalid-email": "Introduce un email válido para enviar la invitación.",
   "invalid-hours": "Las horas semanales deben estar entre 0 y 168.",
-  "invalid-invitation-id": "La invitacion recibida no es valida.",
+  "invalid-invitation-id": "La invitación recibida no es válida.",
   "invalid-person-profile":
-    "La persona vinculada a esa ficha no pertenece a esta organización.",
-  "invalid-profile-id": "La ficha de entrenador recibida no es válida.",
+    "La persona vinculada a esos datos no pertenece a esta organización.",
+  "invalid-profile-id": "Los datos operativos recibidos no son válidos.",
   "invalid-profile-reference":
-    "La ficha no se ha podido guardar porque falta un acceso o centro válido.",
+    "Los datos no se han podido guardar porque falta un acceso o centro válido.",
   "invalid-role":
     "El rol debe ser Propietario, Administrador, Responsable o Entrenador.",
   "invalid-status": "El estado seleccionado no es válido.",
-  "invalid-user-id": "La cuenta del entrenador debe usar un UUID válido.",
+  "invalid-user-id": "Selecciona una cuenta valida del equipo.",
   "membership-required": "No se ha encontrado el acceso de esta organización.",
-  "invitation-closed": "Esa invitacion ya esta cerrada.",
-  "invitation-rate-limited": "Espera un minuto antes de reenviar la invitacion.",
-  "invitation-required": "No se ha encontrado una invitacion valida.",
+  "invitation-closed": "Esa invitación ya está cerrada.",
+  "invitation-rate-limited": "Espera un minuto antes de reenviar la invitación.",
+  "invitation-required": "No se ha encontrado una invitación válida.",
   "missing-fields": "Completa los campos obligatorios.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   "notes-too-long": "Las notas no pueden superar 1000 caracteres.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required:
     "Elige una organización antes de gestionar el equipo.",
-  "person-profile-inactive": "La persona de esa ficha no está activa.",
+  "password-mismatch": "Las contraseñas no coinciden.",
+  "password-missing-letter": "La contraseña debe incluir al menos una letra.",
+  "password-missing-number": "La contraseña debe incluir al menos un número.",
+  "password-too-short": "La contraseña debe tener al menos 8 caracteres.",
+  "person-profile-inactive": "La persona de esos datos no está activa.",
   "person-profile-internal":
     "Los perfiles internos no pueden vincularse como entrenadores operativos.",
   "person-user-conflict":
-    "La persona de esa ficha ya está vinculada a otra cuenta.",
-  "profile-inactive": "La ficha de entrenador no está activa.",
-  "profile-required": "No se ha recibido una ficha de entrenador válida.",
+    "La persona de esos datos ya está vinculada a otra cuenta.",
+  "profile-inactive": "Los datos operativos no están activos.",
+  "profile-delete-blocked":
+    "Estos datos tienen referencias protegidas y no se pueden borrar físicamente.",
+  "profile-delete-operational-history":
+    "Estos datos ya aparecen en horario, plantillas, solicitudes, documentos o fichaje. Al archivarlos se conserva el historial.",
+  "profile-delete-requires-inactive":
+    "Archiva los datos antes de eliminarlos físicamente.",
+  "profile-required": "No se han recibido datos operativos válidos.",
   "profile-without-person":
-    "Esa ficha no conserva una persona operativa pendiente de cuenta.",
+    "Esos datos no conservan una persona operativa pendiente de cuenta.",
   "save-failed": "No se han podido guardar los cambios.",
   "self-membership":
     "No puedes cambiar tu propio acceso desde esta pantalla para evitar quedarte sin acceso.",
@@ -358,10 +408,6 @@ function formatHours(value: number) {
   }).format(value)} h`;
 }
 
-function shortId(value: string) {
-  return value.slice(0, 8);
-}
-
 function isVisiblePerson(
   profile?: PersonProfileRow,
 ): profile is PersonProfileRow {
@@ -386,9 +432,18 @@ function getMembershipIdentity(
   }
 
   return {
-    detail: `Cuenta MVP ${shortId(membership.user_id)}`,
-    label: `Miembro ${shortId(membership.user_id)}`,
+    detail: "Revisar vinculación",
+    label: "Acceso sin persona visible",
   };
+}
+
+function getMembershipLinkStatus(
+  membership: MembershipRow,
+  personProfilesByUserId: Map<string, PersonProfileRow>,
+): CoachProfileLinkStatus {
+  return isVisiblePerson(personProfilesByUserId.get(membership.user_id))
+    ? "linked"
+    : "incomplete";
 }
 
 function getCoachProfileIdentity(
@@ -403,28 +458,28 @@ function getCoachProfileIdentity(
 
   if (isVisiblePerson(personProfile)) {
     return {
-      detail: profile.user_id ? "Cuenta vinculada" : "Pendiente de cuenta",
+      detail: profile.user_id ? "Cuenta vinculada" : "Sin cuenta vinculada",
       label: personProfile.display_name,
     };
   }
 
   if (profile.user_id) {
     return {
-      detail: `Cuenta MVP ${shortId(profile.user_id)}`,
-      label: `Entrenador ${shortId(profile.user_id)}`,
+      detail: "Revisar vinculación",
+      label: "Ficha con cuenta sin persona visible",
     };
   }
 
   if (profile.person_profile_id) {
     return {
-      detail: `Persona pendiente ${shortId(profile.person_profile_id)}`,
-      label: "Entrenador pendiente",
+      detail: "Revisar vinculación",
+      label: "Ficha sin persona visible",
     };
   }
 
   return {
-    detail: "Sin usuario ni persona vinculada",
-    label: "Entrenador pendiente",
+    detail: "Revisar vinculación",
+    label: "Ficha incompleta",
   };
 }
 
@@ -444,16 +499,31 @@ function isCoachProfileLinkStatus(
 
 function getCoachProfileLinkStatus(
   profile: CoachProfileRow,
+  personProfiles: PersonProfileMaps,
 ): CoachProfileLinkStatus {
-  if (profile.user_id) {
+  const personProfile = profile.person_profile_id
+    ? personProfiles.byId.get(profile.person_profile_id)
+    : profile.user_id
+      ? personProfiles.byUserId.get(profile.user_id)
+      : undefined;
+
+  if (profile.user_id && isVisiblePerson(personProfile)) {
     return "linked";
   }
 
-  if (profile.person_profile_id) {
+  if (
+    !profile.user_id &&
+    profile.person_profile_id &&
+    isVisiblePerson(personProfile)
+  ) {
     return "pending";
   }
 
   return "incomplete";
+}
+
+function getTeamLinkStatusLabel(status: CoachProfileLinkStatus) {
+  return teamLinkStatusLabels[status];
 }
 
 function getCoachProfileRole(
@@ -475,6 +545,10 @@ function resolveCoachProfileFilters({
   const rawCenterId = getParam(params.center_id);
   const rawLinkStatus = getParam(params.link_status);
   const rawProfileStatus = getParam(params.profile_status);
+  const hasProfileStatusParam = Object.prototype.hasOwnProperty.call(
+    params,
+    "profile_status",
+  );
   const rawQuery = getParam(params.q) ?? "";
   const rawRole = getParam(params.role);
   const centerId: string | null =
@@ -493,10 +567,12 @@ function resolveCoachProfileFilters({
   return {
     centerId,
     linkStatus: isCoachProfileLinkStatus(rawLinkStatus) ? rawLinkStatus : null,
-    profileStatus:
-      rawProfileStatus && isCoachProfileStatus(rawProfileStatus)
+    profileStatus: hasProfileStatusParam
+      ? rawProfileStatus && isCoachProfileStatus(rawProfileStatus)
         ? rawProfileStatus
-        : null,
+        : null
+      : "active",
+    profileStatusIsDefault: !hasProfileStatusParam,
     query: rawQuery.trim().slice(0, 80),
     role,
   };
@@ -506,44 +582,182 @@ function getCoachProfileActiveFilterCount(filters: CoachProfileFilters) {
   return [
     filters.centerId,
     filters.linkStatus,
-    filters.profileStatus,
+    filters.profileStatusIsDefault ? null : filters.profileStatus,
     filters.query,
     filters.role,
   ].filter(Boolean).length;
 }
 
-function applyCoachProfileFilters({
-  centersById,
-  filters,
+function pickPreferredCoachProfile(
+  current: CoachProfileRow | undefined,
+  candidate: CoachProfileRow,
+) {
+  if (!current) {
+    return candidate;
+  }
+
+  if (current.status !== candidate.status) {
+    return candidate.status === "active" ? candidate : current;
+  }
+
+  return candidate.updated_at > current.updated_at ? candidate : current;
+}
+
+function getCoachProfileResolvedUserId(
+  profile: CoachProfileRow,
+  personProfiles: PersonProfileMaps,
+) {
+  if (profile.user_id) {
+    return profile.user_id;
+  }
+
+  return profile.person_profile_id
+    ? (personProfiles.byId.get(profile.person_profile_id)?.user_id ?? null)
+    : null;
+}
+
+function buildTeamUserRows({
+  coachProfiles,
+  memberships,
   membershipsByUserId,
   personProfiles,
-  profiles,
+}: {
+  coachProfiles: CoachProfileRow[];
+  memberships: MembershipRow[];
+  membershipsByUserId: Map<string, MembershipRow>;
+  personProfiles: PersonProfileMaps;
+}) {
+  const profilesByUserId = new Map<string, CoachProfileRow>();
+  const profilesByPersonId = new Map<string, CoachProfileRow>();
+
+  for (const profile of coachProfiles) {
+    const userId = getCoachProfileResolvedUserId(profile, personProfiles);
+
+    if (userId) {
+      profilesByUserId.set(
+        userId,
+        pickPreferredCoachProfile(profilesByUserId.get(userId), profile),
+      );
+    }
+
+    if (profile.person_profile_id) {
+      profilesByPersonId.set(
+        profile.person_profile_id,
+        pickPreferredCoachProfile(
+          profilesByPersonId.get(profile.person_profile_id),
+          profile,
+        ),
+      );
+    }
+  }
+
+  const usedProfileIds = new Set<string>();
+  const rows: TeamUserRow[] = memberships.map((membership) => {
+    const personProfile = personProfiles.byUserId.get(membership.user_id);
+    const profile =
+      profilesByUserId.get(membership.user_id) ??
+      (personProfile ? profilesByPersonId.get(personProfile.id) : undefined) ??
+      null;
+    const identity = getMembershipIdentity(
+      membership,
+      personProfiles.byUserId,
+    );
+
+    if (profile) {
+      usedProfileIds.add(profile.id);
+    }
+
+    return {
+      detail: identity.detail,
+      id: `membership:${membership.id}`,
+      label: identity.label,
+      linkStatus: getMembershipLinkStatus(membership, personProfiles.byUserId),
+      membership,
+      personProfile,
+      profile,
+      role: membership.role,
+    } satisfies TeamUserRow;
+  });
+
+  for (const profile of coachProfiles) {
+    if (usedProfileIds.has(profile.id)) {
+      continue;
+    }
+
+    const identity = getCoachProfileIdentity(profile, personProfiles);
+    const personProfile = profile.person_profile_id
+      ? personProfiles.byId.get(profile.person_profile_id)
+      : profile.user_id
+        ? personProfiles.byUserId.get(profile.user_id)
+        : undefined;
+
+    rows.push({
+      detail: identity.detail,
+      id: `profile:${profile.id}`,
+      label: identity.label,
+      linkStatus: getCoachProfileLinkStatus(profile, personProfiles),
+      membership: profile.user_id
+        ? (membershipsByUserId.get(profile.user_id) ?? null)
+        : null,
+      personProfile,
+      profile,
+      role: getCoachProfileRole(profile, membershipsByUserId),
+    });
+  }
+
+  return rows.sort((first, second) =>
+    first.label.localeCompare(second.label, "es"),
+  );
+}
+
+function getTeamUserStatusBucket(row: TeamUserRow) {
+  if (row.membership) {
+    return row.membership.status === "active" ? "active" : "inactive";
+  }
+
+  return row.profile?.status === "active" ? "active" : "inactive";
+}
+
+function getTeamUserOperationalStatusLabel(row: TeamUserRow) {
+  if (!row.profile) {
+    return "Sin datos operativos";
+  }
+
+  return row.profile.status === "active"
+    ? "Datos operativos activos"
+    : "Datos operativos archivados";
+}
+
+function applyTeamUserFilters({
+  centersById,
+  filters,
+  rows,
 }: {
   centersById: Map<string, CenterRow>;
   filters: CoachProfileFilters;
-  membershipsByUserId: Map<string, MembershipRow>;
-  personProfiles: PersonProfileMaps;
-  profiles: CoachProfileRow[];
+  rows: TeamUserRow[];
 }) {
   const query = normalizeFilterText(filters.query);
 
-  return profiles.filter((profile) => {
-    const center = profile.primary_center_id
-      ? centersById.get(profile.primary_center_id)
+  return rows.filter((row) => {
+    const center = row.profile?.primary_center_id
+      ? centersById.get(row.profile.primary_center_id)
       : undefined;
-    const identity = getCoachProfileIdentity(profile, personProfiles);
-    const role = getCoachProfileRole(profile, membershipsByUserId);
+    const role = row.role;
 
     if (
       filters.centerId &&
       (filters.centerId === NO_CENTER_FILTER_VALUE
-        ? profile.primary_center_id !== null
-        : profile.primary_center_id !== filters.centerId)
+        ? row.profile?.primary_center_id
+        : row.profile?.primary_center_id !== filters.centerId)
     ) {
       return false;
     }
 
-    if (filters.profileStatus && profile.status !== filters.profileStatus) {
+    if (
+      filters.profileStatus &&
+      getTeamUserStatusBucket(row) !== filters.profileStatus
+    ) {
       return false;
     }
 
@@ -556,10 +770,7 @@ function applyCoachProfileFilters({
       return false;
     }
 
-    if (
-      filters.linkStatus &&
-      getCoachProfileLinkStatus(profile) !== filters.linkStatus
-    ) {
+    if (filters.linkStatus && row.linkStatus !== filters.linkStatus) {
       return false;
     }
 
@@ -569,11 +780,13 @@ function applyCoachProfileFilters({
 
     const haystack = [
       center?.name,
-      getCoachProfileStatusLabel(profile.status),
-      identity.detail,
-      identity.label,
-      profile.notes,
-      role ? getMembershipRoleLabel(role) : "Sin acceso vinculado",
+      getMembershipStatusLabel(row.membership?.status ?? "inactive"),
+      getTeamLinkStatusLabel(row.linkStatus),
+      getTeamUserOperationalStatusLabel(row),
+      row.detail,
+      row.label,
+      row.profile?.notes,
+      role ? getMembershipRoleLabel(role) : "Sin cuenta vinculada",
     ]
       .filter((value): value is string => Boolean(value))
       .map(normalizeFilterText)
@@ -597,11 +810,20 @@ function selectClassName(className = "") {
 const compactActionFormClassName = "grid grid-cols-2 gap-x-4 gap-y-4";
 const compactActionFieldClassName = "grid min-w-0 gap-2";
 const wideActionFieldClassName = "col-span-2 grid min-w-0 gap-2";
+const membershipAccessEditFormClassName =
+  "grid gap-3 sm:grid-cols-[minmax(8.5rem,1fr)_minmax(8.5rem,1fr)]";
 
-function MembershipRoleSelect({ defaultValue }: { defaultValue?: string }) {
+function MembershipRoleSelect({
+  className,
+  defaultValue,
+}: {
+  className?: string;
+  defaultValue?: string;
+}) {
   return (
     <select
-      className={selectClassName()}
+      aria-label="Rol del acceso"
+      className={selectClassName(className)}
       defaultValue={defaultValue ?? "coach"}
       name="role"
     >
@@ -614,10 +836,17 @@ function MembershipRoleSelect({ defaultValue }: { defaultValue?: string }) {
   );
 }
 
-function MembershipStatusSelect({ defaultValue }: { defaultValue?: string }) {
+function MembershipStatusSelect({
+  className,
+  defaultValue,
+}: {
+  className?: string;
+  defaultValue?: string;
+}) {
   return (
     <select
-      className={selectClassName()}
+      aria-label="Estado del acceso"
+      className={selectClassName(className)}
       defaultValue={defaultValue ?? "active"}
       name="status"
     >
@@ -700,22 +929,14 @@ function MembershipStatusBadge({ status }: { status: string }) {
   );
 }
 
-function CoachProfileStatusBadge({ status }: { status: string }) {
-  return (
-    <Badge variant={status === "active" ? "secondary" : "outline"}>
-      {getCoachProfileStatusLabel(status)}
-    </Badge>
-  );
-}
-
 function TeamInvitationStatusBadge({ status }: { status: string }) {
   const labelByStatus: Record<string, string> = {
     accepted: "Aceptada",
     cancelled: "Cancelada",
     expired: "Caducada",
-    failed: "Error",
-    pending: "Pendiente",
-    sent: "Enviada",
+    failed: "Revisar invitación",
+    pending: "Invitación pendiente",
+    sent: "Invitación pendiente",
   };
 
   return (
@@ -730,6 +951,92 @@ function TeamInvitationStatusBadge({ status }: { status: string }) {
     >
       {labelByStatus[status] ?? status}
     </Badge>
+  );
+}
+
+function TeamLinkStatusBadge({ status }: { status: CoachProfileLinkStatus }) {
+  const tone =
+    status === "linked"
+      ? "success"
+      : status === "pending"
+        ? "pending"
+        : "warning";
+
+  return <StatusBadge tone={tone}>{getTeamLinkStatusLabel(status)}</StatusBadge>;
+}
+
+function isOpenTeamInvitation(invitation: TeamInvitationRow) {
+  return OPEN_TEAM_INVITATION_STATUSES.includes(
+    invitation.status as (typeof OPEN_TEAM_INVITATION_STATUSES)[number],
+  );
+}
+
+function TeamLinkingReviewNotice({
+  summary,
+}: {
+  summary: TeamLinkingReviewSummary;
+}) {
+  const items = [
+    {
+      count: summary.membershipsWithoutVisiblePerson,
+      description: "accesos con cuenta, pero sin persona operativa visible",
+      label: "Revisar cuenta",
+    },
+    {
+      count: summary.profilesWithoutLinkedAccount,
+      description: "datos operativos con persona visible y sin cuenta vinculada",
+      label: "Datos sin cuenta",
+    },
+    {
+      count: summary.incompleteCoachProfiles,
+      description: "datos operativos que necesitan revisar persona, cuenta o estado",
+      label: "Revisar datos",
+    },
+    {
+      count: summary.openInvitations,
+      description: "invitaciones abiertas hasta aceptar, reenviar o cancelar",
+      label: "Invitación pendiente",
+    },
+  ].filter((item) => item.count > 0);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card size="sm">
+      <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)] lg:items-start">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            <KeyRound aria-hidden="true" className="size-4" />
+            Revisar datos de acceso
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Usa Equipo para revisar accesos, personas operativas, datos e
+            invitaciones pendientes. Para altas nuevas puedes invitar por email
+            o crear una cuenta con contraseña temporal.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {items.map((item) => (
+            <div
+              className="min-w-0 rounded-lg border border-border bg-muted/20 px-3 py-2"
+              key={`${item.label}-${item.description}`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg font-semibold tabular-nums">
+                  {item.count}
+                </span>
+                <Badge variant="outline">{item.label}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {item.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -770,9 +1077,9 @@ function TeamInvitationCreateForm({
       </label>
 
       <label className={wideActionFieldClassName}>
-        <span className="text-sm font-medium">Ficha asociada</span>
+        <span className="text-sm font-medium">Datos operativos asociados</span>
         <select className={selectClassName()} name="coachProfileId" required>
-          <option value="new">Crear nueva ficha</option>
+          <option value="new">Crear datos operativos</option>
           {pendingProfiles.map((profile) => {
             const identity = getCoachProfileIdentity(profile, personProfiles);
 
@@ -784,8 +1091,8 @@ function TeamInvitationCreateForm({
           })}
         </select>
         <span className="text-xs leading-5 text-muted-foreground">
-          Puedes usar una ficha pendiente o crear una ficha minima en el mismo
-          envio.
+          Puedes usar datos pendientes de vincular cuenta o crearlos en el
+          mismo envio.
         </span>
       </label>
 
@@ -793,7 +1100,7 @@ function TeamInvitationCreateForm({
         <span className="text-sm font-medium">Nombre visible</span>
         <Input
           name="displayName"
-          placeholder="Solo necesario si creas una ficha nueva"
+          placeholder="Solo necesario si creas datos nuevos"
         />
       </label>
 
@@ -822,175 +1129,81 @@ function TeamInvitationCreateForm({
       <div className="col-span-2 flex items-end">
         <Button type="submit">
           <Mail aria-hidden="true" />
-          Enviar invitacion
+          Enviar invitación
         </Button>
       </div>
     </form>
   );
 }
 
-function MembershipCreateForm({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
-  return (
-    <form action={createMembership} className={compactActionFormClassName}>
-      <input name="organizationId" type="hidden" value={organizationId} />
-
-      <label className={wideActionFieldClassName}>
-        <span className="text-sm font-medium">Cuenta existente</span>
-        <Input
-          className="truncate"
-          name="userId"
-          placeholder="UUID de la cuenta existente"
-          required
-        />
-        <span className="text-xs leading-5 text-muted-foreground">
-          Este MVP no envia invitaciones por email: usa el UUID de una cuenta
-          real de Supabase Auth.
-        </span>
-      </label>
-
-      <label className={compactActionFieldClassName}>
-        <span className="text-sm font-medium">Rol</span>
-        <MembershipRoleSelect />
-      </label>
-
-      <label className={compactActionFieldClassName}>
-        <span className="text-sm font-medium">Estado del acceso</span>
-        <MembershipStatusSelect />
-      </label>
-
-      <div className="col-span-2 flex items-end">
-        <Button type="submit">
-          <Plus aria-hidden="true" />
-          Crear acceso
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function CoachAccountLinkForm({
-  organizationId,
-  pendingProfiles,
-  personProfiles,
-}: {
-  organizationId: string;
-  pendingProfiles: CoachProfileRow[];
-  personProfiles: PersonProfileMaps;
-}) {
-  const canLinkProfile = pendingProfiles.length > 0;
-
-  return (
-    <form
-      action={linkCoachProfileToExistingAccount}
-      className={compactActionFormClassName}
-    >
-      <input name="organizationId" type="hidden" value={organizationId} />
-
-      <label className={wideActionFieldClassName}>
-        <span className="text-sm font-medium">Ficha pendiente</span>
-        <select
-          className={selectClassName()}
-          disabled={!canLinkProfile}
-          name="coachProfileId"
-          required
-        >
-          {canLinkProfile ? (
-            pendingProfiles.map((profile) => {
-              const identity = getCoachProfileIdentity(profile, personProfiles);
-
-              return (
-                <option key={profile.id} value={profile.id}>
-                  {identity.label} / {identity.detail}
-                </option>
-              );
-            })
-          ) : (
-            <option value="">Sin fichas pendientes visibles</option>
-          )}
-        </select>
-        <span className="text-xs leading-5 text-muted-foreground">
-          Solo aparecen fichas con persona activa y visible, aún sin cuenta
-          vinculada en la ficha.
-        </span>
-      </label>
-
-      <label className={wideActionFieldClassName}>
-        <span className="text-sm font-medium">Cuenta real</span>
-        <Input
-          className="truncate"
-          disabled={!canLinkProfile}
-          name="userId"
-          placeholder="UUID de Supabase Auth"
-          required
-        />
-        <span className="text-xs leading-5 text-muted-foreground">
-          Vincula una cuenta Auth existente. Esto no crea usuarios ni envia
-          emails.
-        </span>
-      </label>
-
-      <label className={compactActionFieldClassName}>
-        <span className="text-sm font-medium">Rol</span>
-        <MembershipRoleSelect />
-      </label>
-
-      <label className={compactActionFieldClassName}>
-        <span className="text-sm font-medium">Estado del acceso</span>
-        <MembershipStatusSelect />
-      </label>
-
-      <div className="col-span-2 flex items-end">
-        <Button disabled={!canLinkProfile} type="submit">
-          <Link2 aria-hidden="true" />
-          Vincular cuenta
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function CoachProfileCreateForm({
+function DirectTeamAccountCreateForm({
   centers,
-  memberships,
   organizationId,
-  personProfilesByUserId,
 }: {
   centers: CenterRow[];
-  memberships: MembershipRow[];
   organizationId: string;
-  personProfilesByUserId: Map<string, PersonProfileRow>;
 }) {
-  const canCreateProfile = memberships.length > 0;
-
   return (
-    <form action={createCoachProfile} className={compactActionFormClassName}>
+    <form action={createDirectTeamAccount} className={compactActionFormClassName}>
       <input name="organizationId" type="hidden" value={organizationId} />
 
       <label className={wideActionFieldClassName}>
-        <span className="text-sm font-medium">Cuenta con acceso</span>
-        <select
-          className={selectClassName()}
-          disabled={!canCreateProfile}
-          name="userId"
+        <span className="text-sm font-medium">Email</span>
+        <Input
+          autoComplete="email"
+          name="email"
+          placeholder="nuria@box.com"
           required
-        >
-          {memberships.map((membership) => {
-            const identity = getMembershipIdentity(
-              membership,
-              personProfilesByUserId,
-            );
+          type="email"
+        />
+      </label>
 
-            return (
-              <option key={membership.id} value={membership.user_id}>
-                {identity.label} / {getMembershipRoleLabel(membership.role)}
-              </option>
-            );
-          })}
-        </select>
+      <label className={compactActionFieldClassName}>
+        <span className="text-sm font-medium">Contraseña temporal</span>
+        <Input
+          autoComplete="new-password"
+          minLength={PASSWORD_MIN_LENGTH}
+          name="password"
+          pattern={PASSWORD_PATTERN_ATTRIBUTE}
+          required
+          title={PASSWORD_POLICY_DESCRIPTION}
+          type="password"
+        />
+      </label>
+
+      <label className={compactActionFieldClassName}>
+        <span className="text-sm font-medium">Confirmar contraseña</span>
+        <Input
+          autoComplete="new-password"
+          name="confirmPassword"
+          required
+          type="password"
+        />
+      </label>
+
+      <p className="col-span-2 text-xs leading-5 text-muted-foreground">
+        BoxOps no guarda esta contraseña. La cuenta quedará obligada a cambiarla
+        en el primer inicio de sesión.
+      </p>
+
+      <label className={compactActionFieldClassName}>
+        <span className="text-sm font-medium">Rol</span>
+        <MembershipRoleSelect />
+      </label>
+
+      <label className={compactActionFieldClassName}>
+        <span className="text-sm font-medium">Estado inicial</span>
+        <InitialAccessStatusSelect />
+      </label>
+
+      <label className={wideActionFieldClassName}>
+        <span className="text-sm font-medium">Nombre visible</span>
+        <Input
+          maxLength={80}
+          name="displayName"
+          placeholder="Nombre que verá el equipo"
+          required
+        />
       </label>
 
       <label className={wideActionFieldClassName}>
@@ -1002,8 +1215,8 @@ function CoachProfileCreateForm({
         <span className="text-sm font-medium">Horas semanales</span>
         <Input
           defaultValue="0"
-          min="0"
           max="168"
+          min="0"
           name="weeklyContractedHours"
           step="0.25"
           type="number"
@@ -1011,32 +1224,16 @@ function CoachProfileCreateForm({
       </label>
 
       <label className={compactActionFieldClassName}>
-        <span className="text-sm font-medium">Estado</span>
-        <CoachProfileStatusSelect />
-      </label>
-
-      <label className={wideActionFieldClassName}>
         <span className="text-sm font-medium">Notas internas</span>
-        <Textarea
-          maxLength={1000}
-          name="notes"
-          placeholder="Capacidad, restricciones o contexto operativo"
-        />
+        <Textarea maxLength={1000} name="notes" rows={3} />
       </label>
 
       <div className="col-span-2 flex items-end">
-        <Button disabled={!canCreateProfile} type="submit">
-          <Plus aria-hidden="true" />
-          Crear ficha
+        <Button type="submit">
+          <KeyRound aria-hidden="true" />
+          Crear cuenta
         </Button>
       </div>
-
-      {!canCreateProfile ? (
-        <p className="col-span-2 text-sm text-muted-foreground">
-          Crea primero un acceso por UUID para poder crear una ficha desde
-          cuenta.
-        </p>
-      ) : null}
     </form>
   );
 }
@@ -1052,9 +1249,7 @@ function TeamInvitationsSection({
   personProfiles: PersonProfileMaps;
   timezone: string;
 }) {
-  const openInvitations = invitations.filter((invitation) =>
-    ["pending", "sent", "failed", "expired"].includes(invitation.status),
-  );
+  const openInvitations = invitations.filter(isOpenTeamInvitation);
 
   return (
     <section className="space-y-3">
@@ -1066,7 +1261,7 @@ function TeamInvitationsSection({
 
       {openInvitations.length === 0 ? (
         <EmptyState
-          description="Cuando envies una invitacion, aparecera aqui hasta que se acepte o se cancele."
+          description="Cuando envíes una invitación, aparecerá aquí hasta que se acepte o se cancele."
           title="No hay invitaciones pendientes"
         />
       ) : (
@@ -1092,7 +1287,7 @@ function TeamInvitationsSection({
                       <MetaItem label="Rol">
                         {getMembershipRoleLabel(invitation.role)}
                       </MetaItem>
-                      <MetaItem label="Ultimo envio">
+                      <MetaItem label="Último envío">
                         {formatDate(
                           invitation.last_sent_at ?? invitation.sent_at,
                           timezone,
@@ -1158,289 +1353,62 @@ function TeamInvitationsSection({
   );
 }
 
-function MembershipMobileCard({
-  canManageAccess,
-  currentUserId,
-  identity,
-  membership,
-  organizationId,
-  timezone,
-}: {
-  canManageAccess: boolean;
-  currentUserId: string;
-  identity: ReturnType<typeof getMembershipIdentity>;
-  membership: MembershipRow;
-  organizationId: string;
-  timezone: string;
-}) {
-  const isSelf = membership.user_id === currentUserId;
-  const canEditMembershipRole = isMembershipRole(membership.role);
+function TeamOperationalStatusBadge({ row }: { row: TeamUserRow }) {
+  if (!row.profile) {
+    return <StatusBadge tone="neutral">Sin datos operativos</StatusBadge>;
+  }
 
   return (
-    <Card size="sm">
-      <CardContent className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold tracking-tight">
-              {identity.label}
-              {isSelf ? (
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  tu usuario
-                </span>
-              ) : null}
-            </h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {identity.detail}
-            </p>
-          </div>
-          <MembershipStatusBadge status={membership.status} />
-        </div>
-
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div className="min-w-0">
-            <dt className="text-xs font-medium text-muted-foreground">Rol</dt>
-            <dd className="mt-1">
-              <Badge variant="outline">
-                {getMembershipRoleLabel(membership.role)}
-              </Badge>
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs font-medium text-muted-foreground">
-              Entrada
-            </dt>
-            <dd className="mt-1 truncate font-medium">
-              {formatDate(membership.joined_at ?? membership.invited_at, timezone)}
-            </dd>
-          </div>
-        </dl>
-
-        {canManageAccess ? (
-          isSelf ? (
-            <p className="text-sm text-muted-foreground">
-              Tu propio acceso está protegido.
-            </p>
-          ) : !canEditMembershipRole ? (
-            <p className="text-sm text-muted-foreground">
-              Este rol futuro se conserva, pero no se edita desde el corte B.2.
-            </p>
-          ) : (
-            <InlineEditDetails label="Ajustar acceso">
-              <form action={updateMembership} className="grid gap-3">
-                <input name="organizationId" type="hidden" value={organizationId} />
-                <input name="membershipId" type="hidden" value={membership.id} />
-                <input name="userId" type="hidden" value={membership.user_id} />
-                <MembershipRoleSelect defaultValue={membership.role} />
-                <MembershipStatusSelect defaultValue={membership.status} />
-                <Button className="w-full" type="submit">
-                  <Save aria-hidden="true" />
-                  Guardar
-                </Button>
-              </form>
-            </InlineEditDetails>
-          )
-        ) : null}
-      </CardContent>
-    </Card>
+    <StatusBadge tone={row.profile.status === "active" ? "success" : "neutral"}>
+      {row.profile.status === "active" ? "Operativo" : "Archivado"}
+    </StatusBadge>
   );
 }
 
-function MembershipsSection({
+function TeamUserCard({
+  canDeleteProfiles,
   canManageAccess,
-  currentUserId,
-  memberships,
-  organizationId,
-  organizationName,
-  personProfilesByUserId,
-  timezone,
-}: {
-  canManageAccess: boolean;
-  currentUserId: string;
-  memberships: MembershipRow[];
-  organizationId: string;
-  organizationName: string;
-  personProfilesByUserId: Map<string, PersonProfileRow>;
-  timezone: string;
-}) {
-  return (
-    <section className="space-y-3">
-      <SectionHeader
-        action={<Badge variant="outline">{memberships.length} accesos</Badge>}
-        description="Quién puede entrar en la organización y con qué rol."
-        title="Accesos del equipo"
-      />
-
-      {memberships.length === 0 ? (
-        <EmptyState
-          description={
-            canManageAccess
-              ? "Crea el primer acceso usando una cuenta real que ya exista en Auth."
-              : "Propietario o Administrador deben revisar tu acceso antes de que aparezca aquí."
-          }
-          title="No hay accesos visibles"
-        />
-      ) : (
-        <>
-          <div className="grid gap-3 md:hidden">
-            {memberships.map((membership) => {
-              const identity = getMembershipIdentity(
-                membership,
-                personProfilesByUserId,
-              );
-
-              return (
-                <MembershipMobileCard
-                  canManageAccess={canManageAccess}
-                  currentUserId={currentUserId}
-                  identity={identity}
-                  key={membership.id}
-                  membership={membership}
-                  organizationId={organizationId}
-                  timezone={timezone}
-                />
-              );
-            })}
-          </div>
-
-        <Card className="hidden md:flex" size="sm">
-          <CardContent className="overflow-x-auto p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Persona</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Organización</TableHead>
-                  <TableHead>Entrada</TableHead>
-                  {canManageAccess ? <TableHead>Gestión</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {memberships.map((membership) => {
-                  const isSelf = membership.user_id === currentUserId;
-                  const canEditMembershipRole = isMembershipRole(
-                    membership.role,
-                  );
-                  const identity = getMembershipIdentity(
-                    membership,
-                    personProfilesByUserId,
-                  );
-
-                  return (
-                    <TableRow key={membership.id}>
-                      <TableCell className="min-w-52">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">
-                            {identity.label}
-                            {isSelf ? (
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                tu usuario
-                              </span>
-                            ) : null}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {identity.detail}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {getMembershipRoleLabel(membership.role)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <MembershipStatusBadge status={membership.status} />
-                      </TableCell>
-                      <TableCell className="max-w-52 truncate">
-                        {organizationName}
-                      </TableCell>
-                      <TableCell>
-                        {formatDate(
-                          membership.joined_at ?? membership.invited_at,
-                          timezone,
-                        )}
-                      </TableCell>
-                      {canManageAccess ? (
-                        <TableCell className="min-w-64">
-                          {isSelf ? (
-                            <span className="text-sm text-muted-foreground">
-                              Protegida
-                            </span>
-                          ) : !canEditMembershipRole ? (
-                            <span className="text-sm text-muted-foreground">
-                              Rol futuro sin edición B.2
-                            </span>
-                          ) : (
-                            <InlineEditDetails label="Ajustar acceso">
-                              <form
-                                action={updateMembership}
-                                className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                              >
-                                <input
-                                  name="organizationId"
-                                  type="hidden"
-                                  value={organizationId}
-                                />
-                                <input
-                                  name="membershipId"
-                                  type="hidden"
-                                  value={membership.id}
-                                />
-                                <input
-                                  name="userId"
-                                  type="hidden"
-                                  value={membership.user_id}
-                                />
-                                <MembershipRoleSelect
-                                  defaultValue={membership.role}
-                                />
-                                <MembershipStatusSelect
-                                  defaultValue={membership.status}
-                                />
-                                <Button size="sm" type="submit">
-                                  <Save aria-hidden="true" />
-                                  Guardar
-                                </Button>
-                              </form>
-                            </InlineEditDetails>
-                          )}
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        </>
-      )}
-    </section>
-  );
-}
-
-function CoachProfileCard({
   canManageProfiles,
   centers,
-  membershipsByUserId,
+  currentUserId,
   organizationId,
-  personProfiles,
-  profile,
+  row,
   timezone,
 }: {
+  canDeleteProfiles: boolean;
+  canManageAccess: boolean;
   canManageProfiles: boolean;
   centers: CenterRow[];
-  membershipsByUserId: Map<string, MembershipRow>;
+  currentUserId: string;
   organizationId: string;
-  personProfiles: PersonProfileMaps;
-  profile: CoachProfileRow;
+  row: TeamUserRow;
   timezone: string;
 }) {
+  const profile = row.profile;
+  const membership = row.membership;
   const primaryCenter = centers.find(
-    (center) => center.id === profile.primary_center_id,
+    (center) => center.id === profile?.primary_center_id,
   );
-  const identity = getCoachProfileIdentity(profile, personProfiles);
-  const profileRole = getCoachProfileRole(profile, membershipsByUserId);
+  const isSelf = membership?.user_id === currentUserId;
+  const canEditAccess =
+    canManageAccess &&
+    Boolean(membership) &&
+    !isSelf &&
+    Boolean(membership && isMembershipRole(membership.role));
+  const canEditOperationalData = canManageProfiles && Boolean(profile);
+  const canCreateOperationalData =
+    canManageAccess &&
+    Boolean(membership) &&
+    !profile &&
+    isVisiblePerson(row.personProfile);
+  const canShowManagement =
+    canEditAccess ||
+    canEditOperationalData ||
+    canCreateOperationalData ||
+    (canDeleteProfiles && Boolean(profile));
+  const hasLinkedAccount = Boolean(
+    membership || profile?.user_id || row.personProfile?.user_id,
+  );
 
   return (
     <Card size="sm">
@@ -1448,85 +1416,258 @@ function CoachProfileCard({
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto] lg:items-start">
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold tracking-tight">
-              {identity.label}
+              {row.label}
+              {isSelf ? (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  tu usuario
+                </span>
+              ) : null}
             </h3>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {identity.detail}
+              {row.detail}
             </p>
           </div>
           <MetaGrid className="lg:grid-cols-4">
-            <MetaItem label="Centro principal">
-              {primaryCenter?.name ?? "Sin centro principal"}
-            </MetaItem>
             <MetaItem label="Rol">
-              {profileRole ? getMembershipRoleLabel(profileRole) : "Sin acceso"}
+              {row.role ? getMembershipRoleLabel(row.role) : "Sin acceso"}
+            </MetaItem>
+            <MetaItem label="Centro principal">
+              {profile
+                ? (primaryCenter?.name ?? "Sin centro principal")
+                : "Sin datos operativos"}
             </MetaItem>
             <MetaItem label="Horas semanales">
-              {formatHours(profile.weekly_contracted_hours)}
+              {profile
+                ? formatHours(profile.weekly_contracted_hours)
+                : "Sin horas"}
             </MetaItem>
-            <MetaItem label="Actualizado">
-              {formatDate(profile.updated_at, timezone)}
+            <MetaItem label={membership ? "Entrada" : "Actualizado"}>
+              {formatDate(
+                membership
+                  ? (membership.joined_at ?? membership.invited_at)
+                  : (profile?.updated_at ?? null),
+                timezone,
+              )}
             </MetaItem>
           </MetaGrid>
-          <div className="flex justify-start lg:justify-end">
-            <CoachProfileStatusBadge status={profile.status} />
+          <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+            {membership ? (
+              <MembershipStatusBadge status={membership.status} />
+            ) : null}
+            <TeamLinkStatusBadge status={row.linkStatus} />
+            <TeamOperationalStatusBadge row={row} />
           </div>
         </div>
 
-        {canManageProfiles ? (
-          <InlineEditDetails label="Gestionar ficha">
-            <form
-              action={updateCoachProfile}
-              className="grid gap-4 lg:grid-cols-4"
-            >
-              <input
-                name="organizationId"
-                type="hidden"
-                value={organizationId}
-              />
-              <input name="coachProfileId" type="hidden" value={profile.id} />
+        {canShowManagement ? (
+          <InlineEditDetails label="Gestionar usuario">
+            <div className="grid gap-4">
+              {isSelf && canManageAccess ? (
+                <p className="text-sm text-muted-foreground">
+                  Tu propio acceso esta protegido.
+                </p>
+              ) : null}
 
-              <label className="grid gap-2 lg:col-span-2">
-                <span className="text-sm font-medium">Centro principal</span>
-                <CenterSelect
-                  centers={centers}
-                  defaultValue={profile.primary_center_id}
-                />
-              </label>
+              {canEditAccess && membership ? (
+                <div className="grid gap-2">
+                  <h4 className="text-sm font-semibold">Acceso y permisos</h4>
+                  <form
+                    action={updateMembership}
+                    className={membershipAccessEditFormClassName}
+                  >
+                    <input
+                      name="organizationId"
+                      type="hidden"
+                      value={organizationId}
+                    />
+                    <input
+                      name="membershipId"
+                      type="hidden"
+                      value={membership.id}
+                    />
+                    <input
+                      name="userId"
+                      type="hidden"
+                      value={membership.user_id}
+                    />
+                    <MembershipRoleSelect defaultValue={membership.role} />
+                    <MembershipStatusSelect defaultValue={membership.status} />
+                    <Button
+                      className="w-full sm:col-span-2 sm:w-fit"
+                      type="submit"
+                    >
+                      <Save aria-hidden="true" />
+                      Guardar acceso
+                    </Button>
+                  </form>
+                </div>
+              ) : null}
 
-              <label className="grid gap-2">
-                <span className="text-sm font-medium">Horas semanales</span>
-                <Input
-                  defaultValue={profile.weekly_contracted_hours}
-                  min="0"
-                  max="168"
-                  name="weeklyContractedHours"
-                  step="0.25"
-                  type="number"
-                />
-              </label>
+              {canEditOperationalData && profile ? (
+                <div className="grid gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
+                  <h4 className="text-sm font-semibold">Datos operativos</h4>
+                  <form
+                    action={updateCoachProfile}
+                    className="grid gap-4 lg:grid-cols-4"
+                  >
+                    <input
+                      name="organizationId"
+                      type="hidden"
+                      value={organizationId}
+                    />
+                    <input
+                      name="coachProfileId"
+                      type="hidden"
+                      value={profile.id}
+                    />
 
-              <label className="grid gap-2">
-                <span className="text-sm font-medium">Estado</span>
-                <CoachProfileStatusSelect defaultValue={profile.status} />
-              </label>
+                    <label className="grid gap-2 lg:col-span-2">
+                      <span className="text-sm font-medium">
+                        Centro principal
+                      </span>
+                      <CenterSelect
+                        centers={centers}
+                        defaultValue={profile.primary_center_id}
+                      />
+                    </label>
 
-              <label className="grid gap-2 lg:col-span-4">
-                <span className="text-sm font-medium">Notas internas</span>
-                <Textarea
-                  defaultValue={profile.notes ?? ""}
-                  maxLength={1000}
-                  name="notes"
-                />
-              </label>
+                    <label className="grid gap-2">
+                      <span className="text-sm font-medium">
+                        Horas semanales
+                      </span>
+                      <Input
+                        defaultValue={profile.weekly_contracted_hours}
+                        min="0"
+                        max="168"
+                        name="weeklyContractedHours"
+                        step="0.25"
+                        type="number"
+                      />
+                    </label>
 
-              <div className="flex flex-wrap gap-2 lg:col-span-4">
-                <Button type="submit">
-                  <Save aria-hidden="true" />
-                  Guardar ficha
-                </Button>
-              </div>
-            </form>
+                    {canManageAccess ? (
+                      <>
+                        <label className="grid gap-2">
+                          <span className="text-sm font-medium">
+                            Estado operativo
+                          </span>
+                          <CoachProfileStatusSelect
+                            defaultValue={profile.status}
+                          />
+                        </label>
+
+                        <label className="grid gap-2 lg:col-span-4">
+                          <span className="text-sm font-medium">
+                            Notas internas
+                          </span>
+                          <Textarea
+                            defaultValue={profile.notes ?? ""}
+                            maxLength={1000}
+                            name="notes"
+                          />
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <input name="status" type="hidden" value={profile.status} />
+                        <input
+                          name="notes"
+                          type="hidden"
+                          value={profile.notes ?? ""}
+                        />
+                      </>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 lg:col-span-4">
+                      <Button type="submit">
+                        <Save aria-hidden="true" />
+                        Guardar datos
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              ) : null}
+
+              {canCreateOperationalData && membership ? (
+                <div className="grid gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
+                  <h4 className="text-sm font-semibold">Datos operativos</h4>
+                  <form
+                    action={createCoachProfile}
+                    className="grid gap-4 lg:grid-cols-4"
+                  >
+                    <input
+                      name="organizationId"
+                      type="hidden"
+                      value={organizationId}
+                    />
+                    <input
+                      name="userId"
+                      type="hidden"
+                      value={membership.user_id}
+                    />
+                    <input
+                      name="displayName"
+                      type="hidden"
+                      value={row.personProfile?.display_name ?? row.label}
+                    />
+                    <input name="status" type="hidden" value="active" />
+                    <input name="notes" type="hidden" value="" />
+
+                    <label className="grid gap-2 lg:col-span-2">
+                      <span className="text-sm font-medium">
+                        Centro principal
+                      </span>
+                      <CenterSelect centers={centers} />
+                    </label>
+
+                    <label className="grid gap-2">
+                      <span className="text-sm font-medium">
+                        Horas semanales
+                      </span>
+                      <Input
+                        defaultValue={0}
+                        min="0"
+                        max="168"
+                        name="weeklyContractedHours"
+                        step="0.25"
+                        type="number"
+                      />
+                    </label>
+
+                    <div className="flex flex-wrap gap-2 lg:col-span-4">
+                      <Button type="submit">
+                        <Save aria-hidden="true" />
+                        Activar datos
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              ) : null}
+
+              {canDeleteProfiles && profile ? (
+                <form
+                  action={deleteCoachProfile}
+                  className="flex flex-wrap items-center gap-2 border-t border-border pt-4"
+                >
+                  <input
+                    name="organizationId"
+                    type="hidden"
+                    value={organizationId}
+                  />
+                  <input
+                    name="coachProfileId"
+                    type="hidden"
+                    value={profile.id}
+                  />
+                  <Button type="submit" variant="destructive">
+                    <Trash2 aria-hidden="true" />
+                    {hasLinkedAccount
+                      ? "Archivar datos operativos"
+                      : "Eliminar datos operativos"}
+                  </Button>
+                </form>
+              ) : null}
+            </div>
           </InlineEditDetails>
         ) : null}
       </CardContent>
@@ -1534,7 +1675,7 @@ function CoachProfileCard({
   );
 }
 
-function CoachProfileFiltersCard({
+function TeamUserFiltersCard({
   activeFilterCount,
   centers,
   filteredCount,
@@ -1556,10 +1697,10 @@ function CoachProfileFiltersCard({
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <Filter aria-hidden="true" className="size-4" />
-              Filtrar fichas
+              Filtrar usuarios
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {filteredCount} de {totalCount} fichas visibles.
+              {filteredCount} de {totalCount} usuarios visibles.
             </p>
           </div>
           {activeFilterCount > 0 ? (
@@ -1578,7 +1719,7 @@ function CoachProfileFiltersCard({
             <Input
               defaultValue={filters.query}
               name="q"
-              placeholder="Nombre, cuenta o notas"
+              placeholder="Nombre, rol, centro o notas"
               type="search"
             />
           </label>
@@ -1627,12 +1768,9 @@ function CoachProfileFiltersCard({
               defaultValue={filters.profileStatus ?? ""}
               name="profile_status"
             >
-              <option value="">Todos los estados</option>
-              {COACH_PROFILE_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {getCoachProfileStatusLabel(status)}
-                </option>
-              ))}
+              <option value="">Todos</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Archivados</option>
             </select>
           </label>
 
@@ -1669,55 +1807,60 @@ function CoachProfileFiltersCard({
   );
 }
 
-function CoachProfilesSection({
+function TeamUsersSection({
   activeFilterCount,
+  canDeleteProfiles,
+  canManageAccess,
   canManageProfiles,
   centers,
+  currentUserId,
   filters,
-  membershipsByUserId,
   organizationId,
-  personProfiles,
-  profiles,
+  rows,
   timezone,
-  totalProfiles,
+  totalRows,
 }: {
   activeFilterCount: number;
+  canDeleteProfiles: boolean;
+  canManageAccess: boolean;
   canManageProfiles: boolean;
   centers: CenterRow[];
+  currentUserId: string;
   filters: CoachProfileFilters;
-  membershipsByUserId: Map<string, MembershipRow>;
   organizationId: string;
-  personProfiles: PersonProfileMaps;
-  profiles: CoachProfileRow[];
+  rows: TeamUserRow[];
   timezone: string;
-  totalProfiles: number;
+  totalRows: number;
 }) {
   const hasActiveFilters = activeFilterCount > 0;
+  const showingArchived = filters.profileStatus === "inactive";
+  const usersBadgeLabel =
+    rows.length === totalRows
+      ? `${totalRows} usuarios`
+      : `${rows.length} de ${totalRows} usuarios`;
 
   return (
     <section className="space-y-3">
       <SectionHeader
-        action={
-          <Badge variant="outline">
-            {hasActiveFilters
-              ? `${profiles.length} de ${totalProfiles} fichas`
-              : `${totalProfiles} fichas`}
-          </Badge>
+        action={<Badge variant="outline">{usersBadgeLabel}</Badge>}
+        description={
+          showingArchived
+            ? "Usuarios o datos operativos conservados por historial."
+            : "Acceso, rol, centro principal y horas semanales en un solo sitio."
         }
-        description="Centro principal, horas semanales, estado y notas."
-        title="Fichas de entrenador"
+        title={showingArchived ? "Usuarios archivados" : "Usuarios del equipo"}
       />
 
-      <CoachProfileFiltersCard
+      <TeamUserFiltersCard
         activeFilterCount={activeFilterCount}
         centers={centers}
-        filteredCount={profiles.length}
+        filteredCount={rows.length}
         filters={filters}
         organizationId={organizationId}
-        totalCount={totalProfiles}
+        totalCount={totalRows}
       />
 
-      {profiles.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           action={
             hasActiveFilters ? (
@@ -1731,28 +1874,35 @@ function CoachProfilesSection({
           }
           description={
             hasActiveFilters
-              ? "Prueba con otro nombre, centro, rol o estado de cuenta."
-              : canManageProfiles
-                ? "Crea una ficha cuando una persona del equipo vaya a cubrir clases."
-                : "Todavía no hay fichas de entrenador visibles para esta organización."
+              ? "Prueba con otro nombre, centro, rol, estado o cuenta."
+              : canManageAccess || canManageProfiles
+                ? showingArchived
+                  ? "Los usuarios archivados apareceran aqui cuando existan."
+                  : "Invita o crea usuarios para empezar a gestionar el equipo."
+                : showingArchived
+                  ? "No hay usuarios archivados visibles para esta organizacion."
+                  : "Todavia no hay usuarios visibles para esta organizacion."
           }
           title={
             hasActiveFilters
-              ? "No hay fichas con estos filtros"
-              : "No hay fichas de entrenador todavía"
+              ? "No hay usuarios con estos filtros"
+              : showingArchived
+                ? "No hay usuarios archivados"
+                : "No hay usuarios todavia"
           }
         />
       ) : (
         <div className="grid gap-3">
-          {profiles.map((profile) => (
-            <CoachProfileCard
+          {rows.map((row) => (
+            <TeamUserCard
+              canDeleteProfiles={canDeleteProfiles}
+              canManageAccess={canManageAccess}
               canManageProfiles={canManageProfiles}
               centers={centers}
-              key={profile.id}
-              membershipsByUserId={membershipsByUserId}
+              currentUserId={currentUserId}
+              key={row.id}
               organizationId={organizationId}
-              personProfiles={personProfiles}
-              profile={profile}
+              row={row}
               timezone={timezone}
             />
           ))}
@@ -1781,7 +1931,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       <div className="space-y-6">
         <PageHeader
           badge="Equipo"
-          description="Gestiona accesos y fichas operativas del equipo."
+          description="Gestiona usuarios y datos operativos del equipo."
           title="Equipo"
         />
         <OrganizationResolutionState
@@ -1810,17 +1960,15 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
   const canManageProfiles = canManageOperationalTeamProfiles(
     resolution.membership.role,
   );
-  const canManageAnyTeamData = canManageAccess || canManageProfiles;
-  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
-  const profileUserIds = new Set(
-    coachProfiles.flatMap((profile) =>
-      profile.user_id ? [profile.user_id] : [],
-    ),
+  const canDeleteProfiles = canDeleteOperationalTeamProfiles(
+    resolution.membership.role,
   );
-  const membershipsWithoutProfile = tenantMemberships.filter(
+  const roleLabel = getApplicationRoleLabel(resolution.membership.role);
+  const membershipsWithoutVisiblePerson = tenantMemberships.filter(
     (membership) =>
       isMembershipRole(membership.role) &&
-      !profileUserIds.has(membership.user_id),
+      getMembershipLinkStatus(membership, personProfiles.byUserId) ===
+        "incomplete",
   );
   const pendingLinkProfiles = coachProfiles.filter((profile) => {
     if (
@@ -1833,6 +1981,17 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
 
     return isVisiblePerson(personProfiles.byId.get(profile.person_profile_id));
   });
+  const incompleteCoachProfiles = coachProfiles.filter(
+    (profile) =>
+      profile.status === "active" &&
+      getCoachProfileLinkStatus(profile, personProfiles) === "incomplete",
+  );
+  const teamLinkingReviewSummary: TeamLinkingReviewSummary = {
+    incompleteCoachProfiles: incompleteCoachProfiles.length,
+    membershipsWithoutVisiblePerson: membershipsWithoutVisiblePerson.length,
+      openInvitations: teamInvitations.filter(isOpenTeamInvitation).length,
+    profilesWithoutLinkedAccount: pendingLinkProfiles.length,
+  };
   const centersById = new Map(centers.map((center) => [center.id, center]));
   const membershipsByUserId = new Map(
     tenantMemberships.map((membership) => [membership.user_id, membership]),
@@ -1841,20 +2000,24 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
     centers,
     params,
   });
-  const filteredCoachProfiles = applyCoachProfileFilters({
-    centersById,
-    filters: coachProfileFilters,
+  const teamUserRows = buildTeamUserRows({
+    coachProfiles,
+    memberships: tenantMemberships,
     membershipsByUserId,
     personProfiles,
-    profiles: coachProfiles,
+  });
+  const filteredTeamUserRows = applyTeamUserFilters({
+    centersById,
+    filters: coachProfileFilters,
+    rows: teamUserRows,
   });
   const coachProfileActiveFilterCount =
     getCoachProfileActiveFilterCount(coachProfileFilters);
   const teamPageDescription = canManageAccess
-    ? "Invita al equipo por email y mantén sus accesos y fichas de entrenador al día."
+    ? "Invita, crea cuentas y gestiona usuarios sin separar acceso y datos operativos."
     : canManageProfiles
-      ? "Mantén actualizadas las fichas de entrenador y consulta los accesos del equipo."
-      : "Consulta quién forma parte del equipo y sus fichas de entrenador.";
+      ? "Consulta el equipo y ajusta centro principal y horas semanales."
+      : "Consulta quien forma parte del equipo y su contexto operativo.";
 
   return (
     <div className="space-y-6">
@@ -1872,7 +2035,7 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
 
       {status && successMessages[status] ? (
         <TransientFeedbackBanner
-          description="La lista ya muestra los accesos y fichas actuales."
+          description="La lista ya muestra los usuarios actualizados."
           title={successMessages[status]}
           tone="success"
         />
@@ -1886,82 +2049,46 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         />
       ) : null}
 
-      {canManageAnyTeamData ? (
+      {canManageAccess ? (
         <div className="space-y-3">
-          {canManageAccess ? (
-            <CollapsibleActionPanel
-              actionLabel="Invitar"
-              description="Crea o reutiliza una ficha y envia un enlace de acceso por email."
-              icon={Mail}
-              title="Invitar usuario"
-            >
-              <TeamInvitationCreateForm
-                centers={centers}
-                organizationId={resolution.organization.id}
-                pendingProfiles={pendingLinkProfiles}
-                personProfiles={personProfiles}
-              />
-            </CollapsibleActionPanel>
-          ) : null}
+          <CollapsibleActionPanel
+            actionLabel="Invitar"
+            description="Crea o reutiliza datos operativos y envia un enlace de acceso por email."
+            icon={Mail}
+            title="Invitar usuario"
+          >
+            <TeamInvitationCreateForm
+              centers={centers}
+              organizationId={resolution.organization.id}
+              pendingProfiles={pendingLinkProfiles}
+              personProfiles={personProfiles}
+            />
+          </CollapsibleActionPanel>
 
-          <details className="group rounded-xl border border-dashed border-border bg-muted/20">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-              Herramientas avanzadas
-              <Badge variant="outline">UUID</Badge>
-            </summary>
-            <div className="grid gap-3 border-t border-border px-4 py-4 xl:grid-cols-3">
-              {canManageAccess ? (
-                <>
-                  <CollapsibleActionPanel
-                    actionLabel="Crear"
-                    description="Da acceso con el UUID de una cuenta Auth existente."
-                    icon={UserPlus}
-                    title="Crear acceso"
-                  >
-                    <MembershipCreateForm
-                      organizationId={resolution.organization.id}
-                    />
-                  </CollapsibleActionPanel>
-                  <CollapsibleActionPanel
-                    actionLabel="Vincular"
-                    description="Conecta una ficha/persona pendiente con una cuenta real."
-                    icon={Link2}
-                    title="Vincular cuenta existente"
-                  >
-                    <CoachAccountLinkForm
-                      organizationId={resolution.organization.id}
-                      pendingProfiles={pendingLinkProfiles}
-                      personProfiles={personProfiles}
-                    />
-                  </CollapsibleActionPanel>
-                </>
-              ) : null}
-              {canManageProfiles ? (
-                <CollapsibleActionPanel
-                  actionLabel="Crear"
-                  description="Crea una ficha desde un acceso ya existente."
-                  icon={BadgeCheck}
-                  title="Crear ficha de entrenador"
-                >
-                  <CoachProfileCreateForm
-                    centers={centers}
-                    memberships={membershipsWithoutProfile}
-                    organizationId={resolution.organization.id}
-                    personProfilesByUserId={personProfiles.byUserId}
-                  />
-                </CollapsibleActionPanel>
-              ) : null}
-            </div>
-          </details>
+          <CollapsibleActionPanel
+            actionLabel="Crear"
+            description="Crea usuario, datos operativos y contraseña temporal sin enviar invitación."
+            icon={KeyRound}
+            title="Crear cuenta"
+          >
+            <DirectTeamAccountCreateForm
+              centers={centers}
+              organizationId={resolution.organization.id}
+            />
+          </CollapsibleActionPanel>
         </div>
+      ) : null}
+
+      {canManageAccess ? (
+        <TeamLinkingReviewNotice summary={teamLinkingReviewSummary} />
       ) : null}
 
       {canManageProfiles && !canManageAccess ? (
         <Alert>
           <AlertTitle>Accesos protegidos</AlertTitle>
           <AlertDescription>
-            Tu rol puede ajustar fichas operativas, pero Propietario y
-            Administrador mantienen altas, roles y vinculaciones de cuenta.
+            Tu rol puede ajustar centro y horas semanales, pero Propietario y
+            Administrador mantienen altas, roles y permisos.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -1975,37 +2102,19 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
         />
       ) : null}
 
-      <MembershipsSection
-        canManageAccess={canManageAccess}
-        currentUserId={user.id}
-        memberships={tenantMemberships}
-        organizationId={resolution.organization.id}
-        organizationName={resolution.organization.name}
-        personProfilesByUserId={personProfiles.byUserId}
-        timezone={resolution.organization.timezone}
-      />
-
-      <CoachProfilesSection
+      <TeamUsersSection
         activeFilterCount={coachProfileActiveFilterCount}
+        canDeleteProfiles={canDeleteProfiles}
+        canManageAccess={canManageAccess}
         canManageProfiles={canManageProfiles}
         centers={centers}
+        currentUserId={user.id}
         filters={coachProfileFilters}
-        membershipsByUserId={membershipsByUserId}
         organizationId={resolution.organization.id}
-        personProfiles={personProfiles}
-        profiles={filteredCoachProfiles}
+        rows={filteredTeamUserRows}
         timezone={resolution.organization.timezone}
-        totalProfiles={coachProfiles.length}
+        totalRows={teamUserRows.length}
       />
-
-      <Alert>
-        <CircleOff aria-hidden="true" className="size-4" />
-        <AlertTitle>Fuera de este corte</AlertTitle>
-        <AlertDescription>
-          Esta pantalla prepara el equipo. Los horarios, plantillas y cobertura
-          se gestionan en sus secciones.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

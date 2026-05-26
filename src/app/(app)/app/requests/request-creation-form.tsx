@@ -29,48 +29,56 @@ type RequestCreationFormProps = {
   selectedBlockId?: string | null;
 };
 
+type CreationAssignmentOption =
+  ChangeRequestCreationOptions["assignmentOptions"][number];
+
 const creationRequestTypeOptions = [
   {
-    description: "Pedir ayuda para cubrir una clase ya asignada.",
+    description:
+      "Para que otro entrenador te cubra ese dia o intercambie turno contigo.",
     label: "Pedir cobertura",
     value: "coverage_request",
   },
   {
-    description: "Ofrecer una clase a entrenadores concretos.",
+    description: "Ofrecer tu clase a entrenadores concretos.",
     label: "Oferta de cobertura",
     value: "offer_block",
   },
   {
-    description: "Pedir un ajuste sobre tu propia clase.",
-    label: "Cambio propio",
+    description: "Pedir un cambio sobre tu propia clase.",
+    label: "Pedir cambio",
     value: "own_block_change",
   },
 ] as const;
+
+type CreationRequestTypeOptionValue =
+  (typeof creationRequestTypeOptions)[number]["value"];
 
 const restrictionLabels: Record<
   ChangeRequestCreationTargetRestrictionReason,
   string
 > = {
-  "already-assigned": "Ya cubre este bloque",
-  overlap: "Solapa con otro bloque asignado",
-  "source-coach": "Es el coach origen",
+  "already-assigned": "Ya cubre esta clase",
+  overlap: "Tiene otra clase en esa franja",
+  "source-coach": "Es quien solicita",
 };
-
-function formatServiceDate(value: string) {
-  try {
-    return new Intl.DateTimeFormat("es-ES", {
-      day: "2-digit",
-      month: "short",
-      timeZone: "UTC",
-      weekday: "short",
-    }).format(new Date(`${value}T12:00:00.000Z`));
-  } catch {
-    return value;
-  }
-}
 
 function formatTime(value: string) {
   return value.slice(0, 5) || value;
+}
+
+function compareAssignmentOptions(
+  left: CreationAssignmentOption,
+  right: CreationAssignmentOption,
+) {
+  return (
+    left.serviceDate.localeCompare(right.serviceDate) ||
+    left.startTime.localeCompare(right.startTime) ||
+    left.endTime.localeCompare(right.endTime) ||
+    left.centerName.localeCompare(right.centerName) ||
+    left.classTypeName.localeCompare(right.classTypeName) ||
+    left.coachName.localeCompare(right.coachName)
+  );
 }
 
 function getInitialAssignmentId({
@@ -82,14 +90,18 @@ function getInitialAssignmentId({
   selectedAssignmentId?: string | null;
   selectedBlockId?: string | null;
 }) {
+  const sortedAssignmentOptions = [
+    ...creationOptions.assignmentOptions,
+  ].sort(compareAssignmentOptions);
+
   return (
-    creationOptions.assignmentOptions.find(
+    sortedAssignmentOptions.find(
       (assignment) => assignment.assignmentId === selectedAssignmentId,
     )?.assignmentId ??
-    creationOptions.assignmentOptions.find(
+    sortedAssignmentOptions.find(
       (assignment) => assignment.blockId === selectedBlockId,
     )?.assignmentId ??
-    creationOptions.assignmentOptions[0]?.assignmentId ??
+    sortedAssignmentOptions[0]?.assignmentId ??
     ""
   );
 }
@@ -108,15 +120,45 @@ export function RequestCreationForm({
       selectedBlockId,
     }),
   );
-  const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
+  const [selectedServiceDate, setSelectedServiceDate] = useState(() => {
+    const initialAssignmentId = getInitialAssignmentId({
+      creationOptions,
+      selectedAssignmentId,
+      selectedBlockId,
+    });
 
+    return (
+      creationOptions.assignmentOptions.find(
+        (assignment) => assignment.assignmentId === initialAssignmentId,
+      )?.serviceDate ?? ""
+    );
+  });
+  const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
+  const [currentRequestType, setCurrentRequestType] =
+    useState<CreationRequestTypeOptionValue>("coverage_request");
+
+  const sortedAssignmentOptions = useMemo(
+    () => [...creationOptions.assignmentOptions].sort(compareAssignmentOptions),
+    [creationOptions.assignmentOptions],
+  );
+  const assignmentsForSelectedDate = useMemo(
+    () =>
+      sortedAssignmentOptions.filter(
+        (assignment) => assignment.serviceDate === selectedServiceDate,
+      ),
+    [selectedServiceDate, sortedAssignmentOptions],
+  );
   const currentAssignment = useMemo(
     () =>
-      creationOptions.assignmentOptions.find(
+      sortedAssignmentOptions.find(
         (assignment) => assignment.assignmentId === currentAssignmentId,
       ) ?? null,
-    [creationOptions.assignmentOptions, currentAssignmentId],
+    [currentAssignmentId, sortedAssignmentOptions],
   );
+  const currentRequestTypeDescription =
+    creationRequestTypeOptions.find(
+      (option) => option.value === currentRequestType,
+    )?.description ?? creationRequestTypeOptions[0].description;
   const restrictionByTargetId = useMemo(
     () =>
       new Map(
@@ -127,14 +169,19 @@ export function RequestCreationForm({
       ),
     [currentAssignment],
   );
-  const availableTargetCount = creationOptions.targetOptions.filter(
-    (target) => !restrictionByTargetId.has(target.coachProfileId),
-  ).length;
-  const canSubmit = selectedTargetIds.length > 0 && availableTargetCount > 0;
+  const availableTargetCount = currentAssignment
+    ? creationOptions.targetOptions.filter(
+        (target) => !restrictionByTargetId.has(target.coachProfileId),
+      ).length
+    : 0;
+  const canSubmit =
+    Boolean(currentAssignment) &&
+    selectedTargetIds.length > 0 &&
+    availableTargetCount > 0;
 
   function handleAssignmentChange(nextAssignmentId: string) {
     const nextAssignment =
-      creationOptions.assignmentOptions.find(
+      sortedAssignmentOptions.find(
         (assignment) => assignment.assignmentId === nextAssignmentId,
       ) ?? null;
     const nextRestrictedTargetIds = new Set(
@@ -144,9 +191,24 @@ export function RequestCreationForm({
     );
 
     setCurrentAssignmentId(nextAssignmentId);
+    if (nextAssignment?.serviceDate) {
+      setSelectedServiceDate(nextAssignment.serviceDate);
+    } else {
+      setSelectedTargetIds([]);
+      return;
+    }
     setSelectedTargetIds((current) =>
       current.filter((targetId) => !nextRestrictedTargetIds.has(targetId)),
     );
+  }
+
+  function handleServiceDateChange(nextServiceDate: string) {
+    const nextAssignment = sortedAssignmentOptions.find(
+      (assignment) => assignment.serviceDate === nextServiceDate,
+    );
+
+    setSelectedServiceDate(nextServiceDate);
+    handleAssignmentChange(nextAssignment?.assignmentId ?? "");
   }
 
   function handleTargetChange(targetId: string, checked: boolean) {
@@ -162,7 +224,7 @@ export function RequestCreationForm({
   return (
     <section className="space-y-3">
       <SectionHeader
-        description="Elige una clase del horario y a qué entrenadores quieres pedir ayuda."
+        description="Pide que otro entrenador te cubra o intercambie una clase contigo."
         title="Pedir cobertura"
       />
 
@@ -170,33 +232,34 @@ export function RequestCreationForm({
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle>Solicitud de cobertura</CardTitle>
+              <CardTitle>Clase y destinatarios</CardTitle>
               <CardDescription>
-                Usa una clase ya asignada en el horario. Solo aparecerán
-                entrenadores disponibles para esa franja.
+                Elige primero el dia, despues la clase y los entrenadores que
+                podrian cubrirla.
               </CardDescription>
             </div>
             <Badge variant="outline">
-              {creationOptions.canManage ? "Gestión" : "Propia"}
+              {creationOptions.canManage ? "Gestion" : "Propia"}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           {creationOptions.assignmentOptions.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="font-medium">No hay clases disponibles</p>
+              <p className="font-medium">No hay clases para pedir cobertura</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Ahora mismo no hay clases asignadas que puedas usar para crear
-                una solicitud. Revisa el horario o cambia de organización si
-                trabajas en otra.
+                No encontramos clases asignadas disponibles. Revisa el horario
+                o cambia de organizacion si trabajas en otra.
               </p>
             </div>
           ) : creationOptions.targetOptions.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="font-medium">No hay entrenadores disponibles</p>
+              <p className="font-medium">
+                No hay entrenadores para solicitar cobertura
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                No hay entrenadores activos que puedan recibir esta solicitud
-                en este momento.
+                No encontramos entrenadores activos que puedan recibir
+                solicitudes en esta organizacion.
               </p>
             </div>
           ) : (
@@ -208,43 +271,78 @@ export function RequestCreationForm({
               />
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.8fr)]">
-                <div className="space-y-2">
-                  <Label htmlFor="scheduleBlockAssignmentId">
-                    Clase
-                  </Label>
-                  <select
-                    className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    id="scheduleBlockAssignmentId"
-                    name="scheduleBlockAssignmentId"
-                    onChange={(event) =>
-                      handleAssignmentChange(event.currentTarget.value)
-                    }
-                    required
-                    value={currentAssignmentId}
-                  >
-                    {creationOptions.assignmentOptions.map((assignment) => (
-                      <option
-                        key={assignment.assignmentId}
-                        value={assignment.assignmentId}
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-[minmax(150px,0.42fr)_minmax(0,1fr)]">
+                    <div className="space-y-2">
+                      <Label htmlFor="requestServiceDate">Fecha</Label>
+                      <Input
+                        id="requestServiceDate"
+                        onChange={(event) =>
+                          handleServiceDateChange(event.currentTarget.value)
+                        }
+                        required
+                        type="date"
+                        value={selectedServiceDate}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="scheduleBlockAssignmentId">
+                        Clase de ese dia
+                      </Label>
+                      <select
+                        className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        id="scheduleBlockAssignmentId"
+                        name="scheduleBlockAssignmentId"
+                        onChange={(event) =>
+                          handleAssignmentChange(event.currentTarget.value)
+                        }
+                        required
+                        value={currentAssignmentId}
                       >
-                        {formatServiceDate(assignment.serviceDate)} /{" "}
-                        {formatTime(assignment.startTime)}-
-                        {formatTime(assignment.endTime)} /{" "}
-                        {assignment.classTypeName} / {assignment.centerName} /{" "}
-                        {assignment.coachName}
-                      </option>
-                    ))}
-                  </select>
+                        {assignmentsForSelectedDate.length === 0 ? (
+                          <option disabled value="">
+                            No hay clases asignadas ese dia
+                          </option>
+                        ) : null}
+                        {assignmentsForSelectedDate.map((assignment) => (
+                          <option
+                            key={assignment.assignmentId}
+                            value={assignment.assignmentId}
+                          >
+                            {formatTime(assignment.startTime)}-
+                            {formatTime(assignment.endTime)} /{" "}
+                            {assignment.classTypeName} /{" "}
+                            {assignment.centerName}
+                            {creationOptions.canManage
+                              ? ` / ${assignment.coachName}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    {creationOptions.canManage
+                      ? "En gestion puedes preparar cobertura de clases del equipo."
+                      : "Solo aparecen clases asignadas a tu usuario."}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="requestType">Qué quieres hacer</Label>
+                  <Label htmlFor="requestType">Tipo de solicitud</Label>
                   <select
                     className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    defaultValue="coverage_request"
                     id="requestType"
                     name="requestType"
+                    onChange={(event) =>
+                      setCurrentRequestType(
+                        event.currentTarget.value as CreationRequestTypeOptionValue,
+                      )
+                    }
                     required
+                    value={currentRequestType}
                   >
                     {creationRequestTypeOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -253,7 +351,7 @@ export function RequestCreationForm({
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    Esta solicitud solo gestiona cobertura del horario.
+                    {currentRequestTypeDescription}
                   </p>
                 </div>
               </div>
@@ -261,15 +359,15 @@ export function RequestCreationForm({
               <fieldset className="space-y-2">
                 <legend className="sr-only">Destinatarios</legend>
                 <div className="flex flex-wrap items-end justify-between gap-2">
-                  <p className="text-sm font-medium">Destinatarios</p>
+                  <p className="text-sm font-medium">Entrenadores</p>
                   <span className="text-xs text-muted-foreground">
-                    {availableTargetCount} disponibles para esta clase
+                    {availableTargetCount} disponibles
                   </span>
                 </div>
                 {availableTargetCount === 0 ? (
                   <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-                    La clase seleccionada no tiene entrenadores disponibles.
-                    Cambia de clase o revisa si hay solapes en el horario.
+                    Nadie aparece disponible para esta clase. Prueba con otra
+                    clase o revisa los solapes en el horario.
                   </p>
                 ) : null}
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -277,7 +375,7 @@ export function RequestCreationForm({
                     const restriction = restrictionByTargetId.get(
                       target.coachProfileId,
                     );
-                    const disabled = Boolean(restriction);
+                    const disabled = !currentAssignment || Boolean(restriction);
 
                     return (
                       <label
@@ -309,9 +407,11 @@ export function RequestCreationForm({
                             {target.displayName}
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
-                            {restriction
-                              ? restrictionLabels[restriction]
-                              : target.detail}
+                            {!currentAssignment
+                              ? "Elige una clase primero"
+                              : restriction
+                                ? restrictionLabels[restriction]
+                                : target.detail}
                           </span>
                         </span>
                       </label>
@@ -322,12 +422,12 @@ export function RequestCreationForm({
 
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
                 <div className="space-y-2">
-                  <Label htmlFor="reasonSummary">Mensaje opcional</Label>
+                  <Label htmlFor="reasonSummary">Mensaje para el equipo</Label>
                   <Textarea
                     id="reasonSummary"
                     maxLength={160}
                     name="reasonSummary"
-                    placeholder="Ej. Necesito ayuda para cubrir esta clase."
+                    placeholder="Ej. Alguien puede cubrirme esta clase?"
                     rows={3}
                   />
                 </div>
@@ -335,7 +435,7 @@ export function RequestCreationForm({
                   <Label htmlFor="expiresAt">Responder antes de</Label>
                   <Input id="expiresAt" name="expiresAt" type="datetime-local" />
                   <p className="text-xs text-muted-foreground">
-                    Opcional. Como máximo, 30 días desde hoy.
+                    Opcional. No puede superar 30 dias desde hoy.
                   </p>
                 </div>
               </div>
@@ -348,17 +448,17 @@ export function RequestCreationForm({
                   type="checkbox"
                 />
                 <span>
-                  Entiendo que esta solicitud solo sirve para cubrir una clase
-                  del horario. No registra ausencias, nóminas ni horas extra
-                  aprobadas.
+                  Entiendo que esta solicitud organiza cobertura o intercambio
+                  sobre esta clase. Las ausencias, nominas y horas extra se
+                  gestionan aparte.
                 </span>
               </label>
 
               <div className="flex flex-wrap items-center gap-3">
                 <RequestCreationSubmitButton disabled={!canSubmit} />
                 <p className="text-sm text-muted-foreground">
-                  Al enviar, los entrenadores seleccionados recibirán la oferta
-                  de cobertura.
+                  Los entrenadores seleccionados recibiran la solicitud en su
+                  bandeja.
                 </p>
               </div>
             </form>

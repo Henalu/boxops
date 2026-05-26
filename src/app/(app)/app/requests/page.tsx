@@ -108,14 +108,14 @@ const CLOSED_REQUEST_STATUSES = new Set([
 ]);
 
 const statusMessages: Record<string, string> = {
-  "request-applied": "Solicitud aplicada al horario.",
-  "request-approved": "Solicitud aprobada.",
+  "request-applied": "Horario actualizado con la solicitud.",
+  "request-approved": "Solicitud aprobada. Falta aplicarla al horario.",
   "request-cancelled": "Solicitud cancelada.",
-  "request-created": "Solicitud de cobertura creada.",
-  "request-expired": "Solicitud cerrada como vencida o no accionable.",
+  "request-created": "Solicitud enviada.",
+  "request-expired": "Solicitud cerrada porque ya no se puede responder.",
   "request-rejected": "Solicitud rechazada.",
-  "target-accepted": "Respuesta aceptada.",
-  "target-rejected": "Respuesta rechazada.",
+  "target-accepted": "Respuesta enviada: aceptada.",
+  "target-rejected": "Respuesta enviada: rechazada.",
 };
 
 const errorMessages: Record<string, string> = {
@@ -124,32 +124,32 @@ const errorMessages: Record<string, string> = {
     "Ese entrenador ya tiene un bloque asignado que se solapa con esta franja.",
   "confirmation-required": "Confirma el alcance operativo antes de enviar.",
   expired: "La solicitud o la oferta ya habia vencido.",
-  forbidden: "Tu rol o tu perfil no permite esa accion.",
-  "invalid-change-request": "La solicitud recibida no es valida.",
-  "invalid-change-request-target": "La oferta recibida no es valida.",
+  forbidden: "No tienes permiso para hacer eso en esta solicitud.",
+  "invalid-change-request": "No hemos encontrado una solicitud valida.",
+  "invalid-change-request-target": "No hemos encontrado una oferta valida.",
   "invalid-coach-profile":
     "Selecciona destinatarios activos, visibles y asignables en esta organización.",
   "invalid-organization": "La organizacion recibida no es valida.",
   "invalid-request-type": "El tipo de solicitud recibido no esta habilitado.",
   "invalid-response": "La respuesta recibida no es valida.",
-  "invalid-schedule-block": "El bloque recibido no esta disponible.",
+  "invalid-schedule-block": "La clase recibida no esta disponible.",
   "invalid-schedule-block-assignment":
-    "La asignacion recibida no esta disponible.",
+    "La asignacion de la clase no esta disponible.",
   "invalid-summary":
-    "La razon debe ser corta y no puede incluir datos sensibles, legales o de payroll.",
+    "El mensaje debe ser breve y no incluir datos sensibles, legales o de nomina.",
   "invalid-timestamp": "La fecha de vencimiento no es valida.",
   "load-failed": "No se han podido cargar los datos necesarios.",
   "no-active-memberships": "No hay accesos activos para este usuario.",
   "not-actionable":
-    "La solicitud no admite esa accion ahora. Si esta vencida o el bloque ya no es accionable, usa cerrar vencida.",
+    "Esta solicitud ya no admite cambios. Si vencio o la clase ya no puede modificarse, cierrala como vencida.",
   "not-approved": "La solicitud debe aprobarse antes de aplicarse.",
   "not-found": "La solicitud ya no esta disponible.",
   "organization-not-found": "La organizacion solicitada no esta disponible.",
   "organization-required": "Elige una organizacion antes de revisar solicitudes.",
-  "permission-denied": "La base de datos ha denegado la operacion.",
+  "permission-denied": "No se pudo completar por permisos de seguridad.",
   "profile-missing":
     "Tu cuenta no tiene persona operativa vinculada en esta organización.",
-  "save-failed": "No se han podido guardar los cambios.",
+  "save-failed": "No se han podido guardar los cambios. Vuelve a intentarlo.",
 };
 
 const requestStatusLabels: Record<string, string> = {
@@ -330,7 +330,7 @@ function getBlockMeta(
   const block = displayData.blocksById.get(item.request.schedule_block_id);
 
   if (!block) {
-    return "Bloque no disponible";
+    return "Clase no disponible";
   }
 
   const center = displayData.centersById.get(block.center_id);
@@ -447,15 +447,15 @@ function getActionBlockReason(
   const block = displayData.blocksById.get(item.request.schedule_block_id);
 
   if (!block) {
-    return "El bloque ya no esta disponible.";
+    return "La clase ya no esta disponible.";
   }
 
   if (isPastTimestamp(item.request.expires_at, now)) {
-    return "La solicitud esta vencida y debe cerrarse antes de tomar otra accion.";
+    return "La solicitud esta vencida. Cierrala antes de hacer otro cambio.";
   }
 
   if (blockIsNotActionable(block.status)) {
-    return "El bloque esta cancelado o completado.";
+    return "La clase esta cancelada o completada.";
   }
 
   const acceptedTarget = item.request.accepted_target_id
@@ -463,7 +463,7 @@ function getActionBlockReason(
     : null;
 
   if (acceptedTarget && isPastTimestamp(acceptedTarget.expires_at, now)) {
-    return "La oferta aceptada esta vencida y debe cerrarse antes de aplicar.";
+    return "La respuesta aceptada esta vencida. Cierra la solicitud antes de aplicarla.";
   }
 
   return null;
@@ -485,7 +485,7 @@ function getManualExpiryReason(
   }
 
   if (block && blockIsNotActionable(block.status)) {
-    return "Bloque no accionable";
+    return "Clase cerrada";
   }
 
   const acceptedTarget = item.request.accepted_target_id
@@ -493,14 +493,14 @@ function getManualExpiryReason(
     : null;
 
   if (acceptedTarget && isPastTimestamp(acceptedTarget.expires_at, now)) {
-    return "Oferta aceptada vencida";
+    return "Respuesta vencida";
   }
 
   if (
     item.request.status === "offered" &&
     !item.targets.some((target) => hasActiveTarget(target, now))
   ) {
-    return "Sin destinatarios activos";
+    return "Sin respuestas pendientes";
   }
 
   return null;
@@ -948,7 +948,7 @@ function RequestCard({
 
         {actionBlockReason ? (
           <Alert>
-            <AlertTitle>No accionable ahora</AlertTitle>
+            <AlertTitle>No se puede modificar ahora</AlertTitle>
             <AlertDescription>{actionBlockReason}</AlertDescription>
           </Alert>
         ) : null}
@@ -996,25 +996,25 @@ function RequestsSummary({
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard icon={Inbox} label="Visibles" value={items.length} />
+      <StatCard icon={Inbox} label="En bandeja" value={items.length} />
       <StatCard
-        description="Ofertas recibidas por tu perfil."
+        description="Ofertas que esperan tu respuesta."
         icon={CheckCircle2}
         label="Para responder"
         tone={ownOfferedTargets > 0 ? "warning" : "neutral"}
         value={ownOfferedTargets}
       />
       <StatCard
-        description="Listas para decision operativa."
+        description="Solicitudes listas para revisar."
         icon={ShieldCheck}
-        label="Aprobacion"
+        label="Para revisar"
         tone={pendingApproval > 0 ? "warning" : "neutral"}
         value={canManage ? pendingApproval : "-"}
       />
       <StatCard
-        description="Aprobadas y pendientes de tocar horario."
+        description="Aprobadas y listas para actualizar horario."
         icon={Send}
-        label="A aplicar"
+        label="Para aplicar"
         tone={approved > 0 ? "success" : "neutral"}
         value={canManage ? approved : "-"}
       />
@@ -1112,8 +1112,8 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
         <details className="group max-w-3xl">
           <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
             <span>
-              Bandeja minima de cambios de bloque y cobertura. La fuente real
-              del horario sigue siendo el horario semanal.
+              Pide ayuda para cubrir clases, responde ofertas y aplica cambios
+              aprobados al horario.
             </span>{" "}
             <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
               Más
@@ -1124,11 +1124,10 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
           </summary>
 
           <Alert className="mt-3">
-            <AlertTitle>Alcance operativo</AlertTitle>
+            <AlertTitle>Uso de esta bandeja</AlertTitle>
             <AlertDescription>
-              Aprobar o aplicar aqui solo resuelve cobertura en el horario. No
-              crea ausencias, payroll, horas extra aprobadas ni cumplimiento
-              legal definitivo.
+              Esta bandeja organiza cobertura sobre clases del horario. Las
+              ausencias, nominas y horas extra se gestionan en sus apartados.
             </AlertDescription>
           </Alert>
         </details>
@@ -1136,7 +1135,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
 
       {status && statusMessages[status] ? (
         <TransientFeedbackBanner
-          description="La bandeja ya esta actualizada."
+          description="La bandeja ya refleja el ultimo cambio."
           title={statusMessages[status]}
           tone="success"
         />
@@ -1178,7 +1177,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
 
       <section className="space-y-3">
         <SectionHeader
-          description="Acciones disponibles segun tu rol, perfil operativo y estado actual."
+          description="Responde, revisa o aplica segun tu rol y el estado de cada solicitud."
           title="Bandeja"
         />
         {items.length === 0 ? (
@@ -1214,18 +1213,6 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
           </div>
         )}
       </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Limitaciones del corte</CardTitle>
-          <CardDescription>
-            I.8 mantiene solicitudes/ofertas minimas sobre bloques asignados y
-            endurece destinos, vencimientos y estados no accionables. No
-            incluye intercambio entre dos bloques, ausencias, vacaciones,
-            payroll, horas extra automaticas ni decisiones legales.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   );
 }

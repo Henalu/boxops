@@ -21,6 +21,54 @@ Reglas para las fases nuevas:
 
 La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cierre hacia beta/webapp v1 vive en `docs/product/webapp-completion-roadmap.md`.
 
+### Corte 2026-05-25 - Revision Publicacion Online / User Testing No Tecnico
+
+Estado: revision local ejecutada como actualizacion de contexto. No cambia producto, UI, migraciones, seeds ni permisos. Objetivo: saber si BoxOps se puede publicar online para que un equipo no tecnico empiece a probar flujos y gusto de uso.
+
+Resultado: `bloqueado para publicacion/user testing`. La app puede compilar, pero no debe exponerse todavia a testers no tecnicos porque la calidad automatizada y el entorno online real no estan cerrados.
+
+Evidencia local 2026-05-25:
+
+- [x] `git status --short` revisado; worktree amplio y no se revierte nada ajeno.
+- [x] `.env.local` existe, esta ignorado por git y se revisa solo por nombres/estado, sin imprimir valores.
+- [x] `.env.local` tiene variables locales/E2E/Resend, pero no tiene `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, DB URL real/staging, URL QA/staging/Vercel ni tenant QA/staging.
+- [x] `npm run build` pasa.
+- [x] `npm run lint` pasa con warning conocido en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npx supabase db lint --local` pasa sin errores de schema.
+- [x] `git diff --check` pasa sin errores, con warnings LF/CRLF del worktree.
+- [x] Guardrails `rg` sobre `src`: sin STL, `service_role`, IA, geolocalizacion, push, service worker ni caches privadas.
+- [x] `npm run typecheck -- --pretty false` falla en 3 specs ya conocidas: `tenant-direct-grants-organizations-runtime.spec.ts:219`, `tenant-direct-grants-time-exports-runtime.spec.ts:452` y `tenant-rls-negative-local.spec.ts:4877`.
+- [x] `E2E_START_SERVER=1 E2E_PORT=3000 npm run test:smoke` ejecuta 247 tests contra servidor local: 204 passed, 21 skipped, 5 not run y 17 failed.
+- [x] `npm audit --omit=dev --audit-level=high` reporta 8 vulnerabilidades de produccion: 2 high (`next`, `fast-uri`) y 6 moderate.
+
+Fallos smoke que bloquean publicar:
+
+- [ ] Revisar/fijar guardrails documentales: `document-programming-manual-validation.spec.ts`, `overtime-candidates-foundation.spec.ts` y varios checks de `tenant-rls-negative-local.spec.ts`.
+- [ ] Revisar/fijar smokes autenticados de `owner`, `manager`, `coach`, `admin` y rutas MVP protegidas.
+- [ ] Revisar/fijar smokes de paneles operativos sin navegacion RSC en Horario/Cobertura.
+- [ ] Revisar/fijar smoke runtime de S.99 para mutaciones app-like de owner.
+- [ ] Reejecutar `npm run typecheck`, `npm run lint`, `npm run build`, `npx supabase db lint --local` y `npm run test:smoke` hasta dejar evidencia limpia o skips justificados.
+
+Bloqueos para publicar online:
+
+- [ ] Elegir y preparar entorno online controlado (Vercel/staging o equivalente) con URL publica real.
+- [ ] Configurar `NEXT_PUBLIC_SITE_URL`, Supabase Auth Site URL y Redirect URLs para el dominio publicado.
+- [ ] Configurar Supabase real/staging: project/ref o acceso dashboard, migrations aplicadas, Storage buckets privados, policies, datos QA y backups/recuperacion basicos.
+- [ ] Configurar `SUPABASE_SERVICE_ROLE_KEY` solo server-side si `Crear cuenta` se usara en beta; nunca en cliente ni repo.
+- [ ] Configurar Resend/SMTP real, remitente verificado o destinatarios permitidos, y probar invitacion/aceptacion/reset.
+- [ ] Cargar tenant/datos controlados para testing: organizacion, centros, tipos, personas/coaches, roles, semana/plantilla, huecos intencionados y casos de cobertura.
+- [ ] Crear credenciales E2E por rol (`owner`, `admin`, `manager`, `coach`) fuera del repo y ejecutar smokes autenticados contra el entorno online.
+- [ ] Validar con responsable operativo una semana real bloque a bloque antes de invitar testers no tecnicos.
+- [ ] Preparar guia breve para testers no tecnicos: URL, usuarios de prueba, rutas a probar, que pueden tocar, que no evaluar todavia, y como reportar feedback.
+- [ ] Resolver `npm audit` de dependencias de produccion o documentar excepciones temporales aceptadas antes de exponer la app.
+- [ ] Guardar evidencia redacted fuera del repo y dejar decision final: `bloqueado`, `listo para user testing controlado` o `no apto para produccion`.
+
+Fuera de alcance:
+
+- [x] No abrir IA, app nativa, geofencing, payroll, documentos firmables ni nuevas superficies.
+- [x] No importar datos reales sensibles ni enviar invitaciones masivas.
+- [x] No marcar beta interna ni produccion como lista sin evidencia real/staging.
+
 ### Corte 2026-05-17 - Mapa De Cierre Webapp Completa / Beta / V1
 
 Estado: completado como fase documental. No cambia `src`, migraciones, seeds, rutas, UI ni permisos. Ordena el roadmap para distinguir beta operativa, webapp v1 vendible, futuro opcional e IA como ultimo extra.
@@ -68,6 +116,15 @@ Decision:
 - [x] El detalle de bloque muestra personal previsto en esa franja y aviso suave si una asignacion queda fuera de una jornada prevista registrada.
 - [x] La gestion visible es compacta y no invasiva dentro de Horario.
 - [x] Smoke/guardrail `tests/smoke/staff-work-windows.spec.ts` protege separacion frente a bloques, asignaciones, fichaje, STL, `service_role`, geolocalizacion, push y caches.
+
+Actualizacion 2026-05-23 - Gestion dedicada de Jornadas:
+
+- [x] Crear `/app/work-windows` como pagina dedicada para gestionar jornadas previstas por persona, dia, centro, vigencia, estado y notas, con lista expandible y edicion/desactivacion por fila.
+- [x] Mantener `/app/schedule` como superficie ligera: resumen semanal, visibilidad en tablero y alta rapida de franjas, con enlace a la gestion completa.
+- [x] Anadir acceso "Jornadas" en Gestion y en `/app/more`, visible solo para roles con `canManageStaffWorkWindows`.
+- [x] Reutilizar las Server Actions existentes de `staff_work_windows` con retorno permitido a `/app/work-windows`, sin mover secretos, sin `service_role`, sin payroll, sin geolocalizacion y sin convertir franjas en bloques.
+- [x] Verificacion local 2026-05-23: `npm run lint` pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs`; `npm run build` pasa; `npx playwright test --config=playwright.smoke.config.ts tests/smoke/staff-work-windows.spec.ts` pasa; `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "base operational listing page local source guardrails|app shell navigation local source guardrails"` pasa 7 tests; `npx playwright test --config=playwright.smoke.config.ts tests/smoke/auth-protection.spec.ts tests/smoke/protected-mvp-routes.spec.ts` pasa 28 tests; `git diff --check` pasa con warnings de line endings.
+- [x] `npm run typecheck -- --pretty false` mantiene solo residuales conocidos: `tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts:219`, `tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts:452` y `tests/smoke/tenant-rls-negative-local.spec.ts:4877`.
 
 Fuera de alcance:
 
@@ -3890,7 +3947,7 @@ Estado: ejecutado el 2026-05-20 como decimo harness runtime local minimo para `o
 Decision:
 
 - [x] Revisar `tests/smoke/tenant-direct-grants-*-runtime.spec.ts`, `tests/smoke/helpers/env.ts`, `src/app/(app)/app/coaches/actions.ts`, `src/lib/coaches.ts`, `src/lib/auth/tenant.ts`, `src/lib/auth/permissions.ts` y migraciones relacionadas con `organization_memberships`.
-- [x] Confirmar el DML directo actual de `organization_memberships`: `/app/coaches` crea memberships por `organization_id`, `user_id`, `role`, `status`, `invited_at` y `joined_at`; `updateMembership` lee primero con `id` + `organization_id`, protege la propia membership y actualiza `role`, `status` y timestamps; `linkCoachProfileToExistingAccount` puede crear o actualizar membership antes de enlazar `person_profiles`/`coach_profiles`; la aceptacion de invitacion por RPC queda fuera.
+- [x] Confirmar el DML directo actual de `organization_memberships`: `/app/coaches` conserva `createMembership` como helper de action existente, aunque ya no se expone como flujo visible normal en Equipo; `updateMembership` lee primero con `id` + `organization_id`, protege la propia membership y actualiza `role`, `status` y timestamps; desde UX.6 `linkCoachProfileToExistingAccount` exige una membership existente del tenant y ya no crea ni actualiza memberships antes de enlazar `person_profiles`/`coach_profiles`; la aceptacion de invitacion por RPC queda fuera.
 - [x] Confirmar permisos actuales: `owner` y `admin` gestionan accesos por `canManageTeamAccess(...)` y policies; `manager` puede leer memberships tenant-wide pero no gestionar; `coach` solo puede leer la propia membership. RLS permite `SELECT` propia o tenant-wide a `owner`/`admin`/`manager`; `INSERT`/`UPDATE` solo a `owner`/`admin`; `organization_memberships_set_updated_at` conserva `updated_at`; el grant amplio actual a `authenticated` sigue sin endurecer porque S.77 es draft no aplicado.
 - [x] Cubrir caso feliz autorizado con `owner` para insert directo solo si existe un `auth.users.id` local sintetico seguro con prefijo `e2e-direct-grants-organization-memberships-smoke` y sin membership previa en el tenant E2E. En la DB local actual no existe candidato seguro: hay 4 usuarios Auth y todos tienen ya membership en `E2E_ORGANIZATION_ID`, sin usuario sintetico prefijado disponible. El test salta explicitamente este subcaso y no fuerza insert sobre usuarios reales ni credenciales E2E.
 - [x] Cubrir update autorizado app-like con `owner` sobre una membership controlada del tenant activo: se prefiere membership sintetica si existe y, si no, una membership activa no propia; el update mantiene `role`, `status`, `user_id`, `invited_at` y `joined_at` intactos. No degrada ni cambia credenciales E2E criticas; el unico efecto posible del DML no-op es refrescar `updated_at` por trigger.
@@ -6188,6 +6245,34 @@ Verificacion F.15:
 - [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src` sin nuevas coincidencias.
 - [x] `rg -n "navigator\\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\\.|CacheStorage" src` sin nuevas coincidencias.
 - [x] Diff documental revisado para confirmar que no se abrio IA, app nativa, geofencing, payroll, documentos firmables, subida visible documental ni cumplimiento legal definitivo.
+
+#### F.16 - Fichaje automatico desde jornada prevista
+
+Estado: implementado el 2026-05-23 como ampliacion acotada del automatico `schedule_auto`. `staff_work_windows` puede generar entradas/salidas automaticas si `scheduleAutoPunchesEnabled` esta activo, con metadata `generatedFrom = staff_work_window`, `presenceVerified = false`, idempotencia por franja+fecha+tipo y job DB activable por operador. No convierte jornada prevista en contrato, payroll ni prueba real de presencia.
+
+- [x] Crear `supabase/migrations/00047_staff_work_window_auto_time_punches.sql`.
+- [x] Mantener `time_punches.source = schedule_auto` y diferenciar el origen con metadata `generatedFrom = staff_work_window`.
+- [x] Generar `clock_in` y `clock_out` desde `staff_work_windows` activas, persona visible/activa, centro opcional del tenant y fecha valida.
+- [x] Hacer la generacion idempotente por `organization_id`, `person_profile_id`, `staffWorkWindowId`, `serviceDate` y `punch_type`.
+- [x] Crear `generate_staff_work_window_auto_time_punches(...)` para ejecucion controlada por roles de gestion/catch-up.
+- [x] Crear `generate_due_staff_work_window_auto_time_punches(...)` como primitiva de scheduler DB, sin grant a `anon` ni `authenticated`.
+- [x] Crear `supabase/snippets/activate-staff-work-window-auto-time-punch-job.sql` para activacion manual por operador DB/pg_cron.
+- [x] Exponer en Configuracion el flag existente `scheduleAutoPunchesEnabled` para no depender de editar JSON manualmente.
+- [x] Anadir `supabase/snippets/time-staff-work-window-auto-verification.sql` con rollback para generacion, idempotencia, permisos, modo desactivado y scheduler.
+- [x] Actualizar guardrails estaticos y documentacion para reflejar que jornada prevista puede alimentar fichaje automatico, sin geolocalizacion, payroll ni presencia real verificada.
+- [x] Verificacion local 2026-05-23: `npx supabase migration up` aplico `00047_staff_work_window_auto_time_punches.sql` sobre Supabase local sin reset.
+- [x] Verificacion SQL rollback 2026-05-23: `time-staff-work-window-auto-verification.sql` valido `clock_in` a las 09:30, `clock_out` a las 13:30, idempotencia, `presenceVerified = false`, rechazo de `coach`, rechazo con tenant desactivado y bloqueo de la primitiva scheduler para `authenticated`.
+- [x] Verificacion tecnica 2026-05-23: `npm run lint`, `npm run build`, smokes `staff-work-windows.spec.ts` y `tenant-rls-negative-local.spec.ts --grep "automatic punches"`, y `git diff --check`.
+- [x] `npm run typecheck -- --pretty false` conserva solo incidencias residuales conocidas en `tenant-direct-grants-organizations-runtime.spec.ts`, `tenant-direct-grants-time-exports-runtime.spec.ts` y `tenant-rls-negative-local.spec.ts` (linea desplazada por nuevas aserciones).
+- [x] Mejora UX 2026-05-23: el alta de jornada prevista permite seleccionar varios dias y crea una franja tenant-scoped por cada dia elegido, manteniendo la edicion de cada franja como registro individual.
+
+Fuera de F.16:
+
+- geolocalizacion web o nativa;
+- payroll, nomina, saldos, compensaciones u horas extra aprobadas;
+- promesa legal de cumplimiento laboral definitivo;
+- emails, push, service worker, background sync o app nativa;
+- datos reales o seeds de tenant real.
 
 ### Fase G - Fichaje Geolocalizado Asistido
 
@@ -8877,7 +8962,7 @@ Verificacion E.20:
 - [x] Equivalente PowerShell de `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 9 passed el 2026-05-22, incluyendo denegacion backend directa para `manager` y `coach`.
 - [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
 - [x] Consulta local de cleanup: `SELECT status, count(*) ...` devuelve `deleted|10` para titulos sinteticos E.19/E.20.
-- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF ya existentes del worktree.
+- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF por configuracion del worktree y los archivos tocados siguen en LF.
 - [x] `git diff --name-only -- .env.local`: sin salida.
 - [x] `rg -n "STL" src`: sin coincidencias.
 - [x] `rg -n "service_role" src`: sin coincidencias.
@@ -8888,6 +8973,691 @@ Bloqueos restantes E.20:
 
 - [ ] No hay evidencia QA/staging real de denegacion backend directa con objeto Storage controlado; sigue dependiendo del handoff E.16 y de acceso/casos QA externos al repo.
 - [ ] No se validan grants personalizados, cross-tenant por ruta directa, reemplazo de versiones ni documentos sensibles; requieren cortes propios.
+
+#### E.21 - Control Local De Grant Metadata-Only Del Adjunto Documental Minimo
+
+Estado: ejecutado el 2026-05-22 como corte local controlado posterior a E.20. No amplia `/app/documents` a gestor documental completo: solo confirma que un grant minimo `read_metadata` permite ver metadata/listado del adjunto sintetico `programming`, pero no concede preview ni descarga por rutas backend E.5. QA/staging real sigue bloqueado por falta de acceso/casos/objeto controlado.
+
+Revision local E.21:
+
+- [x] Releidos `tests/smoke/documents-repository-surface.spec.ts`, rutas E.5 `preview`/`download`, `src/lib/document-file-access.ts`, `src/lib/documents.ts`, migracion base de `document_access_grants`, E.19/E.20 en `TASKS.md` y `docs/operations/document-repository-beta-readiness-runbook.md`.
+- [x] Scope runtime probado: documento sintetico `programming` con archivo `.txt` no sensible desde `/app/documents`.
+- [x] Grant preparado localmente: fila sintetica en `document_access_grants` con `access_level = 'read_metadata'`, objetivo `organization_membership_id` del `manager` local disponible, `document_version_id` exacto del adjunto E.21 y `metadata.source = 'documents-repository-surface-e21'`.
+- [x] El `manager` con grant `read_metadata` ve el documento en `/app/documents?scope=programming` como `Solo metadata` y sin enlaces `Preview` ni `Descargar`.
+- [x] El mismo actor `manager` no puede abrir preview/download directos por E.5: ambas rutas devuelven `404` JSON `document_file_not_available` con `Cache-Control: no-store`.
+- [x] Auditoria local de denegacion verificada en `document_access_events`: para el documento/version E.21 existe `result = 'denied'` en `file_preview` y `file_download`, con `metadata.reason = 'insufficient_access'`. La misma prueba conserva auditoria `allowed` solo para el admin creador que abre el archivo durante la preparacion controlada.
+- [x] Cleanup prudente: la metadata/version sintetica queda en `deleted`, el grant sintetico queda en `revoked`, no se borran directamente tablas internas de Storage y no se resetea Supabase. Consulta local posterior: documento E.21 `deleted|1`, grant E.21 `revoked|read_metadata|1`, auditoria `allowed||2` y `denied|insufficient_access|2`.
+
+Implementacion E.21:
+
+- [x] `tests/smoke/documents-repository-surface.spec.ts` anade un smoke runtime opt-in barato bajo `E2E_DOCUMENT_UPLOAD_RUNTIME=1` para preparar el grant `read_metadata` solo si existen admin, organizacion y una membership local `manager` o `coach` util.
+- [x] El smoke usa `manager` como actor preferente y `coach` como fallback; si faltan credenciales, usuario objetivo o capacidad local para preparar el grant, hace skip explicito.
+- [x] El grant es membership-specific y version-specific, no role-wide, no se crea desde UI y no abre gestion visible de grants.
+- [x] El cleanup del smoke revoca grants activos del documento sintetico antes de marcar metadata/version como `deleted`, sin tocar Storage interno ni resetear Supabase.
+
+Fuera de E.21:
+
+- [x] No QA/staging/remoto/produccion, no reset real de Supabase, no documentos reales ni sensibles.
+- [x] No grants UI, no reemplazo de versiones, no firma documental, no auditoria visible y no gestor documental completo.
+- [x] No cross-tenant por ruta directa, no documentos sensibles, no grants `preview`/`download` personalizados, no payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache ni app nativa.
+
+Verificacion E.21:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 7 skipped opt-in el 2026-05-22.
+- [x] Equivalente PowerShell de `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 10 passed el 2026-05-22, incluyendo grant `read_metadata` para `manager`, metadata visible y preview/download denegados por E.5.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
+- [x] Consulta local de cleanup E.21: `deleted|1` para documento sintetico, `revoked|read_metadata|1` para grant sintetico y auditoria `denied|insufficient_access|2` para preview/download directos.
+- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF ya existentes del worktree.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`: sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src`: sin coincidencias.
+
+Bloqueos restantes E.21:
+
+- [ ] No hay evidencia QA/staging real de metadata-only + denegacion backend directa con objeto Storage controlado; sigue dependiendo del handoff E.16 y de acceso/casos QA externos al repo.
+- [x] Los grants membership-specific `preview`/`download` controlados quedan cerrados localmente en E.22.
+- [ ] No se validan cross-tenant por ruta directa, reemplazo de versiones ni documentos sensibles; requieren cortes propios.
+
+#### E.22 - Control Local Positivo De Grants Preview/Download Del Adjunto Documental Minimo
+
+Estado: ejecutado el 2026-05-22 como corte local controlado posterior a E.21. No amplia `/app/documents` a gestor documental completo: solo confirma que grants minimos `preview` y `download` sobre un adjunto sintetico `programming` habilitan las rutas backend E.5 segun nivel, mantienen Storage privado/backend-only y conservan denegacion prudente cuando el grant no alcanza descarga. QA/staging real sigue bloqueado por falta de acceso/casos/objeto controlado.
+
+Revision local E.22:
+
+- [x] Releidos `tests/smoke/documents-repository-surface.spec.ts`, rutas E.5 `preview`/`download`, `src/lib/document-file-access.ts`, `src/lib/documents.ts`, migracion base de `document_access_grants`, E.19/E.20/E.21 en `TASKS.md` y `docs/operations/document-repository-beta-readiness-runbook.md`.
+- [x] Scope runtime probado: documentos sinteticos `programming` con archivo `.txt` no sensible desde `/app/documents`.
+- [x] Actor local probado: `manager` con membership activa y credenciales E2E locales disponibles.
+- [x] Grant `preview` preparado localmente: fila sintetica en `document_access_grants` con `access_level = 'preview'`, objetivo `organization_membership_id` del `manager`, `document_version_id` exacto del adjunto E.22 y `metadata.source = 'documents-repository-surface-e22-preview'`.
+- [x] El `manager` con grant `preview` ve metadata/listado y enlace `Preview` en `/app/documents?scope=programming`, no ve enlace `Descargar`, y la UI no expone signed URLs, `storage_path`, `storage_bucket`, `document-files`, `/storage` ni `storage/v1`.
+- [x] Preview directo por E.5 para el grant `preview`: `302` con `Cache-Control: no-store` y auditoria `file_preview` `allowed` para `manager`.
+- [x] Download directo por E.5 para el grant solo `preview`: `404` JSON `document_file_not_available` con `Cache-Control: no-store` y auditoria `file_download` `denied` con `metadata.reason = 'insufficient_access'`.
+- [x] Grant `download` preparado localmente sobre otro documento sintetico `programming`: fila sintetica con `access_level = 'download'`, objetivo `organization_membership_id` del `manager`, version exacta y `metadata.source = 'documents-repository-surface-e22-download'`.
+- [x] El `manager` con grant `download` ve metadata/listado y enlaces de archivo autorizados; descarga directa por E.5 devuelve `302` con `Cache-Control: no-store` y auditoria `file_download` `allowed`.
+- [x] Cleanup prudente: documentos/versiones E.22 quedan `deleted`, grants E.22 quedan `revoked`, no se borran directamente tablas internas de Storage y no se resetea Supabase. Consulta local posterior: documentos E.22 `deleted|deleted`; grants `preview|revoked|manager|1` y `download|revoked|manager|1`; auditoria `manager` `file_preview allowed` para preview, `file_download denied|insufficient_access` para preview-only y `file_download allowed` para download.
+
+Implementacion E.22:
+
+- [x] `tests/smoke/documents-repository-surface.spec.ts` generaliza el helper local de grants para `read_metadata`, `preview` y `download`, manteniendo el caso E.21.
+- [x] Se anaden dos smokes runtime opt-in baratos bajo `E2E_DOCUMENT_UPLOAD_RUNTIME=1`: preview-only y download.
+- [x] Los smokes usan `manager` como actor preferente y `coach` como fallback; si faltan credenciales, usuario objetivo o capacidad local para preparar grants, hacen skip explicito.
+- [x] Los grants son membership-specific y version-specific, no role-wide, no se crean desde UI y no abren gestion visible de grants.
+- [x] El cleanup revoca grants activos del documento sintetico antes de marcar metadata/version como `deleted`, sin tocar Storage interno ni resetear Supabase.
+
+Fuera de E.22:
+
+- [x] No QA/staging/remoto/produccion, no reset real de Supabase, no documentos reales ni sensibles.
+- [x] No grants UI, no reemplazo de versiones, no firma documental, no auditoria visible y no gestor documental completo.
+- [x] No cross-tenant por ruta directa, no documentos sensibles, no payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache ni app nativa.
+
+Verificacion E.22:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 9 skipped opt-in el 2026-05-22.
+- [x] Equivalente PowerShell de `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 12 passed el 2026-05-22, incluyendo grants `preview` y `download` para `manager`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
+- [x] Consulta local de cleanup/auditoria E.22: documentos E.22 `deleted|deleted`, grants `preview|revoked|manager|1` y `download|revoked|manager|1`, auditoria `manager` `file_preview allowed|1`, `file_download denied|insufficient_access|1` y `file_download allowed|1`.
+- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF por configuracion del worktree y los archivos tocados siguen en LF.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`: sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src`: sin coincidencias.
+
+Bloqueos restantes E.22:
+
+- [ ] No hay evidencia QA/staging real de grants `preview`/`download` con objeto Storage controlado; sigue dependiendo del handoff E.16 y de acceso/casos QA externos al repo.
+- [ ] No se validan cross-tenant por ruta directa, reemplazo de versiones ni documentos sensibles; requieren cortes propios.
+
+#### E.23 - Guardrail Local Cross-Tenant Para Rutas Backend E.5 Del Adjunto Minimo
+
+Estado: implementado el smoke opt-in el 2026-05-22, pero la validacion runtime cross-tenant queda bloqueada en este entorno local por falta de credenciales de un actor autenticable del segundo tenant. No se inventa evidencia: el test queda preparado y hace skip explicito si no existe segundo tenant, usuario objetivo, credenciales o capacidad local para preparar el caso.
+
+Revision local E.23:
+
+- [x] Releidos `tests/smoke/documents-repository-surface.spec.ts`, rutas E.5 `preview`/`download`, `src/lib/document-file-access.ts`, `src/lib/documents.ts`, migracion base de `document_access_grants`, E.19/E.20/E.21/E.22 en `TASKS.md` y `docs/operations/document-repository-beta-readiness-runbook.md`.
+- [x] Las rutas E.5 siguen revalidando sesion, organizacion activa, version, `can_access_document(...)`, estado documental, bucket privado `document-files`, signed URL corta server-side y auditoria antes de responder `302`.
+- [x] Las denegaciones prudentes siguen devolviendo JSON sin datos sensibles, con `Cache-Control: no-store`; si el usuario no puede resolver el tenant solicitado, el contrato actual devuelve `400` con `organization_not_found`; si el documento/version no esta disponible para el tenant resuelto, devuelve `404` con `document_file_not_available`.
+- [x] El repositorio visible sigue sin exponer signed URLs, `storage_path`, `storage_bucket`, `document-files`, `/storage` ni `storage/v1` desde UI; preview/download visibles siguen siendo rutas backend E.5.
+- [x] Cleanup existente se mantiene prudente: revoca grants sinteticos activos y marca documentos/versiones sinteticas como `deleted`; no borra tablas internas de Storage y no resetea Supabase.
+
+Implementacion E.23:
+
+- [x] `tests/smoke/helpers/env.ts` anade credenciales opcionales `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD` para un actor local de otro tenant, sin requerirlas para los smokes normales.
+- [x] `tests/smoke/documents-repository-surface.spec.ts` anade helper `getLocalCrossTenantDocumentActor(...)`: solo acepta un usuario con membership activa en otro tenant usable y sin membership activa en `E2E_ORGANIZATION_ID`.
+- [x] Se anade smoke runtime opt-in `denies cross-tenant direct programming file routes while tenant grant remains scoped`.
+- [x] Cuando exista actor cross-tenant, el smoke crea un documento sintetico no sensible `programming`, prepara grant `download` membership-specific/version-specific para un actor del tenant A, confirma preview y download E.5 autorizados con `302`/`no-store`, cambia a actor de otro tenant y exige que listado/rutas directas no resuelvan ni abran el documento/version del tenant A.
+- [x] La respuesta cross-tenant aceptada por contrato queda acotada a `400`/`404`, JSON con una unica clave `error`, sin IDs documentales, signed URLs ni detalles de Storage, y `Cache-Control: no-store`.
+- [x] Auditoria esperada para cross-tenant: si la organizacion A no se resuelve para el actor de otro tenant, no aplica evento documental porque no existe membership tenant-scoped valida para registrar `document_access_events`; el smoke confirma cero eventos para ese actor sobre el documento/version del tenant A.
+
+Evidencia local E.23:
+
+- [x] Actor tenant A disponible en runtime local: `manager` con membership activa y credenciales E2E locales. E.22 en la misma suite confirma grant `preview` con preview E.5 `302`/`no-store` y download denegado, y grant `download` con descarga E.5 `302`/`no-store`.
+- [x] Capacidad cross-tenant local revisada sin imprimir IDs ni emails: existe 1 organizacion activa/trialing distinta de `E2E_ORGANIZATION_ID`, pero hay 0 credenciales E2E disponibles que pertenezcan solo a ese otro tenant.
+- [x] Resultado runtime E.23: el nuevo smoke cross-tenant hizo skip antes de crear documento E.23, preparar grant E.23 o intentar rutas E.5 cross-tenant, por falta de actor cross-tenant autenticable.
+- [x] No hay respuesta preview/download cross-tenant real que registrar en este entorno: no se pudo intentar la ruta con otro tenant por falta de credenciales.
+- [x] Auditoria cross-tenant no aplica en runtime local porque el caso no se ejecuto. La auditoria `allowed`/`denied` de E.22 sigue validada localmente para actor del tenant A y grant insuficiente/suficiente.
+- [x] Consulta local posterior: no hay documentos E.23 persistidos; documentos E.19/E.20/E.21/E.22 sinteticos existentes de runs locales quedan `deleted`; grants sinteticos E.21/E.22 quedan `revoked`.
+
+Verificacion E.23:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 10 skipped opt-in el 2026-05-22.
+- [x] Equivalente PowerShell de `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 12 passed y 1 skipped el 2026-05-22. El skipped es el nuevo E.23 cross-tenant por falta de actor cross-tenant autenticable.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
+- [x] `git diff --check`: pasa sin errores de whitespace; solo muestra avisos LF/CRLF por configuracion del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] `rg -n "OpenAI|openai|anthropic|embeddings|vector|pgvector|ai_" src`: sin coincidencias.
+- [x] `rg -n "navigator\.geolocation|PushManager|webpush|serviceWorker|service worker|Notification|background sync|caches\.|CacheStorage|offline" src`: sin coincidencias.
+
+Fuera de E.23:
+
+- [x] No QA/staging/remoto/produccion, no reset real de Supabase, no documentos reales ni sensibles.
+- [x] No grants UI, no reemplazo de versiones, no firma documental, no auditoria visible y no gestor documental completo.
+- [x] No se crean usuarios/tenants cross-tenant desde el smoke; se exige capacidad local existente y, si falta, se salta con bloqueo concreto.
+- [x] No payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache ni app nativa.
+
+Bloqueos restantes E.23:
+
+- [x] Desbloqueado localmente en E.24 con actor sintetico temporal `@boxops.local`, pertenencia activa solo a tenant B y credenciales pasadas por variables de proceso, sin tocar `.env.local`.
+- [x] Ejecutado en E.24 el smoke E.23 con ese actor para obtener respuesta real `400` de preview/download E.5 cross-tenant y confirmar no auditoria aplicable para tenant A.
+- [ ] QA/staging real sigue bloqueado por falta de acceso/casos/objeto `document-files` controlado.
+
+#### E.24 - Desbloqueo Local Controlado Cross-Tenant Para Rutas Backend E.5
+
+Estado: ejecutado el 2026-05-22 como desbloqueo local controlado de E.23. No amplia `/app/documents` a gestor documental completo: solo prepara un actor sintetico temporal de otro tenant local para validar rutas backend E.5 con documento `programming` no sensible, grant `download` tenant A y denegacion cross-tenant real. QA/staging real sigue bloqueado por falta de acceso/casos/objeto `document-files` controlado.
+
+Revision local E.24:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.21/E.22/E.23 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts`, rutas E.5 `preview`/`download`, `src/lib/document-file-access.ts`, `src/lib/documents.ts` y migracion base de `document_access_grants`.
+- [x] Capacidad local inicial revisada sin imprimir IDs completos ni emails reales: existe 1 tenant distinto activo/trialing; `.env.local` tiene credenciales E2E de tenant A para `admin`, `manager` y `coach`, pero no `E2E_CROSS_TENANT_*`.
+- [x] `supabase/snippets/tenant-runtime-ab-local-capacity-setup.sql` existe, pero no era el corte minimo aplicable para E.24 porque exige baseline tenant B con `owner` y `coach` confirmados; tenant B local solo necesitaba un actor autenticable para provocar `organization_not_found` frente a tenant A.
+- [x] Actor cross-tenant usado: `manager` sintetico temporal `@boxops.local`, creado solo en tenant B (`tenant_b_suffix=200001`) con membership activa, Auth confirmado y `person_profiles` visible sintetico. Credenciales pasadas solo por variables de proceso del comando, sin tocar `.env.local`.
+- [x] Actor tenant A probado: `manager` local existente con membership activa, recibiendo grant `download` membership-specific/version-specific sobre documento/version E.24.
+
+Evidencia local E.24:
+
+- [x] Runtime smoke completo con actor cross-tenant temporal: `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts` devuelve `13 passed` el 2026-05-22.
+- [x] Tenant A autorizado por grant `download`: preview E.5 `302` con `Cache-Control: no-store`; download E.5 `302` con `Cache-Control: no-store`; grant insertado como `grant_access=download`, `grant_status=active`, `target_role=manager`.
+- [x] Cross-tenant listado: el actor tenant B no ve el documento tenant A en `/app/documents?scope=programming` (`cross_tenant_listing_contains_tenant_a_document=0`).
+- [x] Cross-tenant preview directo E.5: `400`, JSON prudente `{"error":"organization_not_found"}`, `Cache-Control: no-store`, sin document id, version id, signed URL, `storage_path`, `storage_bucket`, `document-files`, `/storage` ni `storage/v1` en body.
+- [x] Cross-tenant download directo E.5: `400`, JSON prudente `{"error":"organization_not_found"}`, `Cache-Control: no-store`, sin document id, version id, signed URL, `storage_path`, `storage_bucket`, `document-files`, `/storage` ni `storage/v1` en body.
+- [x] Auditoria cross-tenant: `cross_audit_events=0` para actor tenant B sobre documento/version tenant A; no aplica `document_access_events` porque el actor no resuelve tenant A y no hay membership tenant-scoped valida para auditar ese documento.
+
+Cleanup E.24:
+
+- [x] Cleanup final: documentos E.23/E.24 sinteticos quedan `deleted:3`; grants `documents-repository-surface-e23-download` quedan `revoked:2` y `documents-repository-surface-e24-download` queda `revoked:1`.
+- [x] Cleanup de sonda E.24: `doc_cleanup_documents=1`, `doc_cleanup_versions=1`, `doc_cleanup_grants=1`; actor temporal `actor_cleanup_profiles=1`, `actor_cleanup_memberships=1`, `actor_cleanup_identities=1`, `actor_cleanup_auth_users=1`; verificacion final `actor_remaining_auth=0`.
+- [x] No se borra Storage interno, no se resetea Supabase, no se persisten credenciales nuevas y no se toca `.env.local`.
+
+Fuera de E.24:
+
+- [x] No QA/staging/remoto/produccion, no documentos reales ni sensibles.
+- [x] No grants UI, no reemplazo de versiones, no firma documental, no auditoria visible y no gestor documental completo.
+- [x] No payroll, RRHH sensible, IA, geolocalizacion, push/offline/cache ni app nativa.
+
+Verificacion E.24:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 3 passed y 10 skipped opt-in el 2026-05-22.
+- [x] `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 13 passed el 2026-05-22 con actor cross-tenant sintetico temporal por variables de proceso.
+- [x] Sonda directa E.24 redacted: confirma tenant A `302/no-store`, cross-tenant `400`/`organization_not_found`/`no-store`, body sin internals y `cross_audit_events=0`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "document storage and signed URL|visible file input"`: 6 passed el 2026-05-22.
+- [x] Consulta local de cleanup E.24: documentos E.23/E.24 `deleted:3`, grants E.23 `revoked:2`, grant E.24 `revoked:1`, actor Auth sintetico E.24 restante `0`.
+
+#### E.25 - Procedimiento Local Reproducible Para Actor Cross-Tenant E.24
+
+Estado: implementado y verificado localmente el 2026-05-22. Convierte el SQL ad hoc de E.24 en un snippet local-only reversible para preparar un unico actor cross-tenant temporal, sin tocar `.env.local`, sin persistir credenciales y sin ampliar `/app/documents`.
+
+Revision local E.25:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.23/E.24 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts`, rutas backend E.5 `preview`/`download` y `src/lib/document-file-access.ts`.
+- [x] Revisado `supabase/snippets/tenant-runtime-ab-local-capacity-setup.sql`: se mantiene util para capacidad A/B mas amplia, pero no encaja como corte minimo E.25 porque exige baseline tenant B con varios roles y catalogo operativo.
+- [x] No se modifica el smoke E.23/E.24 ni se convierte el actor en fixture persistente.
+
+Implementacion E.25:
+
+- [x] Nuevo snippet `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql`.
+- [x] Guard obligatorio `allow_local_synthetic_e2e_setup=local-only`.
+- [x] Entradas obligatorias por variables `psql`: `tenant_a_id`, `synthetic_email` y `synthetic_password`; el email debe ser sintetico `@boxops.local`.
+- [x] Selecciona un unico tenant B activo/trialing distinto de tenant A; en local selecciono tenant B `trialing` con sufijo redacted `200001`.
+- [x] Crea Auth confirmado en formato compatible con el fixture E2E local, identity `email`, membership activa `manager` en tenant B y `person_profiles` visible minimo.
+- [x] Incluye modo de cleanup explicito por el mismo email sintetico con `cleanup_synthetic_actor=1`; elimina profile, membership, identity y Auth user, y reporta `remaining_auth_users`.
+
+Uso operativo local E.25:
+
+- [x] Dry-run por defecto: ejecutar el snippet sin `commit_changes=1` con password desechable generada fuera del repo; termina con `ROLLBACK` y no persiste actor.
+- [x] Ventana corta de setup local: repetir con `commit_changes=1`, exportar solo en el proceso `E2E_CROSS_TENANT_EMAIL=boxops-e25-cross-tenant@boxops.local` y `E2E_CROSS_TENANT_PASSWORD=<local-disposable-password>`, ejecutar el smoke y limpiar en `finally`.
+- [x] Smoke runtime: pasar `E2E_START_SERVER=1` y `E2E_DOCUMENT_UPLOAD_RUNTIME=1` como variables de proceso junto a `E2E_CROSS_TENANT_*`; no escribir esas credenciales en `.env.local`.
+- [x] Cleanup local: reejecutar el snippet con `cleanup_synthetic_actor=1` y `commit_changes=1` usando el mismo email sintetico.
+
+Evidencia local E.25:
+
+- [x] Dry-run del snippet nuevo contra `supabase_db_boxops` con `ROLLBACK`: crea en transaccion Auth, identity, membership y profile, selecciona tenant B `200001`, y reporta `stale_cleanup_counts` en cero.
+- [x] Primera sonda Auth tras alinear el snippet con el fixture local: `AUTH_SIGNIN_OK`; cleanup posterior `auth_users=1`, `auth_identities=1`, `person_profiles=1`, `organization_memberships=1`, `remaining_auth_users=0`.
+- [x] Ejecucion controlada final: setup con `commit_changes=1`, smoke completo y cleanup en `finally`; cleanup final `auth_users=1`, `auth_identities=1`, `person_profiles=1`, `organization_memberships=1`, `remaining_auth_users=0`.
+- [x] Resultado del smoke runtime: `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: `13 passed` el 2026-05-22.
+
+Fuera de E.25:
+
+- [x] No QA/staging/remoto/produccion, no documentos reales ni sensibles.
+- [x] No grants UI, no gestor documental completo, no reemplazo de versiones, no firma documental ni auditoria visible.
+- [x] No reset de Supabase, no `.env.local`, no commit, no normalizacion EOL.
+
+Verificacion E.25:
+
+- [x] `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql` dry-run con rollback contra Supabase local.
+- [x] Setup local controlado con `commit_changes=1`, credenciales solo en variables de proceso, smoke runtime y cleanup explicito por email sintetico.
+- [x] `E2E_START_SERVER=1 E2E_DOCUMENT_UPLOAD_RUNTIME=1 npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 13 passed.
+- [x] Consulta final local de cleanup: actor Auth `boxops-e25-cross-tenant@boxops.local` restante `0`.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra avisos LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### E.26 - Guardrail Local Estatico Para Procedimiento Cross-Tenant E.25
+
+Estado: implementado el 2026-05-22 como corte local estatico para proteger que el procedimiento E.25 siga siendo local-only, reversible, sin credenciales persistidas y sin ampliar `/app/documents`. No crea usuarios, no ejecuta setup persistente, no repite el smoke runtime opt-in y no toca `.env.local`.
+
+Revision local E.26:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.23/E.24/E.25 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts` y `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql`.
+- [x] Confirmado que E.23/E.24 ya cubren el runtime cross-tenant local opt-in y que E.26 no debe repetir SQL manual ni convertir el actor `@boxops.local` en fixture persistente.
+
+Implementacion E.26:
+
+- [x] `tests/smoke/documents-repository-surface.spec.ts` anade el test estatico `keeps E.25 cross-tenant actor setup local-only, reversible and secret-free`.
+- [x] El guardrail confirma que `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql` existe y mantiene el guard obligatorio `allow_local_synthetic_e2e_setup=local-only`.
+- [x] Protege entradas obligatorias por variables `psql`: `tenant_a_id`, `synthetic_email` y `synthetic_password`, con email limitado a `@boxops.local`.
+- [x] Protege la seleccion de un tenant B activo/trialing distinto de tenant A y la creacion minima de Auth confirmado, identity `email`, membership activa y `person_profiles` visible.
+- [x] Protege cleanup explicito con `cleanup_synthetic_actor=1`, reporte `remaining_auth_users`, `ROLLBACK` por defecto y `commit_changes=1` solo como opt-in.
+- [x] Protege que el snippet no de instrucciones de escritura a `.env.local`, no mencione `/app/documents`, y no contenga `service_role`, patrones de signed URL, rutas reales de Storage ni patrones obvios de secretos.
+
+Evidencia local E.26:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 4 passed y 10 skipped opt-in el 2026-05-22. El nuevo guardrail E.26 es el cuarto smoke estatico; no se ejecuto el runtime opt-in ni se creo actor.
+
+Fuera de E.26:
+
+- [x] No QA/staging/remoto/produccion, no documentos reales ni sensibles.
+- [x] No usuarios nuevos, no setup persistente, no SQL manual repetido, no reset de Supabase.
+- [x] No grants UI, no gestor documental completo, no cambios runtime del smoke cross-tenant.
+- [x] No `.env.local`, no `git add`, no `git commit`, no `git reset`, no `git checkout`, no normalizacion EOL.
+
+Verificacion E.26:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 4 passed y 10 skipped opt-in.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra avisos LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### E.27 - Guardrail Local Para Credenciales Cross-Tenant Process-Only
+
+Estado: implementado el 2026-05-22 como corte local estatico y de helper para evitar que el actor cross-tenant sintetico de E.23/E.24/E.25 pueda quedar convertido por accidente en fixture persistido desde `.env.local`. No crea usuarios, no ejecuta setup persistente, no repite el smoke runtime opt-in y no toca `.env.local`.
+
+Revision local E.27:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.23/E.24/E.25/E.26 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts` y `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql`.
+- [x] Confirmado el riesgo: `tests/smoke/helpers/env.ts` leia `.env.local` de forma generica para credenciales E2E normales, y `crossTenantCredentials` reutilizaba ese camino.
+- [x] Confirmado que el procedimiento E.25 exige pasar `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD` solo como variables de proceso durante la ventana corta del smoke.
+
+Implementacion E.27:
+
+- [x] `tests/smoke/helpers/env.ts` mantiene el fallback existente a `.env.local` para credenciales E2E normales mediante `readCredentials(...)`.
+- [x] `crossTenantCredentials` cambia a lectura process-only: `E2E_CROSS_TENANT_EMAIL` y `E2E_CROSS_TENANT_PASSWORD` se leen solo desde `process.env` mediante `readProcessCredentials(...)`.
+- [x] `tests/smoke/documents-repository-surface.spec.ts` anade el guardrail estatico `keeps E.23-E.25 cross-tenant smoke credentials process-only`.
+- [x] El guardrail protege que las credenciales cross-tenant opcionales existen por nombre exacto, que no usan `readCredentials("E2E_CROSS_TENANT")`, que el helper normal conserva lectura de `.env.local`, y que el snippet no introduce escritura de `E2E_CROSS_TENANT_*` a `.env.local`.
+
+Evidencia local E.27:
+
+- [x] Smoke estatico documental: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 5 passed y 10 skipped opt-in el 2026-05-22.
+- [x] El smoke runtime cross-tenant opt-in no se repitio: E.27 no cambia la ruta runtime ni crea/prepara actor.
+
+Fuera de E.27:
+
+- [x] No `.env.local`, no usuarios, no setup persistente, no reset de Supabase, no documentos reales/sensibles.
+- [x] No QA/staging/remoto/produccion, no grants UI, no gestor documental completo y no cambios en el contrato runtime cross-tenant.
+- [x] No `git add`, no `git commit`, no `git reset`, no `git checkout`, no normalizacion EOL.
+
+Verificacion E.27:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 5 passed y 10 skipped opt-in.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra avisos LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### E.28 - Actor Cross-Tenant Documental Solo Desde Credenciales Explicitas Process-Only
+
+Estado: implementado el 2026-05-22 como corte local minimo para cerrar el fallback residual del smoke documental E.23/E.24/E.25. El actor cross-tenant ya solo puede salir de `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD` pasadas como variables de proceso; las credenciales E2E normales de rol pueden seguir existiendo para otros smokes, pero no son fuente valida para este actor.
+
+Revision local E.28:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.23/E.24/E.25/E.26/E.27 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts` y `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql`.
+- [x] Confirmado el riesgo restante tras E.27: aunque `crossTenantCredentials` ya era process-only, `getLocalCrossTenantDocumentActor(...)` todavia podia seleccionar `owner`, `admin`, `manager`, `coach` o `payroll_manager` si alguna credencial normal de rol pertenecia solo a otro tenant.
+- [x] Se mantiene el procedimiento E.25 como actor sintetico explicito, temporal y pasado solo durante la ventana corta del smoke; no se repite el runtime opt-in ni se crea usuario.
+
+Implementacion E.28:
+
+- [x] `tests/smoke/documents-repository-surface.spec.ts` cambia `getLocalCrossTenantDocumentActor(...)` para usar una unica fuente: `crossTenantCredentials`.
+- [x] Se eliminan de la seleccion cross-tenant los fallbacks a `ownerCredentials`, `adminCredentials`, `managerCredentials`, `coachCredentials` y `payrollManagerCredentials`.
+- [x] El mensaje de skip del smoke cross-tenant pide explicitamente `E2E_CROSS_TENANT_EMAIL` y `E2E_CROSS_TENANT_PASSWORD` como variables de proceso y recuerda no persistirlas en `.env.local`.
+- [x] Se endurece el guardrail estatico E.27 y se anade el smoke estatico E.28 `keeps E.28 cross-tenant actor selection explicit and process-only`.
+- [x] El guardrail E.28 extrae el cuerpo de `getLocalCrossTenantDocumentActor(...)` y protege que no haya array de candidatos ni referencias a `ownerCredentials`, `adminCredentials`, `managerCredentials`, `coachCredentials` o `payrollManagerCredentials` dentro de la seleccion cross-tenant.
+- [x] El mismo guardrail vuelve a proteger que `crossTenantCredentials` se construye con `readProcessCredentials(...)`, que `E2E_CROSS_TENANT_*` no se lee desde `.env.local` y que el snippet E.25 no recomienda persistir esas credenciales.
+
+Evidencia local E.28:
+
+- [x] Smoke estatico documental: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 6 passed y 10 skipped opt-in el 2026-05-22.
+- [x] El smoke runtime cross-tenant opt-in no se repitio: E.28 solo cierra seleccion del actor y guardrail estatico.
+- [x] `E2E_CROSS_TENANT_*` queda como unica fuente aceptada para el actor cross-tenant y sigue siendo process-only.
+
+Fuera de E.28:
+
+- [x] No `.env.local`, no usuarios, no setup persistente, no reset de Supabase, no documentos reales/sensibles.
+- [x] No QA/staging/remoto/produccion, no grants UI, no gestor documental completo y no cambios en el contrato runtime cross-tenant.
+- [x] No `git add`, no `git commit`, no `git reset`, no `git checkout`, no normalizacion EOL.
+
+Verificacion E.28:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 6 passed y 10 skipped opt-in.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra avisos LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### E.29 - Runbook Local Del Actor Cross-Tenant Documental Process-Only
+
+Estado: implementado el 2026-05-22 como corte local/documental para alinear el runbook del repositorio documental con E.23-E.28. No crea usuarios, no ejecuta setup persistente, no repite el smoke runtime opt-in y no toca `.env.local`.
+
+Revision local E.29:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md`, routing de skills, E.23/E.24/E.25/E.26/E.27/E.28 en `TASKS.md`, `tests/smoke/documents-repository-surface.spec.ts`, `tests/smoke/helpers/env.ts` y `supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql`.
+- [x] Confirmado el hueco: `docs/operations/document-repository-beta-readiness-runbook.md` documentaba validacion cross-tenant QA/staging y E.19, pero no dejaba instruccion local explicita tras E.27/E.28 para `E2E_CROSS_TENANT_*`.
+
+Implementacion E.29:
+
+- [x] `docs/operations/document-repository-beta-readiness-runbook.md` anade la nota `Nota Local E.23-E.28: Actor Cross-Tenant Documental`.
+- [x] La nota aclara que el actor cross-tenant local solo puede venir de `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD`, pasadas como variables de proceso durante la ventana corta del smoke.
+- [x] La nota prohibe escribir `E2E_CROSS_TENANT_*` en `.env.local` o archivos persistentes y prohibe sustituir el actor por credenciales normales de rol E2E.
+- [x] La nota recuerda que el actor E.25 es sintetico, temporal, local-only y process-only, y que debe limpiarse con `cleanup_synthetic_actor=1` verificando `remaining_auth_users=0`.
+- [x] `tests/smoke/documents-repository-surface.spec.ts` anade el guardrail estatico `keeps E.29 local cross-tenant actor runbook guidance explicit`.
+
+Evidencia local E.29:
+
+- [x] `E2E_CROSS_TENANT_*` sigue siendo process-only en `tests/smoke/helpers/env.ts` mediante `readProcessCredentials(...)`.
+- [x] `getLocalCrossTenantDocumentActor(...)` sigue sin fallback a credenciales normales `owner`/`admin`/`manager`/`coach`/`payroll_manager`.
+- [x] No se repitio el smoke runtime cross-tenant opt-in: E.29 solo documenta y protege instrucciones locales.
+
+Fuera de E.29:
+
+- [x] No `.env.local`, no usuarios, no setup persistente, no reset de Supabase, no documentos reales/sensibles.
+- [x] No QA/staging/remoto/produccion, no grants UI, no gestor documental completo y no cambios runtime del smoke cross-tenant.
+- [x] No `git add`, no `git commit`, no `git reset`, no `git checkout`, no normalizacion EOL.
+
+Verificacion E.29:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/documents-repository-surface.spec.ts`: 7 passed y 10 skipped opt-in.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra avisos LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### UX.2 - Contexto De UX Operativa Y Vinculacion Cuenta-Persona
+
+Estado: documentado el 2026-05-22 como cierre de contexto de los ultimos cambios locales de UX/copy y del flujo de vinculacion cuenta Auth -> persona operativa -> ficha de entrenador. No abre producto nuevo, no crea migraciones, no cambia RLS, no toca `.env.local`, no ejecuta reset, no crea usuarios y no hace commit.
+
+Revision UX.2:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, E.29 en `TASKS.md` y las superficies tocadas recientemente: Inicio, Mi cuenta, Equipo, Solicitudes, Ausencias, Mi fichaje, Horario y Plantillas.
+- [x] Confirmado que el problema principal del mensaje de vinculacion pendiente era de flujo: Horario no resolvia la falta de persona operativa visible ni la ficha de entrenador vinculada sin persona.
+- [x] Confirmado que el camino normal de alta/vinculacion sigue siendo invitacion por email desde Equipo; las herramientas UUID quedan como avanzado/debug y no como experiencia normal de administrador.
+
+Contexto actualizado:
+
+- [x] `PROJECT_BRIEF.md` anade la actualizacion 2026-05-22 y la revision 2026-05-22 para que el source of truth refleje el estado actual.
+- [x] Inicio ya no debe enviar estados pendientes de identidad a Horario como callejon sin salida: usuarios sin capacidad de gestionar accesos van a Mi cuenta; roles con capacidad van a Equipo.
+- [x] Mi cuenta distingue entre cuenta sin persona visible y ficha de entrenador enlazada sin persona operativa, explicando que debe resolverlo Propietario/Administrador desde Equipo si el usuario no puede hacerlo.
+- [x] Equipo conserva invitacion por email como flujo normal, herramientas UUID solo en avanzado/debug y borrado controlado de fichas operativas creadas por error cuando las reglas lo permiten.
+- [x] Solicitudes, Ausencias, Mi fichaje, Inicio/cierre semanal, Horario, Plantillas y Equipo quedan registrados como superficies con copy mas user-friendly, menos texto interno/legal visible y acciones mas claras.
+- [x] Horario/Plantillas conservan guardrails existentes: no se relaja disponibilidad de coach, no se cambia la frontera de `default_coach_profile_id`, no se convierte programacion documental en permiso documental y no se resuelve cobertura automaticamente.
+
+Fuera de UX.2:
+
+- [x] No crear usuarios, invitaciones reales, fixtures persistentes, setup Supabase, reset, QA/staging/remoto/produccion ni datos reales.
+- [x] No abrir RRHH sensible, payroll, documentos firmables, geolocalizacion, IA, push, service worker, grants UI ni gestor documental completo.
+- [x] No `git add`, no `git commit`, no `git reset`, no `git checkout` y no normalizacion EOL.
+
+Verificacion UX.2:
+
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra warnings LF/CRLF preexistentes del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### UX.3 - Equipo Vinculacion Cuenta-Persona Local
+
+Estado: implementado el 2026-05-22 como corte local pequeno sobre Equipo para reforzar el flujo cuenta Auth -> persona operativa -> ficha de entrenador. No abre RRHH, no crea flujos nuevos, no toca Auth Admin, no crea usuarios, no envia invitaciones reales, no cambia RLS/migraciones, no toca `.env.local`, no ejecuta reset y no hace commit.
+
+Cambios UX.3:
+
+- [x] Revisados `PROJECT_BRIEF.md`, `AGENTS.md`, UX.2 en `TASKS.md`, Inicio, Mi cuenta, Equipo, actions de Equipo, permisos y el smoke estatico `tenant-rls-negative-local`.
+- [x] Equipo mantiene `Invitar usuario` por email como camino normal y las herramientas UUID confinadas a `Herramientas avanzadas`.
+- [x] Accesos con cuenta pero sin persona visible dejan de depender de referencias UUID cortas y muestran `Acceso sin persona visible` + `Revisar vinculación`.
+- [x] Fichas con persona visible pero sin cuenta muestran `Sin cuenta vinculada` y el filtro/estado `Pendiente de vincular cuenta`.
+- [x] Fichas con cuenta/persona incompleta muestran `Revisar vinculación` para que Propietario/Administrador sepan que no es un problema de Horario.
+- [x] Invitaciones abiertas muestran `Invitación pendiente` o `Revisar invitación` segun estado, con las acciones existentes de reenviar/cancelar.
+- [x] Propietario/Administrador ven un resumen compacto de estados de vinculacion problematica en Equipo sin abrir un sistema de RRHH ni nuevas acciones sensibles.
+
+Guardrails UX.3:
+
+- [x] El smoke estatico protege que el formulario normal de invitacion no contenga `UUID`.
+- [x] El smoke estatico protege que los estados accionables de vinculacion existan en Equipo: `Pendiente de vincular cuenta`, `Sin cuenta vinculada`, `Invitación pendiente` y `Revisar vinculación`.
+- [x] Se conserva el guardrail de Inicio: los estados pendientes de identidad van a Mi cuenta o Equipo, no a Horario como callejon sin salida.
+
+Fuera de UX.3:
+
+- [x] No Auth Admin, no creacion de usuarios, no invitaciones reales por email, no Supabase reset, no QA/staging/remoto/produccion.
+- [x] No RRHH sensible, payroll, documentos, permisos nuevos, RLS/migraciones ni sistema nuevo de personas.
+- [x] No `.env.local`, no `git add`, no `git commit`, no `git reset`, no `git checkout` y no normalizacion EOL.
+
+Verificacion UX.3:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "identity pending|account link|vincul"`: 2 passed.
+- [x] Extra local: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "visible UUID tooling|technical identifier"`: 2 passed.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra warnings LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+
+#### UX.4 - Crear Ficha Sin Ficha Huerfana Local
+
+Estado: implementado el 2026-05-22 como corte local pequeno sobre Equipo para evitar que la herramienta avanzada `Crear ficha de entrenador` genere una ficha con cuenta Auth pero sin persona operativa visible. No abre RRHH, no crea usuarios, no usa Auth Admin, no introduce contrasenas temporales, no cambia RLS/migraciones, no toca `.env.local`, no ejecuta reset y no hace commit.
+
+Analisis UX.4:
+
+- [x] Confirmado que Inicio ya no debe resolver `missing_person`, `missing_coach_profile`, `profile_unlinked` ni `ambiguous_coach_profile` enviando a Horario: propietarios/admins van a Equipo y usuarios sin gestion van a Mi cuenta.
+- [x] Confirmado que el camino normal sigue siendo `Invitar usuario`: crea o reutiliza `person_profiles` + `coach_profiles`, envia email y `/invite/accept` vincula cuenta/persona/ficha cuando el email coincide.
+- [x] Localizado el problema incremental en el flujo avanzado: `createCoachProfile` podia crear `coach_profiles` con `user_id` pero sin `person_profile_id`, dejando el estado que luego aparecia como `Ficha pendiente de vinculacion`.
+
+Cambios UX.4:
+
+- [x] `Crear ficha de entrenador` pide `Nombre visible` solo para el caso en que la cuenta con acceso aun no tenga persona visible; si ya existe una persona visible vinculada a la cuenta, se reutiliza.
+- [x] `createCoachProfile` valida centro, comprueba membership tenant-scoped, rechaza duplicados por cuenta/ficha, reutiliza una `person_profiles` activa y visible por `user_id` o crea una nueva `person_profiles` activa/visible con ese `user_id`.
+- [x] La ficha de entrenador avanzada se inserta ya con `person_profile_id` y `user_id`, cerrando la ficha huerfana sin persona operativa visible.
+- [x] Equipo muestra aviso en `Herramientas avanzadas`: para altas nuevas se debe usar `Invitar usuario`; estas herramientas no crean usuarios ni contrasenas.
+- [x] La accion avanzada de crear ficha queda protegida por permisos de acceso de equipo (`owner`/`admin`), porque tambien crea/vincula persona visible; `manager` conserva edicion operativa de fichas existentes sin altas/vinculacion.
+- [x] El listado de cuentas disponibles para crear ficha evita ofrecer accesos que ya tienen ficha por cuenta o por persona vinculada.
+
+Guardrails UX.4:
+
+- [x] No se implementa creacion manual de usuario, contrasena temporal ni reset obligatorio porque requiere diseno de Auth Admin/service-role fuera de este corte.
+- [x] No se relaja RLS, no se anade migracion y no se crea un sistema nuevo de personas/RRHH.
+- [x] El smoke estatico protege que el flujo normal no vuelva a depender de UUID visibles, que los estados de vinculacion sigan siendo accionables y que `createCoachProfile` enlace `person_profiles` antes de crear `coach_profiles`.
+
+Verificacion UX.4:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "identity pending|account link|vincul"`: 2 passed.
+- [x] Extra local: `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "base operational admin"`: 2 passed.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra warnings LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] Extra no bloqueante: `npm run typecheck -- --pretty false` sigue fallando por errores ya existentes en specs de smoke (`tenant-direct-grants-organizations-runtime.spec.ts`, `tenant-direct-grants-time-exports-runtime.spec.ts` y una named capture en `tenant-rls-negative-local.spec.ts`), fuera del corte UX.4.
+
+#### UX.5 - Mi Fichaje Paneles Compactos Local
+
+Estado: implementado el 2026-05-22 como corte local de UX/UI en `/app/time` para reducir altura vacia, mejorar jerarquia visual y dejar una base reutilizable de secciones colapsables. No cambia RLS/migraciones, no toca `.env.local`, no ejecuta reset, no crea usuarios, no cambia el flujo de Horario/Plantillas y no hace commit.
+
+Cambios UX.5:
+
+- [x] Revisados `PROJECT_BRIEF.md`, `AGENTS.md`, guias de diseno de workspace y la estructura actual de `src/app/(app)/app/time/page.tsx`.
+- [x] Anadido `src/components/features/collapsible-section.tsx` como panel reutilizable con cabecera compacta, badges/resumen, accion opcional, chevron, `aria-expanded`, transicion por `grid-rows` e `inert` al colapsar.
+- [x] `Posibles excesos de horas`, `Correcciones del equipo`, `Aplicar correccion`, `Semana de fichaje`, `Registros de la semana` y `Correcciones y aprobaciones` usan cabeceras mas compactas con contadores integrados.
+- [x] Las secciones sin contenido quedan colapsadas o reducidas a empty states compactos; dejan de reservar cajas grandes con aire cuando no hay fichajes, correcciones o aprobaciones.
+- [x] La semana de fichaje mantiene la revision operativa visible cuando hay datos/error, pero reduce padding/altura del grid diario y evita una tarjeta grande anidada para el calendario.
+- [x] El copy antiguo de despliegue `Mostrar` / `Ver detalles` queda sustituido por un patron consistente de chevron y cabecera clicable.
+
+Guardrails UX.5:
+
+- [x] El smoke estatico protege que `/app/time` siga usando `CollapsibleTimeSection`, `CollapsibleReviewQueue`, `CompactEmptyState` y el componente `CollapsibleSection` con `aria-expanded`, `grid-rows-[0fr]`, `ChevronDown`, `inert` y atributos `data-time-collapsible-*`.
+- [x] El smoke estatico protege que no vuelva el patron literal `Mostrar` / `Ver detalles` en estos paneles compactos.
+
+Fuera de UX.5:
+
+- [x] No se cambia la logica de fichaje, correcciones, deteccion de posibles excesos, Horario, Plantillas, permisos, RLS, Supabase ni datos.
+- [x] No QA/staging/remoto/produccion, no runtime autenticado, no `.env.local`, no reset, no commit y no normalizacion EOL.
+
+Verificacion UX.5:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "overtime detection"`: 1 passed.
+- [x] `git diff --check`: pasa sin errores de whitespace; muestra warnings LF/CRLF del worktree, sin normalizar EOL.
+- [x] `git diff --name-only -- .env.local`: sin salida.
+- [x] `rg -n "STL" src`: sin coincidencias.
+- [x] `rg -n "service_role" src`: sin coincidencias.
+- [x] Extra no bloqueante: `npm run typecheck -- --pretty false` sigue fallando solo por errores ya conocidos en specs de smoke (`tenant-direct-grants-organizations-runtime.spec.ts`, `tenant-direct-grants-time-exports-runtime.spec.ts` y named capture en `tenant-rls-negative-local.spec.ts`), sin errores nuevos del corte UX.5.
+
+#### UX.6 - Equipo Sin UUID Visible En Vinculacion Local
+
+Estado: implementado el 2026-05-22 como correccion local de UX en Equipo para sacar las herramientas UUID del flujo normal visible y convertir la vinculacion cuenta/ficha en seleccion de accesos ya existentes. No crea usuarios, no usa Auth Admin, no envia invitaciones reales, no cambia RLS/migraciones, no toca `.env.local`, no ejecuta reset y no hace commit.
+
+Cambios UX.6:
+
+- [x] Quitado de la superficie normal de Equipo el bloque `Herramientas avanzadas`, el badge `UUID`, `Crear acceso` y los inputs de UUID.
+- [x] `Invitar usuario` queda como alta normal por email.
+- [x] `Completar vinculaciones` aparece solo cuando hay casos reales que revisar en Equipo.
+- [x] `Vincular ficha con cuenta` ya no pide UUID: permite elegir una ficha pendiente y una cuenta del equipo ya existente desde desplegables legibles.
+- [x] `Crear ficha para cuenta existente` queda como accion para cuentas que ya tienen acceso pero todavia no tienen ficha operativa.
+- [x] La Server Action `linkCoachProfileToExistingAccount` deja de crear o actualizar memberships desde el formulario de vinculacion; exige que el acceso ya exista en el tenant y solo enlaza persona/ficha con esa cuenta.
+- [x] El copy de error visible evita `UUID`, `Supabase Auth` y explicaciones tecnicas para administradores.
+
+Guardrails UX.6:
+
+- [x] El smoke estatico protege que no haya `UUID` visible en superficies app/componentes normales.
+- [x] El smoke protege que Equipo no vuelva a mostrar `Herramientas avanzadas`, `Crear acceso`, `Cuenta real`, `Supabase Auth` ni el aviso retirado.
+- [x] El smoke protege que la vinculacion use `Cuenta del equipo` con `select`, sin selects de rol/estado que puedan cambiar permisos por accidente.
+- [x] El smoke protege que `linkCoachProfileToExistingAccount` no use `validateMembershipForm`, no cree memberships y no use `validation.values.role/status`.
+
+Verificacion UX.6:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "visible UUID tooling|identity pending|account link|vincul"`: 3 passed.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "base operational admin"`: 2 passed.
+- [x] Extra no bloqueante: `npm run typecheck -- --pretty false` sigue fallando solo por errores ya conocidos en specs de smoke (`tenant-direct-grants-organizations-runtime.spec.ts`, `tenant-direct-grants-time-exports-runtime.spec.ts` y named capture en `tenant-rls-negative-local.spec.ts`), sin errores nuevos del corte UX.6.
+
+#### UX.7 - Equipo Crear Cuenta Directa Con Reset Obligatorio Local
+
+Estado: implementado el 2026-05-23 como corte local sobre Equipo para tener dos caminos de alta: invitacion por email o creacion directa de cuenta Auth con contrasena temporal y cambio obligatorio en primer login. No abre RRHH sensible, payroll, documentos firmables, geolocalizacion, IA, push, app nativa, reset de Supabase, QA/staging/remoto/produccion ni datos reales. No toca `.env.local` y no hace commit.
+
+Cambios UX.7:
+
+- [x] `Crear cuenta` aparece como accion normal junto a `Invitar usuario` en `/app/coaches`.
+- [x] El formulario directo pide email, contrasena temporal, confirmacion, rol, estado inicial, nombre visible, centro principal, horas semanales y notas internas.
+- [x] El flujo visible antiguo de `Completar vinculaciones`, `Vincular ficha con cuenta` y `Crear ficha para cuenta existente` se retira de la superficie principal; queda solo un aviso compacto de revision de datos de acceso.
+- [x] `createDirectTeamAccount(...)` crea usuario Auth con email confirmado, membership, persona visible y ficha operativa tenant-scoped.
+- [x] La cuenta se marca en `app_metadata` con cambio de contrasena obligatorio; login, proxy/layout y reset-password fuerzan `/reset-password?reason=first-login` antes de entrar en `/app`.
+- [x] `SUPABASE_SERVICE_ROLE_KEY` queda documentada en `.env.example` y centralizada en `src/lib/supabase/admin.ts` como excepcion server-only acotada para Auth Admin.
+- [x] El reset de primer login limpia la marca de `app_metadata` via Auth Admin despues de actualizar la contrasena y cerrar sesion.
+- [x] La documentacion actualiza arquitectura, guia admin, roadmap y brief para que el guardrail historico de no `service_role` en `src` no contradiga esta excepcion acotada.
+
+Guardrails UX.7:
+
+- [x] No se guarda ni registra la contrasena temporal en BoxOps; solo se usa para crear la cuenta Auth.
+- [x] El service role no se importa desde componentes cliente ni helpers publicos; los smokes protegen que Auth Admin quede confinado al flujo directo y al reset obligatorio.
+- [x] La Server Action revalida sesion, membership activa, organizacion, permiso `team-access`, centro del tenant, rol/estado validos, politica de contrasena y duplicados antes de crear datos.
+- [x] Si falla la creacion de membership/persona/ficha despues de crear Auth, hay rollback best-effort del usuario Auth y de las filas parciales.
+- [x] `.env.local` local sigue sin `SUPABASE_SERVICE_ROLE_KEY`, por lo que la prueba real de creacion directa queda bloqueada hasta configurar entorno servidor.
+
+Verificacion UX.7:
+
+- [x] `npm run lint`: pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run build`: pasa.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "visible protected identifier|privileged Supabase|transactional email|team invitation issuance|public auth transition"`: 11 passed.
+- [x] Smoke HTTP local contra servidor existente: `/login` devuelve 200, `/app/coaches` anonimo redirige a login con 307 y `/reset-password?reason=first-login` devuelve 200 con copy de contrasena temporal.
+- [x] `git diff --check` en archivos tocados: pasa sin errores de whitespace; muestra warnings LF/CRLF del worktree, sin normalizar EOL.
+- [x] Extra no bloqueante: `npm run typecheck` sigue fallando solo por errores ya conocidos en specs de smoke (`tenant-direct-grants-organizations-runtime.spec.ts`, `tenant-direct-grants-time-exports-runtime.spec.ts` y named capture en `tenant-rls-negative-local.spec.ts`), sin errores nuevos del corte UX.7.
+
+Siguiente corte recomendado:
+
+- [x] S.111/UX.8 reintentado abajo como validacion controlada local; el flujo real queda bloqueado por entorno porque falta `SUPABASE_SERVICE_ROLE_KEY`.
+
+#### UX.8 / S.111 - Validacion Controlada Crear Cuenta Auth Real Local
+
+Estado: ejecutado el 2026-05-23 como reintento controlado del flujo real de Auth para `Crear cuenta` en `/app/coaches`. No abre producto nuevo, no toca datos reales, no usa staging/remoto/produccion, no resetea Supabase, no mueve `SUPABASE_SERVICE_ROLE_KEY` fuera del helper server-only y no crea usuario sintetico porque la capacidad local de Auth Admin sigue ausente.
+
+Evidencia UX.8/S.111:
+
+- [x] Relectura redacted de entorno local: `.env.local` existe, pero `SUPABASE_SERVICE_ROLE_KEY` no esta definida con valor ni en `.env.local` ni en variables de proceso; no se imprimen valores.
+- [x] Bloqueo exacto: `createDirectTeamAccount(...)` depende de `createAdminClient()` y, sin service role, la Server Action redirige a `auth-admin-not-configured` antes de llamar a Supabase Auth Admin. Por tanto no se puede crear usuario Auth real ni validar primer login/reset/limpieza de metadata desde este entorno.
+- [x] No se crea usuario sintetico ni se guarda email/password temporal de prueba; no hay cleanup de Auth/datos que ejecutar.
+- [x] Revision de fuente confirma que el alta directa marca `app_metadata` con `boxops_password_change_required`, crea membership/persona/ficha tenant-scoped y usa la contrasena solo en `auth.admin.createUser(...)`.
+- [x] Revision de fuente confirma que reset obligatorio llama a `supabase.auth.updateUser({ password })`, limpia la marca con Auth Admin, cierra sesion y devuelve a `/login?status=password-updated`.
+- [x] Revision de fuente confirma que login, proxy y layout fuerzan `/reset-password?reason=first-login` si la marca sigue activa antes de permitir `/app`.
+- [x] Smoke estatico ampliado en `tests/smoke/tenant-rls-negative-local.spec.ts` para proteger que la contrasena temporal no entra en auditoria/logging, que no hay `console.*` en `src`, que Auth Admin queda acotado y que login/proxy/layout/reset mantienen el gate de primer login.
+- [x] Smoke HTTP parcial contra servidor local existente en `http://127.0.0.1:3000`: `/login` y `/reset-password` responden, y `/app/coaches` anonimo redirige a `/login`. Esto no valida el flujo real autenticado porque falta service role.
+
+Verificacion UX.8/S.111:
+
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "direct Auth account passwords temporary"`: 1 passed.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "privileged Supabase|public auth transition|direct Auth account"`: 5 passed.
+- [x] `E2E_BASE_URL=http://127.0.0.1:3000 npx playwright test --config=playwright.smoke.config.ts tests/smoke/auth-protection.spec.ts --grep "login page|reset password page|/app/coaches"`: 3 passed. Intento previo con `E2E_START_SERVER=1 E2E_PORT=3007` queda bloqueado porque ya habia un `next dev` activo para este proyecto; se reutiliza el servidor existente sin detenerlo.
+- [x] `npm run lint`: pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run build`: pasa.
+- [x] `npm run typecheck -- --pretty false`: falla solo por residuales conocidos en `tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts:219`, `tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts:452` y `tests/smoke/tenant-rls-negative-local.spec.ts:4798`.
+- [x] `git diff --check`: pasa sin errores de whitespace; mantiene warnings LF/CRLF del worktree, sin normalizar EOL.
+
+Pendiente para QA/local real:
+
+- [x] Resuelto en UX.9/S.112 con `SUPABASE_SERVICE_ROLE_KEY` process-only en servidor local aislado, usuario sintetico `@boxops.local`, reset obligatorio, limpieza real de `app_metadata`, acceso posterior y cleanup verificado.
+
+#### UX.9 / S.112 - Validacion Real Local Crear Cuenta Auth Con Service Role Server-Only
+
+Estado: ejecutado el 2026-05-23 como validacion local real del flujo `Crear cuenta` en `/app/coaches`. No usa datos reales, emails reales, staging/remoto/produccion ni reset de Supabase. No persiste `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`: el servidor aislado `next start` en `http://127.0.0.1:3003` se arranca con la secret local solo como variable de proceso server-side. El `next dev` ya existente en `http://127.0.0.1:3000` se deja intacto y confirma el bloqueo anterior con `auth-admin-not-configured`.
+
+Evidencia UX.9/S.112:
+
+- [x] Relectura redacted de entorno local: `.env.local` existe, contiene Supabase public env y credenciales E2E locales, pero no contiene `SUPABASE_SERVICE_ROLE_KEY`; tampoco existe en el proceso shell general. No se imprimen secretos.
+- [x] `SUPABASE_SERVICE_ROLE_KEY` se obtiene del Supabase local solo en memoria y se pasa unicamente al proceso servidor `next start -p 3003`; no se escribe en repo, `.env.local`, cliente ni output.
+- [x] Usuario sintetico usado: `boxops-s112-1779539332036-1mf1dc@boxops.local`; no se imprimen contrasenas temporales ni finales.
+- [x] Creacion directa desde UI en `/app/coaches`: Auth user creado con email confirmado, `organization_memberships` creada en el tenant activo, `person_profiles` visible creada y `coach_profiles` creada/vinculada.
+- [x] La contrasena temporal no aparece en `operational_audit_events` de las entidades creadas ni en los logs locales revisados; el smoke estatico tambien protege que no entre en auditoria ni `console.*`.
+- [x] Primer login con contrasena temporal redirige obligatoriamente a `/reset-password?reason=first-login`.
+- [x] Acceso manual posterior a `/app` mientras sigue la marca de primer login vuelve a redirigir a `/reset-password?reason=first-login`.
+- [x] Detectado y corregido bug real: Supabase Auth Admin fusiona `app_metadata`, por lo que omitir claves no las borraba. `clearRequiredPasswordChangeAppMetadata(...)` ahora envia las marcas con `null`, validado localmente para borrar las claves.
+- [x] Cambio de contrasena completado: devuelve a `/login?status=password-updated`, limpia `boxops_password_change_required`, `boxops_password_change_reason` y `boxops_password_change_set_at`, y cierra sesion.
+- [x] Login posterior con la nueva contrasena entra normalmente en `/app`.
+- [x] Cleanup realizado: borrados `operational_audit_events` sinteticos, `coach_profiles`, `person_profiles`, `organization_memberships` y Auth user; comprobacion final `boxops-s112-* @boxops.local` queda en 0 usuarios.
+
+Verificacion UX.9/S.112:
+
+- [x] `npm run build`: pasa antes y despues del fix de metadata.
+- [x] Prueba browser/HTTP local real contra `http://127.0.0.1:3003`: `accountCreated`, `authUserCreated`, `membershipCreated`, `personProfileCreated`, `coachProfileCreated`, `auditPasswordClean`, `logPasswordClean`, `firstLoginRedirect`, `appRedirectWhileRequired`, `passwordUpdated`, `metadataCleaned`, `subsequentAppAccess` y `cleanup` quedan en `true`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "Auth Admin|direct Auth account"`: 2 passed.
+- [x] `npm run lint`: pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run typecheck -- --pretty false`: falla solo por residuales conocidos en `tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts:219`, `tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts:452` y `tests/smoke/tenant-rls-negative-local.spec.ts:4798`.
+- [x] `git diff --check`: pasa sin errores de whitespace; mantiene warnings LF/CRLF del worktree, sin normalizar EOL.
+
+Riesgos residuales:
+
+- [ ] Repetir en QA/staging real con secret gestionada por entorno, Redirect URLs reales y credenciales/casos QA controlados antes de invitar usuarios reales.
+- [ ] El servidor dev existente en `3000` sigue sin service role en su proceso; para validar creacion directa ahi hay que reiniciarlo con entorno server-only configurado.
+
+#### UX.10 / S.113 - Validacion QA/Staging Crear Cuenta Auth
+
+Estado: ejecutado el 2026-05-23 como reintento de validacion QA/staging del flujo real `Crear cuenta` en `/app/coaches`. Resultado: bloqueado por acceso/entorno, no validado. No se usa produccion, datos reales ni reset de Supabase; no se mueve `SUPABASE_SERVICE_ROLE_KEY` fuera de `src/lib/supabase/admin.ts`; no se crea usuario sintetico porque no hay target QA/staging ni entorno local apuntado a QA/staging.
+
+Evidencia UX.10/S.113:
+
+- [x] Releidos `PROJECT_BRIEF.md`, `AGENTS.md`, workspace `../../AGENTS.md` y `../../_workspace/AIContext/09_SKILL_ROUTING.md` antes del corte.
+- [x] Relectura redacted de entorno: `.env.local` existe y contiene Supabase public env, `NEXT_PUBLIC_SITE_URL`, Resend y credenciales E2E locales, pero `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SITE_URL` apuntan a scope local; no se imprimen valores.
+- [x] Variables de proceso relevantes ausentes: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_URL`, `DATABASE_URL`, `E2E_BASE_URL` y credenciales QA/admin/owner en proceso.
+- [x] `npx supabase projects list --output json` no tiene acceso autenticado desde este entorno; no se puede verificar project/ref, Auth Site URL, Redirect URLs, password policy ni logs/dashboard de QA/staging.
+- [x] `supabase/config.toml` local mantiene Auth `site_url` y `additional_redirect_urls` locales; no prueba ni sustituye Redirect URLs reales de QA/staging.
+- [x] `SUPABASE_SERVICE_ROLE_KEY` no esta persistida en `.env.local`; `.env.example` conserva placeholder vacio. El codigo sigue centralizando su lectura en `src/lib/supabase/admin.ts` y `createAdminClient()` la usa como env server-side con sesion no persistente.
+- [x] Usos Auth Admin revisados en fuente: creacion directa en `src/app/(app)/app/coaches/actions.ts` y limpieza de metadata obligatoria en `src/app/(auth)/reset-password/actions.ts`. No se encuentra `console.*` en `src`.
+- [x] Redirects esperados a nivel de app: `getAuthCallbackUrl(...)` construye `/auth/callback` desde el origen configurado y usa `next` interno seguro hacia `/reset-password` o flujos internos; QA/staging debe permitir el callback real del dominio objetivo, pero no hay acceso para confirmarlo en Supabase Auth.
+- [x] No hay credencial admin/owner QA controlada ni `E2E_BASE_URL` para autenticar en `/app/coaches`; por tanto no se ejecuta el flujo UI real de creacion directa.
+- [x] Usuario sintetico: no se usa ninguno en este corte. El patron permitido para un reintento sigue siendo `@boxops.local` o dominio QA permitido; nunca datos reales.
+- [x] Creacion directa, Auth user, membership, `person_profiles`, `coach_profiles`, primer login obligatorio, reset, limpieza runtime de `app_metadata`, acceso posterior y cleanup QA/staging quedan no ejecutados por falta de target/capacidades.
+- [x] Contrasena temporal: no se genera ninguna en este corte, asi que no hay secreto que aparezca en output o logs de esta ejecucion. La comprobacion de logs/auditoria QA/staging no es posible sin entorno ni acceso; el smoke source guard local confirma que las contrasenas temporales siguen fuera de auditoria/codigo de logging.
+- [x] Cleanup: no se crea Auth user ni filas sinteticas, asi que no queda nada que limpiar de este corte. Si un operador reintenta con acceso real, debe borrar Auth user, membership, persona, ficha coach y eventos audit sinteticos del tenant objetivo.
+
+Bloqueo exacto para desbloquear UX.10/S.113:
+
+- [ ] URL app QA/staging o local apuntada a QA/staging (`E2E_BASE_URL` o equivalente), con `NEXT_PUBLIC_SITE_URL` real del mismo origen.
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` configurada solo como variable server-side del entorno objetivo, no en cliente ni repo.
+- [ ] Acceso Supabase QA/staging via dashboard o `SUPABASE_ACCESS_TOKEN` + project ref para confirmar Auth Site URL, Redirect URLs y revisar Auth/logs de forma redacted.
+- [ ] Credencial `owner`/`admin` QA controlada fuera del repo para entrar en `/app/coaches`.
+- [ ] Dominio sintetico permitido (`@boxops.local` o dominio QA autorizado) y permiso explicito para crear y borrar el usuario/filas sinteticas.
+
+Verificacion UX.10/S.113:
+
+- [x] `npm run lint`: pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run build`: pasa.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/tenant-rls-negative-local.spec.ts --grep "Auth Admin|direct Auth account"`: 2 passed.
+- [x] Prueba HTTP/browser completa contra QA/staging: no ejecutada porque no existe target QA/staging accesible ni entorno local apuntado a QA/staging; repetir local seria evidencia duplicada de UX.9/S.112, no validacion QA/staging.
+- [x] `npm run typecheck -- --pretty false`: falla solo por residuales conocidos en `tests/smoke/tenant-direct-grants-organizations-runtime.spec.ts:219`, `tests/smoke/tenant-direct-grants-time-exports-runtime.spec.ts:452` y `tests/smoke/tenant-rls-negative-local.spec.ts:4798`.
+- [x] `git diff --check`: pasa sin errores de whitespace; mantiene warnings LF/CRLF del worktree, sin normalizar EOL.
 
 #### OD.1 / I.32 - Cierre De Operativa Diaria Completa Para Beta Interna
 
@@ -10421,6 +11191,10 @@ Dependencias de schema/migraciones futuras:
 - [x] E.19 implementa primer adjunto seguro desde `/app/documents`, sin grants UI, reemplazo de versiones, firma documental, payroll, IA, geolocalizacion ni gestor completo.
 - [x] E.18 reintenta validacion QA/staging real solo si hay acceso completo; confirma que solo existe CLI via `npx` sin proyectos/acceso, reejecuta SQL local con rollback y mantiene QA/staging bloqueado sin inventar evidencia.
 - [x] E.20 cierra control local de permisos negativos backend para el adjunto minimo E.19: `manager` y `coach` autenticados no abren preview/download directos por E.5 y generan auditoria `denied`.
+- [x] E.21 cierra control local metadata-only para el adjunto minimo E.19/E.20: grant `read_metadata` membership-specific permite listado/metadata, pero no preview/download directos por E.5.
+- [x] E.22 cierra control local positivo de grants `preview`/`download` para el adjunto minimo E.19/E.20/E.21: `preview` concede preview E.5 pero no descarga, y `download` concede descarga E.5 con auditoria `allowed`.
+- [x] E.23 deja preparado smoke local opt-in cross-tenant para rutas E.5 del adjunto minimo; E.24 lo desbloquea localmente con actor sintetico temporal de otro tenant y respuesta real `400`.
+- [x] E.24 cierra el desbloqueo local cross-tenant de rutas backend E.5: tenant A con grant `download` obtiene `302/no-store`, actor tenant B recibe `400` `organization_not_found` `no-store`, sin internals ni auditoria tenant A aplicable.
 - [ ] Validar requisitos legales antes de presentar la firma como firma electronica avanzada/cualificada.
 
 ## Fase 7 - MVP 6: IA Sobre Programacion

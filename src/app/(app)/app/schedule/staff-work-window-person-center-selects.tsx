@@ -41,6 +41,9 @@ export function StaffWorkWindowPersonCenterSelects({
     [activeCenterIds, people],
   );
   const initialPersonProfileId = defaultPersonProfileId ?? people[0]?.id ?? "";
+  const hasInitialPersonOption = people.some(
+    (person) => person.id === initialPersonProfileId,
+  );
   const [personProfileId, setPersonProfileId] = React.useState(
     initialPersonProfileId,
   );
@@ -67,7 +70,12 @@ export function StaffWorkWindowPersonCenterSelects({
           required
           value={personProfileId}
         >
-          {people.length === 0 ? <option value="">Sin personas visibles</option> : null}
+          {people.length === 0 ? <option value="">Sin fichas activas</option> : null}
+          {initialPersonProfileId && !hasInitialPersonOption ? (
+            <option value={initialPersonProfileId}>
+              Persona no disponible
+            </option>
+          ) : null}
           {people.map((person) => (
             <option key={person.id} value={person.id}>
               {person.display_name}

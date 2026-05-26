@@ -334,31 +334,12 @@ function normalizeRequiredDateTimeLocal({
   redirect(getAbsencesErrorPath(context.organizationId, "invalid-timestamp"));
 }
 
-function ensureSensitiveSummaryConfirmation({
-  context,
-  formData,
-}: {
-  context: AbsencesActionContext;
-  formData: FormData;
-}) {
-  if (getFormString(formData, "sensitiveSummaryConfirmation") !== "on") {
-    redirect(
-      getAbsencesErrorPath(context.organizationId, "confirmation-required"),
-    );
-  }
-}
-
 export async function createOwnAbsenceRequestFromForm(formData: FormData) {
   const context = await getValidatedContext(formData);
 
   if (!context.canUseSelfService) {
     redirect(getAbsencesErrorPath(context.organizationId, "forbidden"));
   }
-
-  ensureSensitiveSummaryConfirmation({
-    context,
-    formData,
-  });
 
   const absenceType = getFormString(formData, "absenceType");
   const startsAt = normalizeRequiredDateTimeLocal({

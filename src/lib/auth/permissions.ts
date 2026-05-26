@@ -42,6 +42,7 @@ const OPERATIONAL_MANAGEMENT_ROLES: ApplicationRole[] = [
   "manager",
 ];
 const TEAM_ACCESS_MANAGEMENT_ROLES: ApplicationRole[] = ["owner", "admin"];
+const TEAM_PROFILE_DELETE_ROLES: ApplicationRole[] = ["owner"];
 const TIME_TRACKING_REVIEW_ROLES: ApplicationRole[] = [
   "owner",
   "admin",
@@ -116,6 +117,10 @@ export function canManageOperationalData(role: string) {
 
 export function canManageOperationalTeamProfiles(role: string) {
   return OPERATIONAL_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+}
+
+export function canDeleteOperationalTeamProfiles(role: string) {
+  return TEAM_PROFILE_DELETE_ROLES.includes(role as ApplicationRole);
 }
 
 export function canManageTeamAccess(role: string) {

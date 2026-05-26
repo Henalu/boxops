@@ -50,7 +50,7 @@ En QA/staging/produccion:
 - `RESEND_API_KEY` es secreto server-side. No usar prefijo `NEXT_PUBLIC_`, no pegarla en docs, snippets, logs ni tickets.
 - `BOXOPS_EMAIL_FROM` debe usar un remitente verificado en Resend antes de enviar a correos externos reales.
 - `BOXOPS_EMAIL_REPLY_TO` es opcional, pero si se define debe ser un buzón controlado por el operador del piloto.
-- No anadir `SUPABASE_SERVICE_ROLE_KEY` a la app Next.js. Cualquier tarea privilegiada debe vivir fuera de `src` y con procedimiento operativo separado.
+- Excepcion vigente desde UX.7/creacion directa de cuentas: `SUPABASE_SERVICE_ROLE_KEY` puede existir solo como secreto server-side del entorno para Auth Admin, centralizado en `src/lib/supabase/admin.ts` y usado desde Server Actions/rutas servidor esperadas. No exponerlo al cliente, logs, docs, tests, `.env.example` con valor real ni usarlo para saltarse tenant/RLS.
 
 ## 3. Resend para invitaciones BoxOps
 

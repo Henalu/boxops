@@ -6,6 +6,7 @@ import path from "node:path";
 
 import {
   canActivateTimeLocationSettings,
+  canDeleteOperationalTeamProfiles,
   canManageAbsenceRequests,
   canManageChangeRequests,
   canManageOperationalData,
@@ -41,7 +42,10 @@ import {
 } from "../../src/lib/documents";
 import { validatePersonalProfileForm } from "../../src/lib/personal-profile";
 import { validateSignatureDataUrl } from "../../src/lib/profile-signatures";
-import { validateStaffWorkWindowForm } from "../../src/lib/staff-work-windows";
+import {
+  validateStaffWorkWindowCreateForm,
+  validateStaffWorkWindowForm,
+} from "../../src/lib/staff-work-windows";
 
 function readProjectFile(relativePath: string) {
   return readFileSync(path.join(process.cwd(), relativePath), "utf8");
@@ -614,11 +618,13 @@ test.describe("visible downloadable response hygiene local source guardrails", (
     expect(timePageSource).toContain("Exporte interno revisable");
     expect(timePageSource).toContain("CSV interno");
     expect(timePageSource).toContain(
-      "No es payroll ni cumplimiento legal definitivo.",
+      "Descarga los fichajes de un periodo para revisarlos con el equipo responsable.",
     );
-    expect(timePageSource).toMatch(
-      /cualquier uso\s+laboral formal requiere validacion externa/,
+    expect(timePageSource).toContain(
+      "La descarga queda registrada para trazabilidad de la organizacion.",
     );
+    expect(timePageSource).not.toMatch(/\bpayroll\b/i);
+    expect(timePageSource).not.toMatch(/cumplimiento legal definitivo/i);
     expect(timeExportForm).toContain('method="get"');
     expect(timeExportForm).toContain('name="organizationId"');
     expect(timeExportForm).toContain('name="from"');
@@ -848,7 +854,7 @@ test.describe("visible form action hygiene local source guardrails", () => {
 });
 
 test.describe("visible protected route query hygiene local source guardrails", () => {
-  const operationalVisibleRouteQueryParams = [
+  const centralAppPathQueryParams = [
     "absence_status",
     "absence_type",
     "assignment_id",
@@ -872,6 +878,16 @@ test.describe("visible protected route query hygiene local source guardrails", (
     "view",
     "week",
     "work_windows",
+  ].sort();
+  const operationalVisibleRouteQueryParams = [
+    ...centralAppPathQueryParams,
+    // Route-state for the schedule operational event panel; the value is
+    // validated against events loaded for the active tenant/week before use.
+    "event_id",
+    // Client-side list filters for planned-presence windows; values are
+    // validated against already loaded tenant-scoped windows before use.
+    "person_profile_id",
+    "window_status",
   ].sort();
   const operationalVisibleRouteQueryParamSet = new Set(
     operationalVisibleRouteQueryParams,
@@ -907,7 +923,7 @@ test.describe("visible protected route query hygiene local source guardrails", (
       .map((match) => match[1])
       .sort();
 
-    expect(helperQueryParams).toEqual(operationalVisibleRouteQueryParams);
+    expect(helperQueryParams).toEqual(centralAppPathQueryParams);
     expect(
       helperQueryParams.filter((name) =>
         forbiddenVisibleRouteQueryParamNamePattern.test(name),
@@ -1123,7 +1139,6 @@ test.describe("visible terminal action hygiene local source guardrails", () => {
     "reviewTimeCorrectionFromForm",
     "setCenterStatus",
     "setClassTypeStatus",
-    "setOperationalEventStatusFromForm",
     "setOvertimeCandidateStatusFromForm",
     "submitOwnTimeCorrectionFromForm",
   ].sort();
@@ -1358,7 +1373,7 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
       /return status === "cancelled" \|\| status === "completed";/,
     );
     expect(getFunctionSource(requestsSource, "getActionBlockReason")).toMatch(
-      /CLOSED_REQUEST_STATUSES\.has\(item\.request\.status\)[\s\S]+return null;[\s\S]+blockIsNotActionable\(block\.status\)[\s\S]+El bloque esta cancelado o completado/,
+      /CLOSED_REQUEST_STATUSES\.has\(item\.request\.status\)[\s\S]+return null;[\s\S]+blockIsNotActionable\(block\.status\)[\s\S]+La clase esta cancelada o completada/,
     );
     expect(getFunctionSource(requestsSource, "getOwnOfferedTargets")).toMatch(
       /item\.request\.status !== "pending" && item\.request\.status !== "offered"[\s\S]+return \[\];[\s\S]+getActionBlockReason\(item, displayData, now\)[\s\S]+return \[\];/,
@@ -1381,9 +1396,6 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
     const scheduleDetailSource = readProjectFile(
       "src/app/(app)/app/schedule/schedule-block-detail-panels.tsx",
     );
-    const schedulePageSource = readProjectFile(
-      "src/app/(app)/app/schedule/page.tsx",
-    );
     const templatesSource = readProjectFile(
       "src/app/(app)/app/templates/page.tsx",
     );
@@ -1394,9 +1406,12 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
     const operationalEventsSource = readProjectFile(
       "src/lib/operational-events.ts",
     );
+    const scheduleSlotCreateDialogSource = readProjectFile(
+      "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx",
+    );
     const assignmentPanelSource = getFunctionSource(
       scheduleDetailSource,
-      "ScheduleAssignmentPanel",
+      "ScheduleCoachAssignForm",
     );
     const templateCardSource = getFunctionSource(templatesSource, "TemplateCard");
     const archivedTemplateCardSource = getFunctionSource(
@@ -1407,19 +1422,18 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
       timePageSource,
       "OvertimeCandidateStatusForm",
     );
-    const operationalEventCardSource = getFunctionSource(
-      schedulePageSource,
-      "OperationalEventCard",
-    );
 
     expect(assignmentPanelSource).toMatch(
-      /const canAssign =[\s\S]+Boolean\(assignmentMutationContext\)[\s\S]+isCoverageActiveBlock\(block\.status\)[\s\S]+availableCoaches\.length > 0;/,
+      /const canAssign = isActiveBlock && availableCoaches\.length > 0;/,
     );
     expect(assignmentPanelSource).toMatch(
-      /disabled=\{!canAssign\}[\s\S]+name="coachProfileId"[\s\S]+<Button disabled=\{!canAssign\} type="submit">/,
+      /<select[\s\S]+disabled=\{!canAssign\}[\s\S]+name="coachProfileId"/,
     );
     expect(assignmentPanelSource).toMatch(
-      /!isCoverageActiveBlock\(block\.status\)[\s\S]+Los bloques cancelados o completados no admiten nuevas asignaciones/,
+      /<Button[\s\S]+disabled=\{!canAssign\}[\s\S]+type="submit"/,
+    );
+    expect(assignmentPanelSource).toMatch(
+      /!isActiveBlock[\s\S]+Los bloques cancelados o completados no admiten nuevas asignaciones/,
     );
 
     expect(templateCardSource).toMatch(
@@ -1460,20 +1474,20 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
     expect(getTsFunctionSource(operationalEventsSource, "listOperationalEvents")).toMatch(
       /if \(canManage\) \{[\s\S]+if \(!validation\.value\.includeArchived\) \{[\s\S]+query = query\.neq\("status", "archived"\);/,
     );
-    expect(operationalEventCardSource).toMatch(
-      /event\.status === "active" \? \([\s\S]+name="eventStatus" type="hidden" value="cancelled"/,
+    expect(scheduleSlotCreateDialogSource).toContain(
+      "createOperationalEventFromForm",
     );
-    expect(operationalEventCardSource).toMatch(
-      /event\.status === "cancelled" \? \([\s\S]+name="eventStatus" type="hidden" value="active"[\s\S]+Reactivar/,
+    expect(scheduleSlotCreateDialogSource).not.toContain(
+      "setOperationalEventStatusFromForm",
     );
-    expect(operationalEventCardSource).toMatch(
-      /name="eventStatus" type="hidden" value="archived"[\s\S]+Archivar/,
+    expect(scheduleSlotCreateDialogSource).not.toContain(
+      "updateOperationalEventFromForm",
     );
   });
 });
 
 test.describe("visible protected identifier exposure hygiene local source guardrails", () => {
-  test("keeps visible UUID tooling confined to advanced team-access fallback", () => {
+  test("keeps visible UUID tooling out of normal team account flows", () => {
     const visibleUuidFiles = collectVisibleAppSurfaceFiles()
       .filter((filePath) => /\bUUID\b/.test(readFileSync(filePath, "utf8")))
       .map((filePath) =>
@@ -1481,24 +1495,134 @@ test.describe("visible protected identifier exposure hygiene local source guardr
       )
       .sort();
 
-    expect(visibleUuidFiles).toEqual(["src/app/(app)/app/coaches/page.tsx"]);
+    expect(visibleUuidFiles).toEqual([]);
 
     const coachesSource = readProjectFile("src/app/(app)/app/coaches/page.tsx");
-    const advancedToolsIndex = coachesSource.indexOf("Herramientas avanzadas");
-
-    expect(advancedToolsIndex).toBeGreaterThanOrEqual(0);
-
-    expect(
-      coachesSource.indexOf('<Badge variant="outline">UUID</Badge>'),
-    ).toBeGreaterThan(advancedToolsIndex);
-    expect(coachesSource).toContain('placeholder="UUID de la cuenta existente"');
-    expect(coachesSource).toContain('placeholder="UUID de Supabase Auth"');
-    expect(coachesSource).toContain(
-      "Da acceso con el UUID de una cuenta Auth existente.",
+    const invitationFormSource = getFunctionSource(
+      coachesSource,
+      "TeamInvitationCreateForm",
+    );
+    const directAccountCreateFormSource = getFunctionSource(
+      coachesSource,
+      "DirectTeamAccountCreateForm",
     );
 
-    expect(coachesSource).toMatch(
-      /function shortId\(value: string\) \{[\s\S]+return value\.slice\(0, 8\);[\s\S]+\}/,
+    expect(coachesSource).not.toMatch(/\bUUID\b/);
+    expect(coachesSource).not.toContain("Herramientas avanzadas");
+    expect(coachesSource).not.toContain("Crear acceso");
+    expect(invitationFormSource).not.toMatch(/\bUUID\b/);
+    expect(coachesSource).not.toContain("Completar vinculaciones");
+    expect(coachesSource).not.toContain("Vincular ficha con cuenta");
+    expect(coachesSource).not.toContain("Crear ficha para cuenta existente");
+    expect(directAccountCreateFormSource).toContain("Contraseña temporal");
+    expect(directAccountCreateFormSource).toContain('name="password"');
+    expect(directAccountCreateFormSource).toContain('name="confirmPassword"');
+    expect(directAccountCreateFormSource).toContain("Crear cuenta");
+    expect(directAccountCreateFormSource).toContain(
+      "obligada a cambiarla",
+    );
+    expect(directAccountCreateFormSource).not.toMatch(/\bUUID\b|Supabase Auth/);
+  });
+
+  test("keeps team account creation and review states visible without normal UUID dependency", () => {
+    const coachesSource = readProjectFile("src/app/(app)/app/coaches/page.tsx");
+    const coachesActionsSource = readProjectFile(
+      "src/app/(app)/app/coaches/actions.ts",
+    );
+    const coachesLibSource = readProjectFile("src/lib/coaches.ts");
+    const invitationFormSource = getFunctionSource(
+      coachesSource,
+      "TeamInvitationCreateForm",
+    );
+    const directAccountCreateFormSource = getFunctionSource(
+      coachesSource,
+      "DirectTeamAccountCreateForm",
+    );
+    const invitationStatusBadgeSource = getFunctionSource(
+      coachesSource,
+      "TeamInvitationStatusBadge",
+    );
+    const teamUserCardSource = getFunctionSource(
+      coachesSource,
+      "TeamUserCard",
+    );
+    const teamUsersSectionSource = getFunctionSource(
+      coachesSource,
+      "TeamUsersSection",
+    );
+    const reviewNoticeSource = getFunctionSource(
+      coachesSource,
+      "TeamLinkingReviewNotice",
+    );
+    const createCoachProfileSource = getTsFunctionSource(
+      coachesActionsSource,
+      "createCoachProfile",
+    );
+    const accountLinkActionSource = getTsFunctionSource(
+      coachesActionsSource,
+      "linkCoachProfileToExistingAccount",
+    );
+    const validateAccountLinkSource = getFunctionSource(
+      coachesLibSource,
+      "validateCoachAccountLinkForm",
+    );
+
+    expect(reviewNoticeSource).toContain("Revisar datos de acceso");
+    expect(reviewNoticeSource).toContain("Datos sin cuenta");
+    expect(coachesSource).toContain("Sin cuenta vinculada");
+    expect(reviewNoticeSource).toContain("Invitación pendiente");
+    expect(reviewNoticeSource).toContain(
+      "crear una cuenta con contraseña temporal",
+    );
+    expect(invitationFormSource).toContain(
+      "datos pendientes de vincular cuenta",
+    );
+    expect(invitationFormSource).toContain(
+      "Datos operativos asociados",
+    );
+    expect(invitationFormSource).not.toMatch(/\bUUID\b/);
+    expect(invitationStatusBadgeSource).toContain("Invitación pendiente");
+    expect(coachesSource).not.toContain("Completar vinculaciones");
+    expect(coachesSource).not.toContain("Vincular ficha con cuenta");
+    expect(coachesSource).not.toContain("Crear ficha para cuenta existente");
+    expect(directAccountCreateFormSource).toContain("Contraseña temporal");
+    expect(directAccountCreateFormSource).toContain('name="password"');
+    expect(directAccountCreateFormSource).toContain('name="confirmPassword"');
+    expect(directAccountCreateFormSource).toContain("Crear cuenta");
+    expect(directAccountCreateFormSource).not.toMatch(/\bUUID\b|Supabase Auth/);
+    expect(teamUserCardSource).toContain("<TeamLinkStatusBadge");
+    expect(teamUserCardSource).toContain("<TeamOperationalStatusBadge");
+    expect(teamUserCardSource).toContain("Acceso y permisos");
+    expect(teamUserCardSource).toContain("Datos operativos");
+    expect(teamUsersSectionSource).toContain("Usuarios del equipo");
+    expect(teamUsersSectionSource).toContain("<TeamUserFiltersCard");
+    expect(coachesSource).not.toContain("Herramientas avanzadas");
+    expect(coachesSource).not.toContain("Accesos del equipo");
+    expect(coachesSource).not.toContain("Fichas de entrenador");
+    expect(coachesSource).not.toContain("Filtrar fichas");
+    expect(coachesSource).not.toMatch(/\bUUID\b/);
+    expect(coachesSource).not.toContain("Solo para cuentas Auth existentes");
+    expect(coachesSource).not.toContain("Estas herramientas no");
+    expect(validateAccountLinkSource).not.toContain("validateMembershipForm");
+    expect(accountLinkActionSource).toMatch(
+      /existingMembershipResult[\s\S]+if \(!existingMembership\)[\s\S]+membership-required/,
+    );
+    expect(accountLinkActionSource).not.toMatch(
+      /\.from\("organization_memberships"\)[\s\S]+\.insert\(/,
+    );
+    expect(accountLinkActionSource).not.toContain("validation.values.role");
+    expect(accountLinkActionSource).not.toContain("validation.values.status");
+    expect(createCoachProfileSource).toContain(
+      'getCoachActionContext(formData, "team-access")',
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.eq\("user_id", validation\.values\.userId\)/,
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+\.insert\({[\s\S]+display_name: validation\.values\.displayName[\s\S]+user_id: validation\.values\.userId[\s\S]+visibility_status: "visible"/,
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("coach_profiles"\)[\s\S]+person_profile_id: personProfile\.id[\s\S]+user_id: validation\.values\.userId/,
     );
   });
 
@@ -1529,11 +1653,26 @@ test.describe("visible protected identifier exposure hygiene local source guardr
     const timeSource = readProjectFile("src/app/(app)/app/time/page.tsx");
     const dashboardSource = readProjectFile("src/app/(app)/app/page.tsx");
 
-    expect(getFunctionSource(coachesSource, "getMembershipIdentity")).toMatch(
-      /Cuenta MVP \$\{shortId\(membership\.user_id\)\}[\s\S]+Miembro \$\{shortId\(membership\.user_id\)\}/,
+    const membershipIdentitySource = getFunctionSource(
+      coachesSource,
+      "getMembershipIdentity",
     );
-    expect(getFunctionSource(coachesSource, "getCoachProfileIdentity")).toMatch(
-      /Cuenta MVP \$\{shortId\(profile\.user_id\)\}[\s\S]+Entrenador \$\{shortId\(profile\.user_id\)\}[\s\S]+Persona pendiente \$\{shortId\(profile\.person_profile_id\)\}/,
+    const coachProfileIdentitySource = getFunctionSource(
+      coachesSource,
+      "getCoachProfileIdentity",
+    );
+
+    expect(membershipIdentitySource).toContain("Acceso sin persona visible");
+    expect(membershipIdentitySource).toContain("Revisar vinculación");
+    expect(membershipIdentitySource).not.toMatch(/shortId|Cuenta MVP|Miembro/);
+    expect(coachProfileIdentitySource).toContain("Sin cuenta vinculada");
+    expect(coachProfileIdentitySource).toContain(
+      "Ficha con cuenta sin persona visible",
+    );
+    expect(coachProfileIdentitySource).toContain("Ficha sin persona visible");
+    expect(coachProfileIdentitySource).toContain("Ficha incompleta");
+    expect(coachProfileIdentitySource).not.toMatch(
+      /shortId|Cuenta MVP|Entrenador \$\{|Persona pendiente/,
     );
     expect(getFunctionSource(coverageSource, "getCoachDisplay")).toMatch(
       /Cuenta sin persona visible \(\$\{shortId\(coachProfile\.user_id\)\}\)[\s\S]+Entrenador sin perfil visible \$\{shortId\(coachProfile\.id\)\}[\s\S]+Perfil t.cnico incompleto \$\{shortId\(coachProfile\.id\)\}/,
@@ -1632,17 +1771,9 @@ test.describe("visible protected personal contact hygiene local source guardrail
       coachesSource,
       "getCoachProfileIdentity",
     );
-    const membershipMobileCardSource = getFunctionSource(
+    const teamUserCardSource = getFunctionSource(
       coachesSource,
-      "MembershipMobileCard",
-    );
-    const membershipSectionSource = getFunctionSource(
-      coachesSource,
-      "MembershipsSection",
-    );
-    const coachProfileCardSource = getFunctionSource(
-      coachesSource,
-      "CoachProfileCard",
+      "TeamUserCard",
     );
     const invitationSectionSource = getFunctionSource(
       coachesSource,
@@ -1651,11 +1782,11 @@ test.describe("visible protected personal contact hygiene local source guardrail
     const teamIdentitySource = [
       membershipIdentitySource,
       coachProfileIdentitySource,
-      membershipMobileCardSource,
-      membershipSectionSource,
-      coachProfileCardSource,
+      teamUserCardSource,
     ].join("\n");
 
+    // Invitations may mention email actions, but team identity labels/cards
+    // labels/cards must keep using visible person labels instead of private emails.
     expect(teamIdentitySource).not.toMatch(
       /\b(?:email|email_normalized|public_email|publicEmail|user\.email)\b/i,
     );
@@ -1695,6 +1826,21 @@ test.describe("visible protected personal contact hygiene local source guardrail
       /<span className="text-sm font-medium">Email p.blico<\/span>[\s\S]+name="publicEmail"[\s\S]+type="email"/,
     );
   });
+
+  test("keeps account labor data as a safe placeholder until the HR model exists", () => {
+    const accountSource = readProjectFile("src/app/(app)/app/account/page.tsx");
+
+    expect(accountSource).toContain("Datos laborales");
+    expect(accountSource).toContain("Puesto");
+    expect(accountSource).toContain("Antigüedad");
+    expect(accountSource).toContain("Jornada");
+    expect(accountSource).toContain("Desbloqueo seguro pendiente");
+    expect(accountSource).toContain("Por configurar");
+    expect(accountSource).toMatch(/reautenticación\s+real/);
+    expect(accountSource).not.toMatch(/\bemployment_profiles\b/);
+    expect(accountSource).not.toMatch(/\bsensitive_hr\b/);
+    expect(accountSource).not.toMatch(/\bpayroll_private_manage\b/);
+  });
 });
 
 test.describe("visible protected free-text field hygiene local source guardrails", () => {
@@ -1716,17 +1862,13 @@ test.describe("visible protected free-text field hygiene local source guardrails
       const source = readFileSync(filePath, "utf8");
 
       for (const match of source.matchAll(
-        /\bname\s*=\s*["'](notes|reasonSummary)["']/g,
+        /<(?:Input|Textarea)\b[^>]*\bname\s*=\s*["'](notes|reasonSummary)["'][^>]*>/g,
       )) {
         const index = match.index ?? 0;
         const snippet = source.slice(
           Math.max(0, index - 700),
           Math.min(source.length, index + 700),
         );
-
-        if (!/<(?:Input|Textarea)\b/.test(snippet)) {
-          continue;
-        }
 
         freeTextControls.push({
           lineNumber: source.slice(0, index).split(/\r?\n/).length,
@@ -1747,10 +1889,13 @@ test.describe("visible protected free-text field hygiene local source guardrails
       "src/app/(app)/app/coaches/page.tsx: notes",
       "src/app/(app)/app/coaches/page.tsx: notes",
       "src/app/(app)/app/requests/request-creation-form.tsx: reasonSummary",
-      "src/app/(app)/app/schedule/page.tsx: notes",
-      "src/app/(app)/app/schedule/page.tsx: notes",
-      "src/app/(app)/app/schedule/page.tsx: notes",
       "src/app/(app)/app/schedule/schedule-block-detail-panels.tsx: notes",
+      // Operational event notes are context-only and validated by
+      // normalizeOptionalNotes with sensitive-text rejection.
+      "src/app/(app)/app/schedule/schedule-operational-event-panels.tsx: notes",
+      "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx: notes",
+      "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx: notes",
+      "src/app/(app)/app/schedule/staff-work-window-form-fields.tsx: notes",
       "src/app/(app)/app/templates/page.tsx: notes",
       "src/app/(app)/app/templates/template-blocks-editor.tsx: notes",
       "src/app/(app)/app/templates/template-blocks-editor.tsx: notes",
@@ -2374,9 +2519,20 @@ test.describe("time tracking local source guardrails", () => {
     const scheduleAutoMigrationSource = readProjectFile(
       "supabase/migrations/00025_time_schedule_auto_punches.sql",
     );
+    const staffWindowAutoMigrationSource = readProjectFile(
+      "supabase/migrations/00047_staff_work_window_auto_time_punches.sql",
+    );
     const scheduleAutoSqlSource = getSqlFunctionSource(
       scheduleAutoMigrationSource,
       "generate_schedule_auto_time_punches",
+    );
+    const staffWindowAutoSqlSource = getSqlFunctionSource(
+      staffWindowAutoMigrationSource,
+      "generate_staff_work_window_auto_time_punches",
+    );
+    const dueStaffWindowAutoSqlSource = getSqlFunctionSource(
+      staffWindowAutoMigrationSource,
+      "generate_due_staff_work_window_auto_time_punches",
     );
 
     for (const functionName of [
@@ -2408,7 +2564,31 @@ test.describe("time tracking local source guardrails", () => {
     expect(scheduleAutoSqlSource).toMatch(
       /Generated from assigned schedule; does not verify real presence\./,
     );
+    expect(staffWindowAutoSqlSource).toMatch(
+      /public\.can_manage_time_tracking\(target_organization_id\)[\s\S]+public\.time_schedule_auto_is_enabled\(target_organization_id\)/,
+    );
+    expect(staffWindowAutoSqlSource).toMatch(
+      /target_person_profile_id IS NOT NULL[\s\S]+person_profile\.organization_id = target_organization_id[\s\S]+person_profile\.status = 'active'/,
+    );
+    expect(staffWindowAutoSqlSource).toMatch(
+      /FROM public\.staff_work_windows work_window[\s\S]+work_window\.status = 'active'[\s\S]+person_profile\.visibility_status = 'visible'/,
+    );
+    expect(staffWindowAutoSqlSource).toMatch(
+      /Generated from planned staff work window; does not verify real presence\./,
+    );
+    expect(staffWindowAutoMigrationSource).toMatch(
+      /metadata ->> 'generatedFrom' = 'staff_work_window'[\s\S]+GRANT EXECUTE ON FUNCTION public\.generate_staff_work_window_auto_time_punches/,
+    );
+    expect(staffWindowAutoMigrationSource).toMatch(
+      /REVOKE ALL ON FUNCTION public\.generate_due_staff_work_window_auto_time_punches\(timestamptz, uuid\)[\s\S]+FROM anon, authenticated/,
+    );
+    expect(dueStaffWindowAutoSqlSource).toMatch(
+      /target_now[\s\S]+public\.time_schedule_auto_is_enabled\(organization\.id\)[\s\S]+'scheduler'/,
+    );
     expect(scheduleAutoSqlSource).not.toMatch(
+      /(?:INSERT INTO|UPDATE|DELETE FROM) public\.schedule_/,
+    );
+    expect(staffWindowAutoSqlSource).not.toMatch(
       /(?:INSERT INTO|UPDATE|DELETE FROM) public\.schedule_/,
     );
     expect(timeActionsSource).toMatch(
@@ -3373,7 +3553,14 @@ test.describe("operational audit local source guardrails", () => {
     expect(coverageTraceHelperSource).toMatch(
       /function getChangedFieldNames[\s\S]+Object\.keys\(changedFields\)[\s\S]+slice\(0, 6\)/,
     );
-    expect(coverageTraceHelperSource).toContain("Campos minimizados");
+    expect(coverageTraceHelperSource).toContain("Cambio guardado");
+    expect(coverageTraceHelperSource).toContain(
+      "Entrenador por defecto actualizado",
+    );
+    expect(coverageTraceHelperSource).not.toContain("Campos minimizados");
+    expect(coverageTraceHelperSource).not.toContain(
+      "Cambio operativo reciente",
+    );
     expect(coverageTraceHelperSource).not.toMatch(
       /Object\.values\(changedFields\)|JSON\.stringify\([^)]*changed_fields|event\.changed_fields\[/,
     );
@@ -3405,8 +3592,13 @@ test.describe("operational audit local source guardrails", () => {
       );
     }
 
-    expect(traceUiSource).toContain("Trazabilidad operativa");
-    expect(traceUiSource).toContain("No modifica");
+    expect(traceUiSource).toContain("Cambios recientes");
+    expect(traceUiSource).toContain("Actualizado el");
+    expect(traceUiSource).toContain("No cambia el horario");
+    expect(traceUiSource).not.toContain("Trazabilidad operativa");
+    expect(traceUiSource).not.toContain("Auditoria");
+    expect(traceUiSource).not.toContain("Campos minimizados");
+    expect(traceUiSource).not.toContain("default_coach_profile_id");
     expect(traceUiSource).not.toMatch(/\breason_summary\b/);
     expect(`${coverageTraceHelperSource}\n${traceUiSource}`).not.toMatch(
       /navigator\.geolocation|serviceWorker|PushManager|CacheStorage|OpenAI|anthropic|embeddings|pgvector|ai_/i,
@@ -3527,6 +3719,9 @@ test.describe("overtime candidates local source guardrails", () => {
       "src/app/(app)/app/time/actions.ts",
     );
     const timePageSource = readProjectFile("src/app/(app)/app/time/page.tsx");
+    const collapsibleSectionSource = readProjectFile(
+      "src/components/features/collapsible-section.tsx",
+    );
     const detectionContextSource = getTsFunctionSource(
       detectionSource,
       "resolveDetectionContext",
@@ -3651,12 +3846,28 @@ test.describe("overtime candidates local source guardrails", () => {
     expect(timeActionsSource).toMatch(
       /export async function setOvertimeCandidateStatusFromForm[\s\S]+setOvertimeCandidateStatus\({[\s\S]+organizationId/,
     );
-    expect(overtimeSurfaceSource).toContain(
-      "Candidatos operativos de posible exceso",
+    expect(overtimeSurfaceSource).toContain("Posibles excesos de horas");
+    expect(overtimeSurfaceSource).toContain("CollapsibleTimeSection");
+    expect(timePageSource).toContain("CompactEmptyState");
+    expect(timePageSource).toContain("Registros de la semana");
+    expect(timePageSource).toContain("Correcciones y aprobaciones");
+    expect(timePageSource).toContain("dataTimeCollapsibleDetails");
+    expect(timePageSource).toContain("CollapsibleReviewQueue");
+    expect(timePageSource).toContain("dataTimeCollapsibleQueue");
+    expect(timePageSource).toContain("Listas para aplicar");
+    expect(timePageSource).toContain("Solicitudes pendientes");
+    expect(collapsibleSectionSource).toContain("data-time-collapsible-details");
+    expect(collapsibleSectionSource).toContain("data-time-collapsible-queue");
+    expect(collapsibleSectionSource).toContain("aria-expanded");
+    expect(collapsibleSectionSource).toContain("grid-rows-[0fr]");
+    expect(collapsibleSectionSource).toContain("ChevronDown");
+    expect(collapsibleSectionSource).toContain("inert=");
+    expect(timePageSource).not.toContain(">Mostrar<");
+    expect(timePageSource).not.toContain(">Ver detalles<");
+    expect(timePageSource).not.toMatch(
+      /<details[^>]+data-time-collapsible-(?:details|queue)[^>]+open/,
     );
-    expect(overtimeSurfaceSource).toContain(
-      "No modifica fichajes, bloques ni",
-    );
+    expect(overtimeSurfaceSource).toContain("no modifica");
     expect(overtimeStatusFormSource).toMatch(
       /overtimeCandidateTerminalStatuses\.has\(candidate\.status\)[\s\S]+Sin acciones/,
     );
@@ -3784,13 +3995,54 @@ test.describe("staff work window validator local helper guardrails", () => {
     });
   });
 
+  test("allows creating the same planned-presence window for several days", () => {
+    const multiDayForm = makeStaffWorkWindowForm({ dayOfWeek: undefined });
+    multiDayForm.append("dayOfWeek", "1");
+    multiDayForm.append("dayOfWeek", "3");
+    multiDayForm.append("dayOfWeek", "3");
+
+    expect(validateStaffWorkWindowCreateForm(multiDayForm)).toEqual({
+      ok: true,
+      values: [
+        {
+          centerId: "00000000-0000-0000-0000-000000000002",
+          dayOfWeek: 1,
+          endTime: "13:00",
+          notes: "Apertura y apoyo en sala",
+          personProfileId: "00000000-0000-0000-0000-000000000001",
+          startTime: "09:00",
+          status: "active",
+          validFrom: "2026-05-18",
+          validUntil: null,
+        },
+        {
+          centerId: "00000000-0000-0000-0000-000000000002",
+          dayOfWeek: 3,
+          endTime: "13:00",
+          notes: "Apertura y apoyo en sala",
+          personProfileId: "00000000-0000-0000-0000-000000000001",
+          startTime: "09:00",
+          status: "active",
+          validFrom: "2026-05-18",
+          validUntil: null,
+        },
+      ],
+    });
+
+    expect(
+      validateStaffWorkWindowCreateForm(
+        makeStaffWorkWindowForm({ dayOfWeek: undefined }),
+      ),
+    ).toEqual({ error: "missing-fields", ok: false });
+  });
+
   test("keeps planned-presence mutations validated, tenant-scoped and audit-minimized", () => {
     const scheduleActionSource = readProjectFile(
       "src/app/(app)/app/schedule/actions.ts",
     );
 
     expect(scheduleActionSource).toMatch(
-      /export async function createStaffWorkWindow[\s\S]+const validation = validateStaffWorkWindowForm\(formData\)[\s\S]+validateStaffWorkWindowReferences\({[\s\S]+organizationId: context\.organization\.id[\s\S]+values: validation\.values[\s\S]+\.from\("staff_work_windows"\)[\s\S]+\.insert\({[\s\S]+organization_id: context\.organization\.id[\s\S]+person_profile_id: validation\.values\.personProfileId/,
+      /export async function createStaffWorkWindow[\s\S]+const validation = validateStaffWorkWindowCreateForm\(formData\)[\s\S]+const referenceValues = validation\.values\[0\][\s\S]+validateStaffWorkWindowReferences\({[\s\S]+organizationId: context\.organization\.id[\s\S]+values: referenceValues[\s\S]+\.from\("staff_work_windows"\)[\s\S]+\.insert\(validation\.values\.map\(\(values\) => \({[\s\S]+organization_id: context\.organization\.id[\s\S]+person_profile_id: values\.personProfileId/,
     );
     expect(scheduleActionSource).toMatch(
       /export async function updateStaffWorkWindow[\s\S]+const validation = validateStaffWorkWindowForm\(formData\)[\s\S]+\.eq\("id", staffWorkWindowId\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+validateStaffWorkWindowReferences\({[\s\S]+values: validation\.values[\s\S]+\.from\("staff_work_windows"\)[\s\S]+\.update\({[\s\S]+person_profile_id: validation\.values\.personProfileId[\s\S]+\.eq\("id", existingWindow\.id\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)/,
@@ -4625,10 +4877,10 @@ test.describe("document access audit local source guardrails", () => {
     );
 
     const auditCapabilityMatch = documentMetadataMigrationSource.match(
-      /WHEN 'document_access_audit_read' THEN[\s\S]+?ARRAY\[(?<roles>[^\]]+)\]/,
+      /WHEN 'document_access_audit_read' THEN[\s\S]+?ARRAY\[([^\]]+)\]/,
     );
     const auditRoles =
-      auditCapabilityMatch?.groups?.roles
+      auditCapabilityMatch?.[1]
         ?.match(/'([^']+)'/g)
         ?.map((role) => role.replace(/'/g, "")) ?? [];
 
@@ -4881,9 +5133,9 @@ test.describe("document programming grants local source guardrails", () => {
     expect(documentRepositoryPageSource).toContain("entry.can_preview");
     expect(documentRepositoryPageSource).toContain("entry.can_download");
     expect(scheduleDetailPanelSource).toContain(
-      "El horario no",
+      "Material de apoyo",
     );
-    expect(scheduleDetailPanelSource).toContain("Solo metadata");
+    expect(scheduleDetailPanelSource).toContain("Solo informacion");
 
     expect(visibleDocumentSurfaceSource).not.toMatch(
       /document_access_grants|manage_grants|document_grant_manage|programming_content_manage/,
@@ -4891,7 +5143,9 @@ test.describe("document programming grants local source guardrails", () => {
     expect(visibleDocumentSurfaceSource).not.toMatch(
       /createDocumentProgrammingLink|setDocumentProgrammingLinkStatus/,
     );
-    expect(visibleDocumentSurfaceSource).not.toMatch(
+    // Minimal uploads are allowed only in the repository; schedule-linked
+    // programming remains read-only from the schedule detail.
+    expect(scheduleDetailPanelSource).not.toMatch(
       /begin_document_version_upload|activate_document_version_upload|cancel_document_version_upload/,
     );
     expect(documentRepositoryPageSource).toMatch(
@@ -5550,7 +5804,14 @@ test.describe("team invitation issuance local source guardrails", () => {
       /\.from\("team_invitations"\)[\s\S]+\.update\(\{[\s\S]+provider_message_id: sendResult\.id[\s\S]+status: "sent"[\s\S]+\.eq\("id", invitationId\)[\s\S]+\.eq\("organization_id", organizationId\)/,
     );
 
-    expect(teamInvitationAuditBlocks).toHaveLength(3);
+    // Three normal invitation actions plus stale-invitation cleanup when an
+    // unlinked inactive coach profile is deleted.
+    expect(teamInvitationAuditBlocks).toHaveLength(4);
+    expect(
+      teamInvitationAuditBlocks.some((auditBlock) =>
+        auditBlock.includes("coach_profile_id: auditFieldSet(null)"),
+      ),
+    ).toBe(true);
     for (const auditBlock of teamInvitationAuditBlocks) {
       expect(auditBlock).not.toMatch(
         /token|token_hash|raw_invitation|acceptUrl|accept_url|provider_message|last_error|sendResult|message/i,
@@ -5642,6 +5903,10 @@ test.describe("transactional email hardening local source guardrails", () => {
       actionsSource,
       "getSafeInvitationEmailErrorMessage",
     );
+    const invitationScopedActionsSource = actionsSource
+      .replace(getFunctionSource(actionsSource, "getDirectAccountAuthCreateError"), "")
+      .replace(getTsFunctionSource(actionsSource, "rollbackDirectAccountCreation"), "")
+      .replace(getTsFunctionSource(actionsSource, "createDirectTeamAccount"), "");
     const visibleErrorMessages =
       pageSource.match(/const errorMessages: Record<string, string> = \{[\s\S]+?\};/)?.[0] ??
       "";
@@ -5690,7 +5955,9 @@ test.describe("transactional email hardening local source guardrails", () => {
     expect(sendAndMarkSource).not.toMatch(
       /sendResult\.message|payload|providerPayload|provider_payload|JSON\.stringify\(sendResult\)/,
     );
-    expect(teamInvitationAuditBlocks).toHaveLength(3);
+    // The fourth audit block is invitation cleanup during safe unlinked ficha
+    // deletion; it still stores only minimized lifecycle fields.
+    expect(teamInvitationAuditBlocks).toHaveLength(4);
     for (const auditBlock of teamInvitationAuditBlocks) {
       expect(auditBlock).not.toMatch(
         /last_error|provider_message|sendResult|payload|token|acceptUrl/i,
@@ -5700,26 +5967,43 @@ test.describe("transactional email hardening local source guardrails", () => {
     expect(visibleErrorMessages).not.toMatch(
       /RESEND_API_KEY|BOXOPS_EMAIL|SMTP|DATABASE_URL|SUPABASE_DB|service_role|provider response|provider payload|payload|token|API/i,
     );
-    expect([emailProviderSource, actionsSource, pageSource].join("\n")).not.toMatch(
+    expect(
+      [emailProviderSource, invitationScopedActionsSource, pageSource].join("\n"),
+    ).not.toMatch(
       /console\.(?:log|error|warn|info|debug)|auth\.admin|SUPABASE_SERVICE_ROLE|SUPABASE_DB|DATABASE_URL|storage_path|storage_bucket|document-files|document_access_grants|manage_grants|signature_evidence|sensitive_hr|requires_signature|center_time_location_settings|time_location_events|navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage|OpenAI|openai|anthropic|embeddings|pgvector|ai_/i,
     );
   });
 });
 
 test.describe("privileged Supabase and Storage client local source guardrails", () => {
-  test("keeps Supabase clients anon-key only and privileged env/API names out of src", () => {
+  test("keeps Supabase Auth Admin scoped to the direct account server flow", () => {
     const sourceFiles = collectSourceFiles(path.join(process.cwd(), "src"));
     const relativeSourceFiles = sourceFiles.map((filePath) =>
       path.relative(process.cwd(), filePath).replace(/\\/g, "/"),
     );
+    const privilegedAuthAdminFiles = new Set([
+      "src/app/(app)/app/coaches/actions.ts",
+      "src/app/(auth)/reset-password/actions.ts",
+      "src/lib/supabase/admin.ts",
+      "src/lib/supabase/env.ts",
+    ]);
     const supabaseEnvSource = readProjectFile("src/lib/supabase/env.ts");
+    const supabaseAdminSource = readProjectFile("src/lib/supabase/admin.ts");
+    const supabaseProxySource = readProjectFile("src/lib/supabase/proxy.ts");
     const supabaseClientSources = [
       "src/lib/supabase/env.ts",
       "src/lib/supabase/server.ts",
       "src/lib/supabase/client.ts",
-      "src/lib/supabase/proxy.ts",
-    ].map((filePath) => readProjectFile(filePath));
+    ]
+      .map((filePath) => readProjectFile(filePath))
+      .concat(supabaseProxySource);
     const combinedSource = sourceFiles
+      .filter(
+        (filePath) =>
+          !privilegedAuthAdminFiles.has(
+            path.relative(process.cwd(), filePath).replace(/\\/g, "/"),
+          ),
+      )
       .map((filePath) => readFileSync(filePath, "utf8"))
       .join("\n");
     const processEnvFiles = sourceFiles
@@ -5759,31 +6043,135 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
 
     expect(relativeSourceFiles).toContain("src/lib/supabase/server.ts");
     expect(relativeSourceFiles).toContain("src/lib/supabase/client.ts");
+    expect(relativeSourceFiles).toContain("src/lib/supabase/admin.ts");
     expect(supabaseEnvSource).toContain("process.env.NEXT_PUBLIC_SUPABASE_URL");
     expect(supabaseEnvSource).toContain(
       "process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY",
     );
+    expect(supabaseAdminSource).toContain("process.env.SUPABASE_SERVICE_ROLE_KEY");
     expect(supabaseEnvSource).not.toMatch(
       /SERVICE_ROLE|service_role|DATABASE_URL|SUPABASE_DB|POSTGRES_URL|DIRECT_URL|PGHOST|PGPASSWORD|SMTP/i,
     );
     expect(processEnvFiles).toEqual([
       "src/lib/auth/site-url.ts",
       "src/lib/email/resend.ts",
+      "src/lib/supabase/admin.ts",
       "src/lib/supabase/env.ts",
+      "src/lib/supabase/proxy.ts",
     ]);
+    expect(supabaseProxySource).toContain(
+      'secure: process.env.NODE_ENV === "production"',
+    );
     expect(supabaseFactoryFiles).toEqual([
       "src/lib/supabase/client.ts",
       "src/lib/supabase/proxy.ts",
       "src/lib/supabase/server.ts",
     ]);
-    expect(nonTypeSupabaseJsImports).toEqual([]);
+    expect(nonTypeSupabaseJsImports).toEqual(["src/lib/supabase/admin.ts"]);
     expect(moduleScopeClientFiles).toEqual([]);
+    expect(supabaseAdminSource).toMatch(/createSupabaseClient<Database>/);
+    expect(supabaseAdminSource).toMatch(/autoRefreshToken: false/);
+    expect(supabaseAdminSource).toMatch(/persistSession: false/);
     expect(supabaseClientSources.join("\n")).toMatch(
       /getSupabasePublicEnv\(\)[\s\S]+createServerClient<Database>|getSupabasePublicEnv\(\)[\s\S]+createBrowserClient<Database>/,
     );
 
     expect(combinedSource).not.toMatch(
       /\bauth\.admin\b|\bservice_role\b|SUPABASE_SERVICE_ROLE|SUPABASE_DB|DATABASE_URL|POSTGRES_URL|POSTGRES_PRISMA_URL|POSTGRES_URL_NON_POOLING|DIRECT_URL|PGPASSWORD|PGHOST|smtp:\/\/|smtps:\/\/|\bnodemailer\b|createTransport\(|SMTP_(?:HOST|USER|PASS|PASSWORD)|EMAIL_SERVER/i,
+    );
+  });
+
+  test("keeps direct Auth account passwords temporary and first-login metadata enforced", () => {
+    const sourceFiles = collectSourceFiles(path.join(process.cwd(), "src"));
+    const combinedSource = sourceFiles
+      .map((filePath) => readFileSync(filePath, "utf8"))
+      .join("\n");
+    const requiredPasswordChangeSource = readProjectFile(
+      "src/lib/auth/required-password-change.ts",
+    );
+    const coachesActionsSource = readProjectFile(
+      "src/app/(app)/app/coaches/actions.ts",
+    );
+    const resetPasswordActionsSource = readProjectFile(
+      "src/app/(auth)/reset-password/actions.ts",
+    );
+    const loginActionsSource = readProjectFile(
+      "src/app/(auth)/login/actions.ts",
+    );
+    const proxySource = readProjectFile("src/lib/supabase/proxy.ts");
+    const appLayoutSource = readProjectFile("src/app/(app)/app/layout.tsx");
+    const directAccountSource = getTsFunctionSource(
+      coachesActionsSource,
+      "createDirectTeamAccount",
+    );
+    const updatePasswordSource = getTsFunctionSource(
+      resetPasswordActionsSource,
+      "updatePassword",
+    );
+    const auditBlocks = directAccountSource
+      .split("await recordOperationalAuditEvent({")
+      .slice(1)
+      .map((source) => `await recordOperationalAuditEvent({${source.split("});")[0]}});`);
+
+    expect(requiredPasswordChangeSource).toContain(
+      'const REQUIRED_PASSWORD_CHANGE_KEY = "boxops_password_change_required";',
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      'const REQUIRED_PASSWORD_CHANGE_REASON_KEY = "boxops_password_change_reason";',
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      'const REQUIRED_PASSWORD_CHANGE_SET_AT_KEY = "boxops_password_change_set_at";',
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      'return `/reset-password?${params.toString()}`;',
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      "nextMetadata[REQUIRED_PASSWORD_CHANGE_KEY] = null;",
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      "nextMetadata[REQUIRED_PASSWORD_CHANGE_REASON_KEY] = null;",
+    );
+    expect(requiredPasswordChangeSource).toContain(
+      "nextMetadata[REQUIRED_PASSWORD_CHANGE_SET_AT_KEY] = null;",
+    );
+    expect(directAccountSource).toMatch(
+      /try \{[\s\S]+authAdmin = createAdminClient\(\);[\s\S]+catch \{[\s\S]+auth-admin-not-configured/,
+    );
+    expect(directAccountSource).toMatch(
+      /authAdmin\.auth\.admin\.createUser\(\{[\s\S]+app_metadata: buildRequiredPasswordChangeAppMetadata\(\),[\s\S]+email_confirm: true,[\s\S]+password: validation\.values\.password/,
+    );
+    expect(directAccountSource).toMatch(
+      /\.from\("organization_memberships"\)[\s\S]+user_id: createdUserId/,
+    );
+    expect(directAccountSource).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+organization_id: context\.organization\.id,[\s\S]+user_id: createdUserId,[\s\S]+visibility_status: "visible"/,
+    );
+    expect(directAccountSource).toMatch(
+      /\.from\("coach_profiles"\)[\s\S]+organization_id: context\.organization\.id,[\s\S]+person_profile_id: personProfile\.id,[\s\S]+user_id: createdUserId/,
+    );
+    expect(auditBlocks.length).toBe(3);
+
+    for (const auditBlock of auditBlocks) {
+      expect(auditBlock).not.toMatch(
+        /\bpassword\b|confirmPassword|validation\.values\.email|validation\.values\.password/i,
+      );
+    }
+
+    expect(combinedSource).not.toMatch(/console\./);
+    expect(updatePasswordSource).toMatch(
+      /const passwordChangeRequired = isPasswordChangeRequired\(user\);[\s\S]+if \(passwordChangeRequired\) \{[\s\S]+authAdmin = createAdminClient\(\);/,
+    );
+    expect(updatePasswordSource).toMatch(
+      /await supabase\.auth\.updateUser\(\{ password \}\)[\s\S]+authAdmin\.auth\.admin\.updateUserById\([\s\S]+app_metadata: clearRequiredPasswordChangeAppMetadata\(user\.app_metadata\),[\s\S]+await supabase\.auth\.signOut\(\);[\s\S]+redirect\("\/login\?status=password-updated"\);/,
+    );
+    expect(loginActionsSource).toMatch(
+      /if \(data\.user && isPasswordChangeRequired\(data\.user\)\) \{[\s\S]+redirect\(getRequiredPasswordChangePath\(\)\);/,
+    );
+    expect(proxySource).toMatch(
+      /if \(user && request\.nextUrl\.pathname\.startsWith\("\/app"\)\) \{[\s\S]+isPasswordChangeRequired\(user\)[\s\S]+NextResponse\.redirect\([\s\S]+new URL\(getRequiredPasswordChangePath\(\), request\.url\)/,
+    );
+    expect(appLayoutSource).toMatch(
+      /if \(isPasswordChangeRequired\(user\)\) \{[\s\S]+redirect\(getRequiredPasswordChangePath\(\)\);/,
     );
   });
 
@@ -5950,13 +6338,14 @@ test.describe("trackable secret and evidence hygiene local guardrails", () => {
     expect(envExampleSource).toMatch(
       /^NEXT_PUBLIC_SITE_URL=http:\/\/127\.0\.0\.1:3000$/m,
     );
+    expect(envExampleSource).toMatch(/^SUPABASE_SERVICE_ROLE_KEY=$/m);
     expect(envExampleSource).toMatch(/^RESEND_API_KEY=$/m);
     expect(envExampleSource).toMatch(
       /^BOXOPS_EMAIL_FROM="BoxOps <onboarding@resend\.dev>"$/m,
     );
     expect(envExampleSource).toMatch(/^BOXOPS_EMAIL_REPLY_TO=$/m);
     expect(envExampleSource).not.toMatch(
-      /SUPABASE_SERVICE_ROLE|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_URL|DATABASE_URL|POSTGRES_URL|DIRECT_URL|PGPASSWORD|SMTP_(?:HOST|USER|PASS|PASSWORD)|EMAIL_SERVER/i,
+      /SUPABASE_ACCESS_TOKEN|SUPABASE_DB_URL|DATABASE_URL|POSTGRES_URL|DIRECT_URL|PGPASSWORD|SMTP_(?:HOST|USER|PASS|PASSWORD)|EMAIL_SERVER/i,
     );
 
     const ignoredEnvLocalRule = execFileSync("git", [
@@ -6356,6 +6745,7 @@ test.describe("base role permission helper guardrails", () => {
       {
         tenantSettings: boolean;
         teamAccess: boolean;
+        teamProfileDelete: boolean;
         operationalData: boolean;
         timeTrackingReview: boolean;
         absenceSelfService: boolean;
@@ -6364,6 +6754,7 @@ test.describe("base role permission helper guardrails", () => {
       owner: {
         tenantSettings: true,
         teamAccess: true,
+        teamProfileDelete: true,
         operationalData: true,
         timeTrackingReview: true,
         absenceSelfService: true,
@@ -6371,6 +6762,7 @@ test.describe("base role permission helper guardrails", () => {
       admin: {
         tenantSettings: true,
         teamAccess: true,
+        teamProfileDelete: false,
         operationalData: true,
         timeTrackingReview: true,
         absenceSelfService: true,
@@ -6378,6 +6770,7 @@ test.describe("base role permission helper guardrails", () => {
       manager: {
         tenantSettings: false,
         teamAccess: false,
+        teamProfileDelete: false,
         operationalData: true,
         timeTrackingReview: true,
         absenceSelfService: true,
@@ -6385,6 +6778,7 @@ test.describe("base role permission helper guardrails", () => {
       coach: {
         tenantSettings: false,
         teamAccess: false,
+        teamProfileDelete: false,
         operationalData: false,
         timeTrackingReview: false,
         absenceSelfService: true,
@@ -6398,6 +6792,10 @@ test.describe("base role permission helper guardrails", () => {
       expect(canManageTeamAccess(role), `${role} team access`).toBe(
         expectation.teamAccess,
       );
+      expect(
+        canDeleteOperationalTeamProfiles(role),
+        `${role} team profile delete`,
+      ).toBe(expectation.teamProfileDelete);
       expect(canManageOperationalData(role), `${role} operational data`).toBe(
         expectation.operationalData,
       );
@@ -6421,6 +6819,10 @@ test.describe("base role permission helper guardrails", () => {
         false,
       );
       expect(canManageTeamAccess(role), `${role} team access`).toBe(false);
+      expect(
+        canDeleteOperationalTeamProfiles(role),
+        `${role} team profile delete`,
+      ).toBe(false);
       expect(canManageOperationalData(role), `${role} operational data`).toBe(
         false,
       );
@@ -6437,6 +6839,7 @@ test.describe("base role permission helper guardrails", () => {
       operationalDataManagement: canManageOperationalData,
       operationalEventManagement: canManageOperationalEvents,
       operationalEventRead: canReadOperationalEvents,
+      operationalTeamProfileDelete: canDeleteOperationalTeamProfiles,
       operationalTeamProfileManagement: canManageOperationalTeamProfiles,
       overtimeCandidateReview: canReviewOvertimeCandidates,
       staffWorkWindowManagement: canManageStaffWorkWindows,
@@ -6567,6 +6970,7 @@ test.describe("base operational admin local source guardrails", () => {
     );
     expect(coachContextSource).toContain("canManageTeamAccess");
     expect(coachContextSource).toContain("canManageOperationalTeamProfiles");
+    expect(coachContextSource).toContain("canDeleteOperationalTeamProfiles");
     expect(coachContextSource).not.toMatch(
       /canManageTenantSettings|canManageOperationalData/,
     );
@@ -6578,13 +6982,16 @@ test.describe("base operational admin local source guardrails", () => {
       "createMembership",
       "updateMembership",
       "createCoachProfile",
+      "deleteCoachProfile",
       "updateCoachProfile",
       "linkCoachProfileToExistingAccount",
     ]) {
       expect(
         getTsFunctionSource(actionSources.coaches, actionName),
         `coaches.${actionName} uses the gated team context`,
-      ).toMatch(/getCoachActionContext\(formData,\s*"team-(?:access|profiles)"\)/);
+      ).toMatch(
+        /getCoachActionContext\(formData,\s*"team-(?:access|profile-delete|profiles)"\)/,
+      );
     }
 
     const settingsContextSource = getTsFunctionSource(
@@ -6648,10 +7055,45 @@ test.describe("base operational admin local source guardrails", () => {
     ).toMatch(
       /\.from\("coach_profiles"\)[\s\S]+\.eq\("id", validation\.values\.coachProfileId\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.from\("person_profiles"\)[\s\S]+\.eq\("id", coachProfile\.person_profile_id\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.from\("team_invitations"\)[\s\S]+organization_id: context\.organization\.id/,
     );
-    expect(
-      getTsFunctionSource(coachesActionsSource, "createCoachProfile"),
-    ).toMatch(
-      /\.from\("organization_memberships"\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.eq\("user_id", validation\.values\.userId\)[\s\S]+\.from\("coach_profiles"\)[\s\S]+organization_id: context\.organization\.id/,
+    const createCoachProfileSource = getTsFunctionSource(
+      coachesActionsSource,
+      "createCoachProfile",
+    );
+    expect(createCoachProfileSource).toContain(
+      'getCoachActionContext(formData, "team-access")',
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("organization_memberships"\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.eq\("user_id", validation\.values\.userId\)/,
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.eq\("user_id", validation\.values\.userId\)/,
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+\.insert\({[\s\S]+organization_id: context\.organization\.id[\s\S]+user_id: validation\.values\.userId[\s\S]+visibility_status: "visible"/,
+    );
+    expect(createCoachProfileSource).toMatch(
+      /\.from\("coach_profiles"\)[\s\S]+organization_id: context\.organization\.id[\s\S]+person_profile_id: personProfile\.id[\s\S]+user_id: validation\.values\.userId/,
+    );
+    const deleteCoachProfileSource = getTsFunctionSource(
+      coachesActionsSource,
+      "deleteCoachProfile",
+    );
+    // Physical deletion is only for inactive fichas without linked Auth.
+    // Linked accounts are archived instead, and operational history remains pinned by FK.
+    expect(deleteCoachProfileSource).toMatch(
+      /const hasLinkedAccount = Boolean\([\s\S]+existingCoachProfile\.user_id \|\| personProfile\?\.user_id[\s\S]+if \(hasLinkedAccount\) \{[\s\S]+\.from\("coach_profiles"\)[\s\S]+\.update\(\{ status: "inactive" \}\)[\s\S]+status: "profile-archived"/,
+    );
+    expect(deleteCoachProfileSource).toContain(
+      '"profile-delete-requires-inactive"',
+    );
+    expect(deleteCoachProfileSource).toMatch(
+      /\.from\("team_invitations"\)[\s\S]+\.update\(\{ coach_profile_id: null, status: "cancelled" \}\)[\s\S]+\.eq\("coach_profile_id", coachProfileId\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)[\s\S]+\.in\("status", \["pending", "sent", "failed", "expired", "cancelled"\]\)/,
+    );
+    expect(deleteCoachProfileSource).toMatch(
+      /\.from\("schedule_template_blocks"\)[\s\S]+\.update\(\{ default_coach_profile_id: null \}\)[\s\S]+\.eq\("default_coach_profile_id", coachProfileId\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)/,
+    );
+    expect(deleteCoachProfileSource).toMatch(
+      /getCoachActionContext\(formData,\s*"team-profile-delete"\)[\s\S]+\.from\("coach_profiles"\)[\s\S]+\.delete\(\)[\s\S]+\.eq\("id", coachProfileId\)[\s\S]+\.eq\("organization_id", context\.organization\.id\)/,
     );
 
     const updateClassTypeSource = getTsFunctionSource(
@@ -6808,6 +7250,12 @@ test.describe("base operational listing page local source guardrails", () => {
         path: "src/app/(app)/app/stats/page.tsx",
       },
       {
+        basePath: "/app/work-windows",
+        functionName: "WorkWindowsPage",
+        loginPath: "/app/work-windows",
+        path: "src/app/(app)/app/work-windows/page.tsx",
+      },
+      {
         basePath: "/app/settings",
         functionName: "SettingsPage",
         loginPath: "/app/settings",
@@ -6874,6 +7322,10 @@ test.describe("base operational listing page local source guardrails", () => {
       readProjectFile("src/app/(app)/app/settings/page.tsx"),
       "SettingsPage",
     );
+    const workWindowsPageSource = getDefaultAsyncFunctionSource(
+      readProjectFile("src/app/(app)/app/work-windows/page.tsx"),
+      "WorkWindowsPage",
+    );
 
     expect(centersPageSource).toMatch(
       /const centers = await getCenters\(resolution\.organization\.id\)[\s\S]+const canManageCenters = canManageOperationalData\(resolution\.membership\.role\)/,
@@ -6885,7 +7337,13 @@ test.describe("base operational listing page local source guardrails", () => {
       /getMemberships\(resolution\.organization\.id\)[\s\S]+getCoachProfiles\(resolution\.organization\.id\)[\s\S]+getCenters\(resolution\.organization\.id\)[\s\S]+getPersonProfiles\(resolution\.organization\.id\)[\s\S]+getTeamInvitations\(resolution\.organization\.id\)/,
     );
     expect(schedulePageSource).toMatch(
-      /const canManageSchedule = canManageOperationalData\([\s\S]+const canManageWorkWindows = canManageStaffWorkWindows\([\s\S]+const canManageEvents = canManageOperationalEvents\(/,
+      /const canManageSchedule = canManageOperationalData\([\s\S]+const canManageEvents = canManageOperationalEvents\(/,
+    );
+    expect(workWindowsPageSource).toMatch(
+      /const canManage = canManageStaffWorkWindows\(resolution\.membership\.role\)[\s\S]+if \(!canManage\)/,
+    );
+    expect(workWindowsPageSource).toMatch(
+      /listStaffWorkWindowsForWeek\({[\s\S]+includeInactive: true[\s\S]+organizationId: resolution\.organization\.id/,
     );
     expect(coveragePageSource).toMatch(
       /const canManageSchedule = canManageOperationalData\([\s\S]+includeCoverageTrace: canManageSchedule[\s\S]+organizationId: resolution\.organization\.id/,
@@ -7084,6 +7542,9 @@ test.describe("base operational listing page local source guardrails", () => {
     expect(coachesPageSource).toMatch(
       /const canManageProfiles = canManageOperationalTeamProfiles\([\s\S]+resolution\.membership\.role/,
     );
+    expect(coachesPageSource).toMatch(
+      /const canDeleteProfiles = canDeleteOperationalTeamProfiles\([\s\S]+resolution\.membership\.role/,
+    );
     expect(coachesPageSource).not.toMatch(
       /const canManageAccess = canManageOperationalData/,
     );
@@ -7091,10 +7552,27 @@ test.describe("base operational listing page local source guardrails", () => {
       /\{canManageAccess \? \([\s\S]+<TeamInvitationsSection/,
     );
     expect(coachesPageSource).toMatch(
-      /<MembershipsSection[\s\S]+canManageAccess={canManageAccess}/,
+      /<TeamUsersSection[\s\S]+canManageAccess={canManageAccess}/,
     );
     expect(coachesPageSource).toMatch(
-      /<CoachProfilesSection[\s\S]+canManageProfiles={canManageProfiles}/,
+      /<TeamUsersSection[\s\S]+canManageProfiles={canManageProfiles}/,
+    );
+    expect(coachesPageSource).toMatch(
+      /<TeamUsersSection[\s\S]+canDeleteProfiles={canDeleteProfiles}/,
+    );
+    expect(coachesPageSource).toMatch(
+      /hasProfileStatusParam[\s\S]+: "active"[\s\S]+profileStatusIsDefault: !hasProfileStatusParam/,
+    );
+    expect(coachesPageSource).toContain("Usuarios archivados");
+    expect(coachesPageSource).toContain(
+      "Archivar datos operativos",
+    );
+    expect(coachesPageSource).not.toContain("Accesos del equipo");
+    expect(coachesPageSource).not.toContain("Fichas de entrenador");
+    expect(coachesPageSource).not.toContain("Filtrar fichas");
+    expect(coachesPageSource).not.toContain("Fuera de este corte");
+    expect(coachesPageSource).not.toContain(
+      "Esta pantalla prepara el equipo.",
     );
 
     expect(settingsPageSource).toMatch(
@@ -7114,7 +7592,10 @@ test.describe("base operational listing page local source guardrails", () => {
       /<CoverageBlockDetailPanels[\s\S]+canManageSchedule={canManageSchedule}/,
     );
     expect(schedulePageSource).toMatch(
-      /\{canManageSchedule \? \([\s\S]+<ScheduleCreateForm/,
+      /<WeeklyScheduleView[\s\S]+canCreateEvents={canManageEvents}[\s\S]+canManageSchedule={canManageSchedule}/,
+    );
+    expect(schedulePageSource).toMatch(
+      /<ScheduleSlotCreateDialog[\s\S]+canCreateEvents={canCreateEvents}[\s\S]+canCreateScheduleBlocks={canManageSchedule}/,
     );
 
     expect(operationalListingPageSource).not.toMatch(
@@ -7160,7 +7641,13 @@ test.describe("app shell navigation local source guardrails", () => {
       /const currentRole = getNavigationRole\(\{ memberships, organizationId \}\)[\s\S]+const canManageOperational = currentRole[\s\S]+\? canManageOperationalData\(currentRole\)[\s\S]+: false/,
     );
     expect(navigationSource).toMatch(
+      /const canManageWorkWindows = currentRole[\s\S]+\? canManageStaffWorkWindows\(currentRole\)[\s\S]+: false/,
+    );
+    expect(navigationSource).toMatch(
       /const visibleMainItems = mainItems\.filter\(\(item\) => \{[\s\S]+item\.href === "\/app\/coverage"[\s\S]+return canManageOperational/,
+    );
+    expect(navigationSource).toMatch(
+      /item\.href === "\/app\/work-windows"[\s\S]+return canManageWorkWindows/,
     );
     expect(navigationSource).toMatch(
       /const visibleManagementItems = managementItems\.filter\(\(item\) => \{[\s\S]+item\.href === "\/app\/templates" \|\| item\.href === "\/app\/settings"[\s\S]+return canManageOperational/,
@@ -7205,6 +7692,7 @@ test.describe("app shell navigation local source guardrails", () => {
     const coachBranch = moreSource.slice(coachBranchStart, personalStart);
 
     expect(managementBranch).toContain("getScheduleTemplatesPath(baseOptions)");
+    expect(managementBranch).toContain("getWorkWindowsPath(baseOptions)");
     expect(managementBranch).toContain("getStatsPath(baseOptions)");
     expect(managementBranch).toContain("getSettingsPath(baseOptions)");
     expect(coachBranch).toContain(
@@ -7216,7 +7704,7 @@ test.describe("app shell navigation local source guardrails", () => {
     expect(coachBranch).toContain("getCentersPath(baseOptions)");
     expect(coachBranch).toContain("getClassTypesPath(baseOptions)");
     expect(coachBranch).not.toMatch(
-      /getCoveragePath|getStatsPath|getSettingsPath|getScheduleTemplatesPath/,
+      /getCoveragePath|getStatsPath|getSettingsPath|getScheduleTemplatesPath|getWorkWindowsPath/,
     );
     expect(moreSource).not.toMatch(
       /\bcanManageTeamAccess\b|\bcanManageTenantSettings\b|\bcanManageTimeTrackingSettings\b/,
@@ -7284,6 +7772,55 @@ test.describe("app shell navigation local source guardrails", () => {
       /createSignedUrl|signedUrl|navigator\.geolocation|serviceWorker|service worker|PushManager|Notification|background sync|caches\.|CacheStorage|OpenAI|openai|anthropic|embeddings|pgvector|ai_/i,
     );
   });
+
+  test("keeps next assigned identity pending states out of dead-end schedule redirects", () => {
+    const dashboardSource = readProjectFile("src/app/(app)/app/page.tsx");
+    const accountSource = readProjectFile("src/app/(app)/app/account/page.tsx");
+    const fallbackStart = dashboardSource.indexOf(
+      "function getNextAssignedFallbackCopy",
+    );
+    const nextAssignedCardStart = dashboardSource.indexOf(
+      "function NextAssignedScheduleCard",
+    );
+    const nextAssignedCardEnd = dashboardSource.indexOf(
+      "function WeeklyApprovalStatusBadge",
+      nextAssignedCardStart,
+    );
+    const fallbackSource = dashboardSource.slice(
+      fallbackStart,
+      nextAssignedCardStart,
+    );
+    const nextAssignedCardSource = dashboardSource.slice(
+      nextAssignedCardStart,
+      nextAssignedCardEnd,
+    );
+    const missingPersonCardSource = getFunctionSource(
+      accountSource,
+      "PersonProfileMissingCard",
+    );
+
+    expect(fallbackStart).toBeGreaterThanOrEqual(0);
+    expect(nextAssignedCardStart).toBeGreaterThan(fallbackStart);
+    expect(nextAssignedCardEnd).toBeGreaterThan(nextAssignedCardStart);
+    expect(fallbackSource).toContain("canManageAccountLinks");
+    expect(fallbackSource).toContain("Pide a un Propietario o Administrador");
+    expect(fallbackSource).not.toMatch(
+      /Existe una ficha t.cnica[\s\S]+Por seguridad no se elige una clase/,
+    );
+    expect(nextAssignedCardSource).toMatch(
+      /copy\.actionTarget === "account"[\s\S]+getAccountPath\(\{ organizationId \}\)/,
+    );
+    expect(nextAssignedCardSource).toMatch(
+      /copy\.actionTarget === "team"[\s\S]+getCoachesPath\(\{ organizationId \}\)/,
+    );
+    expect(nextAssignedCardSource).toMatch(
+      /copy\.actionTarget === "my_schedule"[\s\S]+getSchedulePath\(\{ mineOnly: true/,
+    );
+    expect(missingPersonCardSource).toContain("hasLinkedCoachProfile");
+    expect(missingPersonCardSource).toContain(
+      "complete la vinculacion desde Equipo",
+    );
+  });
 });
 
 test.describe("protected app route cache local source guardrails", () => {
@@ -7314,7 +7851,7 @@ test.describe("protected app route cache local source guardrails", () => {
       /if \(!user && request\.nextUrl\.pathname\.startsWith\("\/app"\)\)[\s\S]+return withPrivateAppCacheHeaders\(NextResponse\.redirect\(loginUrl\)\)/,
     );
     expect(supabaseProxySource).toMatch(
-      /return withPrivateAppCacheHeaders\(response\)/,
+      /return withScheduleCenterPreference\(\s*request,\s*withPrivateAppCacheHeaders\(response\),\s*\)/,
     );
   });
 

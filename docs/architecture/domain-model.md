@@ -187,6 +187,7 @@ Decision aplicada tras validacion STL 2026-04-30:
 - Preparar personas/coaches operativos antes de vincularlos a Auth.
 - El usuario tecnico interno puede tener Auth y membership admin, pero su perfil visible debe quedar oculto del equipo operativo.
 - `manager` no recibe permisos completos sobre perfiles personales sensibles; tras B.2 puede ajustar fichas operativas de coach, pero no altas, roles ni vinculaciones de cuenta.
+- Matiz 2026-05-23: el producto admite un segundo camino administrado tipo ServiceNow para crear cuentas Auth directas con contrasena temporal. Ese flujo queda marcado con cambio obligatorio de contrasena en primer login y requiere Auth Admin server-only; no sustituye la invitacion como camino sin contrasena compartida.
 
 Flujo implementado en Fase A 2026-05-07:
 
@@ -197,6 +198,7 @@ Flujo implementado en Fase A 2026-05-07:
 - No se permite reutilizar el mismo `user_id` si ya esta vinculado a otra persona o ficha de coach del tenant.
 - La propia membership del admin no se degrada ni suspende desde este flujo.
 - Tras B.2, `owner`/`admin` pueden vincular cuentas y gestionar memberships; `manager` puede ajustar fichas operativas de coach, pero no altas, roles ni vinculaciones de cuenta. `coach` conserva lectura.
+- Tras UX.7, la vinculacion manual deja de ser una accion principal visible para altas nuevas: las altas normales son invitacion por email o creacion directa de cuenta.
 
 Flujo implementado en Fase D.1 2026-05-07:
 
@@ -216,6 +218,15 @@ Flujo implementado en B.3 2026-05-12:
 - `/invite/accept` permite aceptar con sesion existente o crear cuenta con contrasena. La aceptacion exige que el email Auth coincida con el email de la invitacion.
 - La RPC `accept_team_invitation(...)` crea o actualiza `organization_memberships`, vincula `person_profiles.user_id` y, si procede, `coach_profiles.user_id`.
 - No se introduce `service_role` en `src`; la vinculacion sensible vive en RPC `SECURITY DEFINER` con token, email, tenant y conflictos validados.
+
+Flujo directo implementado 2026-05-23:
+
+- `/app/coaches` ofrece una segunda alta: crear una cuenta Auth directa con email, contrasena temporal, rol, estado inicial, persona visible y ficha operativa.
+- La creacion directa requiere `SUPABASE_SERVICE_ROLE_KEY` solo en servidor y queda centralizada en `src/lib/supabase/admin.ts`; no debe importarse desde componentes cliente.
+- La cuenta Auth se crea con email confirmado y `app_metadata.boxops_password_change_required = true`.
+- Login, proxy y layout protegido bloquean `/app` mientras esa marca siga activa y envian a `/reset-password?reason=first-login`.
+- Al guardar la nueva contrasena, la app actualiza la contrasena con la sesion del usuario y limpia la marca con Auth Admin antes de cerrar sesion.
+- La invitacion por email sigue siendo el camino sin contrasena compartida; la creacion directa queda para el flujo tipo ServiceNow donde un admin entrega credenciales temporales.
 
 ### `team_invitations`
 
@@ -1321,7 +1332,7 @@ Relaciones con modelos existentes:
 - `time_weekly_approvals`: puede congelar contexto para revision, pero una semana `approved` no aprueba horas extra.
 - `schedule_blocks`: planificacion operativa de bloques reales; no es contrato ni payroll.
 - `schedule_block_assignments`: asignaciones `assigned` definen planificacion por coach; aceptar o aplicar una cobertura no aprueba horas extra.
-- `staff_work_windows`: presencia prevista compartida; no es jornada legal ni saldo.
+- `staff_work_windows`: presencia prevista compartida; puede alimentar `schedule_auto` cuando el tenant lo activa, pero no es jornada legal, saldo ni prueba de presencia real.
 - Ausencias: una ausencia aprobada o en revision puede explicar una diferencia, sin exponer motivos sensibles ni generar horas extra por si sola.
 - `operational_events`: eventos/festivos/competiciones son contexto; no equivalen a voluntariado legal ni hora extra aprobada.
 
@@ -1354,7 +1365,7 @@ Futuro seguro:
 
 ## Fichaje
 
-F.1 queda documentada el 2026-05-11 como modelado seguro de fichaje manual legal/auditable. F.2 implementa el primer schema minimo en `supabase/migrations/00010_time_tracking_manual_foundation.sql`, con RLS estricta, auditoria tecnica, RPC de fichaje propio y tipos Supabase actualizados. F.3 abre la primera capa servidor en `src/lib/time-tracking.ts` y `src/lib/time-tracking-actions.ts`. F.4/F.5/F.6 abren `/app/time` para fichaje propio, correcciones propias y revision administrativa minima. F.7 anade `supabase/migrations/00012_time_correction_application.sql` y una RPC transaccional para aplicar correcciones ya aprobadas. F.8 anade `supabase/migrations/00013_time_correction_policy.sql`, `00014_time_correction_direct_punch_policy.sql` y `00015_time_tracking_config_owner_guard.sql`: por defecto las correcciones propias se aplican directamente mediante RPC trazada. `00017_time_tracking_settings_management_policy.sql` permite que `owner`, `admin` y `manager` activen aprobacion previa en `organizations.time_tracking_config` sin abrir toda la configuracion global a `manager`. F.9 anade `getOwnTimeWeekOverview(...)` y una vista semanal en `/app/time` para comparar fichajes propios con bloques asignados. F.10 separa punches sustituidos/anulados del dia principal y los muestra solo como historial visible 30 dias. F.11 anade `supabase/migrations/00025_time_schedule_auto_punches.sql`, `source = schedule_auto`, flag `scheduleAutoPunchesEnabled`, RPC `generate_schedule_auto_time_punches(...)`, helper server-side e idempotencia por asignacion/tipo de punch. F.12 anade `supabase/migrations/00026_time_weekly_closure_approval.sql`, estados semanales ampliados, envio idempotente, primitiva DB para cierre domingo 23:59 por timezone de organizacion, aprobacion con firma propia del aprobador, rechazo con nota obligatoria, reapertura auditada y bloqueo de modificaciones normales en semanas aprobadas. F.13 anade avisos in-app en Inicio derivados de `time_weekly_approvals`, cola de aprobacion para `owner`/`admin`/`manager`, avisos propios, navegacion a `/app/time?week=YYYY-MM-DD` y acciones de aprobar/rechazar con las RPC de F.12. F.14 reutiliza `time_exports` para registrar descargas CSV internas revisables desde `/app/time/export`, con validacion server-side de tenant, rol, rango y persona opcional. G.1-G.4 quedan como base tecnica para geolocalizacion nativa/wrapper futuro, no para lectura de ubicacion en webapp. No crea payroll, aprobacion legal de horas extra, seeds reales, tabla nueva de notificaciones, email/push de fichaje, exporte legal definitivo ni cumplimiento legal definitivo.
+F.1 queda documentada el 2026-05-11 como modelado seguro de fichaje manual legal/auditable. F.2 implementa el primer schema minimo en `supabase/migrations/00010_time_tracking_manual_foundation.sql`, con RLS estricta, auditoria tecnica, RPC de fichaje propio y tipos Supabase actualizados. F.3 abre la primera capa servidor en `src/lib/time-tracking.ts` y `src/lib/time-tracking-actions.ts`. F.4/F.5/F.6 abren `/app/time` para fichaje propio, correcciones propias y revision administrativa minima. F.7 anade `supabase/migrations/00012_time_correction_application.sql` y una RPC transaccional para aplicar correcciones ya aprobadas. F.8 anade `supabase/migrations/00013_time_correction_policy.sql`, `00014_time_correction_direct_punch_policy.sql` y `00015_time_tracking_config_owner_guard.sql`: por defecto las correcciones propias se aplican directamente mediante RPC trazada. `00017_time_tracking_settings_management_policy.sql` permite que `owner`, `admin` y `manager` activen aprobacion previa en `organizations.time_tracking_config` sin abrir toda la configuracion global a `manager`. F.9 anade `getOwnTimeWeekOverview(...)` y una vista semanal en `/app/time` para comparar fichajes propios con bloques asignados. F.10 separa punches sustituidos/anulados del dia principal y los muestra solo como historial visible 30 dias. F.11 anade `supabase/migrations/00025_time_schedule_auto_punches.sql`, `source = schedule_auto`, flag `scheduleAutoPunchesEnabled`, RPC `generate_schedule_auto_time_punches(...)`, helper server-side e idempotencia por asignacion/tipo de punch. El corte 2026-05-23 anade `supabase/migrations/00047_staff_work_window_auto_time_punches.sql` para generar `schedule_auto` desde `staff_work_windows`, con RPC manager/catch-up, primitiva DB `generate_due_staff_work_window_auto_time_punches(...)`, idempotencia por franja+fecha+tipo, `presenceVerified = false` y snippet de activacion por `pg_cron`. F.12 anade `supabase/migrations/00026_time_weekly_closure_approval.sql`, estados semanales ampliados, envio idempotente, primitiva DB para cierre domingo 23:59 por timezone de organizacion, aprobacion con firma propia del aprobador, rechazo con nota obligatoria, reapertura auditada y bloqueo de modificaciones normales en semanas aprobadas. F.13 anade avisos in-app en Inicio derivados de `time_weekly_approvals`, cola de aprobacion para `owner`/`admin`/`manager`, avisos propios, navegacion a `/app/time?week=YYYY-MM-DD` y acciones de aprobar/rechazar con las RPC de F.12. F.14 reutiliza `time_exports` para registrar descargas CSV internas revisables desde `/app/time/export`, con validacion server-side de tenant, rol, rango y persona opcional. G.1-G.4 quedan como base tecnica para geolocalizacion nativa/wrapper futuro, no para lectura de ubicacion en webapp. No crea payroll, aprobacion legal de horas extra, seeds reales, tabla nueva de notificaciones, email/push de fichaje, exporte legal definitivo ni cumplimiento legal definitivo.
 
 Principios F.1/F.2:
 
@@ -1459,7 +1470,7 @@ Tipos implementados:
 Reglas implementadas:
 
 - F.1 solo modela entrada y salida; pausas, descansos u otros eventos quedan para una decision posterior.
-- `source = manual` es el origen permitido para el fichaje propio; F.7 usa `source = correction` solo desde `apply_time_record_correction(...)`; F.11 usa `source = schedule_auto` solo desde `generate_schedule_auto_time_punches(...)`.
+- `source = manual` es el origen permitido para el fichaje propio; F.7 usa `source = correction` solo desde `apply_time_record_correction(...)`; F.11 usa `source = schedule_auto` desde `generate_schedule_auto_time_punches(...)` y, desde el corte 2026-05-23, desde `generate_staff_work_window_auto_time_punches(...)`/`generate_due_staff_work_window_auto_time_punches(...)`.
 - No se debe guardar ubicacion, coordenadas ni evidencia movil en F.1.
 - Un punch reemplazado por correccion queda supersedido o versionado, no sobrescrito sin rastro.
 - F.10 excluye punches `superseded` y `voided` de los fichajes visibles del dia y los muestra como historial reciente de cambios durante 30 dias desde `updated_at`.
@@ -2376,7 +2387,7 @@ Antes de cualquier migracion futura:
 | Coach como capacidad operativa | `coach_profiles` puede depender de `person_profiles` pendiente de Auth o de `user_id` con membership existente. |
 | Vinculacion de ficha pendiente con Auth real | `/app/coaches` vincula `person_profiles` + `coach_profiles` a un `user_id` existente, crea/actualiza membership del tenant y no envia invitaciones por email. |
 | Asignaciones reales coach-bloque | `schedule_block_assignments` es la fuente canonica de quien cubre cada bloque real. |
-| Jornada prevista del personal | `staff_work_windows` planifica presencia prevista por persona, dia, hora y centro opcional; no crea bloques, asignaciones ni fichajes. |
+| Jornada prevista del personal | `staff_work_windows` planifica presencia prevista por persona, dia, hora y centro opcional; no crea bloques ni asignaciones. Desde el corte 2026-05-23 puede crear fichajes `schedule_auto` idempotentes si `scheduleAutoPunchesEnabled` esta activo. |
 | Cobertura MVP 1 al vuelo | `covered`, `uncovered`, `insufficient` y `conflict` se calculan desde bloques, asignaciones, coaches, personas y memberships. |
 | Plantillas antes de calendario complejo | `schedule_templates` + `schedule_template_blocks` cubren el primer caso semanal/mensual. |
 | Plantillas semanales basicas | `/app/templates` crea plantillas weekly, bloques de plantilla y aplica patrones a semanas reales sin duplicar bloques. |
@@ -2685,6 +2696,7 @@ Antes de cualquier migracion futura:
 | RPC canonica | `generate_schedule_auto_time_punches(...)` exige usuario autenticado, membership activa y permiso `owner`/`admin`/`manager`; no acepta `person_profile_id` desde acciones propias. |
 | Base planificada | La generacion usa solo `schedule_block_assignments.assignment_status = assigned`, `coach_profiles.active`, persona visible/activa y `schedule_blocks` no cancelados del tenant. |
 | Idempotencia | Un indice unico parcial evita duplicar `schedule_auto` por `organization_id`, `schedule_block_assignment_id` y `punch_type`; repetir el job devuelve los punches existentes. |
+| Jornada prevista auto | `00047_staff_work_window_auto_time_punches.sql` anade idempotencia por `organization_id`, `person_profile_id`, `staffWorkWindowId`, `serviceDate` y `punch_type`; `generate_due_staff_work_window_auto_time_punches(...)` queda para scheduler DB y no se concede a `anon`/`authenticated`. |
 | Snapshot minimo | Cada punch guarda bloque, asignacion, coach, centro, tipo, fecha, hora prevista, timezone, estado de bloque/asignacion y `presenceVerified = false` en `metadata`. |
 | Registro diario | La RPC crea o reutiliza el `time_record` diario abierto; el detalle por bloque vive en los punches para soportar varios bloques el mismo dia. |
 | Correcciones intactas | Un automatico por planificacion no prueba presencia real: retrasos, salidas anticipadas, sustituciones o cambios no reflejados se corrigen con el flujo existente. |

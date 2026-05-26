@@ -604,11 +604,6 @@ function TemplateBlockEditForm({
         ) : (
           <CenterSelect centers={centers} defaultValue={block.center_id} />
         )}
-        {templateCenterId ? (
-          <span className="text-xs leading-5 text-muted-foreground">
-            Lo marca el alcance de la plantilla.
-          </span>
-        ) : null}
       </label>
 
       <label className="grid min-w-0 gap-2">

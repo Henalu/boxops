@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIResponse, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -7,6 +7,7 @@ import path from "node:path";
 import {
   adminCredentials,
   coachCredentials,
+  crossTenantCredentials,
   hasCredentials,
   managerCredentials,
   organizationId,
@@ -57,6 +58,40 @@ type LocalDeniedDocumentFileAccessEvidence = {
   previewDeniedCount: number;
 };
 
+type LocalDocumentFileAccessAuditEvidence = {
+  downloadAllowedCount: number;
+  downloadDeniedCount: number;
+  previewAllowedCount: number;
+  previewDeniedCount: number;
+};
+
+type LocalDocumentGrantAccessLevel = "download" | "preview" | "read_metadata";
+
+type LocalDocumentGrantActorRole = "coach" | "manager";
+
+type LocalDocumentGrantActor = {
+  credentials: SmokeCredentials;
+  email: string;
+  membershipId: string;
+  role: LocalDocumentGrantActorRole;
+};
+
+type LocalCrossTenantDocumentActor = {
+  credentials: SmokeCredentials;
+  email: string;
+  membershipId: string;
+  organizationId: string;
+  role: string;
+  source: string;
+};
+
+type LocalDocumentGrantEvidence = {
+  accessLevel: string;
+  grantId: string;
+  grantStatus: string;
+  targetRole: string;
+};
+
 type UploadedDocumentRouteEvidence = LocalDocumentUploadEvidence & {
   downloadHref: string;
   previewHref: string;
@@ -65,6 +100,12 @@ type UploadedDocumentRouteEvidence = LocalDocumentUploadEvidence & {
 
 const shouldRunDocumentUploadRuntimeSmoke =
   process.env.E2E_DOCUMENT_UPLOAD_RUNTIME === "1";
+
+async function expectNoDocumentFileInternalsInUi(page: Page) {
+  expect(await page.content()).not.toMatch(
+    /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+  );
+}
 
 function quoteSqlLiteral(value: string) {
   return `'${value.replace(/'/g, "''")}'`;
@@ -94,6 +135,14 @@ function runLocalPsql(sql: string) {
       encoding: "utf8",
     },
   ).trim();
+}
+
+function tryRunLocalPsql(sql: string) {
+  try {
+    return runLocalPsql(sql);
+  } catch {
+    return null;
+  }
 }
 
 function getLocalDocumentUploadEvidence({
@@ -198,6 +247,261 @@ function getLocalDocumentUploadEvidence({
   };
 }
 
+function getLocalGrantActorMembership({
+  actorEmail,
+  orgId,
+  role,
+}: {
+  actorEmail: string;
+  orgId: string;
+  role: LocalDocumentGrantActorRole;
+}) {
+  return tryRunLocalPsql(`
+    SELECT membership.id::text
+    FROM public.organization_memberships membership
+    INNER JOIN auth.users auth_user
+      ON auth_user.id = membership.user_id
+    WHERE membership.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+      AND membership.status = 'active'
+      AND membership.role = ${quoteSqlLiteral(role)}
+      AND lower(auth_user.email) = lower(${quoteSqlLiteral(actorEmail)})
+    LIMIT 1;
+  `);
+}
+
+function getLocalDocumentGrantActor(
+  orgId: string,
+): LocalDocumentGrantActor | null {
+  const candidates: Array<{
+    credentials: SmokeCredentials | null;
+    role: LocalDocumentGrantActorRole;
+  }> = [
+    { credentials: managerCredentials, role: "manager" },
+    { credentials: coachCredentials, role: "coach" },
+  ];
+
+  for (const candidate of candidates) {
+    const credentials = candidate.credentials;
+
+    if (!hasCredentials(credentials)) {
+      continue;
+    }
+
+    const membershipId = getLocalGrantActorMembership({
+      actorEmail: credentials.email,
+      orgId,
+      role: candidate.role,
+    });
+
+    if (membershipId) {
+      return {
+        credentials,
+        email: credentials.email,
+        membershipId,
+        role: candidate.role,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getLocalCrossTenantDocumentActor(
+  orgId: string,
+): LocalCrossTenantDocumentActor | null {
+  const credentials = crossTenantCredentials;
+
+  if (!hasCredentials(credentials)) {
+    return null;
+  }
+
+  const output = tryRunLocalPsql(`
+    WITH target_user AS (
+      SELECT auth_user.id, auth_user.email
+      FROM auth.users auth_user
+      WHERE lower(auth_user.email) = lower(${quoteSqlLiteral(credentials.email)})
+      LIMIT 1
+    ),
+    tenant_a_membership AS (
+      SELECT 1
+      FROM public.organization_memberships membership
+      INNER JOIN target_user
+        ON target_user.id = membership.user_id
+      WHERE membership.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+        AND membership.status = 'active'
+      LIMIT 1
+    ),
+    cross_membership AS (
+      SELECT
+        membership.id,
+        membership.organization_id,
+        membership.role
+      FROM public.organization_memberships membership
+      INNER JOIN target_user
+        ON target_user.id = membership.user_id
+      INNER JOIN public.organizations organization
+        ON organization.id = membership.organization_id
+      WHERE membership.organization_id <> ${quoteSqlLiteral(orgId)}::uuid
+        AND membership.status = 'active'
+        AND organization.status IN ('trialing', 'active')
+        AND NOT EXISTS (SELECT 1 FROM tenant_a_membership)
+      ORDER BY
+        CASE membership.role
+          WHEN 'owner' THEN 1
+          WHEN 'admin' THEN 2
+          WHEN 'document_admin' THEN 3
+          WHEN 'manager' THEN 4
+          WHEN 'coach' THEN 5
+          ELSE 6
+        END,
+        membership.created_at
+      LIMIT 1
+    )
+    SELECT
+      target_user.email,
+      cross_membership.id::text,
+      cross_membership.organization_id::text,
+      cross_membership.role
+    FROM target_user
+    CROSS JOIN cross_membership;
+  `);
+
+  if (!output) {
+    return null;
+  }
+
+  const [email, membershipId, crossOrganizationId, role] = output.split("|");
+
+  return {
+    credentials,
+    email,
+    membershipId,
+    organizationId: crossOrganizationId,
+    role,
+    source: "cross_tenant",
+  };
+}
+
+function createLocalDocumentGrant({
+  accessLevel,
+  actor,
+  documentId,
+  documentVersionId,
+  orgId,
+  source,
+  title,
+}: {
+  accessLevel: LocalDocumentGrantAccessLevel;
+  actor: LocalDocumentGrantActor;
+  documentId: string;
+  documentVersionId: string;
+  orgId: string;
+  source: string;
+  title: string;
+}): LocalDocumentGrantEvidence | null {
+  if (!hasCredentials(adminCredentials)) {
+    return null;
+  }
+
+  const output = tryRunLocalPsql(`
+    WITH admin_user AS (
+      SELECT auth_user.id
+      FROM auth.users auth_user
+      INNER JOIN public.organization_memberships membership
+        ON membership.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+       AND membership.user_id = auth_user.id
+       AND membership.status = 'active'
+      WHERE lower(auth_user.email) = lower(${quoteSqlLiteral(adminCredentials.email)})
+      LIMIT 1
+    ),
+    target_membership AS (
+      SELECT membership.id, membership.role
+      FROM public.organization_memberships membership
+      INNER JOIN auth.users auth_user
+        ON auth_user.id = membership.user_id
+      WHERE membership.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+        AND membership.id = ${quoteSqlLiteral(actor.membershipId)}::uuid
+        AND membership.status = 'active'
+        AND membership.role = ${quoteSqlLiteral(actor.role)}
+        AND lower(auth_user.email) = lower(${quoteSqlLiteral(actor.email)})
+      LIMIT 1
+    ),
+    target_document AS (
+      SELECT document.id, document.organization_id, document.document_scope
+      FROM public.documents document
+      WHERE document.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+        AND document.id = ${quoteSqlLiteral(documentId)}::uuid
+        AND document.title = ${quoteSqlLiteral(title)}
+        AND document.document_scope = 'programming'
+        AND document.status = 'active'
+      LIMIT 1
+    ),
+    target_version AS (
+      SELECT document_version.id, document_version.document_id
+      FROM public.document_versions document_version
+      WHERE document_version.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+        AND document_version.document_id = ${quoteSqlLiteral(documentId)}::uuid
+        AND document_version.id = ${quoteSqlLiteral(documentVersionId)}::uuid
+        AND document_version.status = 'active'
+      LIMIT 1
+    ),
+    inserted AS (
+      INSERT INTO public.document_access_grants (
+        organization_id,
+        document_id,
+        document_version_id,
+        organization_membership_id,
+        access_level,
+        grant_status,
+        granted_by_user_id,
+        metadata
+      )
+      SELECT
+        target_document.organization_id,
+        target_document.id,
+        target_version.id,
+        target_membership.id,
+        ${quoteSqlLiteral(accessLevel)},
+        'active',
+        admin_user.id,
+        jsonb_build_object(
+          'source',
+          ${quoteSqlLiteral(source)},
+          'scope',
+          target_document.document_scope,
+          'target_role',
+          target_membership.role
+        )
+      FROM admin_user
+      CROSS JOIN target_membership
+      CROSS JOIN target_document
+      CROSS JOIN target_version
+      RETURNING id, access_level, grant_status
+    )
+    SELECT
+      inserted.id::text,
+      inserted.access_level,
+      inserted.grant_status,
+      target_membership.role
+    FROM inserted
+    CROSS JOIN target_membership;
+  `);
+
+  if (!output) {
+    return null;
+  }
+
+  const [grantId, resolvedAccessLevel, grantStatus, targetRole] =
+    output.split("|");
+
+  return {
+    accessLevel: resolvedAccessLevel,
+    grantId,
+    grantStatus,
+    targetRole,
+  };
+}
+
 function getLocalDeniedDocumentFileAccessEvidence({
   actorEmail,
   documentId,
@@ -238,6 +542,92 @@ function getLocalDeniedDocumentFileAccessEvidence({
   };
 }
 
+function getLocalDocumentFileAccessAuditEvidence({
+  actorEmail,
+  documentId,
+  documentVersionId,
+  orgId,
+  role,
+}: {
+  actorEmail: string;
+  documentId: string;
+  documentVersionId: string;
+  orgId: string;
+  role: LocalDocumentGrantActorRole;
+}): LocalDocumentFileAccessAuditEvidence {
+  const output = runLocalPsql(`
+    SELECT
+      count(*) FILTER (
+        WHERE event.event_type = 'file_preview'
+          AND event.result = 'allowed'
+      )::text,
+      count(*) FILTER (
+        WHERE event.event_type = 'file_download'
+          AND event.result = 'allowed'
+      )::text,
+      count(*) FILTER (
+        WHERE event.event_type = 'file_preview'
+          AND event.result = 'denied'
+          AND event.metadata->>'reason' = 'insufficient_access'
+      )::text,
+      count(*) FILTER (
+        WHERE event.event_type = 'file_download'
+          AND event.result = 'denied'
+          AND event.metadata->>'reason' = 'insufficient_access'
+      )::text
+    FROM public.document_access_events event
+    INNER JOIN public.organization_memberships membership
+      ON membership.id = event.organization_membership_id
+     AND membership.organization_id = event.organization_id
+    INNER JOIN auth.users auth_user
+      ON auth_user.id = event.actor_user_id
+    WHERE event.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+      AND event.document_id = ${quoteSqlLiteral(documentId)}::uuid
+      AND event.document_version_id = ${quoteSqlLiteral(documentVersionId)}::uuid
+      AND membership.role = ${quoteSqlLiteral(role)}
+      AND lower(auth_user.email) = lower(${quoteSqlLiteral(actorEmail)});
+  `);
+
+  const [
+    previewAllowedCount,
+    downloadAllowedCount,
+    previewDeniedCount,
+    downloadDeniedCount,
+  ] = output.split("|");
+
+  return {
+    downloadAllowedCount: Number(downloadAllowedCount),
+    downloadDeniedCount: Number(downloadDeniedCount),
+    previewAllowedCount: Number(previewAllowedCount),
+    previewDeniedCount: Number(previewDeniedCount),
+  };
+}
+
+function getLocalDocumentFileAccessEventCountForActor({
+  actorEmail,
+  documentId,
+  documentVersionId,
+  orgId,
+}: {
+  actorEmail: string;
+  documentId: string;
+  documentVersionId: string;
+  orgId: string;
+}) {
+  const output = runLocalPsql(`
+    SELECT count(*)::text
+    FROM public.document_access_events event
+    INNER JOIN auth.users auth_user
+      ON auth_user.id = event.actor_user_id
+    WHERE event.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+      AND event.document_id = ${quoteSqlLiteral(documentId)}::uuid
+      AND event.document_version_id = ${quoteSqlLiteral(documentVersionId)}::uuid
+      AND lower(auth_user.email) = lower(${quoteSqlLiteral(actorEmail)});
+  `);
+
+  return Number(output);
+}
+
 function cleanupLocalDocumentUpload({
   orgId,
   title,
@@ -246,14 +636,27 @@ function cleanupLocalDocumentUpload({
   title: string;
 }) {
   runLocalPsql(`
-    WITH target_versions AS (
-      SELECT document_version.id
+    WITH target_documents AS (
+      SELECT document.id, document.organization_id
       FROM public.documents document
+      WHERE document.organization_id = ${quoteSqlLiteral(orgId)}::uuid
+        AND document.title = ${quoteSqlLiteral(title)}
+    ),
+    revoked_grants AS (
+      UPDATE public.document_access_grants grant_record
+      SET grant_status = 'revoked'
+      FROM target_documents target_document
+      WHERE grant_record.document_id = target_document.id
+        AND grant_record.organization_id = target_document.organization_id
+        AND grant_record.grant_status = 'active'
+      RETURNING grant_record.id
+    ),
+    target_versions AS (
+      SELECT document_version.id
+      FROM target_documents document
       INNER JOIN public.document_versions document_version
         ON document_version.document_id = document.id
        AND document_version.organization_id = document.organization_id
-      WHERE document.organization_id = ${quoteSqlLiteral(orgId)}::uuid
-        AND document.title = ${quoteSqlLiteral(title)}
     ),
     marked_versions AS (
       UPDATE public.document_versions document_version
@@ -467,6 +870,34 @@ async function signOutCurrentSession(page: Page) {
   expect(response.status()).toBe(303);
 }
 
+async function expectPrudentDocumentFileDenialResponse({
+  documentId,
+  documentVersionId,
+  response,
+}: {
+  documentId: string;
+  documentVersionId: string;
+  response: APIResponse;
+}) {
+  expect([400, 404]).toContain(response.status());
+  expect(response.headers()["cache-control"]).toContain("no-store");
+
+  const responseText = await response.text();
+  const responseJson = JSON.parse(responseText) as { error?: string };
+
+  expect(Object.keys(responseJson)).toEqual(["error"]);
+  expect([
+    "document_file_not_available",
+    "organization_not_found",
+    "organization_required",
+  ]).toContain(responseJson.error);
+  expect(responseText).not.toContain(documentId);
+  expect(responseText).not.toContain(documentVersionId);
+  expect(responseText).not.toMatch(
+    /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+  );
+}
+
 async function expectDirectDocumentFileRoutesDeniedForRole({
   credentials,
   page,
@@ -547,6 +978,563 @@ async function expectDirectDocumentFileRoutesDeniedForRole({
       downloadDeniedCount: 1,
       previewDeniedCount: 1,
     });
+  } finally {
+    try {
+      cleanupLocalDocumentUpload({ orgId: organizationId ?? "", title });
+    } catch {
+      // Best-effort cleanup: the synthetic title keeps any leftover local row identifiable.
+    }
+  }
+}
+
+async function expectReadMetadataGrantKeepsFileRoutesDenied({
+  page,
+}: {
+  page: Page;
+}) {
+  test.setTimeout(120_000);
+
+  if (
+    !shouldRunDocumentUploadRuntimeSmoke ||
+    !hasCredentials(adminCredentials) ||
+    !organizationId
+  ) {
+    test.skip(
+      true,
+      "Set E2E_DOCUMENT_UPLOAD_RUNTIME=1 with E2E_ADMIN_* and E2E_ORGANIZATION_ID to run the controlled local metadata-only grant smoke.",
+    );
+    return;
+  }
+
+  const actor = getLocalDocumentGrantActor(organizationId);
+
+  if (!actor) {
+    test.skip(
+      true,
+      "Set E2E_MANAGER_* or E2E_COACH_* for an active local membership that can receive a controlled read_metadata grant.",
+    );
+    return;
+  }
+
+  const timestamp = Date.now();
+  const title = `E21 ${actor.role} read metadata programming smoke synthetic ${timestamp}`;
+  const syntheticFileName = `e21-${actor.role}-read-metadata-programming-smoke-${timestamp}.txt`;
+
+  try {
+    const uploadEvidence = await createSyntheticDocumentWithBackendRouteEvidence({
+      expectedDocumentType: "programming_document",
+      page,
+      scope: "programming",
+      scopeLabel: "Programacion",
+      syntheticFileName,
+      title,
+    });
+    const grantEvidence = createLocalDocumentGrant({
+      accessLevel: "read_metadata",
+      actor,
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      orgId: organizationId,
+      source: "documents-repository-surface-e21",
+      title,
+    });
+
+    if (!grantEvidence) {
+      test.skip(
+        true,
+        "Local DB did not allow preparing the controlled read_metadata grant.",
+      );
+      return;
+    }
+
+    expect(grantEvidence).toMatchObject({
+      accessLevel: "read_metadata",
+      grantStatus: "active",
+      targetRole: actor.role,
+    });
+
+    await signOutCurrentSession(page);
+    await loginAs(page, actor.credentials);
+    await page.goto(buildProtectedPath("/app/documents", { scope: "programming" }), {
+      waitUntil: "domcontentloaded",
+    });
+    await expectNoFrameworkError(page);
+
+    const titleHeading = page.getByRole("heading", { name: title });
+    await expect(titleHeading).toBeVisible();
+
+    const card = titleHeading.locator(
+      "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
+    );
+    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Solo metadata");
+    await expect(card).toContainText("Sin archivo para tu permiso");
+    await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(0);
+    await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(0);
+
+    const previewResponse = await page.request.get(
+      new URL(uploadEvidence.previewHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+    const downloadResponse = await page.request.get(
+      new URL(uploadEvidence.downloadHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+
+    expect(previewResponse.status()).toBe(404);
+    expect(downloadResponse.status()).toBe(404);
+    expect(previewResponse.headers()["cache-control"]).toContain("no-store");
+    expect(downloadResponse.headers()["cache-control"]).toContain("no-store");
+    expect(await previewResponse.json()).toMatchObject({
+      error: "document_file_not_available",
+    });
+    expect(await downloadResponse.json()).toMatchObject({
+      error: "document_file_not_available",
+    });
+
+    expect(
+      getLocalDeniedDocumentFileAccessEvidence({
+        actorEmail: actor.email,
+        documentId: uploadEvidence.documentId,
+        documentVersionId: uploadEvidence.documentVersionId,
+        orgId: organizationId,
+        role: actor.role,
+      }),
+    ).toMatchObject({
+      downloadDeniedCount: 1,
+      previewDeniedCount: 1,
+    });
+  } finally {
+    try {
+      cleanupLocalDocumentUpload({ orgId: organizationId ?? "", title });
+    } catch {
+      // Best-effort cleanup: the synthetic title keeps any leftover local row identifiable.
+    }
+  }
+}
+
+async function expectPreviewGrantAllowsPreviewOnly({ page }: { page: Page }) {
+  test.setTimeout(120_000);
+
+  if (
+    !shouldRunDocumentUploadRuntimeSmoke ||
+    !hasCredentials(adminCredentials) ||
+    !organizationId
+  ) {
+    test.skip(
+      true,
+      "Set E2E_DOCUMENT_UPLOAD_RUNTIME=1 with E2E_ADMIN_* and E2E_ORGANIZATION_ID to run the controlled local preview grant smoke.",
+    );
+    return;
+  }
+
+  const actor = getLocalDocumentGrantActor(organizationId);
+
+  if (!actor) {
+    test.skip(
+      true,
+      "Set E2E_MANAGER_* or E2E_COACH_* for an active local membership that can receive a controlled preview grant.",
+    );
+    return;
+  }
+
+  const timestamp = Date.now();
+  const title = `E22 ${actor.role} preview grant programming smoke synthetic ${timestamp}`;
+  const syntheticFileName = `e22-${actor.role}-preview-grant-programming-smoke-${timestamp}.txt`;
+
+  try {
+    const uploadEvidence = await createSyntheticDocumentWithBackendRouteEvidence({
+      expectedDocumentType: "programming_document",
+      page,
+      scope: "programming",
+      scopeLabel: "Programacion",
+      syntheticFileName,
+      title,
+    });
+    const grantEvidence = createLocalDocumentGrant({
+      accessLevel: "preview",
+      actor,
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      orgId: organizationId,
+      source: "documents-repository-surface-e22-preview",
+      title,
+    });
+
+    if (!grantEvidence) {
+      test.skip(
+        true,
+        "Local DB did not allow preparing the controlled preview grant.",
+      );
+      return;
+    }
+
+    expect(grantEvidence).toMatchObject({
+      accessLevel: "preview",
+      grantStatus: "active",
+      targetRole: actor.role,
+    });
+
+    await signOutCurrentSession(page);
+    await loginAs(page, actor.credentials);
+    await page.goto(buildProtectedPath("/app/documents", { scope: "programming" }), {
+      waitUntil: "domcontentloaded",
+    });
+    await expectNoFrameworkError(page);
+    await expectNoDocumentFileInternalsInUi(page);
+
+    const titleHeading = page.getByRole("heading", { name: title });
+    await expect(titleHeading).toBeVisible();
+
+    const card = titleHeading.locator(
+      "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
+    );
+    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Preview");
+    await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
+    await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(0);
+    await expect(card.getByText("Sin archivo para tu permiso")).toHaveCount(0);
+
+    const previewHref = await card
+      .getByRole("link", { name: /Preview/i })
+      .getAttribute("href");
+
+    if (!previewHref) {
+      throw new Error("Missing preview href for controlled preview grant.");
+    }
+
+    expect(previewHref).toBe(uploadEvidence.previewHref);
+    expect(previewHref).not.toMatch(
+      /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+    );
+
+    const previewResponse = await page.request.get(
+      new URL(previewHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+    const downloadResponse = await page.request.get(
+      new URL(uploadEvidence.downloadHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+
+    expect(previewResponse.status()).toBe(302);
+    expect(downloadResponse.status()).toBe(404);
+    expect(previewResponse.headers()["cache-control"]).toContain("no-store");
+    expect(downloadResponse.headers()["cache-control"]).toContain("no-store");
+    expect(await downloadResponse.json()).toMatchObject({
+      error: "document_file_not_available",
+    });
+
+    expect(
+      getLocalDocumentFileAccessAuditEvidence({
+        actorEmail: actor.email,
+        documentId: uploadEvidence.documentId,
+        documentVersionId: uploadEvidence.documentVersionId,
+        orgId: organizationId,
+        role: actor.role,
+      }),
+    ).toMatchObject({
+      downloadAllowedCount: 0,
+      downloadDeniedCount: 1,
+      previewAllowedCount: 1,
+      previewDeniedCount: 0,
+    });
+  } finally {
+    try {
+      cleanupLocalDocumentUpload({ orgId: organizationId ?? "", title });
+    } catch {
+      // Best-effort cleanup: the synthetic title keeps any leftover local row identifiable.
+    }
+  }
+}
+
+async function expectDownloadGrantAllowsDownload({ page }: { page: Page }) {
+  test.setTimeout(120_000);
+
+  if (
+    !shouldRunDocumentUploadRuntimeSmoke ||
+    !hasCredentials(adminCredentials) ||
+    !organizationId
+  ) {
+    test.skip(
+      true,
+      "Set E2E_DOCUMENT_UPLOAD_RUNTIME=1 with E2E_ADMIN_* and E2E_ORGANIZATION_ID to run the controlled local download grant smoke.",
+    );
+    return;
+  }
+
+  const actor = getLocalDocumentGrantActor(organizationId);
+
+  if (!actor) {
+    test.skip(
+      true,
+      "Set E2E_MANAGER_* or E2E_COACH_* for an active local membership that can receive a controlled download grant.",
+    );
+    return;
+  }
+
+  const timestamp = Date.now();
+  const title = `E22 ${actor.role} download grant programming smoke synthetic ${timestamp}`;
+  const syntheticFileName = `e22-${actor.role}-download-grant-programming-smoke-${timestamp}.txt`;
+
+  try {
+    const uploadEvidence = await createSyntheticDocumentWithBackendRouteEvidence({
+      expectedDocumentType: "programming_document",
+      page,
+      scope: "programming",
+      scopeLabel: "Programacion",
+      syntheticFileName,
+      title,
+    });
+    const grantEvidence = createLocalDocumentGrant({
+      accessLevel: "download",
+      actor,
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      orgId: organizationId,
+      source: "documents-repository-surface-e22-download",
+      title,
+    });
+
+    if (!grantEvidence) {
+      test.skip(
+        true,
+        "Local DB did not allow preparing the controlled download grant.",
+      );
+      return;
+    }
+
+    expect(grantEvidence).toMatchObject({
+      accessLevel: "download",
+      grantStatus: "active",
+      targetRole: actor.role,
+    });
+
+    await signOutCurrentSession(page);
+    await loginAs(page, actor.credentials);
+    await page.goto(buildProtectedPath("/app/documents", { scope: "programming" }), {
+      waitUntil: "domcontentloaded",
+    });
+    await expectNoFrameworkError(page);
+    await expectNoDocumentFileInternalsInUi(page);
+
+    const titleHeading = page.getByRole("heading", { name: title });
+    await expect(titleHeading).toBeVisible();
+
+    const card = titleHeading.locator(
+      "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
+    );
+    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Descarga");
+    await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
+    await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(1);
+
+    const downloadHref = await card
+      .getByRole("link", { name: /Descargar/i })
+      .getAttribute("href");
+
+    if (!downloadHref) {
+      throw new Error("Missing download href for controlled download grant.");
+    }
+
+    expect(downloadHref).toBe(uploadEvidence.downloadHref);
+    expect(downloadHref).not.toMatch(
+      /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+    );
+
+    const downloadResponse = await page.request.get(
+      new URL(downloadHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+
+    expect(downloadResponse.status()).toBe(302);
+    expect(downloadResponse.headers()["cache-control"]).toContain("no-store");
+
+    expect(
+      getLocalDocumentFileAccessAuditEvidence({
+        actorEmail: actor.email,
+        documentId: uploadEvidence.documentId,
+        documentVersionId: uploadEvidence.documentVersionId,
+        orgId: organizationId,
+        role: actor.role,
+      }),
+    ).toMatchObject({
+      downloadAllowedCount: 1,
+      downloadDeniedCount: 0,
+      previewDeniedCount: 0,
+    });
+  } finally {
+    try {
+      cleanupLocalDocumentUpload({ orgId: organizationId ?? "", title });
+    } catch {
+      // Best-effort cleanup: the synthetic title keeps any leftover local row identifiable.
+    }
+  }
+}
+
+async function expectCrossTenantDirectFileRoutesDenied({
+  page,
+}: {
+  page: Page;
+}) {
+  test.setTimeout(150_000);
+
+  if (
+    !shouldRunDocumentUploadRuntimeSmoke ||
+    !hasCredentials(adminCredentials) ||
+    !organizationId
+  ) {
+    test.skip(
+      true,
+      "Set E2E_DOCUMENT_UPLOAD_RUNTIME=1 with E2E_ADMIN_* and E2E_ORGANIZATION_ID to run the controlled local cross-tenant route denial smoke.",
+    );
+    return;
+  }
+
+  const tenantActor = getLocalDocumentGrantActor(organizationId);
+
+  if (!tenantActor) {
+    test.skip(
+      true,
+      "Set E2E_MANAGER_* or E2E_COACH_* for an active tenant A membership that can receive a controlled download grant.",
+    );
+    return;
+  }
+
+  const crossTenantActor = getLocalCrossTenantDocumentActor(organizationId);
+
+  if (!crossTenantActor) {
+    test.skip(
+      true,
+      "Set E2E_CROSS_TENANT_EMAIL and E2E_CROSS_TENANT_PASSWORD as process variables for a confirmed local user with an active membership only in another tenant. Do not persist them in .env.local.",
+    );
+    return;
+  }
+
+  const timestamp = Date.now();
+  const title = `E23 ${tenantActor.role} cross tenant programming smoke synthetic ${timestamp}`;
+  const syntheticFileName = `e23-${tenantActor.role}-cross-tenant-programming-smoke-${timestamp}.txt`;
+
+  try {
+    const uploadEvidence = await createSyntheticDocumentWithBackendRouteEvidence({
+      expectedDocumentType: "programming_document",
+      page,
+      scope: "programming",
+      scopeLabel: "Programacion",
+      syntheticFileName,
+      title,
+    });
+    const grantEvidence = createLocalDocumentGrant({
+      accessLevel: "download",
+      actor: tenantActor,
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      orgId: organizationId,
+      source: "documents-repository-surface-e23-download",
+      title,
+    });
+
+    if (!grantEvidence) {
+      test.skip(
+        true,
+        "Local DB did not allow preparing the controlled tenant A download grant.",
+      );
+      return;
+    }
+
+    expect(grantEvidence).toMatchObject({
+      accessLevel: "download",
+      grantStatus: "active",
+      targetRole: tenantActor.role,
+    });
+
+    await signOutCurrentSession(page);
+    await loginAs(page, tenantActor.credentials);
+    await page.goto(buildProtectedPath("/app/documents", { scope: "programming" }), {
+      waitUntil: "domcontentloaded",
+    });
+    await expectNoFrameworkError(page);
+    await expectNoDocumentFileInternalsInUi(page);
+
+    const titleHeading = page.getByRole("heading", { name: title });
+    await expect(titleHeading).toBeVisible();
+
+    const card = titleHeading.locator(
+      "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
+    );
+    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Descarga");
+    await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
+    await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(1);
+
+    const tenantPreviewResponse = await page.request.get(
+      new URL(uploadEvidence.previewHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+    const tenantDownloadResponse = await page.request.get(
+      new URL(uploadEvidence.downloadHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+
+    expect(tenantPreviewResponse.status()).toBe(302);
+    expect(tenantDownloadResponse.status()).toBe(302);
+    expect(tenantPreviewResponse.headers()["cache-control"]).toContain(
+      "no-store",
+    );
+    expect(tenantDownloadResponse.headers()["cache-control"]).toContain(
+      "no-store",
+    );
+    expect(
+      getLocalDocumentFileAccessAuditEvidence({
+        actorEmail: tenantActor.email,
+        documentId: uploadEvidence.documentId,
+        documentVersionId: uploadEvidence.documentVersionId,
+        orgId: organizationId,
+        role: tenantActor.role,
+      }),
+    ).toMatchObject({
+      downloadAllowedCount: 1,
+      downloadDeniedCount: 0,
+      previewAllowedCount: 1,
+      previewDeniedCount: 0,
+    });
+
+    await signOutCurrentSession(page);
+    await loginAs(page, crossTenantActor.credentials);
+    await page.goto(buildProtectedPath("/app/documents", { scope: "programming" }), {
+      waitUntil: "domcontentloaded",
+    });
+    await expectNoFrameworkError(page);
+    await expectNoDocumentFileInternalsInUi(page);
+    await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
+
+    const crossTenantPreviewResponse = await page.request.get(
+      new URL(uploadEvidence.previewHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+    const crossTenantDownloadResponse = await page.request.get(
+      new URL(uploadEvidence.downloadHref, page.url()).toString(),
+      { maxRedirects: 0 },
+    );
+
+    await expectPrudentDocumentFileDenialResponse({
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      response: crossTenantPreviewResponse,
+    });
+    await expectPrudentDocumentFileDenialResponse({
+      documentId: uploadEvidence.documentId,
+      documentVersionId: uploadEvidence.documentVersionId,
+      response: crossTenantDownloadResponse,
+    });
+    expect(
+      getLocalDocumentFileAccessEventCountForActor({
+        actorEmail: crossTenantActor.email,
+        documentId: uploadEvidence.documentId,
+        documentVersionId: uploadEvidence.documentVersionId,
+        orgId: organizationId,
+      }),
+    ).toBe(0);
   } finally {
     try {
       cleanupLocalDocumentUpload({ orgId: organizationId ?? "", title });
@@ -737,6 +1725,246 @@ test.describe("documents minimal repository guardrails", () => {
     expect(snippet).toContain("E.13 evidence closure note");
     expect(snippet).toContain("Keep BEGIN/ROLLBACK");
   });
+
+  test("keeps E.25 cross-tenant actor setup local-only, reversible and secret-free", () => {
+    const tasks = readProjectFile("TASKS.md");
+    const snippetPath =
+      "supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql";
+    const snippet = readProjectFile(snippetPath);
+
+    expect(tasks).toContain(
+      "#### E.26 - Guardrail Local Estatico Para Procedimiento Cross-Tenant E.25",
+    );
+    expect(tasks).toContain(snippetPath);
+    expect(snippet).toContain(
+      "BoxOps - E.25 local cross-tenant document route actor setup",
+    );
+
+    [
+      "allow_local_synthetic_e2e_setup",
+      "tenant_a_id",
+      "synthetic_email",
+      "synthetic_password",
+    ].forEach((variableName) => {
+      expect(snippet).toContain(`\\if :{?${variableName}}`);
+      expect(snippet).toContain(
+        `Missing required psql variable: ${variableName}`,
+      );
+    });
+
+    expect(snippet).toContain(
+      ":'allow_local_synthetic_e2e_setup' = 'local-only'",
+    );
+    expect(snippet).toContain(
+      "pg_temp.assert_synthetic_email(:'synthetic_email', 'synthetic_email')",
+    );
+    expect(snippet).toContain("@boxops\\.local$");
+    expect(snippet).toContain("CREATE TEMP TABLE selected_tenant_b");
+    expect(snippet).toContain(
+      "organization.id <> (SELECT tenant_a_id FROM synthetic_actor_input)",
+    );
+    expect(snippet).toContain("organization.status IN ('trialing', 'active')");
+    expect(snippet).toContain(
+      "exactly one tenant B candidate must be selected from active/trialing tenants",
+    );
+
+    expect(snippet).toContain("INSERT INTO auth.users");
+    expect(snippet).toContain("email_confirmed_at");
+    expect(snippet).toContain("auth_user.email_confirmed_at IS NOT NULL");
+    expect(snippet).toContain("auth_user.confirmed_at IS NOT NULL");
+    expect(snippet).toContain("INSERT INTO auth.identities");
+    expect(snippet).toContain("identity.provider = 'email'");
+    expect(snippet).toContain("INSERT INTO public.organization_memberships");
+    expect(snippet).toContain("membership.status = 'active'");
+    expect(snippet).toContain("INSERT INTO public.person_profiles");
+    expect(snippet).toContain("person_profile.visibility_status = 'visible'");
+    expect(snippet).toContain("person_profile.status = 'active'");
+
+    expect(snippet).toContain("cleanup_synthetic_actor=1");
+    expect(snippet).toContain("\\if :cleanup_synthetic_actor");
+    expect(snippet).toContain("remaining_auth_users");
+    expect(snippet).toContain("\\set commit_changes 0");
+    expect(snippet).toMatch(
+      /\\if :commit_changes[\s\S]*COMMIT;[\s\S]*\\else[\s\S]*ROLLBACK;/,
+    );
+    expect(snippet).toContain("commit_changes=1");
+    expect(snippet).toContain(
+      "Do not write E2E_CROSS_TENANT_* to .env.local",
+    );
+    expect(snippet).not.toMatch(
+      /(?:Set-Content|Add-Content|Out-File|tee|>>|>)\s+[^\n]*\.env\.local/i,
+    );
+
+    expect(snippet).not.toContain("/app/documents");
+    expect(snippet).not.toMatch(/\bservice_role\b/i);
+    expect(snippet).not.toMatch(
+      /createSignedUrl|signedUrl|signed_url|X-Amz-Signature|token=/i,
+    );
+    expect(snippet).not.toMatch(
+      /document-files\/|storage\/v1|storage_path|storage_bucket|bucket_id/i,
+    );
+    expect(snippet).not.toMatch(
+      /sb_secret_|SUPABASE_SERVICE_ROLE|SUPABASE_ACCESS_TOKEN|eyJ[a-zA-Z0-9_-]{20,}|postgres(?:ql)?:\/\/|https?:\/\//i,
+    );
+  });
+
+  test("keeps E.23-E.25 cross-tenant smoke credentials process-only", () => {
+    const tasks = readProjectFile("TASKS.md");
+    const envHelper = readProjectFile("tests/smoke/helpers/env.ts");
+    const smoke = readProjectFile(
+      "tests/smoke/documents-repository-surface.spec.ts",
+    );
+    const snippet = readProjectFile(
+      "supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql",
+    );
+    const persistentEnvWritePattern =
+      /(?:Set-Content|Add-Content|Out-File|tee|>>|>)\s+[^\n]*\.env\.local/i;
+    const normalRoleFallbackHint = [
+      "or provide another",
+      "E2E role credential",
+    ].join(" ");
+
+    expect(tasks).toContain(
+      "#### E.27 - Guardrail Local Para Credenciales Cross-Tenant Process-Only",
+    );
+    expect(envHelper).toContain("const envFileValues = readEnvFile();");
+    expect(envHelper).toContain(
+      "const value = process.env[name]?.trim() ?? envFileValues.get(name)?.trim();",
+    );
+    expect(envHelper).toContain(
+      'export const adminCredentials = readCredentials("E2E_ADMIN");',
+    );
+    expect(envHelper).toContain(
+      'export const managerCredentials = readCredentials("E2E_MANAGER");',
+    );
+    expect(envHelper).toContain(
+      "function readProcessEnv(name: string): string | null",
+    );
+    expect(envHelper).toContain("function readProcessCredentials(");
+    expect(envHelper).toMatch(
+      /export const crossTenantCredentials = readProcessCredentials\(\s*"E2E_CROSS_TENANT_EMAIL",\s*"E2E_CROSS_TENANT_PASSWORD",\s*\);/,
+    );
+    expect(envHelper).not.toContain(
+      'crossTenantCredentials = readCredentials("E2E_CROSS_TENANT")',
+    );
+    expect(envHelper).not.toMatch(
+      /envFileValues\.get\(\s*["'`]E2E_CROSS_TENANT/,
+    );
+
+    expect(smoke).toContain("crossTenantCredentials");
+    expect(smoke).toContain(
+      "Set E2E_CROSS_TENANT_EMAIL and E2E_CROSS_TENANT_PASSWORD as process variables",
+    );
+    expect(smoke).not.toContain(normalRoleFallbackHint);
+    expect(snippet).toContain(
+      "Do not write E2E_CROSS_TENANT_* to .env.local",
+    );
+    expect(snippet).toContain("process variables");
+
+    [envHelper, smoke, snippet].forEach((source) => {
+      expect(source).not.toMatch(persistentEnvWritePattern);
+    });
+  });
+
+  test("keeps E.28 cross-tenant actor selection explicit and process-only", () => {
+    const tasks = readProjectFile("TASKS.md");
+    const envHelper = readProjectFile("tests/smoke/helpers/env.ts");
+    const smoke = readProjectFile(
+      "tests/smoke/documents-repository-surface.spec.ts",
+    );
+    const snippet = readProjectFile(
+      "supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql",
+    );
+    const actorSelectionSource =
+      smoke.match(
+        /function getLocalCrossTenantDocumentActor\([\s\S]*?\n}\n\nfunction createLocalDocumentGrant/,
+      )?.[0] ?? "";
+    const normalRoleFallbackHint = [
+      "or provide another",
+      "E2E role credential",
+    ].join(" ");
+
+    expect(tasks).toContain(
+      "#### E.28 - Actor Cross-Tenant Documental Solo Desde Credenciales Explicitas Process-Only",
+    );
+    expect(actorSelectionSource).not.toBe("");
+    expect(actorSelectionSource).toContain(
+      "const credentials = crossTenantCredentials;",
+    );
+    expect(actorSelectionSource).toContain('source: "cross_tenant"');
+    expect(actorSelectionSource).not.toContain("const candidates");
+    expect(actorSelectionSource).not.toMatch(
+      /\b(?:ownerCredentials|adminCredentials|managerCredentials|coachCredentials|payrollManagerCredentials)\b/,
+    );
+    expect(actorSelectionSource).not.toMatch(
+      /\bsource:\s*"(?:owner|admin|manager|coach|payroll_manager)"/,
+    );
+
+    expect(envHelper).toMatch(
+      /export const crossTenantCredentials = readProcessCredentials\(\s*"E2E_CROSS_TENANT_EMAIL",\s*"E2E_CROSS_TENANT_PASSWORD",\s*\);/,
+    );
+    expect(envHelper).not.toMatch(
+      /envFileValues\.get\(\s*["'`]E2E_CROSS_TENANT/,
+    );
+    expect(smoke).toContain(
+      "Set E2E_CROSS_TENANT_EMAIL and E2E_CROSS_TENANT_PASSWORD as process variables",
+    );
+    expect(smoke).toContain("Do not persist them in .env.local");
+    expect(smoke).not.toContain(normalRoleFallbackHint);
+    expect(snippet).toContain(
+      "Do not write E2E_CROSS_TENANT_* to .env.local",
+    );
+    expect(snippet).toContain("process variables");
+  });
+
+  test("keeps E.29 local cross-tenant actor runbook guidance explicit", () => {
+    const tasks = readProjectFile("TASKS.md");
+    const envHelper = readProjectFile("tests/smoke/helpers/env.ts");
+    const smoke = readProjectFile(
+      "tests/smoke/documents-repository-surface.spec.ts",
+    );
+    const runbook = readProjectFile(
+      "docs/operations/document-repository-beta-readiness-runbook.md",
+    );
+    const snippet = readProjectFile(
+      "supabase/snippets/document-repository-cross-tenant-local-actor-setup.sql",
+    );
+
+    expect(tasks).toContain(
+      "#### E.29 - Runbook Local Del Actor Cross-Tenant Documental Process-Only",
+    );
+    expect(runbook).toContain(
+      "## Nota Local E.23-E.28: Actor Cross-Tenant Documental",
+    );
+    expect(runbook).toContain(
+      "El actor cross-tenant local solo puede venir de `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD`.",
+    );
+    expect(runbook).toContain(
+      "Esas variables se pasan solo como variables de proceso durante la ventana corta del smoke.",
+    );
+    expect(runbook).toContain(
+      "No escribir `E2E_CROSS_TENANT_*` en `.env.local` ni en ningun archivo persistente.",
+    );
+    expect(runbook).toContain(
+      "No sustituir el actor por credenciales normales de rol E2E",
+    );
+    expect(runbook).toContain(
+      "El actor E.25 es sintetico, temporal, local-only y process-only",
+    );
+    expect(runbook).toContain("cleanup_synthetic_actor=1");
+    expect(runbook).toContain("remaining_auth_users=0");
+
+    expect(envHelper).toMatch(
+      /export const crossTenantCredentials = readProcessCredentials\(\s*"E2E_CROSS_TENANT_EMAIL",\s*"E2E_CROSS_TENANT_PASSWORD",\s*\);/,
+    );
+    expect(smoke).toContain(
+      "Set E2E_CROSS_TENANT_EMAIL and E2E_CROSS_TENANT_PASSWORD as process variables",
+    );
+    expect(snippet).toContain(
+      "Do not write E2E_CROSS_TENANT_* to .env.local",
+    );
+    expect(snippet).toContain("cleanup_synthetic_actor=1");
+  });
 });
 
 test.describe("documents minimal upload runtime smoke", () => {
@@ -822,5 +2050,29 @@ test.describe("documents minimal upload runtime smoke", () => {
       page,
       role: "coach",
     });
+  });
+
+  test("allows metadata-only grant listing while denying direct programming file routes", async ({
+    page,
+  }) => {
+    await expectReadMetadataGrantKeepsFileRoutesDenied({ page });
+  });
+
+  test("allows preview grant file preview while denying direct download", async ({
+    page,
+  }) => {
+    await expectPreviewGrantAllowsPreviewOnly({ page });
+  });
+
+  test("allows download grant file download through backend route", async ({
+    page,
+  }) => {
+    await expectDownloadGrantAllowsDownload({ page });
+  });
+
+  test("denies cross-tenant direct programming file routes while tenant grant remains scoped", async ({
+    page,
+  }) => {
+    await expectCrossTenantDirectFileRoutesDenied({ page });
   });
 });

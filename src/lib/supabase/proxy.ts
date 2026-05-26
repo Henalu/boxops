@@ -1,13 +1,66 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  getRequiredPasswordChangePath,
+  isPasswordChangeRequired,
+} from "@/lib/auth/required-password-change";
 import { getLoginPath } from "@/lib/auth/redirects";
+import {
+  getScheduleCenterPreferenceCookieName,
+  isScheduleCenterPreferenceValue,
+  SCHEDULE_CENTER_PREFERENCE_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/schedule-center-preferences";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import type { Database } from "@/types/supabase";
 
 function withPrivateAppCacheHeaders(response: NextResponse) {
   response.headers.set("Cache-Control", "no-store");
   response.headers.set("Pragma", "no-cache");
+
+  return response;
+}
+
+function isNavigationPrefetch(request: NextRequest) {
+  return (
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch" ||
+    request.headers.get("sec-purpose")?.includes("prefetch") === true
+  );
+}
+
+function withScheduleCenterPreference(
+  request: NextRequest,
+  response: NextResponse,
+) {
+  if (
+    request.nextUrl.pathname !== "/app/schedule" ||
+    isNavigationPrefetch(request)
+  ) {
+    return response;
+  }
+
+  const centerId = request.nextUrl.searchParams.get("center_id");
+  const organizationId = request.nextUrl.searchParams.get("organizationId");
+
+  if (
+    !isScheduleCenterPreferenceValue(centerId) ||
+    !isScheduleCenterPreferenceValue(organizationId)
+  ) {
+    return response;
+  }
+
+  response.cookies.set(
+    getScheduleCenterPreferenceCookieName(organizationId),
+    centerId,
+    {
+      httpOnly: true,
+      maxAge: SCHEDULE_CENTER_PREFERENCE_COOKIE_MAX_AGE_SECONDS,
+      path: "/app",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  );
 
   return response;
 }
@@ -50,5 +103,18 @@ export async function updateSession(request: NextRequest) {
     return withPrivateAppCacheHeaders(NextResponse.redirect(loginUrl));
   }
 
-  return withPrivateAppCacheHeaders(response);
+  if (user && request.nextUrl.pathname.startsWith("/app")) {
+    if (isPasswordChangeRequired(user)) {
+      return withPrivateAppCacheHeaders(
+        NextResponse.redirect(
+          new URL(getRequiredPasswordChangePath(), request.url),
+        ),
+      );
+    }
+  }
+
+  return withScheduleCenterPreference(
+    request,
+    withPrivateAppCacheHeaders(response),
+  );
 }

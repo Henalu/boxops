@@ -228,14 +228,28 @@ function TimeTrackingSettingsSummary({
               ? "Cada corrección queda pendiente hasta que un perfil autorizado la revise. Una aprobación válida basta antes de aplicarla."
               : "Cada persona corrige directamente sus propios fichajes; el motivo y los cambios quedan auditados."}
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {settings.scheduleAutoPunchesEnabled
+              ? "El fichaje automatico por planificacion puede generar entradas y salidas desde bloques asignados y franjas de jornada prevista."
+              : "El fichaje automatico por planificacion esta desactivado."}
+          </p>
         </div>
-        <StatusBadge
-          tone={settings.correctionApprovalRequired ? "warning" : "success"}
-        >
-          {settings.correctionApprovalRequired
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            tone={settings.correctionApprovalRequired ? "warning" : "success"}
+          >
+            {settings.correctionApprovalRequired
             ? "Con aprobación"
             : "Correcciones directas"}
-        </StatusBadge>
+          </StatusBadge>
+          <StatusBadge
+            tone={settings.scheduleAutoPunchesEnabled ? "success" : "neutral"}
+          >
+            {settings.scheduleAutoPunchesEnabled
+              ? "Automatico activado"
+              : "Automatico desactivado"}
+          </StatusBadge>
+        </div>
       </CardContent>
     </Card>
   );
@@ -288,6 +302,34 @@ function TimeTrackingSettingsForm({
               La corrección queda pendiente. Propietario, Administrador o
               Responsable pueden aprobarla; con una aprobación válida basta
               antes de aplicarla.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
+      <fieldset className="grid gap-3">
+        <legend className="text-sm font-medium">Fichaje automatico</legend>
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
+          <input
+            name="scheduleAutoPunchesEnabled"
+            type="hidden"
+            value="false"
+          />
+          <input
+            className="mt-1 size-4 shrink-0 accent-primary"
+            defaultChecked={settings.scheduleAutoPunchesEnabled}
+            name="scheduleAutoPunchesEnabled"
+            type="checkbox"
+            value="true"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">
+              Generar fichajes desde la planificacion
+            </span>
+            <span className="mt-1 block text-sm text-muted-foreground">
+              Crea entradas y salidas automaticas desde bloques asignados y
+              franjas de jornada prevista. No verifica presencia real y siempre
+              queda corregible.
             </span>
           </span>
         </label>
@@ -364,7 +406,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <TransientFeedbackBanner
           description={
             status === "time-tracking-updated"
-              ? "La politica de correcciones ya esta disponible en fichaje."
+              ? "La politica de fichaje ya esta disponible."
               : "La identidad de la organizacion ya esta aplicada."
           }
           title={successMessages[status]}

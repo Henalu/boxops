@@ -69,6 +69,10 @@ const managementRoutes = [
     heading: /Estad.sticas operativas/i,
     path: "/app/stats",
   },
+  {
+    heading: /Jornadas previstas/i,
+    path: "/app/work-windows",
+  },
 ];
 
 test.describe("admin MVP 1 protected routes smoke @role-admin", () => {
@@ -155,6 +159,48 @@ test.describe("owner B.2 advanced role smoke @role-owner", () => {
         route.heading,
       );
     }
+  });
+
+  test("owner sees the full weekly schedule without horizontal overflow on desktop", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 800, width: 1280 });
+    await loginAs(page, ownerCredentials!);
+
+    await openAndExpectHeading(
+      page,
+      buildProtectedPath("/app/schedule", { view: "week" }),
+      /Horario/i,
+    );
+
+    const weekGrid = page.locator('[data-schedule-week-grid="desktop"]');
+    await expect(weekGrid).toBeVisible();
+    await expect(weekGrid.locator("[data-schedule-week-day]")).toHaveCount(7);
+
+    const gridMetrics = await weekGrid.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(gridMetrics.scrollWidth).toBeLessThanOrEqual(
+      gridMetrics.clientWidth + 1,
+    );
+
+    const sundayMetrics = await weekGrid
+      .locator('[data-schedule-week-day="6"]')
+      .evaluate((element) => {
+        const dayRect = element.getBoundingClientRect();
+        const gridRect = element
+          .closest('[data-schedule-week-grid="desktop"]')!
+          .getBoundingClientRect();
+
+        return {
+          dayRight: dayRect.right,
+          gridRight: gridRect.right,
+        };
+      });
+    expect(sundayMetrics.dayRight).toBeLessThanOrEqual(
+      sundayMetrics.gridRight + 1,
+    );
   });
 });
 

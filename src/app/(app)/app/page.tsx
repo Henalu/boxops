@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
   canManageAbsenceRequests,
+  canManageTeamAccess,
   canReviewTimeTracking,
   canManageOperationalData,
   getApplicationRoleLabel,
@@ -353,21 +354,18 @@ function getOwnWeeklyNoticeTitle(status: string) {
 
 function getOwnWeeklyNoticeDescription(status: string) {
   const descriptions: Record<string, string> = {
-    approved:
-      "El cierre interno de fichajes de esta semana ya está aprobado.",
+    approved: "Esta semana ya está aprobada.",
     correction_required:
       "Revisa la semana, aplica las correcciones necesarias y vuelve a enviarla cuando esté lista.",
-    rejected:
-      "La semana necesita revisión antes de volver a enviarse a aprobación.",
+    rejected: "Revisa la semana y vuelve a enviarla cuando esté lista.",
     resubmitted:
-      "La semana se ha reenviado y vuelve a estar pendiente de revisión interna.",
-    submitted:
-      "El cierre interno de fichajes está enviado y pendiente de revisión.",
+      "La semana se ha reenviado y está pendiente de revisión.",
+    submitted: "La semana está enviada y pendiente de revisión.",
   };
 
   return (
     descriptions[status] ??
-    "Hay una actualización del cierre interno de fichajes."
+    "Hay una actualización sobre una semana de fichaje."
   );
 }
 
@@ -514,9 +512,9 @@ async function getWeeklyApprovalHomeData({
 
 const homeSuccessMessages: Record<string, string> = {
   "weekly-approval-approved":
-    "Semana aprobada. El cierre interno de fichajes queda bloqueado para cambios normales.",
+    "Semana aprobada. Ya no acepta cambios normales.",
   "weekly-approval-correction-required":
-    "Semana marcada con corrección requerida. El aviso ya sale del estado canónico del cierre.",
+    "Semana marcada para corregir. La persona verá el aviso en sus fichajes.",
 };
 
 const homeErrorMessages: Record<string, string> = {
@@ -535,7 +533,7 @@ const homeErrorMessages: Record<string, string> = {
   review_failed:
     "No se ha podido revisar el cierre semanal. Comprueba que siga pendiente.",
   signature_required:
-    "Para firmar y aprobar necesitas tener guardada tu propia firma interna.",
+    "Para aprobar una semana, guarda primero tu firma en Mi cuenta.",
 };
 
 function HomeActionFeedback({
@@ -1609,10 +1607,17 @@ function getNextAssignedBlockHref({
   });
 }
 
-function getNextAssignedFallbackCopy(state: OwnNextAssignedScheduleState) {
+function getNextAssignedFallbackCopy({
+  canManageAccountLinks,
+  state,
+}: {
+  canManageAccountLinks: boolean;
+  state: OwnNextAssignedScheduleState;
+}) {
   if (state.status === "matched") {
     return {
       actionLabel: "Abrir Mi horario",
+      actionTarget: "my_schedule" as const,
       description:
         "No hay bloques futuros con asignación activa para tu ficha vinculada en la planificación visible.",
       title: "Sin próximo bloque asignado",
@@ -1621,41 +1626,57 @@ function getNextAssignedFallbackCopy(state: OwnNextAssignedScheduleState) {
 
   if (state.status === "missing_person") {
     return {
-      actionLabel: "Abrir horario",
-      description:
-        "Tu usuario tiene acceso a la organización, pero todavía no hay una persona visible vinculada. Hasta entonces esta vista se mantiene en lectura segura.",
-      title: "Persona vinculada pendiente",
+      actionLabel: canManageAccountLinks ? "Abrir Equipo" : "Ver Mi cuenta",
+      actionTarget: canManageAccountLinks
+        ? ("team" as const)
+        : ("account" as const),
+      description: canManageAccountLinks
+        ? "Tu cuenta tiene acceso, pero falta vincularla con una persona visible del equipo. Revísalo desde Equipo antes de usar Mi horario."
+        : "Tu cuenta tiene acceso, pero todavía no está vinculada con una persona del equipo. Pide a un Propietario o Administrador que lo revise.",
+      title: "Vinculación pendiente",
     };
   }
 
   if (state.status === "missing_coach_profile") {
     return {
-      actionLabel: "Abrir horario",
-      description:
-        "No hay una ficha de entrenador propia vinculada a tu persona. Cuando exista, Inicio mostrará tu siguiente bloque asignado.",
+      actionLabel: canManageAccountLinks ? "Abrir Equipo" : "Ver Mi cuenta",
+      actionTarget: canManageAccountLinks
+        ? ("team" as const)
+        : ("account" as const),
+      description: canManageAccountLinks
+        ? "Tu persona está vinculada, pero todavía no tiene una ficha de entrenador activa. Crea o revisa la ficha desde Equipo."
+        : "Tu persona está vinculada, pero todavía no tienes una ficha de entrenador activa. Pide a un Propietario o Administrador que la cree o revise.",
       title: "Sin ficha de entrenador propia",
     };
   }
 
   if (state.status === "profile_unlinked") {
     return {
-      actionLabel: "Abrir horario",
-      description:
-        "Existe una ficha técnica asociada a tu cuenta, pero falta enlazarla con tu persona operativa visible. Por seguridad no se elige una clase automáticamente.",
+      actionLabel: canManageAccountLinks ? "Abrir Equipo" : "Ver Mi cuenta",
+      actionTarget: canManageAccountLinks
+        ? ("team" as const)
+        : ("account" as const),
+      description: canManageAccountLinks
+        ? "Hay una ficha de entrenador asociada a tu cuenta, pero falta enlazarla con tu persona visible. Haz la vinculación desde Equipo."
+        : "Hay una ficha de entrenador asociada a tu cuenta, pero falta enlazarla con tu persona visible. Pide a un Propietario o Administrador que complete la vinculación.",
       title: "Ficha pendiente de vinculación",
     };
   }
 
   if (state.status === "ambiguous_coach_profile") {
     return {
-      actionLabel: "Abrir horario",
-      description: `Tu usuario aparece vinculado a ${state.profileCount ?? "varias"} fichas de entrenador. Revisa el perfil antes de decidir cuál usar como propio.`,
+      actionLabel: canManageAccountLinks ? "Abrir Equipo" : "Ver Mi cuenta",
+      actionTarget: canManageAccountLinks
+        ? ("team" as const)
+        : ("account" as const),
+      description: `Tu usuario aparece vinculado a ${state.profileCount ?? "varias"} fichas de entrenador. No se elige una automáticamente; pide que el equipo deje solo la ficha correcta.`,
       title: "Revisión de perfiles necesaria",
     };
   }
 
   return {
     actionLabel: "Abrir horario",
+    actionTarget: "schedule" as const,
     description:
       "No se pudo cargar el próximo bloque asignado. El resto de Inicio sigue disponible.",
     title: "Próximo bloque no disponible",
@@ -1663,19 +1684,16 @@ function getNextAssignedFallbackCopy(state: OwnNextAssignedScheduleState) {
 }
 
 function NextAssignedScheduleCard({
+  canManageAccountLinks,
   organizationId,
   state,
   weekStart,
 }: {
+  canManageAccountLinks: boolean;
   organizationId: string;
   state: OwnNextAssignedScheduleState;
   weekStart: string;
 }) {
-  const fallbackHref =
-    state.status === "matched"
-      ? getSchedulePath({ mineOnly: true, organizationId, week: weekStart })
-      : getSchedulePath({ organizationId, week: weekStart });
-
   if (state.status === "matched" && state.nextBlock) {
     const block = state.nextBlock;
     const leadCopy = getNextAssignedLeadCopy(block);
@@ -1754,7 +1772,18 @@ function NextAssignedScheduleCard({
     );
   }
 
-  const copy = getNextAssignedFallbackCopy(state);
+  const copy = getNextAssignedFallbackCopy({
+    canManageAccountLinks,
+    state,
+  });
+  const fallbackHref =
+    copy.actionTarget === "my_schedule"
+      ? getSchedulePath({ mineOnly: true, organizationId, week: weekStart })
+      : copy.actionTarget === "account"
+        ? getAccountPath({ organizationId })
+        : copy.actionTarget === "team"
+          ? getCoachesPath({ organizationId })
+          : getSchedulePath({ organizationId, week: weekStart });
 
   return (
     <Card data-tour="next-assigned-block">
@@ -2046,14 +2075,13 @@ function WeeklyApprovalHomeSection({
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <FileClock aria-hidden="true" className="size-5" />
-            Cierre interno de fichajes
+            Cierre semanal de fichajes
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Avisos in-app derivados del estado canónico del cierre semanal. La
-            aprobación firmada es una confirmación interna de fichajes.
+            Consulta el estado de tus semanas y revisa los cierres pendientes
+            del equipo.
           </p>
         </div>
-        <Badge variant="outline">In-app</Badge>
       </div>
 
       <WeeklyApprovalLoadNotice errors={data.errors} />
@@ -2070,22 +2098,20 @@ function WeeklyApprovalHomeSection({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardCheck aria-hidden="true" className="size-4" />
-                Cola de aprobación
+                Pendientes de revisión
               </CardTitle>
               <CardDescription>
-                Semanas enviadas o reenviadas para firmar y aprobar con tu
-                propia firma interna, o rechazar con nota.
+                Aprueba el cierre o pide correcciones con una nota.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {data.pendingReview.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border px-4 py-5">
                   <p className="text-sm font-medium">
-                    Sin semanas pendientes de aprobación
+                    No hay semanas por revisar
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Cuando el cierre semanal se envíe, aparecerá aquí sin crear
-                    una notificación persistida aparte.
+                    Cuando alguien envíe su semana, aparecerá aquí.
                   </p>
                 </div>
               ) : (
@@ -2106,21 +2132,20 @@ function WeeklyApprovalHomeSection({
         <div className="grid gap-4">
           <Card data-tour={canReview ? undefined : "personal-pending"}>
             <CardHeader>
-              <CardTitle>Mis avisos de fichaje</CardTitle>
+              <CardTitle>Mis semanas de fichaje</CardTitle>
               <CardDescription>
-                Envíos, aprobaciones, rechazos, correcciones requeridas y
-                reenvíos de tus propias semanas.
+                Estado de las semanas que has enviado.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {data.ownNotices.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border px-4 py-5">
                   <p className="text-sm font-medium">
-                    Sin avisos de cierre semanal
+                    Sin avisos por ahora
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Tus semanas enviadas, aprobadas o con corrección aparecerán
-                    aquí.
+                    Cuando envíes una semana o el equipo la revise, verás el
+                    estado aquí.
                   </p>
                 </div>
               ) : (
@@ -2139,20 +2164,19 @@ function WeeklyApprovalHomeSection({
           {canReview ? (
             <Card>
               <CardHeader>
-                <CardTitle>Correcciones y rechazos recientes</CardTitle>
+                <CardTitle>Seguimiento de correcciones</CardTitle>
                 <CardDescription>
-                  Semanas marcadas como rechazadas o con corrección requerida.
+                  Últimas semanas devueltas para revisar fichajes.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {data.recentRejections.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border px-4 py-5">
                     <p className="text-sm font-medium">
-                      Sin rechazos recientes
+                      Sin correcciones recientes
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Los cierres que pidan corrección aparecerán aquí como
-                      seguimiento interno.
+                      Cuando una semana necesite cambios, aparecerá aquí.
                     </p>
                   </div>
                 ) : (
@@ -2432,6 +2456,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   const canReviewWeeklyApprovals = canReviewTimeTracking(
     resolution.membership.role,
   );
+  const canManageAccountLinks = canManageTeamAccess(resolution.membership.role);
   const [
     greetingPersonProfile,
     nextAssignedSchedule,
@@ -2499,6 +2524,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
       />
 
       <NextAssignedScheduleCard
+        canManageAccountLinks={canManageAccountLinks}
         organizationId={resolution.organization.id}
         state={nextAssignedSchedule}
         weekStart={currentWeek.weekStart}

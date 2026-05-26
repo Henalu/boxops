@@ -4,6 +4,7 @@ import {
   isManagedAccessRole,
   type ManagedAccessRole,
 } from "@/lib/auth/permissions";
+import { validatePasswordPolicy } from "@/lib/auth/password-policy";
 import { isPostgresUuid } from "@/lib/uuid";
 
 export const MEMBERSHIP_ROLES = MANAGED_ACCESS_ROLES;
@@ -26,11 +27,24 @@ type MembershipFormValues = {
 };
 
 type CoachProfileCreateValues = CoachProfileEditableValues & {
+  displayName: string;
   userId: string;
 };
 
-type CoachAccountLinkValues = MembershipFormValues & {
+type DirectTeamAccountCreateValues = {
+  displayName: string;
+  email: string;
+  initialAccessStatus: Exclude<MembershipStatus, "invited">;
+  notes: string | null;
+  password: string;
+  primaryCenterId: string | null;
+  role: MembershipRole;
+  weeklyContractedHours: number;
+};
+
+type CoachAccountLinkValues = {
   coachProfileId: string;
+  userId: string;
 };
 
 type CoachProfileEditableValues = {
@@ -63,7 +77,30 @@ export type CoachProfileCreateValidationResult =
         | "invalid-center"
         | "invalid-hours"
         | "invalid-status"
+        | "display-name-too-long"
         | "notes-too-long";
+    };
+
+export type DirectTeamAccountCreateValidationResult =
+  | {
+      ok: true;
+      values: DirectTeamAccountCreateValues;
+    }
+  | {
+      ok: false;
+      error:
+        | "display-name-too-long"
+        | "invalid-center"
+        | "invalid-email"
+        | "invalid-hours"
+        | "invalid-role"
+        | "invalid-status"
+        | "missing-fields"
+        | "notes-too-long"
+        | "password-mismatch"
+        | "password-missing-letter"
+        | "password-missing-number"
+        | "password-too-short";
     };
 
 export type CoachProfileUpdateValidationResult =
@@ -255,6 +292,7 @@ export function validateMembershipForm(
 export function validateCoachProfileCreateForm(
   formData: FormData,
 ): CoachProfileCreateValidationResult {
+  const displayName = getFormString(formData, "displayName");
   const userId = getFormString(formData, "userId");
 
   if (!userId) {
@@ -271,6 +309,13 @@ export function validateCoachProfileCreateForm(
     };
   }
 
+  if (displayName.length > 80) {
+    return {
+      ok: false,
+      error: "display-name-too-long",
+    };
+  }
+
   const editableValidation = validateCoachProfileEditableForm(formData);
 
   if (!editableValidation.ok) {
@@ -281,7 +326,121 @@ export function validateCoachProfileCreateForm(
     ok: true,
     values: {
       ...editableValidation.values,
+      displayName,
       userId,
+    },
+  };
+}
+
+export function validateDirectTeamAccountCreateForm(
+  formData: FormData,
+): DirectTeamAccountCreateValidationResult {
+  const displayName = getFormString(formData, "displayName");
+  const email = getFormString(formData, "email").toLowerCase();
+  const password = getFormString(formData, "password");
+  const confirmPassword = getFormString(formData, "confirmPassword");
+  const rawRole = getFormString(formData, "role") || "coach";
+  const rawInitialAccessStatus =
+    getFormString(formData, "initialAccessStatus") || "active";
+  const rawPrimaryCenterId = getFormString(formData, "primaryCenterId");
+  const rawHours = getFormString(formData, "weeklyContractedHours");
+  const notes = getFormString(formData, "notes");
+  const primaryCenterId = parseOptionalUuid(rawPrimaryCenterId);
+  const weeklyContractedHours = parseHours(rawHours || "0");
+
+  if (
+    !displayName ||
+    !email ||
+    !password ||
+    !confirmPassword ||
+    !rawRole ||
+    !rawInitialAccessStatus
+  ) {
+    return {
+      ok: false,
+      error: "missing-fields",
+    };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return {
+      ok: false,
+      error: "invalid-email",
+    };
+  }
+
+  if (!isMembershipRole(rawRole)) {
+    return {
+      ok: false,
+      error: "invalid-role",
+    };
+  }
+
+  if (
+    !isMembershipStatus(rawInitialAccessStatus) ||
+    rawInitialAccessStatus === "invited"
+  ) {
+    return {
+      ok: false,
+      error: "invalid-status",
+    };
+  }
+
+  if (displayName.length > 80) {
+    return {
+      ok: false,
+      error: "display-name-too-long",
+    };
+  }
+
+  const passwordValidation = validatePasswordPolicy(password);
+
+  if (!passwordValidation.ok) {
+    return {
+      ok: false,
+      error: passwordValidation.error,
+    };
+  }
+
+  if (password !== confirmPassword) {
+    return {
+      ok: false,
+      error: "password-mismatch",
+    };
+  }
+
+  if (primaryCenterId === undefined) {
+    return {
+      ok: false,
+      error: "invalid-center",
+    };
+  }
+
+  if (weeklyContractedHours === null) {
+    return {
+      ok: false,
+      error: "invalid-hours",
+    };
+  }
+
+  if (notes.length > 1000) {
+    return {
+      ok: false,
+      error: "notes-too-long",
+    };
+  }
+
+  return {
+    ok: true,
+    values: {
+      displayName,
+      email,
+      initialAccessStatus: rawInitialAccessStatus,
+      notes: notes || null,
+      password,
+      primaryCenterId,
+      role: rawRole,
+      weeklyContractedHours,
     },
   };
 }
@@ -296,9 +455,9 @@ export function validateCoachAccountLinkForm(
   formData: FormData,
 ): CoachAccountLinkValidationResult {
   const coachProfileId = getFormString(formData, "coachProfileId");
-  const membershipValidation = validateMembershipForm(formData);
+  const userId = getFormString(formData, "userId");
 
-  if (!coachProfileId) {
+  if (!coachProfileId || !userId) {
     return {
       ok: false,
       error: "missing-fields",
@@ -312,15 +471,18 @@ export function validateCoachAccountLinkForm(
     };
   }
 
-  if (!membershipValidation.ok) {
-    return membershipValidation;
+  if (!isUuid(userId)) {
+    return {
+      ok: false,
+      error: "invalid-user-id",
+    };
   }
 
   return {
     ok: true,
     values: {
-      ...membershipValidation.values,
       coachProfileId,
+      userId,
     },
   };
 }

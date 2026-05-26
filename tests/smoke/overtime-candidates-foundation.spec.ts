@@ -71,6 +71,9 @@ test.describe("overtime candidates I.21-I.24 source guardrails", () => {
       "src/lib/overtime-candidate-detection.ts",
     );
     const permissions = readProjectFile("src/lib/auth/permissions.ts");
+    const collapsibleSection = readProjectFile(
+      "src/components/features/collapsible-section.tsx",
+    );
     const rlsVerification = readProjectFile(
       "supabase/snippets/overtime-candidates-rls-verification.sql",
     );
@@ -230,19 +233,30 @@ test.describe("overtime candidates I.21-I.24 source guardrails", () => {
       "overtime candidate operations did not mutate time_punches",
     );
     expect(timePage).toContain("OvertimeCandidateReviewSection");
+    expect(timePage).toContain("CollapsibleTimeSection");
+    expect(timePage).toContain("CollapsibleReviewQueue");
+    expect(timePage).toContain("dataTimeCollapsibleDetails");
+    expect(timePage).toContain("dataTimeCollapsibleQueue");
+    expect(collapsibleSection).toContain("data-time-collapsible-details");
+    expect(collapsibleSection).toContain("data-time-collapsible-queue");
     expect(timePage).toContain("data-overtime-candidates-review");
     expect(timePage).toContain("data-overtime-candidate-detection-form");
     expect(timePage).toContain("Detectar posibles excesos");
     expect(timePage).toContain("ignorados por datos insuficientes");
     expect(timePage).toContain("listOvertimeCandidates");
     expect(timePage).toContain("canReviewOvertimeCandidates");
-    expect(timePage).toContain("Candidatos operativos de posible exceso");
+    expect(timePage).toContain("Posibles excesos de horas");
     expect(timePage).toContain("posible exceso");
-    expect(timePage).toContain("candidato operativo");
-    expect(timePage).toContain("pendiente de revisi");
+    expect(timePage).toContain("por revisar");
+    expect(timePage).toContain("necesite revision");
+    expect(timePage).toContain("Listas para aplicar");
+    expect(timePage).toContain("Solicitudes pendientes");
     expect(timePage).toContain("overtimeCandidateTerminalStatuses");
     expect(timePage).toContain("Sin acciones");
-    expect(timePage).toContain("No modifica fichajes, bloques ni");
+    expect(timePage).toContain("no modifica");
+    expect(timePage).not.toMatch(
+      /<details[^>]+data-time-collapsible-(?:details|queue)[^>]+open/,
+    );
     expect(timeActions).toContain("setOvertimeCandidateStatusFromForm");
     expect(timeActions).toContain("detectOvertimeCandidatesFromForm");
     expect(timeActions).toContain("detectOperationalOvertimeCandidates");
@@ -293,21 +307,24 @@ for (const managementCase of managementCases) {
       ).toBeVisible();
       await expect(
         page.getByRole("heading", {
-          name: /Candidatos operativos de posible exceso/i,
+          name: /Posibles excesos de horas/i,
         }),
       ).toBeVisible();
-      await expect(page.getByText(/posible exceso/i).first()).toBeVisible();
-      await expect(page.getByText(/candidato operativo/i).first()).toBeVisible();
-      await expect(
-        page
-          .locator("[data-overtime-candidates-review]")
-          .getByText(/payroll|nomina|importe|hora extra aprobada/i),
-      ).toHaveCount(0);
       const reviewSurface = page.locator("[data-overtime-candidates-review]");
+      await expect(reviewSurface.getByText(/por revisar/i).first()).toBeVisible();
+      await expect(
+        reviewSurface.getByText(/payroll|nomina|importe|hora extra aprobada/i),
+      ).toHaveCount(0);
+      const reviewToggle = reviewSurface
+        .getByRole("button", { name: /Posibles excesos de horas/i })
+        .first();
+      if ((await reviewToggle.getAttribute("aria-expanded")) !== "true") {
+        await reviewToggle.click();
+      }
       await expect(
         reviewSurface
           .locator("[data-overtime-candidate-status-form]")
-          .or(reviewSurface.getByText(/Sin candidatos operativos pendientes/i))
+          .or(reviewSurface.getByText(/No hay posibles excesos por revisar/i))
           .or(reviewSurface.getByText(/Sin acciones/i))
           .first(),
       ).toBeVisible();
@@ -334,7 +351,7 @@ test.describe("coach overtime candidate review smoke", () => {
     await expectNoFrameworkError(page);
     await expect(
       page.getByRole("heading", {
-        name: /Candidatos operativos de posible exceso/i,
+        name: /Posibles excesos de horas/i,
       }),
     ).toHaveCount(0);
     await expect(
@@ -365,7 +382,7 @@ test.describe("payroll manager overtime candidate review smoke", () => {
     ).toBeVisible();
     await expect(
       page.getByRole("heading", {
-        name: /Candidatos operativos de posible exceso/i,
+        name: /Posibles excesos de horas/i,
       }),
     ).toHaveCount(0);
     await expect(

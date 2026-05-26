@@ -84,18 +84,85 @@ function getScheduleActionTimes(stamp: string) {
   };
 }
 
-async function waitForStatus(page: Page, status: string | RegExp) {
-  await page.waitForURL((url) => {
-    const value = url.searchParams.get("status") ?? "";
+function statusMatches(status: string | RegExp, value: string) {
+  return typeof status === "string" ? value === status : status.test(value);
+}
 
-    return typeof status === "string" ? value === status : status.test(value);
-  });
+function getVisibleStatusPattern(status: string | RegExp) {
+  if (typeof status !== "string") {
+    return statusMatches(status, "correction-requested") ||
+      statusMatches(status, "correction-applied-direct")
+      ? /Correcci.n (solicitada|aplicada)/i
+      : null;
+  }
+
+  const patterns: Record<string, RegExp> = {
+    assigned: /Entrenador asignado/i,
+    "clock-in-created": /Entrada registrada/i,
+    created: /(Bloque|Centro|Tipo) creado/i,
+    "membership-updated": /Usuario actualizado/i,
+    "profile-updated": /Datos operativos actualizados/i,
+    "template-block-created": /Bloque de plantilla creado/i,
+    "template-created": /Plantilla creada/i,
+    updated: /Configuraci.n guardada/i,
+    "work-window-created": /Jornada prevista creada/i,
+  };
+
+  return patterns[status] ?? null;
+}
+
+async function waitForStatus(page: Page, status: string | RegExp) {
+  const visibleStatusPattern = getVisibleStatusPattern(status);
+
+  await expect(async () => {
+    const value = new URL(page.url()).searchParams.get("status") ?? "";
+
+    if (statusMatches(status, value)) {
+      return;
+    }
+
+    if (visibleStatusPattern) {
+      const visibleStatusCount = await page
+        .locator('[role="status"], [role="alert"]')
+        .filter({ hasText: visibleStatusPattern })
+        .count();
+
+      if (visibleStatusCount > 0) {
+        return;
+      }
+    }
+
+    throw new Error(`Expected visible status ${String(status)}.`);
+  }).toPass({ timeout: 30_000 });
   await expectNoFrameworkError(page);
 }
 
 async function openDetailsByText(page: Page, text: string | RegExp) {
   const details = page.locator("details").filter({ hasText: text }).first();
   await expect(details).toBeVisible();
+
+  if ((await details.getAttribute("open")) === null) {
+    await details.locator("summary").click();
+  }
+
+  return details;
+}
+
+async function openTeamUserDetails(page: Page, label: string) {
+  const card = page
+    .locator('[data-slot="card"]')
+    .filter({
+      has: page.getByRole("heading", { exact: true, name: label }),
+    })
+    .filter({ hasText: "Gestionar usuario" })
+    .first();
+
+  await expect(card).toBeVisible();
+
+  const details = card
+    .locator("details")
+    .filter({ hasText: "Gestionar usuario" })
+    .first();
 
   if ((await details.getAttribute("open")) === null) {
     await details.locator("summary").click();
@@ -191,37 +258,29 @@ test.describe.serial("S.99 tenant direct grants app runtime smoke", () => {
     await page.goto(buildProtectedPath("/app/coaches"));
     await expectNoFrameworkError(page);
 
-    const membershipRow = page.locator("tr").filter({ hasText: "E2E Coach" });
-    await expect(membershipRow).toBeVisible();
-    const accessDetails = membershipRow
-      .locator("details")
-      .filter({ hasText: "Ajustar acceso" })
+    const accessDetails = await openTeamUserDetails(page, "E2E Coach");
+    const accessForm = accessDetails
+      .locator("form")
+      .filter({ hasText: "Guardar acceso" })
       .first();
-    await accessDetails.locator("summary").click();
     await Promise.all([
       waitForStatus(page, "membership-updated"),
-      accessDetails.getByRole("button", { name: /^Guardar$/i }).click(),
+      accessForm.getByRole("button", { name: /Guardar acceso/i }).click(),
     ]);
 
     await page.goto(buildProtectedPath("/app/coaches"));
     await expectNoFrameworkError(page);
-    const profileCard = page
-      .locator('[data-slot="card"]')
-      .filter({ hasText: "E2E Coach" })
-      .filter({ hasText: "Gestionar ficha" })
+    const profileDetails = await openTeamUserDetails(page, "E2E Coach");
+    const profileForm = profileDetails
+      .locator("form")
+      .filter({ hasText: "Guardar datos" })
       .first();
-    await expect(profileCard).toBeVisible();
-    const profileDetails = profileCard
-      .locator("details")
-      .filter({ hasText: "Gestionar ficha" })
-      .first();
-    await profileDetails.locator("summary").click();
     await profileDetails
       .locator('textarea[name="notes"]')
       .fill(`S99 synthetic coach profile update ${stamp}`);
     await Promise.all([
       waitForStatus(page, "profile-updated"),
-      profileDetails.getByRole("button", { name: /Guardar ficha/i }).click(),
+      profileForm.getByRole("button", { name: /Guardar datos/i }).click(),
     ]);
   });
 
@@ -238,9 +297,16 @@ test.describe.serial("S.99 tenant direct grants app runtime smoke", () => {
     await page.goto(buildProtectedPath("/app/schedule", { week: smokeWeek }));
     await expectNoFrameworkError(page);
 
-    await page.getByRole("button", { name: /Nuevo bloque/i }).click();
-    const dialog = page.getByRole("dialog", { name: /Nuevo bloque/i });
+    await page
+      .getByRole("button", { name: /Crear bloque, evento o festivo/i })
+      .click();
+    const dialog = page.getByRole("dialog", { name: /Crear desde horario/i });
     await expect(dialog).toBeVisible();
+    const dialogEscapesWeekGrid = await dialog.evaluate(
+      (element) => element.closest('[data-schedule-week-grid="desktop"]') === null,
+    );
+    expect(dialogEscapesWeekGrid).toBe(true);
+    await dialog.getByRole("button", { name: /Bloque de trabajo/i }).click();
     await dialog.locator('input[name="serviceDate"]').fill(smokeWeek);
     await dialog.locator('input[name="startTime"]').fill(times.startTime);
     await dialog.locator('input[name="endTime"]').fill(times.endTime);
@@ -291,24 +357,23 @@ test.describe.serial("S.99 tenant direct grants app runtime smoke", () => {
       `),
     ).toBeTruthy();
 
-    await page.goto(
-      buildProtectedPath("/app/schedule", {
-        week: smokeWeek,
-        work_windows: "1",
-      }),
-    );
+    await page.goto(buildProtectedPath("/app/work-windows", { week: smokeWeek }));
     await expectNoFrameworkError(page);
-    const workWindowsDetails = await openDetailsByText(page, "Gestionar franjas");
-    await workWindowsDetails.locator('input[name="startTime"]').first().fill("12:10");
-    await workWindowsDetails.locator('input[name="endTime"]').first().fill("12:40");
-    await workWindowsDetails.locator('input[name="validFrom"]').first().fill(smokeWeek);
-    await workWindowsDetails
+    const workWindowsForm = page
+      .locator("form")
+      .filter({ hasText: /Crear franjas/i })
+      .first();
+    await expect(workWindowsForm).toBeVisible();
+    await workWindowsForm.locator('input[name="startTime"]').first().fill("12:10");
+    await workWindowsForm.locator('input[name="endTime"]').first().fill("12:40");
+    await workWindowsForm.locator('input[name="validFrom"]').first().fill(smokeWeek);
+    await workWindowsForm
       .locator('input[name="notes"]')
       .first()
       .fill(workWindowNotes);
     await Promise.all([
       waitForStatus(page, "work-window-created"),
-      workWindowsDetails
+      workWindowsForm
         .getByRole("button", { name: /Crear franja/i })
         .click(),
     ]);
@@ -422,14 +487,37 @@ test.describe.serial("S.99 tenant direct grants app runtime smoke", () => {
       waitForStatus(page, "clock-in-created"),
       punchForm.getByRole("button", { name: /Fichar entrada/i }).click(),
     ]);
+    const [punchId, timeRecordId] = readSingleValue(`
+      select id || E'\t' || time_record_id
+      from public.time_punches
+      where organization_id = '${toSqlUuid(organizationId!)}'::uuid
+        and notes = '${toSqlText(`S99 synthetic punch ${stamp}`)}'
+      order by created_at desc
+      limit 1;
+    `).split("\t");
+    expect(punchId).toBeTruthy();
+    expect(timeRecordId).toBeTruthy();
 
     await page.goto(buildProtectedPath("/app/time", { week: smokeWeek }));
     await expectNoFrameworkError(page);
-    const correctionForm = page
-      .locator("form")
-      .filter({ hasText: /correcci/i })
-      .last();
+    const correctionHref = await page
+      .getByRole("link", { name: /Corregir d/i })
+      .first()
+      .getAttribute("href");
+    expect(correctionHref).toBeTruthy();
+    await page.goto(correctionHref!, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/app/time" &&
+        Boolean(url.searchParams.get("record_id")) &&
+        url.hash === "#correccion"
+      );
+    });
+    await expectNoFrameworkError(page);
+    const correctionForm = page.locator("#correccion form").first();
     await expect(correctionForm).toBeVisible();
+    await correctionForm.locator('select[name="timeRecordId"]').selectOption(timeRecordId!);
+    await correctionForm.locator('select[name="timePunchId"]').selectOption(punchId!);
     await correctionForm.locator('input[name="occurredAtLocal"]').fill(correctedTime);
     await correctionForm
       .locator('textarea[name="reason"]')

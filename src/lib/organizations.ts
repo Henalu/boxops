@@ -254,6 +254,26 @@ export function validateOrganizationTimeTrackingSettingsForm(
 ): OrganizationTimeTrackingSettingsValidationResult {
   const rawCorrectionMode = formData.get("correctionMode");
   const rawApprovalRequired = formData.get("correctionApprovalRequired");
+  const rawScheduleAutoValues = formData.getAll("scheduleAutoPunchesEnabled");
+  let scheduleAutoPunchesEnabled: boolean | undefined;
+
+  if (rawScheduleAutoValues.length > 0) {
+    const lastScheduleAutoValue =
+      rawScheduleAutoValues[rawScheduleAutoValues.length - 1];
+
+    if (
+      typeof lastScheduleAutoValue !== "string" ||
+      !["false", "off", "on", "true"].includes(lastScheduleAutoValue)
+    ) {
+      return {
+        error: "invalid-time-tracking-config",
+        ok: false,
+      };
+    }
+
+    scheduleAutoPunchesEnabled =
+      lastScheduleAutoValue === "on" || lastScheduleAutoValue === "true";
+  }
 
   if (rawCorrectionMode !== null) {
     if (
@@ -270,6 +290,7 @@ export function validateOrganizationTimeTrackingSettingsForm(
       ok: true,
       values: {
         correctionApprovalRequired: rawCorrectionMode === "approval",
+        scheduleAutoPunchesEnabled,
       },
     };
   }
@@ -289,6 +310,7 @@ export function validateOrganizationTimeTrackingSettingsForm(
     ok: true,
     values: {
       correctionApprovalRequired: rawApprovalRequired !== null,
+      scheduleAutoPunchesEnabled,
     },
   };
 }

@@ -145,6 +145,10 @@ export function getSchedulePath(options: AppPathOptions = {}) {
   return getAppPath("/app/schedule", options);
 }
 
+export function getWorkWindowsPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/work-windows", options);
+}
+
 export function getCoveragePath(options: AppPathOptions = {}) {
   return getAppPath("/app/coverage", options);
 }

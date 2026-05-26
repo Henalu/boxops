@@ -20,6 +20,8 @@ E.18 no abre producto nuevo. Relee el entorno sin secretos, confirma que no hay 
 
 E.19 abre solo el primer adjunto seguro desde la app. La pantalla no permite elegir tenant alternativo ni persona/sujeto; el servidor resuelve organizacion y usuario desde sesion/membership, valida permiso con `can_manage_document_metadata(...)`, crea el documento como `draft`, prepara version `pending` con `begin_document_version_upload`, sube al bucket privado usando el path exacto devuelto por la RPC, publica metadata y activa con `activate_document_version_upload`.
 
+E.23-E.29 cierran el flujo local cross-tenant del repositorio documental despues del primer adjunto: el smoke runtime opt-in valida rutas backend E.5 contra un actor de otro tenant, E.25 deja un procedimiento local-only reversible para crear ese actor temporal, E.27/E.28 fuerzan credenciales process-only explicitas, y E.29 deja esta instruccion operativa protegida por smoke estatico.
+
 ## Objetivo
 
 Permitir que un usuario autenticado consulte las versiones documentales que ya puede ver por permisos reales:
@@ -89,6 +91,16 @@ Get-Content -Raw supabase/snippets/document-repository-beta-qa-verification.sql 
 ```
 
 El snippet usa `BEGIN`/`ROLLBACK`, crea tenants/usuarios/documentos sinteticos, verifica la RPC `list_accessible_document_versions(...)`, comprueba `can_access_document(...)` para los casos relevantes y registra eventos de auditoria con rollback. No crea objetos reales en Storage y por tanto no sustituye la prueba manual de abrir `/preview` o `/download` con un archivo controlado.
+
+## Nota Local E.23-E.28: Actor Cross-Tenant Documental
+
+Esta nota aplica solo al smoke local runtime opt-in de rutas backend E.5 del repositorio documental. No aplica a QA/staging, produccion ni credenciales reales.
+
+- El actor cross-tenant local solo puede venir de `E2E_CROSS_TENANT_EMAIL` / `E2E_CROSS_TENANT_PASSWORD`.
+- Esas variables se pasan solo como variables de proceso durante la ventana corta del smoke.
+- No escribir `E2E_CROSS_TENANT_*` en `.env.local` ni en ningun archivo persistente.
+- No sustituir el actor por credenciales normales de rol E2E como `E2E_OWNER_*`, `E2E_ADMIN_*`, `E2E_MANAGER_*`, `E2E_COACH_*` o `E2E_PAYROLL_MANAGER_*`.
+- El actor E.25 es sintetico, temporal, local-only y process-only; al terminar hay que limpiar con `cleanup_synthetic_actor=1` y confirmar `remaining_auth_users=0`.
 
 ## Cierre QA/Staging E.13/E.14/E.15/E.16/E.17/E.18
 

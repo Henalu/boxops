@@ -188,7 +188,6 @@ function DocumentCreateForm({
     <form
       action={createDocumentWithInitialFileUpload}
       className="grid gap-4"
-      encType="multipart/form-data"
     >
       <input name="organizationId" type="hidden" value={organizationId} />
 

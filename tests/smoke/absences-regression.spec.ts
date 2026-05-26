@@ -81,6 +81,13 @@ test.describe("absences I.15 source guardrails", () => {
     expect(page).toContain('name="view"');
     expect(page).toContain('name="absence_type"');
     expect(page).toContain('name="absence_status"');
+    expect(page).not.toContain("sensitiveSummaryConfirmation");
+    expect(page).not.toContain("Confirmo que el resumen");
+    expect(actions).not.toContain("sensitiveSummaryConfirmation");
+    expect(actions).not.toContain('"confirmation-required"');
+    expect(actions).toMatch(
+      /if \(hasSensitiveReasonSignal\(reasonSummary\)\) \{[\s\S]+getAbsencesErrorPath\(context\.organizationId, "sensitive-summary"\)/,
+    );
 
     expect(actions).not.toMatch(
       /getFormString\(formData,\s*["'](?:personProfileId|person_profile_id|coachProfileId|coach_profile_id)["']\)/,

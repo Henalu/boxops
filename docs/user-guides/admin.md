@@ -251,7 +251,7 @@ Aqui el admin ve dos piezas distintas:
 
 - `organization_memberships`: quien pertenece a la organizacion, con rol y estado.
 - `coach_profiles`: capacidad operativa de coach dentro de la organizacion.
-- Vinculacion de ficha pendiente: conecta una persona/ficha ya creada con una cuenta Auth real.
+- Alta directa: crea una cuenta Auth, membership, persona visible y ficha operativa en un unico envio.
 
 ## Compatibilidad de roles B.2
 
@@ -276,30 +276,30 @@ En `/app/coaches`, el flujo principal de alta es por email:
 - ficha pendiente existente o ficha nueva;
 - centro principal, horas semanales y notas internas si aplica.
 
-BoxOps envia una invitacion. Cuando la persona acepta con el mismo email, la cuenta Auth queda vinculada automaticamente con su persona/ficha operativa. Las herramientas por UUID se mantienen solo como apartado avanzado/debug.
+BoxOps envia una invitacion. Cuando la persona acepta con el mismo email, la cuenta Auth queda vinculada automaticamente con su persona/ficha operativa.
 
-## Vincular ficha pendiente con cuenta real
+## Crear cuenta directa
 
-Si una persona/ficha operativa de coach ya existe pero sigue sin cuenta vinculada, el admin puede usar "Vincular cuenta existente".
+Como alternativa a la invitacion, el admin puede crear una cuenta completa desde `/app/coaches` con "Crear cuenta".
 
 El flujo pide:
 
-- ficha pendiente visible;
-- `user_id` de una cuenta real de Supabase Auth;
-- rol inicial o actualizado (`owner`, `admin`, `manager` o `coach`);
-- estado del acceso.
+- email;
+- contrasena temporal y confirmacion;
+- rol (`owner`, `admin`, `manager` o `coach`);
+- estado inicial del acceso;
+- nombre visible;
+- centro principal, horas semanales y notas internas.
 
 Al guardar, BoxOps:
 
-- crea o actualiza `organization_memberships` dentro de la organizacion activa;
-- rellena `person_profiles.user_id`;
-- rellena `coach_profiles.user_id`;
-- conserva `coach_profiles.person_profile_id`;
-- rechaza perfiles internos, personas inactivas o IDs de otra organizacion;
-- rechaza cuentas ya vinculadas a otra persona o ficha de la misma organizacion;
-- no permite degradar o suspender tu propia membership desde este flujo.
+- crea la cuenta Auth con email confirmado;
+- crea `organization_memberships` dentro de la organizacion activa;
+- crea `person_profiles` visible y `coach_profiles` vinculados a esa cuenta;
+- marca la cuenta con cambio de contrasena obligatorio para el primer inicio;
+- no guarda ni registra la contrasena temporal en BoxOps.
 
-Esto desbloquea que una cuenta real con ficha de coach pueda usar "Mi horario" cuando tenga asignaciones reales. No es una invitacion por email completa ni crea usuarios Auth.
+La persona inicia sesion con la contrasena temporal que le facilite el admin y BoxOps la envia a cambiarla antes de entrar en `/app`. Este flujo necesita `SUPABASE_SERVICE_ROLE_KEY` configurado solo en servidor.
 
 ## Editar membership
 

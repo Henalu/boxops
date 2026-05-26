@@ -76,9 +76,11 @@ test.describe("document programming E.9/I.30 QA guardrails", () => {
       'data-document-programming-surface="schedule-block"',
     );
     expect(schedulePanel).toContain(
-      "No hay programacion disponible para tu permiso en este bloque.",
+      "No hay material visible para esta sesion.",
     );
-    expect(schedulePanel).toContain("Solo metadata");
+    expect(schedulePanel).toContain("Solo informacion");
+    expect(schedulePanel).not.toContain("Programacion autorizada");
+    expect(schedulePanel).not.toContain("Fuente documental versionada");
     expect(schedulePanel).toContain("entry.can_preview");
     expect(schedulePanel).toContain("entry.can_download");
     expect(schedulePanel).toContain(
@@ -87,12 +89,14 @@ test.describe("document programming E.9/I.30 QA guardrails", () => {
 
     expect(appSource).not.toContain("createDocumentProgrammingLink");
     expect(appSource).not.toContain("setDocumentProgrammingLinkStatus");
-    expect(appSource).not.toMatch(
+    expect(`${schedulePage}\n${schedulePanel}`).not.toMatch(
       /begin_document_version_upload|activate_document_version_upload|cancel_document_version_upload/,
     );
     expect(documentRouteFiles).toEqual([
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/download/route.ts",
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/preview/route.ts",
+      "src/app/(app)/app/documents/actions.ts",
+      "src/app/(app)/app/documents/document-upload-submit-button.tsx",
       "src/app/(app)/app/documents/page.tsx",
     ]);
     expect(source).not.toMatch(/\bservice_role\b/);

@@ -147,6 +147,26 @@ test.describe("schedule zero-required coverage", () => {
     expectDefaultCoachDetailGuarded(templateEditor);
   });
 
+  test("keeps template coach picker aligned with user-linked visible profiles", () => {
+    const templatePage = readProjectFile("src/app/(app)/app/templates/page.tsx");
+    const templateEditor = readProjectFile(
+      "src/app/(app)/app/templates/template-blocks-editor.tsx",
+    );
+
+    expect(templatePage).toContain(
+      '.select("id, user_id, display_name, status, visibility_status")',
+    );
+    expect(templatePage).toMatch(
+      /\.from\("person_profiles"\)[\s\S]+\.eq\("organization_id", organizationId\)[\s\S]+\.in\("user_id", userIds\)/,
+    );
+    expect(templatePage).toContain("const personProfilesByUserId = new Map(");
+    expect(templatePage).toMatch(
+      /coachProfile\.person_profile_id[\s\S]+\? personProfilesById\.get\(coachProfile\.person_profile_id\)[\s\S]+: coachProfile\.user_id[\s\S]+\? personProfilesByUserId\.get\(coachProfile\.user_id\)/,
+    );
+    expect(templatePage).not.toContain("Lo marca el alcance de la plantilla.");
+    expect(templateEditor).not.toContain("Lo marca el alcance de la plantilla.");
+  });
+
   test("keeps template week cards readable and activity-colored", () => {
     const templatePage = readProjectFile("src/app/(app)/app/templates/page.tsx");
     const templateEditor = readProjectFile(

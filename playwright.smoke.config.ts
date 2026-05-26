@@ -18,6 +18,7 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
+  workers: shouldStartLocalServer ? 2 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
