@@ -1,10 +1,16 @@
 import type { User } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 import {
   APPLICATION_ROLES,
   isApplicationRole,
   type ApplicationRole,
 } from "@/lib/auth/permissions";
+import {
+  PLATFORM_SUPPORT_ACCESS_ROLE,
+  PLATFORM_SUPPORT_SESSION_COOKIE_NAME,
+  type PlatformSupportAccessRole,
+} from "@/lib/platform-support-session-cookie";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/supabase";
 
@@ -12,6 +18,36 @@ type MembershipRow = Tables<"organization_memberships">;
 type OrganizationRow = Tables<"organizations">;
 type ApplicationMembershipRow = Omit<MembershipRow, "role"> & {
   role: ApplicationRole;
+};
+type ActiveMembershipRole = ApplicationRole | PlatformSupportAccessRole;
+type ActivePlatformSupportSessionRow = {
+  actor_user_id: string;
+  expires_at: string;
+  organization_id: string;
+  organization_name: string;
+  organization_slug: string;
+  organization_status: string;
+  organization_theme_config: OrganizationRow["theme_config"];
+  organization_time_tracking_config: OrganizationRow["time_tracking_config"];
+  organization_timezone: string;
+  platform_admin_id: string;
+  platform_role: string;
+  started_at: string;
+  support_scope: string;
+  support_session_id: string;
+};
+type DatabaseErrorLike = {
+  message?: string;
+};
+type QueryResponse<T> = {
+  data: T | null;
+  error: DatabaseErrorLike | null;
+};
+type UntypedTenantClient = {
+  rpc<T>(
+    fn: string,
+    args?: Record<string, unknown>,
+  ): Promise<QueryResponse<T>>;
 };
 
 const ACTIVE_ORGANIZATION_STATUSES = ["trialing", "active"] as const;
@@ -31,7 +67,15 @@ export type ActiveMembership = Pick<
   MembershipRow,
   "id" | "organization_id" | "user_id" | "status" | "joined_at" | "created_at"
 > & {
-  role: ApplicationRole;
+  accessMode: "membership" | "platform_support";
+  platformSupportSession?: {
+    expiresAt: string;
+    platformAdminId: string;
+    platformRole: string;
+    startedAt: string;
+    supportSessionId: string;
+  };
+  role: ActiveMembershipRole;
   organization: ActiveOrganization;
 };
 
@@ -54,6 +98,78 @@ function isUsableOrganizationStatus(status: string) {
   return ACTIVE_ORGANIZATION_STATUSES.includes(
     status as (typeof ACTIVE_ORGANIZATION_STATUSES)[number],
   );
+}
+
+function getTenantClient(client: Awaited<ReturnType<typeof createClient>>) {
+  return client as unknown as UntypedTenantClient;
+}
+
+async function getPlatformSupportMembership({
+  supabase,
+  userId,
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}): Promise<ActiveMembership | null> {
+  const cookieStore = await cookies();
+  const supportSessionId = cookieStore.get(
+    PLATFORM_SUPPORT_SESSION_COOKIE_NAME,
+  )?.value;
+
+  if (!supportSessionId) {
+    return null;
+  }
+
+  const db = getTenantClient(supabase);
+  const { data, error } = await db.rpc<ActivePlatformSupportSessionRow[]>(
+    "get_active_platform_support_session",
+    {
+      target_support_session_id: supportSessionId,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Could not load active platform support session: ${error.message ?? "unknown error"}`,
+    );
+  }
+
+  const [supportSession] = data ?? [];
+
+  if (
+    !supportSession ||
+    supportSession.actor_user_id !== userId ||
+    !isUsableOrganizationStatus(supportSession.organization_status)
+  ) {
+    return null;
+  }
+
+  return {
+    accessMode: "platform_support",
+    created_at: supportSession.started_at,
+    id: supportSession.support_session_id,
+    joined_at: supportSession.started_at,
+    organization: {
+      id: supportSession.organization_id,
+      name: supportSession.organization_name,
+      slug: supportSession.organization_slug,
+      status: supportSession.organization_status,
+      theme_config: supportSession.organization_theme_config,
+      time_tracking_config: supportSession.organization_time_tracking_config,
+      timezone: supportSession.organization_timezone,
+    },
+    organization_id: supportSession.organization_id,
+    platformSupportSession: {
+      expiresAt: supportSession.expires_at,
+      platformAdminId: supportSession.platform_admin_id,
+      platformRole: supportSession.platform_role,
+      startedAt: supportSession.started_at,
+      supportSessionId: supportSession.support_session_id,
+    },
+    role: PLATFORM_SUPPORT_ACCESS_ROLE,
+    status: "active",
+    user_id: userId,
+  };
 }
 
 export async function getAuthenticatedUser(): Promise<User | null> {
@@ -98,7 +214,12 @@ export async function getActiveMemberships(
   });
 
   if (validMemberships.length === 0) {
-    return [];
+    const supportMembership = await getPlatformSupportMembership({
+      supabase,
+      userId,
+    });
+
+    return supportMembership ? [supportMembership] : [];
   }
 
   const organizationIds = validMemberships.map(
@@ -122,7 +243,7 @@ export async function getActiveMemberships(
       .map((organization) => [organization.id, organization]),
   );
 
-  return validMemberships.flatMap((membership) => {
+  const activeMemberships = validMemberships.flatMap((membership) => {
     const organization = organizationsById.get(membership.organization_id);
 
     if (!organization) {
@@ -131,6 +252,7 @@ export async function getActiveMemberships(
 
     return [
       {
+        accessMode: "membership" as const,
         id: membership.id,
         organization_id: membership.organization_id,
         user_id: membership.user_id,
@@ -142,6 +264,23 @@ export async function getActiveMemberships(
       },
     ];
   });
+
+  const supportMembership = await getPlatformSupportMembership({
+    supabase,
+    userId,
+  });
+
+  if (!supportMembership) {
+    return activeMemberships;
+  }
+
+  return [
+    supportMembership,
+    ...activeMemberships.filter(
+      (membership) =>
+        membership.organization_id !== supportMembership.organization_id,
+    ),
+  ];
 }
 
 export function resolveActiveOrganization(

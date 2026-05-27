@@ -21,6 +21,116 @@ Reglas para las fases nuevas:
 
 La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cierre hacia beta/webapp v1 vive en `docs/product/webapp-completion-roadmap.md`.
 
+### Corte 2026-05-26 - Decision Console SaaS Y Billing Por Fases
+
+Estado: completado como decision documental. No cambia `src`, migraciones, seeds, rutas, UI, permisos ni datos reales. Ordena la capa de plataforma necesaria para operar BoxOps como SaaS multi-tenant.
+
+Decision:
+
+- [x] Crear concepto `BoxOps Console` como capa interna separada de `/app` para operar tenants, revisar empresas, centros, usuarios, plan, limites, estado y salud.
+- [x] Separar roles de plataforma de roles de tenant: un operador de plataforma no debe ser `owner` permanente de todos los tenants.
+- [x] Definir roles candidatos `platform_owner`, `support`, `billing` y `viewer`.
+- [x] Definir tablas candidatas `platform_admins`, `organization_subscriptions`, `platform_support_sessions` y `platform_audit_events`.
+- [x] Definir modo soporte auditado para abrir la app de un tenant desde Console, con indicador visible y sin saltarse permisos sensibles por defecto.
+- [x] Decidir Stripe como proveedor inicial para suscripciones, Checkout/Customer Portal, facturas, webhooks, tarjeta y SEPA Direct Debit.
+- [x] Mantener GoCardless como alternativa futura si la domiciliacion SEPA domina el negocio.
+- [x] Prohibir guardar tarjetas, IBAN completos, mandates crudos o datos bancarios sensibles en BoxOps; guardar solo referencias del proveedor, plan, estado, limites y metadata comercial minimizada.
+- [x] Fasear billing: foundation manual, Console interna, billing visible para owner, Stripe real y comercializacion v1.
+
+Fuera de alcance:
+
+- [x] No crear migraciones ni aplicar schema real en este corte documental.
+- [x] No crear `/console`, `/app/settings/billing`, Server Actions, webhooks ni integracion Stripe real todavia.
+- [x] No usar `SUPABASE_SERVICE_ROLE_KEY` desde cliente ni como via normal para saltarse RLS.
+- [x] No hacer suplantacion silenciosa de usuarios reales ni lectura global de documentos sensibles/payroll/RRHH.
+- [x] No tocar datos reales de tenant ni metodos de pago.
+
+Verificacion:
+
+- [x] `docs/architecture/tenancy-and-billing.md` actualizado con Console, roles, tablas candidatas, soporte auditado y decision Stripe.
+- [x] `docs/product/webapp-completion-roadmap.md` actualizado con Console/billing en comercializacion SaaS.
+- [x] `docs/product/roadmap.md` actualizado con decision 2026-05-26.
+- [x] `PROJECT_BRIEF.md` actualizado para reflejar la decision en proximos pasos/referencias.
+- [ ] Reejecutar typecheck/lint solo si un corte posterior toca codigo.
+
+Cortes tecnicos abiertos:
+
+- [x] Crear foundation DB/RLS/helper de plataforma: `platform_admins`, `organization_subscriptions`, `platform_support_sessions`, `platform_audit_events`, funciones de permiso de plataforma, vista/RPC de resumen de organizaciones y smoke/guardrails. Sin UI grande, sin Stripe real, sin webhooks y sin pago real.
+- [x] Crear Console minima con listado/detalle de organizaciones, creacion controlada de organizacion + owner inicial, suspension/reactivacion manual y soporte auditado temporal.
+
+### Corte 2026-05-27 - Console Control Manual De Acceso Tenant
+
+Estado: implementado como mutacion manual de plataforma sobre `organizations.status`, sin billing automatico ni soporte completo.
+
+Decision:
+
+- [x] Mantener la resolucion tenant de `/app` limitada a organizaciones `trialing` o `active`.
+- [x] Tratar `suspended` e `inactive` como estados bloqueados para acceso tenant aunque las memberships sigan activas.
+- [x] Anadir en `/console/organizations/[organizationId]` una accion `Suspender acceso` para `trialing`/`active` y `Reactivar` para `suspended`/`inactive`.
+- [x] Mantener la tabla principal de Console sin accion destructiva directa.
+- [x] Proteger la mutacion con Server Action, helper y RPC; solo `platform_owner`.
+- [x] Exigir motivo breve y confirmacion explicita al suspender.
+- [x] Auditar en `platform_audit_events` con actor plataforma, organizacion objetivo, accion `suspended` o `activated`, resultado y metadata minimizada.
+- [x] Actualizar solo `organizations.status`; no crear, borrar ni modificar memberships.
+
+Fuera de alcance:
+
+- [x] No implementar Stripe, Checkout, Customer Portal, webhooks ni `/app/settings/billing`.
+- [x] No borrar tenants ni memberships.
+- [x] No convertir platform admins en miembros permanentes.
+- [x] No crear sesion de soporte completa ni suplantacion.
+- [x] No bloquear automaticamente por plan; solo cambio manual desde Console.
+
+Verificacion:
+
+- [x] `npm run typecheck -- --pretty false` pasa.
+- [x] `npm run lint` pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run build` pasa.
+- [x] `npx supabase db lint --local` pasa sin errores de schema.
+- [x] `git diff --check` pasa sin errores, solo warnings LF/CRLF del worktree.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/platform-console-surface.spec.ts` pasa 7 tests y 1 skip por falta de credenciales `E2E_PLATFORM_ADMIN_*`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/auth-protection.spec.ts` pasa 23 tests.
+
+### Corte 2026-05-27 - Console Sesion De Soporte Auditada
+
+Estado: implementado como entrada minima controlada desde Console hacia `/app`, con motivo, expiracion, auditoria e indicador visible. No es suplantacion, no crea memberships permanentes y no abre acciones destructivas.
+
+Decision:
+
+- [x] Crear sesion de soporte desde `/console/organizations/[organizationId]` con CTA `Abrir en modo soporte`.
+- [x] Permitirla solo a `platform_owner` y `support` activos, revalidando sesion/rol en Server Action, helper y RPC.
+- [x] Limitarla a organizaciones `trialing` o `active`; `suspended` e `inactive` no abren modo soporte hacia `/app`.
+- [x] Exigir motivo breve, confirmacion explicita y duracion acotada de 30, 60 o 120 minutos.
+- [x] Guardar la sesion en `platform_support_sessions` con scope `app_support`, actor, organizacion, estado, inicio, expiracion y metadata minimizada.
+- [x] Auditar inicio/cierre en `platform_audit_events` como `support_started` y `support_ended`.
+- [x] Resolver `/app` con un acceso pseudo-membership `platform_support` solo mientras la cookie HttpOnly apunta a una sesion activa valida.
+- [x] Mostrar indicador visible en `/app` y accion `Cerrar soporte`.
+- [x] Ocultar superficies personales en modo soporte y evitar lecturas de programacion/documentos sensibles desde Horario.
+- [x] Conceder por RLS solo lectura operativa minima: organizacion, centros, memberships, equipo, tipos, horario, plantillas, asignaciones y eventos.
+- [x] No conceder RLS nueva para documentos, fichaje, payroll, firmas ni RRHH sensible.
+- [x] No crear, borrar ni modificar `organization_memberships`.
+
+Fuera de alcance:
+
+- [x] No implementar Stripe, Checkout, Customer Portal, webhooks ni `/app/settings/billing`.
+- [x] No suplantar usuarios reales ni crear membresia permanente para platform admins.
+- [x] No abrir soporte sobre organizaciones `suspended` o `inactive`.
+- [x] No leer documentos, fichaje, payroll, firmas, salud ni RRHH sensible desde soporte.
+- [x] No implementar chat, grabacion/replay, aprobacion dual ni elevacion granular por modulo.
+
+Verificacion:
+
+- [x] `npm run typecheck -- --pretty false` pasa.
+- [x] `npm run lint` pasa con warning preexistente en `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npm run build` pasa.
+- [x] `npx supabase db lint --local` pasa sin errores de schema.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/platform-console-surface.spec.ts` pasa 8 tests y 1 skip por falta de credenciales `E2E_PLATFORM_ADMIN_*`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/auth-protection.spec.ts` pasa 23 tests.
+- [x] `rg -n "service_role|SUPABASE_SERVICE_ROLE" src -g "!src/lib/supabase/admin.ts"` sin coincidencias.
+- [x] `rg -n "stripe|STRIPE_|checkout|webhook|Customer Portal|customer\s*portal|/app/settings/billing|settings/billing" src package.json` sin coincidencias.
+- [x] Smoke estatico confirma que la sesion de soporte no inserta, borra ni actualiza memberships.
+- [x] Smoke estatico confirma que la migracion de soporte no anade politicas RLS para documentos/fichaje/payroll.
+
 ### Corte 2026-05-25 - Revision Publicacion Online / User Testing No Tecnico
 
 Estado: revision local ejecutada como actualizacion de contexto. No cambia producto, UI, migraciones, seeds ni permisos. Objetivo: saber si BoxOps se puede publicar online para que un equipo no tecnico empiece a probar flujos y gusto de uso.
@@ -11209,8 +11319,11 @@ Dependencias de schema/migraciones futuras:
 
 ## Backlog Futuro
 
-- [ ] Billing por organizacion/centro/coach.
-- [ ] Onboarding de nuevo box.
+- [x] Foundation DB/RLS de `BoxOps Console`: roles de plataforma, suscripciones manuales, soporte auditado y auditoria de plataforma.
+- [x] Console interna minima: listado/detalle de organizaciones, contadores de centros/usuarios/coaches, estado de plan, creacion de organizacion + owner inicial, suspension/reactivacion manual y soporte auditado temporal.
+- [ ] Billing owner en `/app/settings/billing`: plan, estado, limites y CTA seguro sin guardar datos bancarios.
+- [ ] Integracion Stripe real: Checkout/Customer Portal, webhooks idempotentes y sincronizacion de suscripcion.
+- [ ] Onboarding de nuevo box desde Console o runbook guiado.
 - [ ] Eliminacion segura de usuarios/fichas creados por error desde Equipo: `owner` puede necesitar borrar una ficha pendiente, acceso o invitacion mal creada con modal de confirmacion; definir primero permisos, auditoria, bloqueo de auto-eliminacion, impacto en Auth, historial operativo y fallback a desactivar/archivar cuando existan referencias.
 - [ ] Permisos avanzados por centro.
 - [ ] Configuracion de categorias de tipos de actividad por tenant: el admin debe poder añadir, editar, desactivar y eliminar categorias visibles en `/app/class-types` cuando exista el modulo de Configuracion. La fase futura debe revisar la lista fija actual y el `CHECK` de `class_types.category`; si una categoria ya esta en uso, priorizar archivar/desactivar antes que borrado destructivo para preservar historial de bloques.

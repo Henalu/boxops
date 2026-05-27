@@ -14,6 +14,7 @@ import {
   LogOut,
   MapPin,
   Settings,
+  ShieldCheck,
   Timer,
   UserRound,
   UsersRound,
@@ -47,6 +48,8 @@ import {
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
+import { PLATFORM_SUPPORT_ACCESS_ROLE } from "@/lib/platform-support-session-cookie";
+import { getActivePlatformAdmin } from "@/lib/platform-console";
 import {
   getAbsencesPath,
   getAccountPath,
@@ -135,12 +138,17 @@ export default async function MorePage({ searchParams }: MorePageProps) {
     week: week.weekStart,
   };
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
+  const isSupportMode = resolution.membership.role === PLATFORM_SUPPORT_ACCESS_ROLE;
   const canManageOperational = canManageOperationalData(
     resolution.membership.role,
   );
   const canManageWorkWindows = canManageStaffWorkWindows(
     resolution.membership.role,
   );
+  const activePlatformAdminResult = await getActivePlatformAdmin().catch(
+    () => null,
+  );
+  const canOpenConsole = activePlatformAdminResult?.ok === true;
 
   return (
     <div className="space-y-5 md:space-y-6">
@@ -149,6 +157,8 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         description={
           canManageOperational
             ? "Gestión del box, ayuda y accesos secundarios."
+            : isSupportMode
+              ? "Revision operativa temporal, separada de acciones personales."
             : "Tus accesos personales, consulta operativa y ayuda."
         }
         meta={
@@ -263,6 +273,69 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             />
           </div>
         </section>
+      ) : isSupportMode ? (
+        <section className="space-y-2.5 md:space-y-3">
+          <SectionHeader
+            description="Sesion temporal auditada para revisar contexto operativo. No abre acciones personales ni soporte sobre datos sensibles."
+            title="Soporte"
+          />
+          <div className="grid gap-2.5 md:hidden">
+            <MobileHubLink
+              description="Semana y bloques"
+              href={getSchedulePath(baseOptions)}
+              icon={CalendarDays}
+              title="Horario"
+            />
+            <MobileHubLink
+              description="Personas y fichas visibles"
+              href={getCoachesPath(baseOptions)}
+              icon={UsersRound}
+              title="Equipo"
+            />
+            <MobileHubLink
+              description="Sedes disponibles"
+              href={getCentersPath(baseOptions)}
+              icon={MapPin}
+              title="Centros"
+            />
+            <MobileHubLink
+              description="Clases y actividades"
+              href={getClassTypesPath(baseOptions)}
+              icon={Dumbbell}
+              title="Tipos de actividad"
+            />
+          </div>
+          <div className="hidden gap-3 md:grid md:grid-cols-2">
+            <ActionCard
+              description="Revisa la semana y el contexto de bloques sin editar."
+              href={getSchedulePath(baseOptions)}
+              icon={CalendarDays}
+              label="Abrir horario"
+              title="Horario"
+            />
+            <ActionCard
+              description="Consulta personas, fichas visibles y datos de equipo."
+              href={getCoachesPath(baseOptions)}
+              icon={UsersRound}
+              label="Abrir equipo"
+              title="Equipo"
+            />
+            <ActionCard
+              description="Revisa sedes disponibles y contexto basico de centros."
+              href={getCentersPath(baseOptions)}
+              icon={MapPin}
+              label="Abrir centros"
+              title="Centros"
+            />
+            <ActionCard
+              description="Consulta el catalogo operativo de clases y actividades."
+              href={getClassTypesPath(baseOptions)}
+              icon={Dumbbell}
+              label="Abrir tipos"
+              title="Tipos de actividad"
+            />
+          </div>
+        </section>
       ) : (
         <>
           <section className="space-y-2.5 md:space-y-3">
@@ -366,6 +439,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
         </>
       )}
 
+      {!isSupportMode ? (
       <section className="space-y-2.5 md:hidden">
         <SectionHeader title="Personal" />
         <MobileHubLink
@@ -420,7 +494,9 @@ export default async function MorePage({ searchParams }: MorePageProps) {
           </CardContent>
         </Card>
       </section>
+      ) : null}
 
+      {!isSupportMode ? (
       <section className="hidden space-y-3 md:block">
         <SectionHeader title="Personal" />
         <div className="grid gap-3 md:grid-cols-2">
@@ -461,6 +537,33 @@ export default async function MorePage({ searchParams }: MorePageProps) {
           />
         </div>
       </section>
+      ) : null}
+
+      {canOpenConsole ? (
+        <section className="space-y-2.5 md:space-y-3">
+          <SectionHeader
+            description="Acceso interno de plataforma separado de la gestion diaria del box."
+            title="Plataforma"
+          />
+          <div className="grid gap-2.5 md:hidden">
+            <MobileHubLink
+              description="Consola SaaS interna"
+              href="/console"
+              icon={ShieldCheck}
+              title="BoxOps Console"
+            />
+          </div>
+          <div className="hidden gap-3 md:grid md:grid-cols-2">
+            <ActionCard
+              description="Abre el dashboard interno de plataforma para organizaciones, soporte y suscripciones."
+              href="/console"
+              icon={ShieldCheck}
+              label="Abrir Console"
+              title="BoxOps Console"
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <SectionHeader title="Ayuda" />

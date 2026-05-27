@@ -28,6 +28,7 @@ import {
   canManageOperationalData,
   canManageStaffWorkWindows,
 } from "@/lib/auth/permissions";
+import { PLATFORM_SUPPORT_ACCESS_ROLE } from "@/lib/platform-support-session-cookie";
 import { cn } from "@/lib/utils";
 import {
   getAppPath,
@@ -246,6 +247,7 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
   const canManageWorkWindows = currentRole
     ? canManageStaffWorkWindows(currentRole)
     : false;
+  const isSupportMode = currentRole === PLATFORM_SUPPORT_ACCESS_ROLE;
   const visibleMainItems = mainItems.filter((item) => {
     if (item.href === "/app/coverage") {
       return canManageOperational;
@@ -282,10 +284,9 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
     visibleManagementItems,
     normalizedSearchQuery,
   );
-  const filteredPersonalItems = filterNavigationItems(
-    personalItems,
-    normalizedSearchQuery,
-  );
+  const filteredPersonalItems = isSupportMode
+    ? []
+    : filterNavigationItems(personalItems, normalizedSearchQuery);
   const hasSearchQuery = normalizedSearchQuery.length > 0;
   const showManagementItems = hasSearchQuery
     ? filteredManagementItems.length > 0

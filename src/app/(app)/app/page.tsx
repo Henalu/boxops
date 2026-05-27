@@ -12,6 +12,7 @@ import {
   Dumbbell,
   FileClock,
   Inbox,
+  LifeBuoy,
   MapPin,
   ShieldCheck,
   Timer,
@@ -2358,6 +2359,71 @@ function ReadOnlyHome({
   );
 }
 
+function SupportModeHome({
+  organizationId,
+  organizationName,
+  timezone,
+  weekStart,
+}: {
+  organizationId: string;
+  organizationName: string;
+  timezone: string;
+  weekStart: string;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LifeBuoy aria-hidden="true" className="size-4" />
+          Revision operativa en soporte
+        </CardTitle>
+        <CardDescription>
+          Acceso temporal auditado para revisar contexto de {organizationName}.
+          No suplanta usuarios ni habilita acciones personales.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Organizacion</dt>
+            <dd className="mt-1 truncate font-medium">{organizationName}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Zona horaria</dt>
+            <dd className="mt-1 truncate font-mono text-xs">{timezone}</dd>
+          </div>
+        </dl>
+        <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+          <Button asChild className="w-full md:w-auto">
+            <Link href={getSchedulePath({ organizationId, week: weekStart })}>
+              <CalendarDays aria-hidden="true" />
+              Horario
+            </Link>
+          </Button>
+          <Button asChild className="w-full md:w-auto" variant="outline">
+            <Link href={getCoachesPath({ organizationId })}>
+              <UsersRound aria-hidden="true" />
+              Equipo
+            </Link>
+          </Button>
+          <Button asChild className="w-full md:w-auto" variant="outline">
+            <Link href={getCentersPath({ organizationId })}>
+              <MapPin aria-hidden="true" />
+              Centros
+            </Link>
+          </Button>
+          <Button asChild className="w-full md:w-auto" variant="outline">
+            <Link href={getClassTypesPath({ organizationId })}>
+              <Dumbbell aria-hidden="true" />
+              Tipos
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SurfaceLinks({
   canManageTemplates,
   organizationId,
@@ -2450,6 +2516,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   const canViewOperationalDashboard = canManageOperationalData(
     resolution.membership.role,
   );
+  const isSupportMode = resolution.membership.accessMode === "platform_support";
   const canReviewAbsenceImpact = canManageAbsenceRequests(
     resolution.membership.role,
   );
@@ -2464,15 +2531,19 @@ export default async function AppPage({ searchParams }: AppPageProps) {
     weeklyApprovalHomeData,
   ] =
     await Promise.all([
-      getGreetingPersonProfile({
-        organizationId: resolution.organization.id,
-        userId: user.id,
-      }),
-      getOwnNextAssignedScheduleBlock({
-        organizationId: resolution.organization.id,
-        organizationTimezone: resolution.organization.timezone,
-        userId: user.id,
-      }),
+      isSupportMode
+        ? Promise.resolve(null)
+        : getGreetingPersonProfile({
+            organizationId: resolution.organization.id,
+            userId: user.id,
+          }),
+      isSupportMode
+        ? Promise.resolve(null)
+        : getOwnNextAssignedScheduleBlock({
+            organizationId: resolution.organization.id,
+            organizationTimezone: resolution.organization.timezone,
+            userId: user.id,
+          }),
       canViewOperationalDashboard
         ? getDashboardData({
             includeAbsenceImpacts: canReviewAbsenceImpact,
@@ -2481,10 +2552,12 @@ export default async function AppPage({ searchParams }: AppPageProps) {
             weekStart: week.weekStart,
           })
         : Promise.resolve(null),
-      getWeeklyApprovalHomeData({
-        canReview: canReviewWeeklyApprovals,
-        organizationId: resolution.organization.id,
-      }),
+      isSupportMode
+        ? Promise.resolve(null)
+        : getWeeklyApprovalHomeData({
+            canReview: canReviewWeeklyApprovals,
+            organizationId: resolution.organization.id,
+          }),
     ]);
   const greetingName = resolveGreetingName({
     personProfile: greetingPersonProfile,
@@ -2523,21 +2596,32 @@ export default async function AppPage({ searchParams }: AppPageProps) {
         status={actionStatus}
       />
 
-      <NextAssignedScheduleCard
-        canManageAccountLinks={canManageAccountLinks}
-        organizationId={resolution.organization.id}
-        state={nextAssignedSchedule}
-        weekStart={currentWeek.weekStart}
-      />
+      {!isSupportMode && nextAssignedSchedule ? (
+        <NextAssignedScheduleCard
+          canManageAccountLinks={canManageAccountLinks}
+          organizationId={resolution.organization.id}
+          state={nextAssignedSchedule}
+          weekStart={currentWeek.weekStart}
+        />
+      ) : null}
 
-      <WeeklyApprovalHomeSection
-        canReview={canReviewWeeklyApprovals}
-        data={weeklyApprovalHomeData}
-        organizationId={resolution.organization.id}
-        timezone={resolution.organization.timezone}
-      />
+      {!isSupportMode && weeklyApprovalHomeData ? (
+        <WeeklyApprovalHomeSection
+          canReview={canReviewWeeklyApprovals}
+          data={weeklyApprovalHomeData}
+          organizationId={resolution.organization.id}
+          timezone={resolution.organization.timezone}
+        />
+      ) : null}
 
-      {dashboardData ? (
+      {isSupportMode ? (
+        <SupportModeHome
+          organizationId={resolution.organization.id}
+          organizationName={resolution.organization.name}
+          timezone={resolution.organization.timezone}
+          weekStart={currentWeek.weekStart}
+        />
+      ) : dashboardData ? (
         <AdminCoverageDashboard
           data={dashboardData}
           organizationId={resolution.organization.id}

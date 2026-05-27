@@ -29,6 +29,10 @@ function isNavigationPrefetch(request: NextRequest) {
   );
 }
 
+function isProtectedSurface(pathname: string) {
+  return pathname.startsWith("/app") || pathname.startsWith("/console");
+}
+
 function withScheduleCenterPreference(
   request: NextRequest,
   response: NextResponse,
@@ -96,14 +100,14 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && request.nextUrl.pathname.startsWith("/app")) {
+  if (!user && isProtectedSurface(request.nextUrl.pathname)) {
     const redirectTo = `${request.nextUrl.pathname}${request.nextUrl.search}`;
     const loginUrl = new URL(getLoginPath(redirectTo), request.url);
 
     return withPrivateAppCacheHeaders(NextResponse.redirect(loginUrl));
   }
 
-  if (user && request.nextUrl.pathname.startsWith("/app")) {
+  if (user && isProtectedSurface(request.nextUrl.pathname)) {
     if (isPasswordChangeRequired(user)) {
       return withPrivateAppCacheHeaders(
         NextResponse.redirect(

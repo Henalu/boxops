@@ -43,7 +43,7 @@ Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues d
 | Horas extra | Candidato operativo revisable | Cierre mensual/exporte interno y decision legal antes de llamarlo aprobacion real o payroll. |
 | Operativa diaria beta | Documentada en OD.1/I.32 | Validacion real/staging por rol, evidencia y cierre de deuda bloqueante antes de beta interna real. |
 | Documentos | Primer repositorio visible minimo abierto en E.11, QA/staging controlado preparado en E.12, evidencia local/bloqueo staging cerrado en E.13, reintento E.14 bloqueado por falta de acceso real/archivo Storage controlado, E.15 actualizado con relectura de entorno redacted y E.16 cerrado como handoff operativo controlado | Ejecutar validacion real/staging con operador autorizado, datos controlados y archivo Storage controlado; despues subida controlada, gestion de grants desde UI, auditoria visible, documentos firmables y certificaciones. |
-| Produccion SaaS | Parcial | ASVS, headers/CSP, secretos, backups, observabilidad, purgas, soporte, onboarding y billing. |
+| Produccion SaaS | Parcial | ASVS, headers/CSP, secretos, backups, observabilidad, purgas, soporte, Console de plataforma, onboarding y billing con Stripe por fases. |
 | App nativa/geofencing/push | Futuro | Decision comercial y legal especifica; no bloquea webapp v1. |
 | IA | Ultimo extra futuro | Solo despues de documentos/programacion/permisos/auditoria/legal y webapp vendible. |
 
@@ -63,6 +63,16 @@ Evidencia local:
 - `npm audit --omit=dev --audit-level=high` reporta vulnerabilidades de produccion, incluidas 2 high.
 
 Lectura de producto: el siguiente objetivo no es abrir mas features. Es cerrar un entorno online controlado, arreglar las regresiones/guardrails que rompen smoke/typecheck, resolver o aceptar explicitamente el audit de dependencias, cargar datos de prueba validados y preparar una guia simple para testers no tecnicos. Hasta entonces, el estado correcto sigue siendo `preparando beta`, no `listo para publicar`.
+
+## Decision 2026-05-26 - Console SaaS Y Billing
+
+BoxOps necesita una capa superior de operacion SaaS separada de la app diaria del tenant. Esa capa sera `BoxOps Console`: una superficie interna para que Henalu/Riptide pueda crear organizaciones, asignar owner/admin iniciales, ver centros/usuarios/estado comercial, revisar salud del tenant y abrir la app de un tenant en modo soporte auditado.
+
+La Console no convierte automaticamente al operador de plataforma en `owner` de todos los tenants. Los roles de plataforma viven separados de `organization_memberships`, y cualquier acceso cross-tenant debe quedar auditado.
+
+Billing se implementara por fases. Stripe queda como proveedor por defecto para suscripciones, Checkout/Customer Portal, facturas, tarjeta y SEPA Direct Debit. BoxOps no guardara tarjetas, IBAN completos ni datos bancarios sensibles: solo referencias del proveedor, plan, estado, limites y metadata comercial minimizada. GoCardless queda como alternativa futura si la domiciliacion SEPA domina el negocio y Stripe deja de encajar.
+
+Actualizacion 2026-05-27: los primeros cortes tecnicos de Console ya cubren foundation, listado/detalle de organizaciones, creacion controlada de organizacion + owner inicial, suspension/reactivacion manual de acceso tenant y sesion de soporte auditada con motivo, expiracion, auditoria e indicador visible en `/app`. El modo soporte no crea memberships permanentes, no suplanta usuarios y no abre lectura de documentos, fichaje, payroll, firmas ni datos sensibles. Billing visible, Stripe, Checkout, Customer Portal y webhooks siguen pendientes.
 
 ## Mapa De Cierre Recomendado
 
@@ -185,14 +195,26 @@ Objetivo: poder vender y operar BoxOps para mas de un box con friccion razonable
 
 Incluye:
 
+- Console interna de plataforma para crear tenants, owner/admin iniciales, revisar organizaciones, centros, usuarios, plan, limites, estado y salud;
+- roles de plataforma separados de roles del tenant, por ejemplo `platform_owner`, `support`, `billing` y `viewer`;
+- sesiones de soporte auditadas para abrir la app de un tenant sin hacerse miembro permanente de esa organizacion;
+- suscripcion por organizacion con plan, estado, limites de centros/usuarios y referencias seguras de proveedor;
+- Stripe como proveedor inicial para Checkout, Customer Portal, facturas, webhooks y SEPA/tarjeta;
+- pantalla de billing para `owner` en `/app/settings/billing`, delegando metodos de pago y datos bancarios al portal del proveedor;
 - onboarding de nuevo box;
 - importacion o carga guiada de centros, usuarios, tipos, plantillas y primera semana;
-- billing por organizacion/centro/coach segun decision comercial;
 - exportes CSV/PDF necesarios para operacion;
 - soporte/administracion interna y proceso de incidencias;
 - documentacion comercial y de limites: que cubre la webapp y que queda fuera.
 
 Mapea a: `docs/architecture/tenancy-and-billing.md` y Backlog Futuro.
+
+Primeros cortes recomendados:
+
+1. Ya abierto: foundation manual de plataforma con `platform_admins`, `organization_subscriptions`, `platform_support_sessions` y `platform_audit_events`, sin pago real.
+2. Ya abierto: Console interna minima con listado/detalle de organizaciones, contadores, estado de plan, creacion controlada de organizacion + owner inicial, control manual de acceso y soporte auditado.
+3. Siguiente corte recomendado: billing visible para owner, si se decide abrirlo, con lectura de plan/estado/limites y CTA seguro; todavia sin almacenar datos bancarios.
+4. Despues: Stripe real con Checkout/Customer Portal, webhooks idempotentes y sincronizacion de suscripcion.
 
 ### 7. Nativo, Push Y Geofencing Si El Negocio Lo Exige
 

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const protectedRoutes = [
   "/app",
+  "/console",
   "/app/absences",
   "/app/absences?view=review&absence_type=vacation&absence_status=pending_review",
   "/app/account",

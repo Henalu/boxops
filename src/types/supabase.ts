@@ -1685,6 +1685,88 @@ export type Database = {
           },
         ]
       }
+      organization_subscriptions: {
+        Row: {
+          billing_email: string | null
+          center_limit: number | null
+          commercial_metadata: Json
+          created_at: string
+          created_by_platform_admin_id: string | null
+          current_period_ends_at: string | null
+          id: string
+          organization_id: string
+          plan_code: string
+          provider: string
+          provider_customer_ref: string | null
+          provider_subscription_ref: string | null
+          seat_limit: number | null
+          status: string
+          trial_ends_at: string | null
+          updated_at: string
+          updated_by_platform_admin_id: string | null
+        }
+        Insert: {
+          billing_email?: string | null
+          center_limit?: number | null
+          commercial_metadata?: Json
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          current_period_ends_at?: string | null
+          id?: string
+          organization_id: string
+          plan_code?: string
+          provider?: string
+          provider_customer_ref?: string | null
+          provider_subscription_ref?: string | null
+          seat_limit?: number | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+        }
+        Update: {
+          billing_email?: string | null
+          center_limit?: number | null
+          commercial_metadata?: Json
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          current_period_ends_at?: string | null
+          id?: string
+          organization_id?: string
+          plan_code?: string
+          provider?: string
+          provider_customer_ref?: string | null
+          provider_subscription_ref?: string | null
+          seat_limit?: number | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_created_by_platform_admin_id_fkey"
+            columns: ["created_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_updated_by_platform_admin_id_fkey"
+            columns: ["updated_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -2012,6 +2094,190 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organization_memberships"
             referencedColumns: ["organization_id", "user_id"]
+          },
+        ]
+      }
+      platform_admins: {
+        Row: {
+          created_at: string
+          created_by_platform_admin_id: string | null
+          display_name: string | null
+          id: string
+          notes: string | null
+          role: string
+          status: string
+          updated_at: string
+          updated_by_platform_admin_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          display_name?: string | null
+          id?: string
+          notes?: string | null
+          role: string
+          status?: string
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          display_name?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_admins_created_by_platform_admin_id_fkey"
+            columns: ["created_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_admins_updated_by_platform_admin_id_fkey"
+            columns: ["updated_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_audit_events: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          platform_admin_id: string
+          result: string
+          retain_until: string
+          support_session_id: string | null
+          target_organization_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json
+          platform_admin_id: string
+          result?: string
+          retain_until?: string
+          support_session_id?: string | null
+          target_organization_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          platform_admin_id?: string
+          result?: string
+          retain_until?: string
+          support_session_id?: string | null
+          target_organization_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_audit_events_platform_admin_id_actor_user_id_fkey"
+            columns: ["platform_admin_id", "actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "platform_audit_events_support_session_id_target_organizati_fkey"
+            columns: ["support_session_id", "target_organization_id"]
+            isOneToOne: false
+            referencedRelation: "platform_support_sessions"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "platform_audit_events_target_organization_id_fkey"
+            columns: ["target_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_support_sessions: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          metadata: Json
+          organization_id: string
+          platform_admin_id: string
+          reason: string
+          started_at: string
+          status: string
+          support_scope: string
+          updated_at: string
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          metadata?: Json
+          organization_id: string
+          platform_admin_id: string
+          reason: string
+          started_at?: string
+          status?: string
+          support_scope?: string
+          updated_at?: string
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          platform_admin_id?: string
+          reason?: string
+          started_at?: string
+          status?: string
+          support_scope?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_support_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_support_sessions_platform_admin_id_actor_user_id_fkey"
+            columns: ["platform_admin_id", "actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -4082,6 +4348,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_read_platform_admin_row: {
+        Args: { target_platform_admin_user_id: string }
+        Returns: boolean
+      }
+      can_read_platform_audit_events: { Args: never; Returns: boolean }
+      can_read_platform_subscription_rows: { Args: never; Returns: boolean }
+      can_read_platform_support_sessions: { Args: never; Returns: boolean }
       can_review_overtime_candidates: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -4555,6 +4828,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_platform_organization_with_owner: {
+        Args: {
+          target_allow_platform_actor_as_owner?: boolean
+          target_center_limit?: number
+          target_organization_name: string
+          target_organization_slug: string
+          target_organization_status: string
+          target_organization_timezone: string
+          target_owner_display_name?: string
+          target_owner_email: string
+          target_owner_user_id?: string
+          target_plan_code?: string
+          target_seat_limit?: number
+          target_subscription_status?: string
+        }
+        Returns: {
+          created_membership_id: string
+          created_organization_id: string
+          created_person_profile_id: string
+          created_subscription_id: string
+          resolved_owner_user_id: string
+        }[]
+      }
       document_access_event_metadata_is_safe: {
         Args: { target_metadata: Json }
         Returns: boolean
@@ -4635,6 +4931,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      generate_due_staff_work_window_auto_time_punches: {
+        Args: { target_now?: string; target_organization_id?: string }
+        Returns: {
+          clock_in_punch_id: string
+          clock_out_punch_id: string
+          inserted_clock_in: boolean
+          inserted_clock_out: boolean
+          local_work_date: string
+          organization_id: string
+          skipped_reason: string
+          staff_work_window_id: string
+          time_record_id: string
+        }[]
+      }
       generate_schedule_auto_time_punches: {
         Args: {
           target_date_from: string
@@ -4652,10 +4962,31 @@ export type Database = {
           time_record_id: string
         }[]
       }
+      generate_staff_work_window_auto_time_punches: {
+        Args: {
+          target_date_from: string
+          target_date_to: string
+          target_due_at?: string
+          target_invocation_source?: string
+          target_organization_id: string
+          target_person_profile_id?: string
+        }
+        Returns: {
+          clock_in_punch_id: string
+          clock_out_punch_id: string
+          inserted_clock_in: boolean
+          inserted_clock_out: boolean
+          local_work_date: string
+          skipped_reason: string
+          staff_work_window_id: string
+          time_record_id: string
+        }[]
+      }
       get_active_membership_id: {
         Args: { target_organization_id: string }
         Returns: string
       }
+      get_active_platform_admin_id: { Args: never; Returns: string }
       get_own_person_profile_id: {
         Args: { target_organization_id: string }
         Returns: string
@@ -4680,6 +5011,8 @@ export type Database = {
         Args: { allowed_roles: string[]; target_organization_id: string }
         Returns: boolean
       }
+      has_platform_role: { Args: { allowed_roles: string[] }; Returns: boolean }
+      is_active_platform_admin: { Args: never; Returns: boolean }
       is_org_member: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -4707,6 +5040,35 @@ export type Database = {
           schedule_block_assignment_id: string
           schedule_block_id: string
           subject_coach_profile_id: string
+        }[]
+      }
+      list_accessible_document_versions: {
+        Args: {
+          target_document_scope?: string
+          target_limit?: number
+          target_organization_id: string
+        }
+        Returns: {
+          activated_at: string
+          archived_at: string
+          can_download: boolean
+          can_preview: boolean
+          description: string
+          document_id: string
+          document_scope: string
+          document_status: string
+          document_type: string
+          document_updated_at: string
+          document_version_id: string
+          mime_type: string
+          organization_id: string
+          original_filename: string
+          sensitivity_level: string
+          size_bytes: number
+          title: string
+          version_number: number
+          version_status: string
+          version_updated_at: string
         }[]
       }
       list_coverage_trace_audit_events: {
@@ -4928,6 +5290,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_platform_organization_summaries: {
+        Args: {
+          target_limit?: number
+          target_status?: string
+          target_subscription_status?: string
+        }
+        Returns: {
+          active_centers_count: number
+          active_coaches_count: number
+          active_users_count: number
+          center_limit: number
+          current_period_ends_at: string
+          organization_created_at: string
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          organization_status: string
+          plan_code: string
+          seat_limit: number
+          subscription_status: string
+          trial_ends_at: string
+        }[]
+      }
       list_time_location_events_for_record: {
         Args: {
           target_limit?: number
@@ -5046,6 +5431,18 @@ export type Database = {
           target_source_id: string
           target_source_type: string
         }
+        Returns: boolean
+      }
+      platform_metadata_is_safe: {
+        Args: { target_metadata: Json }
+        Returns: boolean
+      }
+      platform_reason_is_safe: {
+        Args: { target_reason: string }
+        Returns: boolean
+      }
+      platform_ref_is_safe: {
+        Args: { target_reference: string }
         Returns: boolean
       }
       purge_expired_operational_audit_events: {
@@ -5311,6 +5708,37 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "time_location_events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_platform_audit_event: {
+        Args: {
+          target_action: string
+          target_entity_id?: string
+          target_entity_type: string
+          target_metadata?: Json
+          target_result?: string
+          target_support_session_id?: string
+          target_target_organization_id?: string
+        }
+        Returns: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          platform_admin_id: string
+          result: string
+          retain_until: string
+          support_session_id: string | null
+          target_organization_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_audit_events"
           isOneToOne: true
           isSetofReturn: false
         }

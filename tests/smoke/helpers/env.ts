@@ -100,6 +100,7 @@ export const managerCredentials = readCredentials("E2E_MANAGER");
 export const organizationId = readEnv("E2E_ORGANIZATION_ID");
 export const ownerCredentials = readCredentials("E2E_OWNER");
 export const payrollManagerCredentials = readCredentials("E2E_PAYROLL_MANAGER");
+export const platformAdminCredentials = readCredentials("E2E_PLATFORM_ADMIN");
 export const smokeWeek = readEnv("E2E_WEEK");
 export const supabaseAnonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 export const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");

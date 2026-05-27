@@ -3943,6 +3943,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
   const canManageSchedule = canManageOperationalData(
     resolution.membership.role,
   );
+  const isSupportMode = resolution.membership.accessMode === "platform_support";
   const canManageEvents = canManageOperationalEvents(resolution.membership.role);
   const canReviewAbsenceImpact = canManageAbsenceRequests(
     resolution.membership.role,
@@ -4057,7 +4058,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         })
       : { data: new Map<string, CoverageTraceItem[]>(), ok: true as const };
   const documentProgrammingResult =
-    scheduleView !== "month" && blocks.length > 0
+    !isSupportMode && scheduleView !== "month" && blocks.length > 0
       ? await getScheduleDocumentProgrammingByBlock({
           blocks,
           organizationId: resolution.organization.id,

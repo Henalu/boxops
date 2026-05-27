@@ -100,6 +100,10 @@ export function isManagedAccessRole(role: string): role is ManagedAccessRole {
 }
 
 export function getApplicationRoleLabel(role: string) {
+  if (role === "platform_support") {
+    return "Soporte BoxOps";
+  }
+
   return isApplicationRole(role) ? ROLE_LABELS[role] : role;
 }
 

@@ -78,6 +78,15 @@ Lectura recomendada del cierre:
 - Futuro opcional: app nativa, push nativo, geofencing real, integraciones avanzadas y validaciones automatizadas solo si el negocio las exige.
 - Ultimo extra: IA sobre programacion/documentos autorizados, con fuentes trazables y sin decisiones automaticas de cobertura, cambios, ausencias, fichaje, horas extra, payroll ni datos sensibles.
 
+Decision 2026-05-26 - Console SaaS y billing:
+
+- BoxOps tendra una capa interna `BoxOps Console`, separada de `/app`, para operar tenants, alta de organizaciones, owner/admin iniciales, estado de plan, limites, salud y soporte.
+- Los operadores de plataforma no deben ser `owner` permanentes de todos los tenants; sus permisos viven en una tabla separada candidata `platform_admins`.
+- El acceso desde Console a un tenant debe ser modo soporte auditado, candidato `platform_support_sessions`, con indicador visible y sin saltarse permisos sensibles por defecto.
+- Billing se hara por fases: primero estado manual de suscripcion, luego pantalla de owner, y despues Stripe real.
+- Stripe queda como proveedor inicial para suscripciones, Checkout/Customer Portal, facturas, tarjeta y SEPA Direct Debit. GoCardless queda como alternativa futura si la domiciliacion SEPA domina el negocio.
+- BoxOps no guarda tarjetas, IBAN completos ni datos bancarios sensibles; solo referencias del proveedor, plan, estado, limites y metadata comercial minimizada.
+
 Orden de cierre propuesto:
 
 1. Cierre de realidad operativa: Fase A + Carril S + Auth/email/purga/credenciales reales, ejecutado con `docs/operations/beta-operational-readiness-runbook.md`.
@@ -86,7 +95,7 @@ Orden de cierre propuesto:
 4. Fichaje web y cierre laboral prudente: Fase F con `docs/operations/time-tracking-beta-readiness-runbook.md`, revision legal/retencion/exportes antes de datos reales definitivos.
 5. Documentos, firma documental y certificaciones: Fase D.5 + Fase E, abriendo UI visible solo por cortes seguros.
 6. Hardening beta/produccion: ASVS, secretos, headers, backups, observabilidad, pruebas negativas y guias.
-7. Comercializacion SaaS web: billing, soporte, importacion/carga guiada y documentacion comercial.
+7. Comercializacion SaaS web: Console de plataforma, billing por fases con Stripe, soporte, importacion/carga guiada y documentacion comercial.
 8. Nativo/push/geofencing si hay razon comercial.
 9. IA como ultimo extra futuro.
 

@@ -158,6 +158,147 @@ Modelo recomendado:
 3. Si un cliente necesita entorno dedicado, se factura como plan superior o setup + mantenimiento mensual.
 4. Para clientes grandes, alternativa: el cliente posee su organizacion/proyecto Supabase y concede acceso tecnico. En ese caso se cobra implementacion y soporte, no se oculta coste infra.
 
+## Plataforma Interna De Operacion
+
+Decision 2026-05-26: BoxOps necesita una capa superior de operacion SaaS separada de la app de cada tenant.
+
+Esa capa se tratara como `BoxOps Console` y debe vivir fuera de la experiencia diaria de `/app`. Puede empezar como `/console` en la misma aplicacion y evolucionar a subdominio propio si el producto lo requiere.
+
+Principios:
+
+- Un operador de plataforma no debe convertirse automaticamente en `owner` de todos los tenants.
+- Los roles de tenant siguen viviendo en `organization_memberships`.
+- Los roles de plataforma viven en una tabla separada, candidata `platform_admins`.
+- Las acciones cross-tenant deben estar auditadas y minimizadas.
+- Entrar en la app de un tenant desde Console debe crear una sesion de soporte auditada, candidata `platform_support_sessions`, y mostrar un indicador visible de modo soporte.
+- El modo soporte no debe saltarse permisos sensibles por defecto: documentos sensibles, payroll, firmas, RRHH futuro o datos legales requieren capacidades explicitas.
+- `SUPABASE_SERVICE_ROLE_KEY` no debe usarse en cliente ni como via normal para saltarse RLS desde Console.
+
+Roles candidatos:
+
+- `platform_owner`: control de plataforma, tenants, planes y soporte.
+- `support`: soporte tecnico limitado y auditado.
+- `billing`: gestion comercial/facturacion, sin acceso operativo completo por defecto.
+- `viewer`: lectura interna de salud SaaS.
+
+Tablas candidatas:
+
+- `platform_admins`: usuarios Auth con rol de plataforma, estado y auditoria minima.
+- `organization_subscriptions`: estado comercial de cada organizacion.
+- `platform_support_sessions`: entradas auditadas desde Console hacia un tenant.
+- `platform_audit_events`: auditoria de cambios y accesos de plataforma.
+
+Primeras superficies candidatas:
+
+- `/console`: listado de organizaciones con estado, plan, centros, usuarios activos, coaches y fecha de alta.
+- `/console/organizations/[organizationId]`: detalle de tenant, centros, usuarios, roles, plan, limites y salud.
+- Accion controlada para crear organizacion y owner inicial.
+- Accion controlada para abrir la app de ese tenant en modo soporte auditado.
+
+### Control Manual De Acceso Tenant Desde Console
+
+Decision 2026-05-27: BoxOps Console puede suspender o reactivar manualmente el acceso de una `organization` sin tocar memberships ni suplantar usuarios.
+
+Reglas aplicadas:
+
+- `trialing` y `active` son los unicos estados resolubles como tenant activo para `/app`.
+- `suspended` e `inactive` bloquean la resolucion tenant aunque existan memberships activas.
+- La accion vive en `/console/organizations/[organizationId]`, no en la tabla principal de organizaciones.
+- Solo `platform_owner` puede ejecutar el cambio; la Server Action revalida sesion/rol y la RPC vuelve a revalidarlo en Postgres.
+- La suspension exige confirmacion explicita y motivo breve. La reactivacion tambien exige motivo.
+- El motivo se valida para evitar tokens, enlaces, datos de pago, payroll, salud o documentos.
+- La mutacion actualiza solo `organizations.status`; no crea, borra ni modifica `organization_memberships`.
+- Cada intento permitido registra `platform_audit_events` con actor de plataforma, organizacion objetivo, accion `suspended` o `activated`, resultado y metadata minimizada.
+- No usa `service_role`, Stripe, Checkout, webhooks, Customer Portal ni `/app/settings/billing`.
+
+Fuera del primer corte:
+
+- suplantacion silenciosa de usuarios reales;
+- lectura global de documentos sensibles;
+- payroll, nominas o datos bancarios crudos;
+- borrar tenants o datos operativos reales desde Console;
+- hacer a un platform admin miembro permanente de cada organizacion.
+
+### Sesiones De Soporte Auditadas Desde Console
+
+Decision 2026-05-27: BoxOps Console puede abrir una entrada temporal y auditada a `/app` para revisar el contexto operativo de una organizacion sin suplantar usuarios ni crear memberships permanentes.
+
+Reglas aplicadas:
+
+- La accion vive en `/console/organizations/[organizationId]` como `Abrir en modo soporte`.
+- Solo `platform_owner` y `support` activos pueden crear o cerrar una sesion de soporte; la Server Action revalida sesion/rol y la RPC vuelve a revalidarlo en Postgres.
+- La organizacion objetivo debe estar en `trialing` o `active`; `suspended` e `inactive` no pueden abrir soporte hacia `/app`.
+- La entrada exige motivo breve, confirmacion explicita y caducidad acotada de 30, 60 o 120 minutos.
+- El motivo se valida con las mismas reglas prudentes de plataforma y bloquea tokens, URLs, datos bancarios, payroll, salud, documentos o adjuntos.
+- La sesion se guarda en `platform_support_sessions` con scope `app_support`, actor, organizacion, motivo, inicio, expiracion y estado.
+- La accion se audita en `platform_audit_events` como `support_started`; cerrar o expirar manualmente registra `support_ended`.
+- `/app` resuelve un acceso pseudo-membership con rol interno `platform_support` solo mientras existe cookie HttpOnly y sesion activa valida.
+- El indicador visible de modo soporte aparece antes de operar en `/app` y permite cerrar la sesion desde la propia app.
+- El modo soporte concede lectura operativa minima por RLS a organizacion, centros, memberships, equipo, tipos, horario, plantillas, asignaciones y eventos.
+- El modo soporte no concede politicas de lectura para documentos, payroll, fichaje, firmas ni datos sensibles futuros.
+- No usa `service_role`, no crea ni borra memberships, no suplantan usuarios y no convierte platform admins en miembros permanentes.
+
+Fuera de este corte:
+
+- sesion de soporte con elevacion granular por modulo sensible;
+- lectura de documentos, payroll, fichaje, firmas o RRHH sensible desde soporte;
+- soporte sobre organizaciones suspendidas/inactivas;
+- recording/replay de sesion, chat de soporte o aprobacion dual;
+- automatizar bloqueo o reactivacion por plan/billing.
+
+## Billing Y Proveedor De Pago
+
+Decision 2026-05-26: Stripe es el proveedor recomendado por defecto para suscripciones SaaS de BoxOps.
+
+Motivos:
+
+- cubre suscripciones, Checkout, Customer Portal, facturas, metodos de pago, webhooks y cambios de plan en una integracion comun;
+- permite empezar con tarjeta y SEPA Direct Debit sin guardar datos bancarios sensibles en BoxOps;
+- reduce trabajo operativo frente a una integracion directa de bancos o Redsys al inicio.
+
+GoCardless queda como alternativa futura si la mayoria de clientes exige domiciliacion SEPA y Stripe no encaja por coste, conciliacion o operativa. Redsys no es el camino inicial para BoxOps SaaS porque obligaria a construir mas piezas de suscripcion, portal y facturacion.
+
+Reglas:
+
+- BoxOps no guarda tarjetas, IBAN completos, mandates crudos ni datos bancarios sensibles.
+- BoxOps guarda referencias del proveedor, por ejemplo `stripe_customer_id`, `stripe_subscription_id`, estado, plan y limites.
+- El owner del tenant gestionara facturacion desde `/app/settings/billing` mediante Stripe Customer Portal o flujo equivalente.
+- La Console de plataforma vera estado comercial y podra crear/asignar plan inicial, pero no debe manipular metodos de pago directamente.
+- Los webhooks de Stripe deben procesarse server-side, con secreto solo en entorno, idempotencia y auditoria.
+- La suscripcion no debe activar ni desactivar modulos sensibles sin una tabla/capacidad explicita y pruebas.
+
+Campos candidatos para `organization_subscriptions`:
+
+- `organization_id`
+- `plan_code`
+- `status`
+- `trial_ends_at`
+- `current_period_ends_at`
+- `seat_limit`
+- `center_limit`
+- `billing_email`
+- `provider`
+- `provider_customer_id`
+- `provider_subscription_id`
+- `metadata`
+
+Estados candidatos:
+
+- `manual`
+- `trialing`
+- `active`
+- `past_due`
+- `paused`
+- `cancelled`
+
+## Fases SaaS Recomendadas
+
+1. Foundation manual: crear schema/RLS/helpers para `platform_admins`, `organization_subscriptions`, auditoria y resumen de organizaciones, sin UI de pago real.
+2. Console interna: listar tenants, ver detalle, crear organizacion y owner inicial, y abrir tenant en modo soporte auditado.
+3. Billing visible para owner: `/app/settings/billing` muestra plan, estado, limites y un CTA seguro.
+4. Stripe real: Checkout/Customer Portal, webhooks, sincronizacion de suscripcion y facturas, sin guardar secretos ni datos bancarios en DB.
+5. Comercializacion v1: planes, limites, upgrades/downgrades, evidencias de soporte y runbook de incidencias.
+
 ## Etapas Recomendadas
 
 ### Piloto / MVP

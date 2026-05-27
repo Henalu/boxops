@@ -193,7 +193,7 @@ B.4 no implementa onboarding, pero define el paquete minimo que un operador debe
 10. Ejecutar smoke anonimo y autenticado.
 11. Guardar evidencia de activacion.
 
-Para v1 comercial, este flujo debe convertirse en onboarding guiado o runbook repetible con importacion/carga asistida, validaciones y rollback operativo.
+Para v1 comercial, este flujo debe convertirse en onboarding guiado o runbook repetible con importacion/carga asistida, validaciones y rollback operativo. La decision 2026-05-26 situa ese flujo preferentemente en `BoxOps Console`: crear organizacion, asignar owner/admin iniciales, definir plan/limites y abrir el tenant en modo soporte auditado sin hacer al operador platform `owner` permanente de todos los tenants.
 
 ## Evidencia De Tenant Readiness
 
@@ -248,10 +248,11 @@ El tenant puede ir a beta interna cuando:
 Aunque beta interna pase, quedan para v1:
 
 - onboarding guiado o runbook repetible para nuevo box;
+- Console interna de plataforma para crear tenants, owner/admin iniciales, soporte auditado y plan/limites;
 - logo privado/controlado si se decide comercialmente;
 - colores por centro si aportan claridad;
 - permisos por centro solo si hay caso real y task propia;
-- billing/soporte/exportes comerciales;
+- billing/soporte/exportes comerciales, con Stripe como proveedor inicial y sin guardar datos bancarios sensibles en BoxOps;
 - documentacion de limites del producto;
 - hardening de produccion.
 

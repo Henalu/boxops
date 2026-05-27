@@ -263,6 +263,7 @@ function makeMembership(
   overrides: Partial<ActiveMembership> = {},
 ): ActiveMembership {
   return {
+    accessMode: "membership",
     id: `membership-${organizationId}-${role}`,
     organization_id: organizationId,
     user_id: "user-a",
