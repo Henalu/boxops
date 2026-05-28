@@ -309,8 +309,8 @@ function ConsolePageHeader({ admin }: { admin: PlatformAdminRow }) {
           BoxOps Console
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Revisa organizaciones, crea altas controladas y abre soporte
-          temporal. Los cambios se validan en servidor y quedan auditados.
+          Controla altas, estado comercial y soporte auditado de cada
+          organizacion sin mezclarlo con la app diaria del tenant.
         </p>
       </div>
 
@@ -813,8 +813,8 @@ function CreateOrganizationSection() {
             Alta de organizacion
           </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Crea una organizacion con propietario inicial, acceso confirmado y
-            suscripcion manual. Usa este flujo solo para altas controladas.
+            Crea una organizacion con propietario inicial y suscripcion manual.
+            Usa este flujo solo cuando el alta ya este revisada.
           </p>
         </div>
         <Badge variant="secondary">Solo propietario plataforma</Badge>
@@ -859,7 +859,7 @@ function CreateOrganizationSection() {
                 <div className="min-w-0">
                   <h3 className="font-semibold">Organizacion</h3>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Nombre, slug y zona horaria que vera el cliente.
+                    Nombre, slug y zona horaria que usara el tenant.
                   </p>
                 </div>
               </div>
@@ -911,7 +911,7 @@ function CreateOrganizationSection() {
                 <div className="min-w-0">
                   <h3 className="font-semibold">Propietario de la organizacion</h3>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Cuenta que administrara el primer acceso del cliente.
+                    Cuenta que administrara el primer acceso del tenant.
                   </p>
                 </div>
               </div>
@@ -1088,23 +1088,23 @@ function PlatformOperationsPlaceholders() {
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       <PlaceholderCard
-        description="Abre una revision tecnica desde cada organizacion."
+        description="Abre una sesion tecnica desde la ficha de la organizacion."
         icon={LifeBuoy}
         id="support"
         items={[
-          "Puedes entrar con una sesion temporal auditada.",
-          "La sesion caduca y muestra un indicador visible.",
+          "La sesion temporal queda auditada.",
+          "Caduca sola y muestra un indicador visible.",
           "No crea usuarios permanentes ni da acceso a documentos o nominas.",
         ]}
         title="Soporte"
       />
       <PlaceholderCard
-        description="Catalogo versionado, snapshots y cambios manuales sin cobro real."
+        description="Planes versionados, snapshots y cambios manuales sin cobro real."
         icon={CreditCard}
         id="billing"
         items={[
-          "Disponible: planes founder publicados y versiones.",
-          "Disponible: cambios manuales con snapshot por organizacion.",
+          "El catalogo vive en Planes.",
+          "Cada cambio manual aplica un snapshot por organizacion.",
           "No se guardan tarjetas ni datos bancarios.",
         ]}
         title="Facturacion"

@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Building2,
+  ChevronDown,
   CreditCard,
   LifeBuoy,
   LockKeyhole,
@@ -23,7 +24,7 @@ import {
 import { assignConsoleOrganizationBillingPlanAction } from "@/lib/billing-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import {
   Card,
@@ -42,6 +43,7 @@ import {
   getOrganizationBillingOverview,
   listBillingActiveCenters,
   listPublishedBillingPlans,
+  sortBillingPlansByPrice,
   type BillingCenterOption,
   type BillingErrorCode,
   type BillingPlanVersion,
@@ -54,6 +56,7 @@ import {
   type PlatformOrganizationSummary,
   type PlatformRole,
 } from "@/lib/platform-console";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -98,14 +101,16 @@ const billingErrorCopy: Partial<Record<BillingErrorCode, string>> = {
   "authentication-required": "Inicia sesion para abrir Console.",
   "billing-catalog-load-failed":
     "No se pudo cargar el catalogo comercial.",
-  "billing-change-forbidden": "Tu rol no permite cambiar el plan.",
+  "billing-change-forbidden":
+    "Tu rol puede revisar la facturacion, pero no cambiar planes.",
   "billing-plan-not-found": "Ese plan ya no esta publicado.",
-  "billing-save-failed": "No se pudo guardar el cambio de plan.",
+  "billing-save-failed":
+    "No se pudo guardar el cambio de plan. Revisa la seleccion e intentalo otra vez.",
   "downgrade-selection-invalid":
     "La seleccion de centros no pertenece a esta organizacion.",
   "downgrade-selection-required":
-    "El nuevo plan permite menos centros. Elige cuales quedan activos.",
-  "invalid-input": "La solicitud no tiene datos validos.",
+    "El nuevo plan permite menos centros. Elige cuales siguen activos.",
+  "invalid-input": "Revisa la seleccion enviada.",
   "invalid-plan-code": "El codigo de plan no es valido.",
 };
 
@@ -162,28 +167,6 @@ function isBillingErrorCode(
   value: string | undefined,
 ): value is BillingErrorCode {
   return Boolean(value && value in billingErrorCopy);
-}
-
-function sortPlans(plans: BillingPlanVersion[]) {
-  const order = [
-    "starter",
-    "box",
-    "growth",
-    "scale",
-    "network",
-    "franchise",
-    "enterprise",
-  ];
-
-  return [...plans].sort((left, right) => {
-    const leftIndex = order.indexOf(left.plan_code);
-    const rightIndex = order.indexOf(right.plan_code);
-
-    return (
-      (leftIndex === -1 ? 999 : leftIndex) -
-      (rightIndex === -1 ? 999 : rightIndex)
-    );
-  });
 }
 
 function formatDateTime(value: string | null) {
@@ -341,8 +324,8 @@ function OrganizationReviewHeader({
           {summary.organization_name}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Revisa estado, limites y soporte sin entrar como usuario del cliente
-          ni tocar su equipo.
+          Revisa estado, uso, plan y soporte sin convertirte en miembro del
+          tenant.
         </p>
       </div>
 
@@ -557,12 +540,12 @@ function ConsoleDowngradeSelector({
   return (
     <div className="grid gap-2 rounded-lg border border-orange-300/60 bg-orange-50 p-3 text-orange-950">
       <p className="text-sm font-medium">
-        Downgrade: elige hasta {formatPlanLimit(limit)} centros activos
+        Elige los centros que siguen activos
       </p>
       <p className="text-xs leading-5 text-orange-900/85">
-        Los centros no seleccionados pasaran a inactivos. No se borran:
-        conservan historico, horarios, asignaciones y documentos vinculados.
-        Al quedar inactivos no admiten nueva operativa ni reservas futuras.
+        Este plan permite {formatPlanLimit(limit)}. Los centros no
+        seleccionados pasan a inactivos: conservan historico, horarios,
+        asignaciones y documentos vinculados.
       </p>
       <div className="grid gap-2">
         {activeCenters.map((center) => (
@@ -646,7 +629,7 @@ function ConsolePlanAssignmentRow({
           {isCurrentPlan ? "Asignado" : "Asignar manualmente"}
         </Button>
         <span className="text-xs text-muted-foreground">
-          Sin cobro real. Aplica snapshot de precio y limites.
+          Aplica snapshot comercial; no cobra ni abre portal de pago.
         </span>
       </div>
     </form>
@@ -721,11 +704,11 @@ function OrganizationCommercialCard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard aria-hidden="true" className="size-4" />
-            Suscripcion y plan
+            Plan y suscripcion
           </CardTitle>
           <CardDescription>
-            Snapshot efectivo para esta organizacion. Versionar el catalogo no
-            cambia estos valores hasta asignar otro plan.
+            Snapshot comercial aplicado a esta organizacion. Cambiar el
+            catalogo no altera este contrato hasta asignar otro plan.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -778,7 +761,7 @@ function OrganizationCommercialCard({
               used={billingOverview.active_centers_count}
             />
             <CommercialUsageItem
-              label="Staff activo"
+              label="Personas activas"
               limit={billingOverview.effective_staff_seat_limit}
               used={billingOverview.active_staff_count}
             />
@@ -796,25 +779,43 @@ function OrganizationCommercialCard({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cambiar plan manualmente</CardTitle>
-          <CardDescription>
-            Sin Stripe ni cobro real. Si bajas a un plan con menos centros,
-            elige cuales quedan activos antes de aplicar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
+      <details
+        className="group rounded-lg border border-border bg-card text-card-foreground shadow-xs"
+        open={canManageBilling}
+      >
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <h3 className="font-semibold tracking-tight">
+              Cambiar plan manual
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Si el nuevo limite de centros es menor, primero eliges cuales
+              siguen activos.
+            </p>
+          </div>
+          <span
+            aria-hidden="true"
+            className={cn(
+              buttonVariants({ size: "sm", variant: "outline" }),
+              "shrink-0 px-2.5",
+            )}
+          >
+            <span className="group-open:hidden">Abrir</span>
+            <span className="hidden group-open:inline">Cerrar</span>
+            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+          </span>
+        </summary>
+        <div className="grid gap-3 border-t border-border p-4">
           {!canManageBilling ? (
             <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
-              Tu rol puede leer planes y suscripciones, pero solo
-              platform_owner puede asignar planes desde Console.
+              Solo platform_owner puede asignar planes; tu rol queda en
+              lectura.
             </p>
           ) : null}
 
           {billingPlans.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay planes publicados disponibles.
+              No hay planes publicados para asignar.
             </p>
           ) : (
             billingPlans.map((plan) =>
@@ -836,7 +837,7 @@ function OrganizationCommercialCard({
                       <p className="font-medium">{plan.display_name}</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {formatPlanLimit(plan.center_limit)} centros /{" "}
-                        {formatPlanLimit(plan.staff_seat_limit)} staff
+                        {formatPlanLimit(plan.staff_seat_limit)} personas
                       </p>
                     </div>
                     <p className="text-sm font-medium">
@@ -847,8 +848,8 @@ function OrganizationCommercialCard({
               ),
             )
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </details>
     </section>
   );
 }
@@ -1062,7 +1063,7 @@ export default async function OrganizationReviewPage({
       ? billingOverviewResult.data
       : null;
     billingPlans = billingPlansResult.ok
-      ? sortPlans(billingPlansResult.data)
+      ? sortBillingPlansByPrice(billingPlansResult.data)
       : [];
     activeBillingCenters = billingCentersResult.ok
       ? billingCentersResult.data

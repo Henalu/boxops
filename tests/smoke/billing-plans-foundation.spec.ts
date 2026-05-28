@@ -251,6 +251,9 @@ test.describe("billing plans foundation guardrails", () => {
     expect(consolePlansPage).toContain("createBillingPlanDraftAction");
     expect(consolePlansPage).toContain("publishBillingPlanVersionAction");
     expect(consolePlansPage).toContain("archiveBillingPlanAction");
+    expect(consolePlansPage).toContain("groupByPlanCode");
+    expect(consolePlansPage).toContain("getBillingPlanMonthlySortValue");
+    expect(consolePlansPage).toContain("<details");
     expect(consolePlansPage).toContain(
       'adminResult.data.role === "platform_owner"',
     );
@@ -283,8 +286,10 @@ test.describe("billing plans visual smoke", () => {
     await page.goto("/console/plans", { waitUntil: "domcontentloaded" });
     await expectNoFrameworkError(page);
 
-    await expect(page.getByRole("heading", { name: /^Planes$/i })).toBeVisible();
-    await expect(page.getByText(/Catalogo comercial/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /^Planes comerciales$/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/Catalogo de planes/i).first()).toBeVisible();
     await expect(page.getByText(/Checkout|Customer Portal|IBAN|tarjeta/i)).toHaveCount(
       0,
     );

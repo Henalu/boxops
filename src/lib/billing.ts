@@ -392,7 +392,7 @@ export async function listPublishedBillingPlans(): Promise<
     );
   }
 
-  return success((data ?? []).map(normalizePlanVersion));
+  return success(sortBillingPlansByPrice((data ?? []).map(normalizePlanVersion)));
 }
 
 export async function listConsoleBillingPlanVersions(): Promise<
@@ -627,7 +627,7 @@ export function formatPlanPrice(plan: {
   monthly_price_cents?: number | null;
 }) {
   if (plan.monthly_price_cents === null || plan.monthly_price_cents === undefined) {
-    return "Hablemos";
+    return "A medida";
   }
 
   const monthly = new Intl.NumberFormat("es-ES", {
@@ -646,6 +646,50 @@ export function formatPlanPrice(plan: {
         }).format(plan.annual_price_cents / 100);
 
   return annual ? `${monthly}/mes o ${annual}/ano` : `${monthly}/mes`;
+}
+
+export function getBillingPlanMonthlySortValue(plan: {
+  annual_price_cents?: number | null;
+  monthly_price_cents?: number | null;
+}) {
+  if (typeof plan.monthly_price_cents === "number") {
+    return plan.monthly_price_cents;
+  }
+
+  if (typeof plan.annual_price_cents === "number") {
+    return Math.round(plan.annual_price_cents / 10);
+  }
+
+  return Number.POSITIVE_INFINITY;
+}
+
+export function sortBillingPlansByPrice<
+  T extends {
+    annual_price_cents?: number | null;
+    display_name?: string;
+    monthly_price_cents?: number | null;
+    plan_code?: string;
+    version?: number;
+  },
+>(plans: T[]) {
+  return [...plans].sort((left, right) => {
+    const priceDifference =
+      getBillingPlanMonthlySortValue(left) -
+      getBillingPlanMonthlySortValue(right);
+
+    if (priceDifference !== 0) {
+      return priceDifference;
+    }
+
+    const labelDifference = (left.display_name ?? left.plan_code ?? "")
+      .localeCompare(right.display_name ?? right.plan_code ?? "", "es");
+
+    if (labelDifference !== 0) {
+      return labelDifference;
+    }
+
+    return (right.version ?? 0) - (left.version ?? 0);
+  });
 }
 
 export function formatPlanLimit(value: number | null, customLabel = "A medida") {

@@ -23,6 +23,7 @@ import {
 import {
   formatPlanLimit,
   formatPlanPrice,
+  getBillingPlanMonthlySortValue,
   listConsoleBillingPlanVersions,
   type BillingErrorCode,
   type BillingPlanVersion,
@@ -53,7 +54,7 @@ import { cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Planes - BoxOps Console",
+  title: "Planes comerciales - BoxOps Console",
 };
 
 type ConsolePlansPageProps = {
@@ -78,20 +79,23 @@ const planStatusLabels: Record<BillingPlanStatus, string> = {
 
 const billingErrorCopy: Partial<Record<BillingErrorCode, string>> = {
   "authentication-required": "Inicia sesion para abrir Console.",
-  "billing-catalog-load-failed":
-    "No se pudo cargar el catalogo de planes.",
-  "billing-change-forbidden": "Tu rol de Console no permite esta accion.",
-  "billing-plan-not-found": "No encontramos esa version de plan.",
-  "billing-save-failed": "No se pudo guardar el cambio de plan.",
+  "billing-catalog-load-failed": "No se pudo cargar el catalogo de planes.",
+  "billing-change-forbidden":
+    "Tu rol de Console puede consultar planes, pero no modificarlos.",
+  "billing-plan-not-found": "Esa version ya no esta disponible.",
+  "billing-save-failed":
+    "No se pudo guardar el plan. Revisa los datos e intentalo otra vez.",
   forbidden: "Tu cuenta no tiene acceso activo a Console.",
-  "invalid-features": "Las prestaciones deben ser lineas breves y seguras.",
-  "invalid-input": "Revisa los datos enviados.",
+  "invalid-features":
+    "Escribe una prestacion por linea. Evita enlaces o datos sensibles.",
+  "invalid-input": "Revisa los campos del formulario.",
   "invalid-limit": "Los limites deben ser numeros enteros positivos.",
-  "invalid-plan-code": "El codigo solo puede usar minusculas, numeros y guiones.",
+  "invalid-plan-code":
+    "El codigo solo puede usar minusculas, numeros y guiones.",
   "invalid-price": "Los precios deben ser importes validos en euros.",
   "invalid-stripe-reference":
-    "Las referencias futuras de Stripe deben empezar por prod_ o price_.",
-  "invalid-text": "Revisa textos: evita datos sensibles, enlaces o tokens.",
+    "Las referencias futuras deben tener formato prod_ o price_.",
+  "invalid-text": "Usa textos breves y evita datos sensibles, enlaces o tokens.",
 };
 
 const consoleErrorCopy: Partial<Record<PlatformConsoleErrorCode, string>> = {
@@ -101,9 +105,11 @@ const consoleErrorCopy: Partial<Record<PlatformConsoleErrorCode, string>> = {
 };
 
 const successMessages: Record<string, string> = {
-  "draft-created": "Borrador de version creado.",
-  "plan-archived": "Plan archivado.",
-  "plan-published": "Version publicada.",
+  "draft-created": "Borrador creado. Aun no afecta a ninguna organizacion.",
+  "plan-archived":
+    "Plan archivado. Las suscripciones existentes conservan su snapshot.",
+  "plan-published":
+    "Version publicada. Las organizaciones no cambian hasta asignarles el plan.",
 };
 
 function getParam(value: string | string[] | undefined) {
@@ -162,6 +168,49 @@ function getStatusVariant(status: string | undefined) {
   return "default" as const;
 }
 
+function getPlanLifecycleStatus(plan: BillingPlanVersion) {
+  return plan.status ?? plan.billing_plan_status;
+}
+
+function getPlanStatusWeight(plan: BillingPlanVersion) {
+  const status = getPlanLifecycleStatus(plan);
+
+  if (status === "published") {
+    return 0;
+  }
+
+  if (status === "draft") {
+    return 1;
+  }
+
+  if (status === "archived") {
+    return 2;
+  }
+
+  return 3;
+}
+
+function sortPlanVersions(versions: BillingPlanVersion[]) {
+  return [...versions].sort((left, right) => {
+    const statusDifference =
+      getPlanStatusWeight(left) - getPlanStatusWeight(right);
+
+    if (statusDifference !== 0) {
+      return statusDifference;
+    }
+
+    return right.version - left.version;
+  });
+}
+
+function getGroupSortPrice(versions: BillingPlanVersion[]) {
+  const [representative] = versions;
+
+  return representative
+    ? getBillingPlanMonthlySortValue(representative)
+    : Number.POSITIVE_INFINITY;
+}
+
 function groupByPlanCode(plans: BillingPlanVersion[]) {
   const groups = new Map<string, BillingPlanVersion[]>();
 
@@ -170,10 +219,24 @@ function groupByPlanCode(plans: BillingPlanVersion[]) {
     groups.set(plan.plan_code, [...existing, plan]);
   }
 
-  return [...groups.entries()].map(([planCode, versions]) => ({
-    planCode,
-    versions,
-  }));
+  return [...groups.entries()]
+    .map(([planCode, versions]) => ({
+      planCode,
+      versions: sortPlanVersions(versions),
+    }))
+    .sort((left, right) => {
+      const priceDifference =
+        getGroupSortPrice(left.versions) - getGroupSortPrice(right.versions);
+
+      if (priceDifference !== 0) {
+        return priceDifference;
+      }
+
+      const leftName = left.versions[0]?.display_name ?? left.planCode;
+      const rightName = right.versions[0]?.display_name ?? right.planCode;
+
+      return leftName.localeCompare(rightName, "es");
+    });
 }
 
 function FeedbackState({
@@ -329,14 +392,14 @@ function ConsolePlansHeader({
           </Link>
         </Button>
         <Badge className="mb-3" variant="secondary">
-          Catalogo comercial
+          Catalogo de planes
         </Badge>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Planes
+          Planes comerciales
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Versiona founder pricing, publica planes y conserva snapshots por
-          organizacion. No hay cobros reales en este corte.
+          Gestiona precios, limites y versiones para aplicar snapshots por
+          organizacion. Esta superficie no cobra ni abre portales de pago.
         </p>
       </div>
 
@@ -347,13 +410,15 @@ function ConsolePlansHeader({
               <ShieldCheck aria-hidden="true" className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium">Rol Console</p>
+              <p className="text-sm font-medium">Rol en Console</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {consoleRoleLabels[role]}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge>{role === "platform_owner" ? "Gestion" : "Lectura"}</Badge>
-                <Badge variant="outline">Sin cobro real</Badge>
+                <Badge>
+                  {role === "platform_owner" ? "Puede gestionar" : "Solo lectura"}
+                </Badge>
+                <Badge variant="outline">Sin pagos</Badge>
               </div>
             </div>
           </div>
@@ -373,11 +438,11 @@ function PlanDraftForm() {
           </span>
           <div className="min-w-0">
             <p className="font-semibold tracking-tight">
-              Crear borrador de version
+              Nuevo borrador de plan
             </p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Los campos con * son obligatorios. Los precios se guardan en
-              centimos EUR al enviar.
+              Crea una version para revisar antes de publicarla. Los campos con
+              * son obligatorios.
             </p>
           </div>
         </div>
@@ -408,7 +473,7 @@ function PlanDraftForm() {
               required
             />
             <TextInputField
-              hint="Nombre visible para Console y owner billing."
+              hint="Nombre visible para Console y para el propietario del tenant."
               label="Nombre visible"
               maxLength={80}
               name="displayName"
@@ -416,7 +481,7 @@ function PlanDraftForm() {
             />
             <TextAreaField
               className="min-h-24 md:col-span-2"
-              hint="Copy comercial breve. No incluyas datos sensibles ni promesas de SLA."
+              hint="Texto comercial breve. No incluyas datos sensibles ni promesas de SLA."
               label="Descripcion"
               maxLength={260}
               minLength={8}
@@ -427,7 +492,7 @@ function PlanDraftForm() {
 
           <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
             <TextInputField
-              hint="Ej. 69 para 69 EUR/mes. Vacio para custom."
+              hint="Ej. 69 para 69 EUR/mes. Vacio para plan a medida."
               label="Precio mensual"
               name="monthlyPrice"
               placeholder="69"
@@ -439,14 +504,14 @@ function PlanDraftForm() {
               placeholder="690"
             />
             <TextInputField
-              hint="Setup opcional. Vacio si es custom."
+              hint="Setup opcional. Vacio si es a medida."
               label="Setup"
               name="setupPrice"
               placeholder="199"
             />
             <TextInputField
               className="md:col-span-3"
-              hint="Texto visible sobre setup. Evita compromisos no acordados."
+              hint="Texto visible sobre el setup. Evita compromisos no acordados."
               label="Descripcion setup"
               maxLength={160}
               name="setupDescription"
@@ -463,7 +528,7 @@ function PlanDraftForm() {
               type="number"
             />
             <TextInputField
-              label="Personas equipo"
+              label="Personas del equipo"
               min={1}
               name="staffSeatLimit"
               placeholder="30"
@@ -499,25 +564,27 @@ function PlanDraftForm() {
             hint="Una prestacion por linea, maximo 24."
             label="Prestaciones"
             name="features"
-            placeholder={"2 centros incluidos\n30 personas del equipo\n10 GB de almacenamiento"}
+            placeholder={
+              "2 centros incluidos\n30 personas del equipo\n10 GB de almacenamiento"
+            }
           />
 
           <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
             <TextInputField
-              hint="Opcional, preparado para el futuro."
-              label="Stripe product ref"
+              hint="Opcional. Formato prod_; no inicia cobros."
+              label="Referencia de producto futura"
               name="stripeProductId"
               placeholder="prod_..."
             />
             <TextInputField
-              hint="Opcional, no se usa para cobrar todavia."
-              label="Stripe monthly price ref"
+              hint="Opcional. Formato price_; no inicia cobros."
+              label="Referencia mensual futura"
               name="stripeMonthlyPriceId"
               placeholder="price_..."
             />
             <TextInputField
-              hint="Opcional, no se usa para cobrar todavia."
-              label="Stripe annual price ref"
+              hint="Opcional. Formato price_; no inicia cobros."
+              label="Referencia anual futura"
               name="stripeAnnualPriceId"
               placeholder="price_..."
             />
@@ -526,8 +593,8 @@ function PlanDraftForm() {
 
         <div className="flex flex-col items-stretch gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Crear borrador no cambia organizaciones. Publicar una version nueva
-            archivara la publicada anterior del mismo plan.
+            Crear un borrador no cambia organizaciones. Al publicar, la version
+            publicada anterior del mismo plan queda archivada.
           </p>
           <Button className="sm:ml-auto" type="submit">
             <Plus aria-hidden="true" />
@@ -562,130 +629,133 @@ function PlanVersionCard({
   plan: BillingPlanVersion;
 }) {
   const storageLabel =
-    plan.storage_gb === null ? "A medida" : `${formatPlanLimit(plan.storage_gb)} GB`;
+    plan.storage_gb === null
+      ? "A medida"
+      : `${formatPlanLimit(plan.storage_gb)} GB`;
 
   return (
-    <Card size="sm">
-      <CardContent className="grid gap-4">
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold tracking-tight">
-                {plan.display_name}
-              </h3>
-              <Badge variant={getStatusVariant(plan.status)}>
-                {plan.status ? planStatusLabels[plan.status] : "Version"}
-              </Badge>
-              <Badge variant="outline">v{plan.version}</Badge>
-            </div>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-              {plan.description}
-            </p>
+    <article className="grid gap-4 rounded-lg border border-border bg-background p-4">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold tracking-tight">
+              {plan.display_name}
+            </h3>
+            <Badge variant={getStatusVariant(plan.status)}>
+              {plan.status ? planStatusLabels[plan.status] : "Version"}
+            </Badge>
+            <Badge variant="outline">v{plan.version}</Badge>
           </div>
-          <div className="text-right">
-            <p className="font-semibold">{formatPlanPrice(plan)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Setup {formatCents(plan.setup_price_cents, "custom")}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <PlanMetric label="Centros" value={formatPlanLimit(plan.center_limit)} />
-          <PlanMetric
-            label="Equipo"
-            value={formatPlanLimit(plan.staff_seat_limit)}
-          />
-          <PlanMetric
-            label="Clientes futuros"
-            value={formatPlanLimit(plan.future_client_limit)}
-          />
-          <PlanMetric label="Storage" value={storageLabel} />
-        </div>
-
-        <div className="grid gap-3 text-sm text-muted-foreground lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
-          <div>
-            <p className="font-medium text-foreground">Prestaciones</p>
-            <ul className="mt-2 grid gap-1.5">
-              {plan.features.length > 0 ? (
-                plan.features.map((feature) => (
-                  <li className="flex min-w-0 items-start gap-2" key={feature}>
-                    <CheckCircle2
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-primary"
-                    />
-                    <span>{feature}</span>
-                  </li>
-                ))
-              ) : (
-                <li>Sin prestaciones detalladas.</li>
-              )}
-            </ul>
-          </div>
-          <dl className="grid gap-2">
-            <div>
-              <dt className="text-xs text-muted-foreground">Soporte</dt>
-              <dd className="mt-1 font-medium text-foreground">
-                {plan.support_level}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Publicado</dt>
-              <dd className="mt-1">{formatDateTime(plan.published_at)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Stripe refs</dt>
-              <dd className="mt-1 font-mono text-xs">
-                {plan.stripe_product_id ||
-                plan.stripe_monthly_price_id ||
-                plan.stripe_annual_price_id
-                  ? "refs guardadas"
-                  : "sin refs"}
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        {isPlatformOwner ? (
-          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-            {plan.status === "draft" ? (
-              <form action={publishBillingPlanVersionAction}>
-                <input
-                  name="billingPlanVersionId"
-                  type="hidden"
-                  value={plan.billing_plan_version_id}
-                />
-                <Button type="submit">
-                  <Rocket aria-hidden="true" />
-                  Publicar version
-                </Button>
-              </form>
-            ) : null}
-            {plan.billing_plan_status !== "archived" ? (
-              <form action={archiveBillingPlanAction}>
-                <input name="planCode" type="hidden" value={plan.plan_code} />
-                <Button type="submit" variant="outline">
-                  <Archive aria-hidden="true" />
-                  Archivar plan
-                </Button>
-              </form>
-            ) : null}
-          </div>
-        ) : (
-          <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
-            Tu rol puede leer planes y suscripciones, pero no publicar ni
-            archivar versiones.
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+            {plan.description}
           </p>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="font-semibold">{formatPlanPrice(plan)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Setup {formatCents(plan.setup_price_cents)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <PlanMetric label="Centros" value={formatPlanLimit(plan.center_limit)} />
+        <PlanMetric
+          label="Personas"
+          value={formatPlanLimit(plan.staff_seat_limit)}
+        />
+        <PlanMetric
+          label="Clientes futuros"
+          value={formatPlanLimit(plan.future_client_limit)}
+        />
+        <PlanMetric label="Almacenamiento" value={storageLabel} />
+      </div>
+
+      <div className="grid gap-3 text-sm text-muted-foreground lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
+        <div>
+          <p className="font-medium text-foreground">Incluye</p>
+          <ul className="mt-2 grid gap-1.5">
+            {plan.features.length > 0 ? (
+              plan.features.map((feature) => (
+                <li className="flex min-w-0 items-start gap-2" key={feature}>
+                  <CheckCircle2
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-primary"
+                  />
+                  <span>{feature}</span>
+                </li>
+              ))
+            ) : (
+              <li>Sin prestaciones detalladas.</li>
+            )}
+          </ul>
+        </div>
+        <dl className="grid gap-2">
+          <div>
+            <dt className="text-xs text-muted-foreground">Soporte</dt>
+            <dd className="mt-1 font-medium text-foreground">
+              {plan.support_level}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Publicado</dt>
+            <dd className="mt-1">{formatDateTime(plan.published_at)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">
+              Referencias futuras
+            </dt>
+            <dd className="mt-1 font-medium text-foreground">
+              {plan.stripe_product_id ||
+              plan.stripe_monthly_price_id ||
+              plan.stripe_annual_price_id
+                ? "Preparadas"
+                : "Sin referencias"}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      {isPlatformOwner ? (
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          {plan.status === "draft" ? (
+            <form action={publishBillingPlanVersionAction}>
+              <input
+                name="billingPlanVersionId"
+                type="hidden"
+                value={plan.billing_plan_version_id}
+              />
+              <Button type="submit">
+                <Rocket aria-hidden="true" />
+                Publicar esta version
+              </Button>
+            </form>
+          ) : null}
+          {plan.billing_plan_status !== "archived" ? (
+            <form action={archiveBillingPlanAction}>
+              <input name="planCode" type="hidden" value={plan.plan_code} />
+              <Button type="submit" variant="outline">
+                <Archive aria-hidden="true" />
+                Archivar plan
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
+          Solo lectura: tu rol permite revisar, no publicar ni archivar planes.
+        </p>
+      )}
+    </article>
   );
 }
 
 function PlanGroup({
+  defaultOpen = false,
   group,
   isPlatformOwner,
 }: {
+  defaultOpen?: boolean;
   group: {
     planCode: string;
     versions: BillingPlanVersion[];
@@ -693,24 +763,52 @@ function PlanGroup({
   isPlatformOwner: boolean;
 }) {
   const latest = group.versions[0];
+  const versionLabel =
+    group.versions.length === 1
+      ? "1 version"
+      : `${group.versions.length} versiones`;
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">
-            {latest?.display_name ?? group.planCode}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {group.versions.length} versiones en catalogo. Codigo{" "}
-            <span className="font-mono">{group.planCode}</span>.
-          </p>
+    <details
+      className="group rounded-lg border border-border bg-card text-card-foreground shadow-xs"
+      open={defaultOpen}
+    >
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <ReceiptText aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold tracking-tight">
+              {latest?.display_name ?? group.planCode}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {latest ? formatPlanPrice(latest) : "Precio no disponible"} -{" "}
+              {versionLabel} - Codigo{" "}
+              <span className="font-mono">{group.planCode}</span>
+            </p>
+          </div>
         </div>
-        <Badge variant={getStatusVariant(latest?.billing_plan_status)}>
-          {latest?.billing_plan_status ?? "plan"}
-        </Badge>
-      </div>
-      <div className="grid gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant={getStatusVariant(latest?.billing_plan_status)}>
+            {latest?.billing_plan_status
+              ? planStatusLabels[latest.billing_plan_status]
+              : "Plan"}
+          </Badge>
+          <span
+            aria-hidden="true"
+            className={cn(
+              buttonVariants({ size: "sm", variant: "outline" }),
+              "min-h-11 px-3 md:min-h-0 md:px-2.5",
+            )}
+          >
+            <span className="group-open:hidden">Ver</span>
+            <span className="hidden group-open:inline">Ocultar</span>
+            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+          </span>
+        </div>
+      </summary>
+      <div className="grid gap-3 border-t border-border p-4">
         {group.versions.map((plan) => (
           <PlanVersionCard
             isPlatformOwner={isPlatformOwner}
@@ -719,7 +817,7 @@ function PlanGroup({
           />
         ))}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -729,8 +827,8 @@ function LoadErrorState() {
       <AlertCircle aria-hidden="true" />
       <AlertTitle>No se pudo cargar el catalogo</AlertTitle>
       <AlertDescription>
-        Solo platform_owner y billing pueden leer esta superficie. Revisa RLS y
-        el rol activo.
+        Tu rol de Console no puede leer el catalogo o la base no devolvio los
+        datos esperados.
       </AlertDescription>
     </Alert>
   );
@@ -775,11 +873,10 @@ export default async function ConsolePlansPage({
 
       <Alert>
         <Database aria-hidden="true" />
-        <AlertTitle>Founder pricing versionable</AlertTitle>
+        <AlertTitle>Catalogo sin cobro real</AlertTitle>
         <AlertDescription>
-          Las organizaciones guardan precio, limites y prestaciones como
-          snapshot al contratar o cambiar plan. Los IDs futuros de Stripe son
-          referencias nullable y no disparan pagos.
+          Publicar actualiza las opciones disponibles. Cada organizacion
+          mantiene su snapshot hasta que se le asigna otro plan.
         </AlertDescription>
       </Alert>
 
@@ -788,10 +885,11 @@ export default async function ConsolePlansPage({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">
-                Gestion de catalogo
+                Crear version
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Crear un borrador no afecta a clientes hasta publicarlo.
+                Prepara un borrador y publicalo cuando el precio y los limites
+                esten revisados.
               </p>
             </div>
             <Badge variant="secondary">platform_owner</Badge>
@@ -805,10 +903,11 @@ export default async function ConsolePlansPage({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">
-                Versiones
+                Planes disponibles
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Precios en EUR sin IVA. El anual equivale a 10 meses pagados.
+                Ordenados por precio mensual ascendente. Los planes a medida
+                quedan al final.
               </p>
             </div>
             <Badge variant="outline">
@@ -817,8 +916,9 @@ export default async function ConsolePlansPage({
             </Badge>
           </div>
 
-          {groups.map((group) => (
+          {groups.map((group, index) => (
             <PlanGroup
+              defaultOpen={index < 3}
               group={group}
               isPlatformOwner={isPlatformOwner}
               key={group.planCode}
