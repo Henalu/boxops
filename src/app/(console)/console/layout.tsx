@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Boxes, LogOut } from "lucide-react";
+import { Boxes, LogOut, ReceiptText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -35,12 +35,18 @@ export default function ConsoleLayout({
               className="hidden min-w-0 items-center gap-1 sm:flex"
             >
               <Link
-                aria-current="page"
-                className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                 href="/console"
               >
                 <Boxes aria-hidden="true" className="size-4 shrink-0" />
                 <span className="truncate">Organizaciones</span>
+              </Link>
+              <Link
+                className="inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                href="/console/plans"
+              >
+                <ReceiptText aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">Planes</span>
               </Link>
             </nav>
 

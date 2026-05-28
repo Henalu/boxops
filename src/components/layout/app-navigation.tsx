@@ -15,6 +15,7 @@ import {
   Inbox,
   LayoutGrid,
   MapPin,
+  ReceiptText,
   Search,
   Settings,
   ShieldAlert,
@@ -27,6 +28,7 @@ import {
 import {
   canManageOperationalData,
   canManageStaffWorkWindows,
+  canReadTenantBilling,
 } from "@/lib/auth/permissions";
 import { PLATFORM_SUPPORT_ACCESS_ROLE } from "@/lib/platform-support-session-cookie";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ import {
   getSchedulePath,
   getScheduleTemplatesPath,
   getSettingsPath,
+  getSettingsBillingPath,
   getTimePath,
   getWorkWindowsPath,
 } from "@/lib/navigation/app-paths";
@@ -125,6 +128,12 @@ const managementItems = [
     label: "Configuración",
     keywords: ["configuracion", "ajustes"],
   },
+  {
+    href: "/app/settings/billing",
+    icon: ReceiptText,
+    label: "Plan y facturacion",
+    keywords: ["billing", "facturacion", "plan", "limites"],
+  },
 ] as const satisfies readonly NavigationItem[];
 
 const personalItems = [
@@ -168,6 +177,7 @@ const mobileMorePaths = [
   "/app/work-windows",
   "/app/stats",
   "/app/settings",
+  "/app/settings/billing",
 ];
 
 const secondaryMorePaths = ["/app/stats"];
@@ -192,6 +202,10 @@ function isActivePath(pathname: string, href: string) {
       pathname === href ||
       secondaryMorePaths.some((path) => pathname.startsWith(path))
     );
+  }
+
+  if (href === "/app/settings") {
+    return pathname === href;
   }
 
   return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
@@ -262,6 +276,10 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
 
     if (item.href === "/app/templates" || item.href === "/app/settings") {
       return canManageOperational;
+    }
+
+    if (item.href === "/app/settings/billing") {
+      return currentRole ? canReadTenantBilling(currentRole) : false;
     }
 
     return true;
@@ -371,6 +389,10 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
 
     if (href === "/app/settings") {
       return getSettingsPath({ organizationId });
+    }
+
+    if (href === "/app/settings/billing") {
+      return getSettingsBillingPath({ organizationId });
     }
 
     return getScheduleTemplatesPath({ organizationId, week });

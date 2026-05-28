@@ -51,6 +51,23 @@ function findMigrationWith(needle: string) {
   return `supabase/migrations/${matches[0]}`;
 }
 
+function expectPolicyDropBeforeCreate(
+  source: string,
+  policyName: string,
+  tableName: string,
+  usingExpression: string,
+) {
+  const normalizedSource = source.replace(/\r\n/g, "\n");
+  const dropStatement = `DROP POLICY IF EXISTS "${policyName}"\n  ON public.${tableName};`;
+  const createStatement = `CREATE POLICY "${policyName}"\n  ON public.${tableName} FOR SELECT TO authenticated\n  USING (${usingExpression});`;
+  const dropIndex = normalizedSource.indexOf(dropStatement);
+  const createIndex = normalizedSource.indexOf(createStatement);
+
+  expect(dropIndex, `${policyName} drop statement`).toBeGreaterThanOrEqual(0);
+  expect(createIndex, `${policyName} create statement`).toBeGreaterThanOrEqual(0);
+  expect(createIndex, `${policyName} create after drop`).toBeGreaterThan(dropIndex);
+}
+
 test.describe("BoxOps Console visible surface guardrails", () => {
   test("anonymous users are redirected from /console to login", async ({
     baseURL,
@@ -179,7 +196,7 @@ test.describe("BoxOps Console visible surface guardrails", () => {
       /createAdminClient|auth\.admin|SUPABASE_SERVICE_ROLE|service_role/i,
     );
     expect(consoleSource).not.toMatch(
-      /stripe|STRIPE_|checkout|webhook|customer\s*portal|portal/i,
+      /from\s+["']stripe["']|require\(["']stripe["']\)|process\.env\.STRIPE|checkout|webhook|customer\s*portal/i,
     );
     expect(consoleSource).not.toMatch(
       /\b(?:iban|bank_account|account_number|routing|swift|bic|cvv|mandate|payment_method|card_number)\b/i,
@@ -189,7 +206,7 @@ test.describe("BoxOps Console visible surface guardrails", () => {
       /\bservice_role\b|SUPABASE_SERVICE_ROLE/,
     );
     expect(sourceWithoutAllowedAdminHelper).not.toMatch(
-      /from\s+["']stripe["']|require\(["']stripe["']\)|STRIPE_|stripe\.webhooks|checkout\.sessions|customerPortal/i,
+      /from\s+["']stripe["']|require\(["']stripe["']\)|process\.env\.STRIPE|stripe\.webhooks|checkout\.sessions|customerPortal|customer\s*portal/i,
     );
     expect(packageManifest).not.toMatch(/"stripe"\s*:/i);
 
@@ -203,9 +220,9 @@ test.describe("BoxOps Console visible surface guardrails", () => {
       existsSync(
         path.join(process.cwd(), "src/app/(app)/app/settings/billing"),
       ),
-    ).toBe(false);
-    expect(readSourceTree("src/app/(app)/app/settings")).not.toMatch(
-      /\/app\/settings\/billing|settings\/billing/i,
+    ).toBe(true);
+    expect(readSourceTree("src/app/(app)/app/settings")).toContain(
+      "changeTenantBillingPlanAction",
     );
   });
 
@@ -401,6 +418,56 @@ test.describe("BoxOps Console visible surface guardrails", () => {
     );
     expect(migration).not.toContain(
       "Platform support sessions can read time records",
+    );
+  });
+
+  test("keeps support-session RLS policies idempotent without widening access", () => {
+    const migration = readProjectFile(
+      findMigrationWith("has_active_platform_support_session"),
+    );
+
+    expectPolicyDropBeforeCreate(
+      migration,
+      "Platform support sessions can read organizations",
+      "organizations",
+      "public.has_active_platform_support_session(id)",
+    );
+
+    for (const [policyName, tableName] of [
+      ["Platform support sessions can read centers", "centers"],
+      ["Platform support sessions can read memberships", "organization_memberships"],
+      ["Platform support sessions can read coach profiles", "coach_profiles"],
+      [
+        "Platform support sessions can read coach center assignments",
+        "coach_center_assignments",
+      ],
+      ["Platform support sessions can read person profiles", "person_profiles"],
+      ["Platform support sessions can read class types", "class_types"],
+      ["Platform support sessions can read schedule templates", "schedule_templates"],
+      [
+        "Platform support sessions can read template blocks",
+        "schedule_template_blocks",
+      ],
+      ["Platform support sessions can read schedule blocks", "schedule_blocks"],
+      [
+        "Platform support sessions can read schedule assignments",
+        "schedule_block_assignments",
+      ],
+      ["Platform support sessions can read operational events", "operational_events"],
+    ] as const) {
+      expectPolicyDropBeforeCreate(
+        migration,
+        policyName,
+        tableName,
+        "public.has_active_platform_support_session(organization_id)",
+      );
+    }
+
+    expect(migration).not.toMatch(
+      /CREATE POLICY "Platform support sessions can read[\s\S]{0,180}FOR\s+(?:ALL|INSERT|UPDATE|DELETE)\s+TO authenticated/i,
+    );
+    expect(migration).not.toMatch(
+      /Platform support sessions can read (?:documents|time records|payroll|signatures)/i,
     );
   });
 

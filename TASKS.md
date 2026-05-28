@@ -131,6 +131,52 @@ Verificacion:
 - [x] Smoke estatico confirma que la sesion de soporte no inserta, borra ni actualiza memberships.
 - [x] Smoke estatico confirma que la migracion de soporte no anade politicas RLS para documentos/fichaje/payroll.
 
+### Corte 2026-05-27 - Planes Comerciales Founder Sin Cobro Real
+
+Estado: implementado como foundation comercial versionable sin Checkout, Customer Portal, webhooks, facturas ni cobros reales.
+
+Decision:
+
+- [x] Crear `billing_plans` y `billing_plan_versions` con RLS, estados `draft`/`published`/`archived`, precios en centimos, moneda `EUR`, limites, soporte, prestaciones y referencias futuras de Stripe nullable/validadas.
+- [x] Sembrar founder pricing v1: `starter`, `box`, `growth`, `scale`, `network`, `franchise` y `enterprise`.
+- [x] Anadir setup opcional a los planes publicados: 199 EUR para starter/box, 399 EUR para growth/scale, 599 EUR para network/franchise y custom para enterprise.
+- [x] Guardar snapshots de plan/precio/limites/prestaciones en `organization_subscriptions` al asignar o cambiar plan.
+- [x] Crear RPCs para listar planes publicados, listar versiones en Console, calcular uso de billing, listar centros activos y asignar plan manualmente.
+- [x] Mantener `platform_owner` como rol de gestion de catalogo y asignacion desde Console; `billing` queda en lectura.
+- [x] Permitir lectura de billing a owner/admin del tenant y cambio manual solo a owner en `/app/settings/billing`.
+- [x] Anadir `/console/plans` para crear borradores, publicar versiones, archivar planes y ver versiones.
+- [x] Anadir gestion manual de plan en `/console/organizations/[organizationId]` con uso actual y downgrade controlado.
+- [x] Anadir `/app/settings/billing` con plan actual, estado, limites, uso, catalogo publicado y cambio manual sin pedir datos de pago.
+- [x] Aplicar `center_limit` al crear centros activos; legacy manual sin version conserva compatibilidad.
+- [x] Implementar downgrade de centros: si el nuevo plan permite menos centros activos, se exige seleccionar los centros que quedan activos y el resto pasa a `inactive`, sin borrado fisico.
+- [x] Dejar `future_client_limit` como semilla contractual sin enforcement real.
+- [x] Documentar que los clientes/reservas futuros deben permitir que una persona acceda a varios centros/boxes y cambie contexto.
+
+Fuera de alcance:
+
+- [x] No implementar Stripe Checkout, Customer Portal, webhooks, facturas reales, cobros reales ni gestion de IVA.
+- [x] No guardar tarjetas, IBAN completos, mandates crudos, payment methods ni datos bancarios sensibles.
+- [x] No implementar clientes finales, reservas, WodBuster-like, storage medido real ni borrado fisico de centros.
+- [x] No crear proyecto Supabase dedicado por tenant ni hardcodear STL.
+
+Verificacion:
+
+- [x] `npm run typecheck -- --pretty false` pasa.
+- [x] `npm run lint -- --quiet` pasa.
+- [x] `npm run build` pasa y lista `/console/plans` y `/app/settings/billing`.
+- [x] `npx supabase db lint --local` pasa sin errores de schema.
+- [x] Migracion nueva validada contra Postgres local en transaccion con `ROLLBACK`; el SQL completo ejecuta sin dejar cambios aplicados.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/billing-plans-foundation.spec.ts tests/smoke/platform-console-surface.spec.ts` pasa 12 tests, con 3 skips autenticados por falta de credenciales/platform admin o por DB local sin migracion de billing aplicada.
+- [x] Guardrails confirman RLS/catalogo, lectura/gestion por rol, owner billing, bloqueo por `center_limit`, downgrade con centros inactivos y ausencia de Checkout/Portal/webhooks/formularios de pago.
+- [x] Desbloqueo local 2026-05-28: `npx supabase migration up --local` pasaba a recrear `20260527063811_platform_console_support_sessions.sql` porque la migracion seguia pendiente en `supabase_migrations.schema_migrations`, pero sus 12 policies de soporte ya existian en `pg_policies`. Se anadieron `DROP POLICY IF EXISTS` antes de cada `CREATE POLICY`, manteniendo los mismos `FOR SELECT TO authenticated` y `USING`.
+- [x] Se reforzo tambien `20260527121908_billing_plans_foundation.sql` con `DROP POLICY IF EXISTS` para las policies recientes de billing y `ON CONSTRAINT` explicito en los `ON CONFLICT` que Supabase lint marcaba ambiguos.
+- [x] Se anadio `20260528064233_fix_billing_plan_lint_ambiguity.sql` como migracion forward minima para reemplazar las funciones ya aplicadas en la DB local sin borrar datos ni resetear.
+- [x] `npx supabase migration up --local` pasa y deja aplicadas `20260527063811`, `20260527103000`, `20260527121908` y `20260528064233`.
+- [x] `npx supabase db lint --local` pasa sin errores despues del fix de ambiguedad.
+- [x] `npm run typecheck -- --pretty false`, `npm run lint -- --quiet`, `npm run build` y `git diff --check` pasan en el reintento del 2026-05-28; `git diff --check` mantiene solo avisos LF/CRLF del worktree.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/billing-plans-foundation.spec.ts tests/smoke/platform-console-surface.spec.ts` pasa 15 tests y deja 2 skips autenticados por falta de credenciales E2E.
+- [x] Guardrails reforzados: soporte y billing exigen `DROP POLICY IF EXISTS` antes de `CREATE POLICY`, siguen solo en `SELECT`, no abren documentos/fichaje/payroll/firmas, y billing conserva lectura por plataforma/owner/admin sin formularios de pago ni Checkout/Portal/webhooks.
+
 ### Corte 2026-05-25 - Revision Publicacion Online / User Testing No Tecnico
 
 Estado: revision local ejecutada como actualizacion de contexto. No cambia producto, UI, migraciones, seeds ni permisos. Objetivo: saber si BoxOps se puede publicar online para que un equipo no tecnico empiece a probar flujos y gusto de uso.
@@ -11321,7 +11367,8 @@ Dependencias de schema/migraciones futuras:
 
 - [x] Foundation DB/RLS de `BoxOps Console`: roles de plataforma, suscripciones manuales, soporte auditado y auditoria de plataforma.
 - [x] Console interna minima: listado/detalle de organizaciones, contadores de centros/usuarios/coaches, estado de plan, creacion de organizacion + owner inicial, suspension/reactivacion manual y soporte auditado temporal.
-- [ ] Billing owner en `/app/settings/billing`: plan, estado, limites y CTA seguro sin guardar datos bancarios.
+- [x] Billing owner en `/app/settings/billing`: plan, estado, limites, uso, planes founder publicados y cambio manual sin guardar datos bancarios.
+- [x] Catalogo versionado de planes en `/console/plans` con founder pricing, snapshots y enforcement inicial de `center_limit`.
 - [ ] Integracion Stripe real: Checkout/Customer Portal, webhooks idempotentes y sincronizacion de suscripcion.
 - [ ] Onboarding de nuevo box desde Console o runbook guiado.
 - [ ] Eliminacion segura de usuarios/fichas creados por error desde Equipo: `owner` puede necesitar borrar una ficha pendiente, acceso o invitacion mal creada con modal de confirmacion; definir primero permisos, auditoria, bloqueo de auto-eliminacion, impacto en Auth, historial operativo y fallback a desactivar/archivar cuando existan referencias.

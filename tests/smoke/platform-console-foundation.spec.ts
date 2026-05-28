@@ -154,7 +154,7 @@ test.describe("BoxOps Console foundation source guardrails", () => {
       /\bservice_role\b|SUPABASE_SERVICE_ROLE/,
     );
     expect(sourceWithoutAllowedAdminHelper).not.toMatch(
-      /from\s+["']stripe["']|require\(["']stripe["']\)|STRIPE_|stripe\.webhooks|checkout\.sessions|customerPortal/i,
+      /from\s+["']stripe["']|require\(["']stripe["']\)|process\.env\.STRIPE|stripe\.webhooks|checkout\.sessions|customerPortal|customer\s*portal/i,
     );
     expect(packageManifest).not.toMatch(/"stripe"\s*:/i);
     expect(tenantAppSource).toContain("getActivePlatformAdmin");

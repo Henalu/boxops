@@ -31,6 +31,7 @@ const ROLE_LABELS: Record<ApplicationRole, string> = {
 };
 
 const TENANT_SETTINGS_ROLES: ApplicationRole[] = ["owner", "admin"];
+const TENANT_BILLING_READ_ROLES: ApplicationRole[] = ["owner", "admin"];
 const TIME_TRACKING_SETTINGS_ROLES: ApplicationRole[] = [
   "owner",
   "admin",
@@ -109,6 +110,10 @@ export function getApplicationRoleLabel(role: string) {
 
 export function canManageTenantSettings(role: string) {
   return TENANT_SETTINGS_ROLES.includes(role as ApplicationRole);
+}
+
+export function canReadTenantBilling(role: string) {
+  return TENANT_BILLING_READ_ROLES.includes(role as ApplicationRole);
 }
 
 export function canManageTimeTrackingSettings(role: string) {

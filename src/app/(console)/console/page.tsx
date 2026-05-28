@@ -1099,12 +1099,12 @@ function PlatformOperationsPlaceholders() {
         title="Soporte"
       />
       <PlaceholderCard
-        description="La consola solo guarda plan manual y limites por ahora."
+        description="Catalogo versionado, snapshots y cambios manuales sin cobro real."
         icon={CreditCard}
         id="billing"
         items={[
-          "Disponible: plan, estado comercial y limites.",
-          "Pendiente: proveedor de pago y area de gestion para el propietario.",
+          "Disponible: planes founder publicados y versiones.",
+          "Disponible: cambios manuales con snapshot por organizacion.",
           "No se guardan tarjetas ni datos bancarios.",
         ]}
         title="Facturacion"

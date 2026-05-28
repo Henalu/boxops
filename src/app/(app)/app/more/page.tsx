@@ -13,6 +13,7 @@ import {
   Inbox,
   LogOut,
   MapPin,
+  ReceiptText,
   Settings,
   ShieldCheck,
   Timer,
@@ -41,6 +42,7 @@ import { getLoginPath } from "@/lib/auth/redirects";
 import {
   canManageStaffWorkWindows,
   canManageOperationalData,
+  canReadTenantBilling,
   getApplicationRoleLabel,
 } from "@/lib/auth/permissions";
 import {
@@ -61,6 +63,7 @@ import {
   getSchedulePath,
   getScheduleTemplatesPath,
   getSettingsPath,
+  getSettingsBillingPath,
   getStatsPath,
   getTimePath,
   getWorkWindowsPath,
@@ -145,6 +148,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
   const canManageWorkWindows = canManageStaffWorkWindows(
     resolution.membership.role,
   );
+  const canReadBilling = canReadTenantBilling(resolution.membership.role);
   const activePlatformAdminResult = await getActivePlatformAdmin().catch(
     () => null,
   );
@@ -218,6 +222,14 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               icon={Settings}
               title="Configuración"
             />
+            {canReadBilling ? (
+              <MobileHubLink
+                description="Plan, limites y uso"
+                href={getSettingsBillingPath(baseOptions)}
+                icon={ReceiptText}
+                title="Plan y facturacion"
+              />
+            ) : null}
           </div>
           <div className="hidden gap-3 md:grid md:grid-cols-2">
             <ActionCard
@@ -271,6 +283,15 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               label="Abrir configuración"
               title="Configuración"
             />
+            {canReadBilling ? (
+              <ActionCard
+                description="Revisa plan, limites incluidos y uso actual de la organizacion."
+                href={getSettingsBillingPath(baseOptions)}
+                icon={ReceiptText}
+                label="Abrir plan"
+                title="Plan y facturacion"
+              />
+            ) : null}
           </div>
         </section>
       ) : isSupportMode ? (

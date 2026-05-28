@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CircleOff, Plus, Save } from "lucide-react";
 
@@ -35,6 +36,11 @@ import {
   getCenterStatusLabel,
   type CenterStatus,
 } from "@/lib/centers";
+import {
+  formatPlanLimit,
+  getOrganizationBillingOverview,
+} from "@/lib/billing";
+import { getSettingsBillingPath } from "@/lib/navigation/app-paths";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/supabase";
 
@@ -62,6 +68,8 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "center-required": "No se ha recibido el centro a actualizar.",
+  "center-limit-reached":
+    "Has llegado al limite de centros activos incluido en tu plan.",
   "duplicate-slug": "Ya existe un centro con ese slug en esta organización.",
   forbidden: "Tu rol no permite gestionar centros.",
   "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
@@ -322,8 +330,21 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
   }
 
   const centers = await getCenters(resolution.organization.id);
+  const billingOverviewResult = await getOrganizationBillingOverview(
+    resolution.organization.id,
+  );
+  const billingOverview = billingOverviewResult.ok
+    ? billingOverviewResult.data
+    : null;
+  const effectiveCenterLimit = billingOverview?.effective_center_limit ?? null;
+  const activeCentersCount = billingOverview?.active_centers_count ?? 0;
+  const centerLimitReached =
+    effectiveCenterLimit !== null && activeCentersCount >= effectiveCenterLimit;
   const canManageCenters = canManageOperationalData(resolution.membership.role);
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
+  const billingPath = getSettingsBillingPath({
+    organizationId: resolution.organization.id,
+  });
 
   return (
     <div className="space-y-6">
@@ -347,7 +368,21 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
         />
       ) : null}
 
-      {error && errorMessages[error] ? (
+      {error === "center-limit-reached" ? (
+        <TransientFeedbackBanner
+          description={
+            <>
+              Has llegado al limite de centros activos de tu plan.{" "}
+              <Link className="font-medium underline" href={billingPath}>
+                Revisar plan
+              </Link>
+              .
+            </>
+          }
+          title="No se ha creado el centro"
+          tone="error"
+        />
+      ) : error && errorMessages[error] ? (
         <TransientFeedbackBanner
           description={errorMessages[error]}
           title="No se han guardado los cambios"
@@ -362,10 +397,26 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
           icon={Plus}
           title="Crear centro"
         >
-          <CenterCreateForm
-            organizationId={resolution.organization.id}
-            timezone={resolution.organization.timezone}
-          />
+          {centerLimitReached ? (
+            <Alert>
+              <AlertTitle>Limite de centros alcanzado</AlertTitle>
+              <AlertDescription>
+                Tu organizacion tiene {activeCentersCount} centros activos y el
+                plan actual incluye {formatPlanLimit(effectiveCenterLimit)}. No
+                se bloquea la edicion de centros existentes. Para anadir otro,
+                revisa{" "}
+                <Link className="font-medium underline" href={billingPath}>
+                  Plan y facturacion
+                </Link>
+                .
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <CenterCreateForm
+              organizationId={resolution.organization.id}
+              timezone={resolution.organization.timezone}
+            />
+          )}
         </CollapsibleActionPanel>
       ) : (
         <Alert>

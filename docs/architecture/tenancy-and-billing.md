@@ -246,6 +246,50 @@ Fuera de este corte:
 - recording/replay de sesion, chat de soporte o aprobacion dual;
 - automatizar bloqueo o reactivacion por plan/billing.
 
+### Catalogo Versionado De Planes Comerciales
+
+Decision 2026-05-27: BoxOps ya tiene foundation comercial sin cobro real. El catalogo vive en `billing_plans` y `billing_plan_versions`, y `organization_subscriptions` conserva un snapshot efectivo de precio, limites y prestaciones cuando se asigna o cambia plan.
+
+Reglas aplicadas:
+
+- Los planes iniciales son founder / early access pricing, sin IVA y versionables.
+- El precio anual equivale a 10 meses pagados.
+- Los precios se guardan en centimos y `currency = EUR`.
+- Los IDs futuros de Stripe (`stripe_product_id`, `stripe_monthly_price_id`, `stripe_annual_price_id`) son nullable y se validan como referencias seguras, pero no cobran ni abren flujos de pago.
+- `platform_owner` puede crear borradores, publicar nuevas versiones, archivar planes y asignar/cambiar planes manualmente desde Console.
+- `billing` puede leer catalogo y suscripciones, pero no publicar ni archivar si el modelo de roles actual no lo concede.
+- Owner del tenant puede ver su plan, uso y planes publicados en `/app/settings/billing`; `admin` tiene lectura prudente.
+- El cambio autoservicio de plan desde `/app/settings/billing` queda manual mientras no exista Stripe real y se revalida en RPC.
+- Una organizacion conserva `plan_code`, `plan_version`, precio mensual/anual/setup, limites, soporte, prestaciones y referencias futuras de Stripe como snapshot aunque el catalogo publique otra version despues.
+- El limite efectivo de centros se calcula desde `organization_subscriptions.center_limit` solo cuando la suscripcion tiene `billing_plan_version_id` y no es legacy manual. Las suscripciones manuales antiguas sin version mantienen compatibilidad y no bloquean centros.
+- `center_limit` se aplica al crear centros activos. No bloquea editar centros existentes.
+- Si un downgrade permite menos centros que los activos actuales, la RPC exige elegir que centros quedan activos. Los no seleccionados pasan a `inactive`; no se borran y conservan historico operativo, horarios, asignaciones y documentos vinculados.
+- `future_client_limit` queda como semilla contractual para clientes/reservas futuras; no tiene enforcement real todavia.
+- El modelo futuro de clientes/reservas debe permitir que una persona tenga acceso a varios centros/boxes y cambie contexto para reservar, no quedar atada a una unica organizacion/centro.
+- Higiene local de migraciones 2026-05-28: las policies creadas por cortes recientes de Console/soporte/billing deben ser idempotentes con `DROP POLICY IF EXISTS` antes de `CREATE POLICY`, conservando la misma tabla, rol, comando y predicado RLS. Si una DB local contiene objetos creados pero la migracion no figura aplicada, se corrige con una migracion forward minima o un ajuste idempotente; no se usa `supabase db reset` para desbloquear.
+
+Planes founder v1 sembrados:
+
+- `starter`: 39 EUR/mes, 390 EUR/ano, 1 centro, 15 staff, 600 clientes futuros, 5 GB, setup opcional 199 EUR.
+- `box`: 69 EUR/mes, 690 EUR/ano, 2 centros, 30 staff, 1.200 clientes futuros, 10 GB, setup opcional 199 EUR.
+- `growth`: 119 EUR/mes, 1.190 EUR/ano, 5 centros, 75 staff, 3.000 clientes futuros, 25 GB, setup opcional 399 EUR.
+- `scale`: 199 EUR/mes, 1.990 EUR/ano, 10 centros, 150 staff, 6.000 clientes futuros, 75 GB, setup opcional 399 EUR.
+- `network`: 349 EUR/mes, 3.490 EUR/ano, 20 centros, 300 staff, 12.000 clientes futuros, 150 GB, setup opcional 599 EUR.
+- `franchise`: 699 EUR/mes, 6.990 EUR/ano, 50 centros, 750 staff, 30.000 clientes futuros, 300 GB, setup opcional 599 EUR.
+- `enterprise`: plan a medida para mas de 50 centros, limites custom y contrato manual.
+
+Fuera de este corte:
+
+- Stripe Checkout;
+- Customer Portal;
+- webhooks;
+- facturas reales;
+- cobros reales;
+- gestion de IVA;
+- clientes finales y reservas;
+- limites reales de storage medidos si no hay fuente fiable;
+- borrado fisico de centros.
+
 ## Billing Y Proveedor De Pago
 
 Decision 2026-05-26: Stripe es el proveedor recomendado por defecto para suscripciones SaaS de BoxOps.
@@ -261,10 +305,11 @@ GoCardless queda como alternativa futura si la mayoria de clientes exige domicil
 Reglas:
 
 - BoxOps no guarda tarjetas, IBAN completos, mandates crudos ni datos bancarios sensibles.
-- BoxOps guarda referencias del proveedor, por ejemplo `stripe_customer_id`, `stripe_subscription_id`, estado, plan y limites.
-- El owner del tenant gestionara facturacion desde `/app/settings/billing` mediante Stripe Customer Portal o flujo equivalente.
-- La Console de plataforma vera estado comercial y podra crear/asignar plan inicial, pero no debe manipular metodos de pago directamente.
-- Los webhooks de Stripe deben procesarse server-side, con secreto solo en entorno, idempotencia y auditoria.
+- BoxOps guarda referencias seguras del proveedor cuando existan, estado, plan, version y limites; no guarda metodos de pago.
+- En el corte actual `/app/settings/billing` solo muestra plan, uso, catalogo publicado y cambio manual sin cobro.
+- En la fase Stripe real, el owner del tenant gestionara pago mediante Customer Portal o flujo equivalente fuera de BoxOps.
+- La Console de plataforma ve estado comercial y puede crear/asignar plan manual, pero no manipula metodos de pago directamente.
+- Los webhooks de Stripe quedan para una fase posterior y deberan procesarse server-side, con secreto solo en entorno, idempotencia y auditoria.
 - La suscripcion no debe activar ni desactivar modulos sensibles sin una tabla/capacidad explicita y pruebas.
 
 Campos candidatos para `organization_subscriptions`:
@@ -295,7 +340,7 @@ Estados candidatos:
 
 1. Foundation manual: crear schema/RLS/helpers para `platform_admins`, `organization_subscriptions`, auditoria y resumen de organizaciones, sin UI de pago real.
 2. Console interna: listar tenants, ver detalle, crear organizacion y owner inicial, y abrir tenant en modo soporte auditado.
-3. Billing visible para owner: `/app/settings/billing` muestra plan, estado, limites y un CTA seguro.
+3. Catalogo founder versionado: `billing_plans`, `billing_plan_versions`, snapshots en `organization_subscriptions`, `/console/plans`, `/app/settings/billing` y enforcement inicial de `center_limit`, sin cobro real.
 4. Stripe real: Checkout/Customer Portal, webhooks, sincronizacion de suscripcion y facturas, sin guardar secretos ni datos bancarios en DB.
 5. Comercializacion v1: planes, limites, upgrades/downgrades, evidencias de soporte y runbook de incidencias.
 

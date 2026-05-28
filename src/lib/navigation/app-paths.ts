@@ -188,3 +188,7 @@ export function getTimePath(options: AppPathOptions = {}) {
 export function getSettingsPath(options: AppPathOptions = {}) {
   return getAppPath("/app/settings", options);
 }
+
+export function getSettingsBillingPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/settings/billing", options);
+}

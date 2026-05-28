@@ -350,49 +350,85 @@ $$;
 -- RLS: operational read access for active support sessions
 -- ============================================================
 
+DROP POLICY IF EXISTS "Platform support sessions can read organizations"
+  ON public.organizations;
+
 CREATE POLICY "Platform support sessions can read organizations"
   ON public.organizations FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read centers"
+  ON public.centers;
 
 CREATE POLICY "Platform support sessions can read centers"
   ON public.centers FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
 
+DROP POLICY IF EXISTS "Platform support sessions can read memberships"
+  ON public.organization_memberships;
+
 CREATE POLICY "Platform support sessions can read memberships"
   ON public.organization_memberships FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read coach profiles"
+  ON public.coach_profiles;
 
 CREATE POLICY "Platform support sessions can read coach profiles"
   ON public.coach_profiles FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
 
+DROP POLICY IF EXISTS "Platform support sessions can read coach center assignments"
+  ON public.coach_center_assignments;
+
 CREATE POLICY "Platform support sessions can read coach center assignments"
   ON public.coach_center_assignments FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read person profiles"
+  ON public.person_profiles;
 
 CREATE POLICY "Platform support sessions can read person profiles"
   ON public.person_profiles FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
 
+DROP POLICY IF EXISTS "Platform support sessions can read class types"
+  ON public.class_types;
+
 CREATE POLICY "Platform support sessions can read class types"
   ON public.class_types FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read schedule templates"
+  ON public.schedule_templates;
 
 CREATE POLICY "Platform support sessions can read schedule templates"
   ON public.schedule_templates FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
 
+DROP POLICY IF EXISTS "Platform support sessions can read template blocks"
+  ON public.schedule_template_blocks;
+
 CREATE POLICY "Platform support sessions can read template blocks"
   ON public.schedule_template_blocks FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read schedule blocks"
+  ON public.schedule_blocks;
 
 CREATE POLICY "Platform support sessions can read schedule blocks"
   ON public.schedule_blocks FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
 
+DROP POLICY IF EXISTS "Platform support sessions can read schedule assignments"
+  ON public.schedule_block_assignments;
+
 CREATE POLICY "Platform support sessions can read schedule assignments"
   ON public.schedule_block_assignments FOR SELECT TO authenticated
   USING (public.has_active_platform_support_session(organization_id));
+
+DROP POLICY IF EXISTS "Platform support sessions can read operational events"
+  ON public.operational_events;
 
 CREATE POLICY "Platform support sessions can read operational events"
   ON public.operational_events FOR SELECT TO authenticated

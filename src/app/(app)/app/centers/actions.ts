@@ -51,8 +51,12 @@ async function getOperationalActionContext(formData: FormData) {
   };
 }
 
-function getMutationError(errorCode?: string) {
-  if (errorCode === "23505") {
+function getMutationError(error?: { code?: string; message?: string }) {
+  if (error?.message?.toLowerCase().includes("center_limit_reached")) {
+    return "center-limit-reached";
+  }
+
+  if (error?.code === "23505") {
     return "duplicate-slug";
   }
 
@@ -77,7 +81,7 @@ export async function createCenter(formData: FormData) {
   });
 
   if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
+    redirect(getErrorPath(context.organization.id, getMutationError(error)));
   }
 
   redirect(
@@ -116,7 +120,7 @@ export async function updateCenter(formData: FormData) {
     .single();
 
   if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
+    redirect(getErrorPath(context.organization.id, getMutationError(error)));
   }
 
   redirect(
@@ -150,7 +154,7 @@ export async function setCenterStatus(formData: FormData) {
     .single();
 
   if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
+    redirect(getErrorPath(context.organization.id, getMutationError(error)));
   }
 
   redirect(
