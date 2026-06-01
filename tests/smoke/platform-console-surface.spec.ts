@@ -547,7 +547,7 @@ test.describe("BoxOps Console visible surface guardrails", () => {
       );
     }
 
-    expect(layoutSource).toContain("sesion auditada de soporte");
+    expect(layoutSource).toMatch(/sesi[oó]n auditada de soporte/);
     expect(layoutSource).not.toContain("ni crear memberships");
     expect(coachesActionsSource).toContain(
       'context.membership.accessMode === "platform_support"',
