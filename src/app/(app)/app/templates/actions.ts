@@ -19,9 +19,13 @@ import {
   ensureScheduleTemplateRangeApplied,
 } from "@/lib/schedule-template-application";
 import {
+  SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES,
+  SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES,
+  getScheduleTemplateEditorSettings,
   getUnavailableScheduleTemplateCoachBlocks,
   isScheduleTemplateUuid,
   scheduleTemplateBlockRequiresCoach,
+  validateScheduleTemplateBlockCreateForm,
   validateScheduleTemplateBlockForm,
   validateScheduleTemplateForm,
   type ScheduleTemplateCoachAvailabilityBlockInput,
@@ -62,6 +66,32 @@ function getTemplateMetadataObject(value: unknown): TemplateMetadata {
     : {};
 }
 
+function getTemplateEditorMetadata(values: {
+  editorEndTime: string;
+  editorStartTime: string;
+}) {
+  return {
+    defaultDurationMinutes: SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES,
+    endTime: values.editorEndTime,
+    slotMinutes: SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES,
+    startTime: values.editorStartTime,
+  } satisfies TemplateMetadata;
+}
+
+function mergeTemplateEditorMetadata(
+  metadata: unknown,
+  values: {
+    editorEndTime: string;
+    editorStartTime: string;
+  },
+) {
+  const nextMetadata = getTemplateMetadataObject(metadata);
+
+  nextMetadata.editor = getTemplateEditorMetadata(values);
+
+  return nextMetadata;
+}
+
 function getTemplateArchiveWindow() {
   const archivedAt = new Date();
   const recoverableUntil = new Date(
@@ -76,6 +106,8 @@ function getTemplateArchiveWindow() {
 
 function getScheduleTemplateCreatedAuditFields(values: {
   centerId: string | null;
+  editorEndTime: string;
+  editorStartTime: string;
   name: string;
   status: string;
   validFrom: string | null;
@@ -83,6 +115,8 @@ function getScheduleTemplateCreatedAuditFields(values: {
 }): OperationalAuditChangedFields {
   return {
     center_id: auditFieldSet(values.centerId),
+    editor_end_time: auditFieldSet(values.editorEndTime),
+    editor_start_time: auditFieldSet(values.editorStartTime),
     name: auditFieldTouched(),
     status: auditFieldSet(values.status),
     valid_from: auditFieldSet(values.validFrom),
@@ -566,6 +600,60 @@ async function validateTemplateDefaultCoachAvailability({
     : null;
 }
 
+function normalizeTimeForComparison(value: string) {
+  return value.slice(0, 5);
+}
+
+async function validateTemplateBlockExactDuplicates({
+  centerId,
+  classTypeId,
+  organizationId,
+  supabase,
+  templateId,
+  values,
+}: {
+  centerId: string;
+  classTypeId: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+  templateId: string;
+  values: {
+    dayOfWeek: number;
+    endTime: string;
+    startTime: string;
+  }[];
+}) {
+  const days = [...new Set(values.map((value) => value.dayOfWeek))];
+
+  if (days.length === 0) {
+    return "missing-fields";
+  }
+
+  const { data: existingBlocks, error } = await supabase
+    .from("schedule_template_blocks")
+    .select("id, day_of_week, start_time, end_time")
+    .eq("organization_id", organizationId)
+    .eq("template_id", templateId)
+    .eq("center_id", centerId)
+    .eq("class_type_id", classTypeId)
+    .in("day_of_week", days);
+
+  if (error) {
+    return "save-failed";
+  }
+
+  const hasDuplicate = (existingBlocks ?? []).some((existingBlock) =>
+    values.some(
+      (value) =>
+        existingBlock.day_of_week === value.dayOfWeek &&
+        normalizeTimeForComparison(existingBlock.start_time) === value.startTime &&
+        normalizeTimeForComparison(existingBlock.end_time) === value.endTime,
+    ),
+  );
+
+  return hasDuplicate ? "template-block-duplicate" : null;
+}
+
 export async function createScheduleTemplate(formData: FormData) {
   const context = await getOperationalActionContext(formData);
   const validation = validateScheduleTemplateForm(formData);
@@ -617,6 +705,7 @@ export async function createScheduleTemplate(formData: FormData) {
     .from("schedule_templates")
     .insert({
       center_id: validation.values.centerId,
+      metadata: mergeTemplateEditorMetadata(null, validation.values),
       name: validation.values.name,
       organization_id: context.organization.id,
       status: validation.values.status,
@@ -755,7 +844,7 @@ export async function updateScheduleTemplate(formData: FormData) {
 
   const { data: existingTemplate, error: existingTemplateError } = await supabase
     .from("schedule_templates")
-    .select("id, center_id, name, status, valid_from, valid_until")
+    .select("id, center_id, name, status, valid_from, valid_until, metadata")
     .eq("id", templateId)
     .eq("organization_id", context.organization.id)
     .eq("template_type", "weekly")
@@ -791,10 +880,16 @@ export async function updateScheduleTemplate(formData: FormData) {
     );
   }
 
+  const nextMetadata = mergeTemplateEditorMetadata(
+    existingTemplate.metadata,
+    validation.values,
+  );
+
   const { error } = await supabase
     .from("schedule_templates")
     .update({
       center_id: validation.values.centerId,
+      metadata: nextMetadata,
       name: validation.values.name,
       status: validation.values.status,
       valid_from: validation.values.validFrom,
@@ -889,6 +984,21 @@ export async function updateScheduleTemplate(formData: FormData) {
     "valid_until",
     existingTemplate.valid_until,
     validation.values.validUntil,
+  );
+  const existingEditorSettings = getScheduleTemplateEditorSettings(
+    existingTemplate.metadata,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "editor_start_time",
+    existingEditorSettings.startTime,
+    validation.values.editorStartTime,
+  );
+  addAuditFieldChange(
+    changedFields,
+    "editor_end_time",
+    existingEditorSettings.endTime,
+    validation.values.editorEndTime,
   );
 
   if (existingTemplate.name !== validation.values.name) {
@@ -1161,7 +1271,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
 
 export async function createScheduleTemplateBlock(formData: FormData) {
   const context = await getOperationalActionContext(formData);
-  const validation = validateScheduleTemplateBlockForm(formData);
+  const validation = validateScheduleTemplateBlockCreateForm(formData);
 
   if (!validation.ok) {
     redirect(
@@ -1175,14 +1285,28 @@ export async function createScheduleTemplateBlock(formData: FormData) {
     );
   }
 
+  const referenceValues = validation.values[0];
+
+  if (!referenceValues) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "missing-fields",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
   const supabase = await createClient();
   const referenceResult = await validateTemplateBlockReferences({
-    centerId: validation.values.centerId,
-    classTypeId: validation.values.classTypeId,
-    defaultCoachProfileId: validation.values.defaultCoachProfileId,
+    centerId: referenceValues.centerId,
+    classTypeId: referenceValues.classTypeId,
+    defaultCoachProfileId: referenceValues.defaultCoachProfileId,
     organizationId: context.organization.id,
     supabase,
-    templateId: validation.values.templateId,
+    templateId: referenceValues.templateId,
   });
 
   if (referenceResult.error || !referenceResult.centerId) {
@@ -1197,46 +1321,75 @@ export async function createScheduleTemplateBlock(formData: FormData) {
     );
   }
 
-  const availabilityError = await validateTemplateDefaultCoachAvailability({
-    defaultCoachProfileId: validation.values.defaultCoachProfileId,
-    dayOfWeek: validation.values.dayOfWeek,
-    endTime: validation.values.endTime,
+  const centerId = referenceResult.centerId;
+  const duplicateError = await validateTemplateBlockExactDuplicates({
+    centerId,
+    classTypeId: referenceValues.classTypeId,
     organizationId: context.organization.id,
-    startTime: validation.values.startTime,
     supabase,
-    templateId: validation.values.templateId,
+    templateId: referenceValues.templateId,
+    values: validation.values,
   });
 
-  if (availabilityError) {
+  if (duplicateError) {
     redirect(
       getErrorPath(
         context.organization.id,
         context.weekStart,
-        availabilityError,
+        duplicateError,
         context.view,
         context.day,
       ),
     );
   }
 
-  const { data: templateBlock, error } = await supabase
-    .from("schedule_template_blocks")
-    .insert({
-      center_id: referenceResult.centerId,
-      class_type_id: validation.values.classTypeId,
-      day_of_week: validation.values.dayOfWeek,
-      default_coach_profile_id: validation.values.defaultCoachProfileId,
-      end_time: validation.values.endTime,
-      notes: validation.values.notes,
-      organization_id: context.organization.id,
-      required_coaches: validation.values.requiredCoaches,
-      start_time: validation.values.startTime,
-      template_id: validation.values.templateId,
-    })
-    .select("id")
-    .single();
+  for (const values of validation.values) {
+    const availabilityError = await validateTemplateDefaultCoachAvailability({
+      defaultCoachProfileId: values.defaultCoachProfileId,
+      dayOfWeek: values.dayOfWeek,
+      endTime: values.endTime,
+      organizationId: context.organization.id,
+      startTime: values.startTime,
+      supabase,
+      templateId: values.templateId,
+    });
 
-  if (error || !templateBlock) {
+    if (availabilityError) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          availabilityError,
+          context.view,
+          context.day,
+        ),
+      );
+    }
+  }
+
+  const { data: templateBlocks, error } = await supabase
+    .from("schedule_template_blocks")
+    .insert(
+      validation.values.map((values) => ({
+        center_id: centerId,
+        class_type_id: values.classTypeId,
+        day_of_week: values.dayOfWeek,
+        default_coach_profile_id: values.defaultCoachProfileId,
+        end_time: values.endTime,
+        notes: values.notes,
+        organization_id: context.organization.id,
+        required_coaches: values.requiredCoaches,
+        start_time: values.startTime,
+        template_id: values.templateId,
+      })),
+    )
+    .select("id, day_of_week");
+
+  if (
+    error ||
+    !templateBlocks ||
+    templateBlocks.length !== validation.values.length
+  ) {
     redirect(
       getErrorPath(
         context.organization.id,
@@ -1251,8 +1404,8 @@ export async function createScheduleTemplateBlock(formData: FormData) {
   const syncStatus = await ensureScheduleTemplateRangeApplied({
     organizationId: context.organization.id,
     supabase,
-    templateId: validation.values.templateId,
-    templateBlockIds: [templateBlock.id],
+    templateId: referenceValues.templateId,
+    templateBlockIds: templateBlocks.map((templateBlock) => templateBlock.id),
     timezone: context.organization.timezone,
   });
   const syncError = getTemplateSyncError(syncStatus);
@@ -1269,23 +1422,285 @@ export async function createScheduleTemplateBlock(formData: FormData) {
     );
   }
 
-  await recordOperationalAuditEvent({
-    action: "created",
-    changedFields: getScheduleTemplateBlockCreatedAuditFields({
-      ...validation.values,
-      centerId: referenceResult.centerId,
+  const valuesByDay = new Map<number, (typeof validation.values)[number]>(
+    validation.values.map((values) => [values.dayOfWeek, values]),
+  );
+
+  await Promise.all(
+    templateBlocks.map((templateBlock) => {
+      const values = valuesByDay.get(templateBlock.day_of_week);
+
+      return recordOperationalAuditEvent({
+        action: "created",
+        changedFields: values
+          ? getScheduleTemplateBlockCreatedAuditFields({
+              ...values,
+              centerId,
+            })
+          : {},
+        entityId: templateBlock.id,
+        entityType: "schedule_template_blocks",
+        organizationId: context.organization.id,
+        supabase,
+      });
     }),
-    entityId: templateBlock.id,
-    entityType: "schedule_template_blocks",
-    organizationId: context.organization.id,
-    supabase,
-  });
+  );
 
   redirect(
     getScheduleTemplatesPath({
       day: context.day,
       organizationId: context.organization.id,
-      status: "template-block-created",
+      status:
+        templateBlocks.length > 1
+          ? "template-blocks-created"
+          : "template-block-created",
+      view: context.view,
+      week: context.weekStart,
+    }),
+  );
+}
+
+export async function copyScheduleTemplateBlock(formData: FormData) {
+  const context = await getOperationalActionContext(formData);
+  const sourceTemplateBlockId = getRequiredFormString(
+    formData,
+    "sourceTemplateBlockId",
+  );
+  const validation = validateScheduleTemplateBlockCreateForm(formData);
+
+  if (!sourceTemplateBlockId) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "template-block-required",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  if (!isScheduleTemplateUuid(sourceTemplateBlockId)) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  if (!validation.ok) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        validation.error,
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const referenceValues = validation.values[0];
+
+  if (!referenceValues) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "missing-fields",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: sourceBlock, error: sourceBlockError } = await supabase
+    .from("schedule_template_blocks")
+    .select("id, template_id")
+    .eq("id", sourceTemplateBlockId)
+    .eq("organization_id", context.organization.id)
+    .maybeSingle();
+
+  if (
+    sourceBlockError ||
+    !sourceBlock ||
+    sourceBlock.template_id !== referenceValues.templateId
+  ) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const referenceResult = await validateTemplateBlockReferences({
+    centerId: referenceValues.centerId,
+    classTypeId: referenceValues.classTypeId,
+    defaultCoachProfileId: referenceValues.defaultCoachProfileId,
+    organizationId: context.organization.id,
+    supabase,
+    templateId: referenceValues.templateId,
+  });
+
+  if (referenceResult.error || !referenceResult.centerId) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        referenceResult.error ?? "invalid-center",
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const centerId = referenceResult.centerId;
+  const duplicateError = await validateTemplateBlockExactDuplicates({
+    centerId,
+    classTypeId: referenceValues.classTypeId,
+    organizationId: context.organization.id,
+    supabase,
+    templateId: referenceValues.templateId,
+    values: validation.values,
+  });
+
+  if (duplicateError) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        duplicateError,
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  for (const values of validation.values) {
+    const availabilityError = await validateTemplateDefaultCoachAvailability({
+      defaultCoachProfileId: values.defaultCoachProfileId,
+      dayOfWeek: values.dayOfWeek,
+      endTime: values.endTime,
+      organizationId: context.organization.id,
+      startTime: values.startTime,
+      supabase,
+      templateId: values.templateId,
+    });
+
+    if (availabilityError) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          availabilityError,
+          context.view,
+          context.day,
+        ),
+      );
+    }
+  }
+
+  const { data: copiedBlocks, error } = await supabase
+    .from("schedule_template_blocks")
+    .insert(
+      validation.values.map((values) => ({
+        center_id: centerId,
+        class_type_id: values.classTypeId,
+        day_of_week: values.dayOfWeek,
+        default_coach_profile_id: values.defaultCoachProfileId,
+        end_time: values.endTime,
+        notes: values.notes,
+        organization_id: context.organization.id,
+        required_coaches: values.requiredCoaches,
+        start_time: values.startTime,
+        template_id: values.templateId,
+      })),
+    )
+    .select("id, day_of_week");
+
+  if (
+    error ||
+    !copiedBlocks ||
+    copiedBlocks.length !== validation.values.length
+  ) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        getMutationError(error?.code),
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const syncStatus = await ensureScheduleTemplateRangeApplied({
+    organizationId: context.organization.id,
+    supabase,
+    templateId: referenceValues.templateId,
+    templateBlockIds: copiedBlocks.map((templateBlock) => templateBlock.id),
+    timezone: context.organization.timezone,
+  });
+  const syncError = getTemplateSyncError(syncStatus);
+
+  if (syncError) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        syncError,
+        context.view,
+        context.day,
+      ),
+    );
+  }
+
+  const valuesByDay = new Map<number, (typeof validation.values)[number]>(
+    validation.values.map((values) => [values.dayOfWeek, values]),
+  );
+
+  await Promise.all(
+    copiedBlocks.map((templateBlock) => {
+      const values = valuesByDay.get(templateBlock.day_of_week);
+
+      return recordOperationalAuditEvent({
+        action: "created",
+        changedFields: values
+          ? {
+              ...getScheduleTemplateBlockCreatedAuditFields({
+                ...values,
+                centerId,
+              }),
+              copied_from_template_block_id: auditFieldSet(
+                sourceTemplateBlockId,
+              ),
+            }
+          : {},
+        entityId: templateBlock.id,
+        entityType: "schedule_template_blocks",
+        organizationId: context.organization.id,
+        supabase,
+      });
+    }),
+  );
+
+  redirect(
+    getScheduleTemplatesPath({
+      day: context.day,
+      organizationId: context.organization.id,
+      status:
+        copiedBlocks.length > 1
+          ? "template-blocks-copied"
+          : "template-block-copied",
       view: context.view,
       week: context.weekStart,
     }),

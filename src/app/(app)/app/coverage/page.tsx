@@ -8,6 +8,9 @@ import {
   CheckCircle2,
   Clock,
   ShieldAlert,
+  UserRound,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -20,10 +23,8 @@ import {
 import { CoverageBlockDetailPanels } from "./coverage-block-detail-panels";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
-  EmptyState,
   PageHeader,
   SectionHeader,
-  StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { RouteStateButton } from "@/components/features/route-state-link";
@@ -35,7 +36,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
@@ -175,7 +175,7 @@ const errorMessages: Record<string, string> = {
     "Selecciona menos bloques para resolverlos en lote.",
   "bulk-update-required": "Elige al menos un cambio para aplicar en lote.",
   "bulk-coach-not-needed":
-    "No se puede anadir entrenador comun si dejas los bloques sin requisito.",
+    "No se puede añadir entrenador común si dejas los bloques sin requisito.",
   "duplicate-assignment":
     "Ese entrenador ya tiene una asignación lógica en este bloque.",
   forbidden: "Tu rol no permite gestionar la cobertura.",
@@ -183,10 +183,10 @@ const errorMessages: Record<string, string> = {
   "invalid-assignment-reference":
     "La asignación ya no apunta a un bloque o entrenador válido.",
   "invalid-block": "El bloque recibido no es válido.",
-  "invalid-class-type": "El tipo de actividad seleccionado no es valido.",
+  "invalid-class-type": "El tipo de actividad seleccionado no es válido.",
   "invalid-coach": "El entrenador seleccionado no es válido.",
   "invalid-reference":
-    "Alguna referencia del cambio ya no pertenece a esta organizacion.",
+    "Alguna referencia del cambio ya no pertenece a esta organización.",
   "invalid-required-coaches":
     "El numero de entrenadores debe estar entre 0 y 20.",
   "invalid-person-profile":
@@ -607,7 +607,7 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision";
+    return "Ausencia en revisión";
   }
 
   return null;
@@ -634,6 +634,68 @@ function getRiskMeta(coverage: ScheduleBlockCoverage) {
   return `${coachCount} / ${absenceLabel.toLowerCase()}`;
 }
 
+function getCoverageCoachSummary({
+  coachDisplaysById,
+  coverage,
+}: {
+  coachDisplaysById: Map<string, CoachDisplay>;
+  coverage: ScheduleBlockCoverage | undefined;
+}) {
+  if (!coverage || coverage.validCoachProfileIds.length === 0) {
+    return {
+      detail: "Se requiere asignación",
+      label: "Sin asignar",
+    };
+  }
+
+  const labels = coverage.validCoachProfileIds.map(
+    (coachProfileId) =>
+      coachDisplaysById.get(coachProfileId)?.label ?? "Entrenador no visible",
+  );
+  const [firstLabel] = labels;
+
+  return {
+    detail: `${coverage.validAssignmentCount}/${coverage.requiredCoaches} entrenadores`,
+    label:
+      labels.length > 1 ? `${firstLabel} +${labels.length - 1}` : firstLabel,
+  };
+}
+
+function getRiskPriorityLabel(coverage: ScheduleBlockCoverage) {
+  if (coverage.state === "conflict" || coverage.state === "uncovered") {
+    return "Alta";
+  }
+
+  if (
+    coverage.state === "insufficient" ||
+    coverage.absenceImpact.coverageNeededCount > 0
+  ) {
+    return "Media";
+  }
+
+  return "Aviso";
+}
+
+function getRiskRecommendation(coverage: ScheduleBlockCoverage) {
+  if (coverage.state === "uncovered") {
+    return "Asigna un entrenador para eliminar el riesgo.";
+  }
+
+  if (coverage.state === "conflict") {
+    return "Revisa el solape antes de confirmar la cobertura.";
+  }
+
+  if (coverage.state === "insufficient") {
+    return "Ajusta entrenadores o requisito para completar cobertura.";
+  }
+
+  if (coverage.absenceImpact.coverageNeededCount > 0) {
+    return "Revisa la ausencia y sustituye la asignación afectada.";
+  }
+
+  return "Abre el bloque para revisar el contexto operativo.";
+}
+
 function getSummary(riskItems: RiskItem[]) {
   return {
     absenceImpact: riskItems.filter(
@@ -651,50 +713,137 @@ function getSummary(riskItems: RiskItem[]) {
   };
 }
 
+function CoverageMetricCard({
+  detail,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: "critical" | "neutral" | "success" | "warning";
+  value: number | string;
+}) {
+  const iconToneClass =
+    tone === "critical"
+      ? "bg-destructive/10 text-destructive ring-destructive/15"
+      : tone === "warning"
+        ? "bg-amber-50 text-amber-700 ring-amber-200"
+        : tone === "success"
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+          : "bg-primary/10 text-primary ring-primary/10";
+  const dotClass =
+    tone === "critical"
+      ? "bg-destructive"
+      : tone === "warning"
+        ? "bg-amber-500"
+        : tone === "success"
+          ? "bg-emerald-600"
+          : "bg-muted-foreground";
+
+  return (
+    <Card className="shadow-sm" size="sm">
+      <CardContent className="flex min-h-32 flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <span
+            className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ${iconToneClass}`}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+          <span
+            aria-hidden="true"
+            className="flex size-5 items-center justify-center rounded-full border border-border text-[11px] font-medium text-muted-foreground"
+          >
+            i
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className="mt-1 font-mono text-3xl font-semibold leading-none tracking-tight">
+            {value}
+          </p>
+        </div>
+        <p className="mt-auto flex items-center gap-2 text-sm text-muted-foreground">
+          <span className={`size-2 rounded-full ${dotClass}`} />
+          {detail}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CoverageOverview({
-  blockCount,
+  data,
   riskItems,
 }: {
-  blockCount: number;
+  data: CoverageData;
   riskItems: RiskItem[];
 }) {
   const summary = getSummary(riskItems);
+  const riskFreeBlocks = Math.max(data.blocks.length - riskItems.length, 0);
+  const coveragePercent =
+    data.blocks.length > 0
+      ? Math.round((riskFreeBlocks / data.blocks.length) * 100)
+      : 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-      <StatCard
-        description="Necesitan una decisión."
+      <CoverageMetricCard
+        detail={
+          riskItems.length > 0
+            ? `${riskItems.length} pendientes de decisión`
+            : "Sin decisiones pendientes"
+        }
         icon={ShieldAlert}
         label="Riesgos"
         tone={riskItems.length > 0 ? "critical" : "success"}
         value={riskItems.length}
       />
-      <StatCard
-        description="Sin entrenador asignado."
+      <CoverageMetricCard
+        detail={
+          summary.uncovered > 0
+            ? `${summary.uncovered} sin entrenador asignado`
+            : "Sin entrenador asignado"
+        }
         icon={AlertTriangle}
         label="Sin cubrir"
         tone={summary.uncovered > 0 ? "critical" : "success"}
         value={summary.uncovered}
       />
-      <StatCard
-        description="Asignación solapada."
+      <CoverageMetricCard
+        detail={
+          summary.conflict > 0
+            ? `${summary.conflict} asignación solapada`
+            : "Sin conflictos"
+        }
         icon={Clock}
         label="Conflictos"
         tone={summary.conflict > 0 ? "critical" : "success"}
         value={summary.conflict}
       />
-      <StatCard
-        description="Aprobada o en revision."
-        icon={AlertTriangle}
+      <CoverageMetricCard
+        detail={
+          summary.absenceImpact > 0
+            ? `${summary.absenceImpact} aprobado o en revisión`
+            : "Aprobada o en revisión"
+        }
+        icon={UsersRound}
         label="Impacto ausencia"
         tone={summary.absenceImpact > 0 ? "warning" : "success"}
         value={summary.absenceImpact}
       />
-      <StatCard
-        description="Bloques de la semana."
+      <CoverageMetricCard
+        detail={
+          data.blocks.length > 0
+            ? `Cobertura actual: ${coveragePercent}%`
+            : "Sin bloques esta semana"
+        }
         icon={CalendarDays}
         label="Todas las clases"
-        value={blockCount}
+        tone={riskItems.length > 0 ? "warning" : "success"}
+        value={data.blocks.length}
       />
     </div>
   );
@@ -708,6 +857,7 @@ function ResolveNow({
   centersById,
   classTypes,
   classTypesById,
+  coachDisplaysById,
   coachOptions,
   organizationId,
   riskItems,
@@ -720,6 +870,7 @@ function ResolveNow({
   centersById: Map<string, CenterRow>;
   classTypes: ClassTypeRow[];
   classTypesById: Map<string, ClassTypeRow>;
+  coachDisplaysById: Map<string, CoachDisplay>;
   coachOptions: CoachDisplay[];
   organizationId: string;
   riskItems: RiskItem[];
@@ -728,15 +879,25 @@ function ResolveNow({
   const bulkRiskItems = riskItems.map((item) => {
     const classType = classTypesById.get(item.block.class_type_id);
     const center = centersById.get(item.block.center_id);
+    const coachSummary = getCoverageCoachSummary({
+      coachDisplaysById,
+      coverage: item.coverage,
+    });
 
     return {
       blockId: item.block.id,
       center: center?.name ?? "Centro no disponible",
+      className: classType?.name ?? "Actividad",
+      coachDetail: coachSummary.detail,
+      coachLabel: coachSummary.label,
+      date: formatServiceDate(item.block.service_date),
       href: getCoverageBlockHref({
         basePath,
         blockId: item.block.id,
       }),
       meta: getRiskMeta(item.coverage),
+      priority: getRiskPriorityLabel(item.coverage),
+      recommendation: getRiskRecommendation(item.coverage),
       status: getRiskStatus(item.coverage),
       time: `${formatTime(item.block.start_time)} - ${formatTime(
         item.block.end_time,
@@ -751,27 +912,43 @@ function ResolveNow({
   return (
     <section className="space-y-3">
       <SectionHeader
+        action={
+          riskItems.length > 0 ? (
+            <Badge variant="outline">
+              {riskItems.length} riesgo{riskItems.length === 1 ? "" : "s"}{" "}
+              requieren tu atención
+            </Badge>
+          ) : null
+        }
         description={
           canManageSchedule
-            ? "Selecciona riesgos para editar tipo, requisito o entrenador comun."
+            ? "Selecciona riesgos para editar tipo, requisito o entrenador común."
             : "Lo primero que debería revisar un rol operativo está arriba."
         }
         title="Resolver ahora"
       />
 
       {riskItems.length === 0 ? (
-        <EmptyState
-          action={
+        <Card className="shadow-sm">
+          <CardContent className="grid gap-5 py-6 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+            <span className="flex size-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+              <CheckCircle2 aria-hidden="true" className="size-8" />
+            </span>
+            <div className="min-w-0">
+              <CardTitle>Todo cubierto para esta semana</CardTitle>
+              <CardDescription className="mt-1 max-w-2xl">
+                No hay clases sin cubrir, insuficientes, conflictos ni impacto
+                de ausencia en esta semana.
+              </CardDescription>
+            </div>
             <Button asChild variant="outline">
               <Link href={getSchedulePath({ organizationId, week: weekStart })}>
                 Revisar horario
-                <ArrowRight aria-hidden="true" />
+                <CalendarDays aria-hidden="true" />
               </Link>
             </Button>
-          }
-          description="No hay clases sin cubrir, insuficientes, conflictos ni impacto de ausencia en esta semana."
-          title="Todo cubierto para esta semana"
-        />
+          </CardContent>
+        </Card>
       ) : (
         <CoverageBulkResolveList
           assignments={
@@ -825,68 +1002,137 @@ function AllClasses({
   return (
     <section className="space-y-3">
       <SectionHeader
-        description="Lista compacta con el estado de cobertura de cada bloque."
+        action={<Badge variant="outline">{data.blocks.length} clases</Badge>}
+        description="Resumen de cobertura por día y clase."
         title="Todas las clases"
       />
-      <Card>
-        <CardContent className="divide-y divide-border">
+      <Card className="overflow-hidden shadow-sm">
+        <CardContent className="px-0">
           {data.blocks.length === 0 ? (
-            <div className="py-5">
+            <div className="px-4 py-5">
               <CardTitle>No hay bloques esta semana</CardTitle>
               <CardDescription className="mt-1">
                 Crea bloques o aplica una plantilla para revisar cobertura.
               </CardDescription>
             </div>
           ) : (
-            data.blocks.map((block) => {
-              const coverage = data.coverageByBlock.get(block.id);
-              const classType = classTypesById.get(block.class_type_id);
-              const center = centersById.get(block.center_id);
-              const state = coverage?.state ?? "inactive";
-              const absenceImpactLabel = coverage
-                ? getAbsenceImpactLabel(coverage)
-                : null;
+            <>
+              <div className="hidden bg-muted/35 px-4 py-3 text-xs font-medium text-muted-foreground lg:grid lg:grid-cols-[132px_84px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] lg:gap-4">
+                <span>Día</span>
+                <span>Hora</span>
+                <span>Clase</span>
+                <span>Centro</span>
+                <span>Entrenador</span>
+                <span>Estado</span>
+                <span className="text-right">Acciones</span>
+              </div>
+              <div className="divide-y divide-border">
+                {data.blocks.map((block) => {
+                  const coverage = data.coverageByBlock.get(block.id);
+                  const classType = classTypesById.get(block.class_type_id);
+                  const center = centersById.get(block.center_id);
+                  const state = coverage?.state ?? "inactive";
+                  const absenceImpactLabel = coverage
+                    ? getAbsenceImpactLabel(coverage)
+                    : null;
+                  const coachSummary = getCoverageCoachSummary({
+                    coachDisplaysById: data.coachDisplaysById,
+                    coverage,
+                  });
 
-              return (
-                <div
-                  className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[84px_minmax(0,1fr)_auto] sm:items-center"
-                  key={block.id}
-                >
-                  <p className="font-mono text-sm font-semibold">
-                    {formatTime(block.start_time)}
-                  </p>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-medium">
-                        {classType?.name ?? "Actividad"}
+                  return (
+                    <div
+                      className="grid gap-3 px-4 py-3 transition-colors hover:bg-muted/25 lg:grid-cols-[132px_84px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] lg:items-center lg:gap-4"
+                      key={block.id}
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        {formatServiceDate(block.service_date)}
                       </p>
+                      <p className="font-mono text-sm font-semibold">
+                        {formatTime(block.start_time)}
+                      </p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {classType?.name ?? "Actividad"}
+                        </p>
+                        {absenceImpactLabel ? (
+                          <Badge className="mt-1" variant="outline">
+                            {absenceImpactLabel}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {center?.name ?? "Centro no disponible"}
+                      </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <UserRound aria-hidden="true" className="size-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">
+                            {coachSummary.label}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {coachSummary.detail}
+                          </span>
+                        </span>
+                      </div>
                       <StatusBadge tone={getCoverageTone(coverage)}>
                         {getScheduleCoverageStateLabel(state)}
                       </StatusBadge>
-                      {absenceImpactLabel ? (
-                        <Badge variant="outline">{absenceImpactLabel}</Badge>
-                      ) : null}
+                      <div className="flex justify-start lg:justify-end">
+                        <Button asChild size="sm" variant="outline">
+                          <RouteStateButton
+                            data-operational-detail-trigger="coverage-block"
+                            href={getCoverageBlockHref({
+                              basePath,
+                              blockId: block.id,
+                            })}
+                          >
+                            Abrir
+                          </RouteStateButton>
+                        </Button>
+                      </div>
                     </div>
-                    <p className="mt-1 truncate text-sm text-muted-foreground">
-                      {formatServiceDate(block.service_date)} /{" "}
-                      {center?.name ?? "Centro no disponible"}
-                    </p>
-                  </div>
-                  <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
-                    <RouteStateButton
-                      data-operational-detail-trigger="coverage-block"
-                      href={getCoverageBlockHref({
-                        basePath,
-                        blockId: block.id,
-                      })}
-                    >
-                      Abrir
-                    </RouteStateButton>
-                  </Button>
-                </div>
-              );
-            })
+                  );
+                })}
+              </div>
+            </>
           )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function PendingActionStrip() {
+  return (
+    <section className="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <Card size="sm">
+        <CardContent className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+            <AlertTriangle aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>Pendiente de acción</CardTitle>
+            <CardDescription className="mt-1">
+              Avisos que conviene mirar después de los riesgos críticos.
+            </CardDescription>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="border-amber-200 bg-amber-50/40" size="sm">
+        <CardContent className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-amber-700 ring-1 ring-amber-200">
+            <CheckCircle2 aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>No hay avisos adicionales</CardTitle>
+            <CardDescription className="mt-1">
+              La prioridad sale del horario y de ausencias aprobadas o en
+              revisión.
+            </CardDescription>
+          </div>
         </CardContent>
       </Card>
     </section>
@@ -956,6 +1202,10 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
       <PageHeader
         actions={
           <div className="hidden flex-wrap gap-2 md:flex">
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium">
+              <CalendarDays aria-hidden="true" className="size-4" />
+              {formatWeekRange(week.weekStart, week.weekEnd)}
+            </span>
             <Button asChild variant="outline">
               <Link
                 href={getCoveragePath({
@@ -999,45 +1249,47 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
           </>
         }
         title="Cobertura"
-      >
-        <p className="text-sm text-muted-foreground">
-          {formatWeekRange(week.weekStart, week.weekEnd)}
-        </p>
-      </PageHeader>
+      />
 
-      <div className="grid grid-cols-3 gap-2 md:hidden">
-        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-          <Link
-            href={getCoveragePath({
-              organizationId: resolution.organization.id,
-              week: getAdjacentWeekStart(week.weekStart, -1),
-            })}
-          >
-            <ArrowLeft aria-hidden="true" />
-            Anterior
-          </Link>
-        </Button>
-        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-          <Link
-            href={getCoveragePath({
-              organizationId: resolution.organization.id,
-              week: currentWeek.weekStart,
-            })}
-          >
-            Hoy
-          </Link>
-        </Button>
-        <Button asChild className="min-h-11 md:min-h-10" variant="outline">
-          <Link
-            href={getCoveragePath({
-              organizationId: resolution.organization.id,
-              week: getAdjacentWeekStart(week.weekStart, 1),
-            })}
-          >
-            Siguiente
-            <ArrowRight aria-hidden="true" />
-          </Link>
-        </Button>
+      <div className="grid gap-2 md:hidden">
+        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium">
+          <CalendarDays aria-hidden="true" className="size-4" />
+          {formatWeekRange(week.weekStart, week.weekEnd)}
+        </span>
+        <div className="grid grid-cols-3 gap-2">
+          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+            <Link
+              href={getCoveragePath({
+                organizationId: resolution.organization.id,
+                week: getAdjacentWeekStart(week.weekStart, -1),
+              })}
+            >
+              <ArrowLeft aria-hidden="true" />
+              Anterior
+            </Link>
+          </Button>
+          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+            <Link
+              href={getCoveragePath({
+                organizationId: resolution.organization.id,
+                week: currentWeek.weekStart,
+              })}
+            >
+              Hoy
+            </Link>
+          </Button>
+          <Button asChild className="min-h-11 md:min-h-10" variant="outline">
+            <Link
+              href={getCoveragePath({
+                organizationId: resolution.organization.id,
+                week: getAdjacentWeekStart(week.weekStart, 1),
+              })}
+            >
+              Siguiente
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {week.invalidWeekParam ? (
@@ -1069,12 +1321,12 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         <Alert>
           <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
           <AlertDescription>
-            La cobertura se muestra sin cruzar ausencias aprobadas o en revision.
+            La cobertura se muestra sin cruzar ausencias aprobadas o en revisión.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      <CoverageOverview blockCount={data.blocks.length} riskItems={riskItems} />
+      <CoverageOverview data={data} riskItems={riskItems} />
 
       <ResolveNow
         assignments={data.assignments}
@@ -1084,30 +1336,14 @@ export default async function CoveragePage({ searchParams }: CoveragePageProps) 
         centersById={centersById}
         classTypes={data.classTypes}
         classTypesById={classTypesById}
+        coachDisplaysById={data.coachDisplaysById}
         coachOptions={data.assignableCoaches}
         organizationId={resolution.organization.id}
         riskItems={riskItems}
         weekStart={week.weekStart}
       />
 
-      <section className="space-y-3">
-        <SectionHeader
-          description="Avisos que conviene mirar después de los riesgos críticos."
-          title="Pendiente de acción"
-        />
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 aria-hidden="true" className="size-4" />
-              No hay avisos adicionales
-            </CardTitle>
-            <CardDescription>
-              Ahora la prioridad sale del horario y de ausencias aprobadas o en
-              revision, sin resolver cobertura automaticamente.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </section>
+      <PendingActionStrip />
 
       <AllClasses
         basePath={coverageBasePath}

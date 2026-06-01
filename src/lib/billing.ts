@@ -518,6 +518,53 @@ export async function createBillingPlanDraftVersion(
   return created ? success(created) : failure("billing-save-failed");
 }
 
+export async function updateBillingPlanDraftVersion(input: {
+  billingPlanVersionId: string;
+  draft: BillingPlanDraftInput;
+}): Promise<BillingResult<BillingPlanVersionMutation>> {
+  if (!isPostgresUuid(input.billingPlanVersionId)) {
+    return failure("invalid-input");
+  }
+
+  const clientResult = await getAuthenticatedBillingClient();
+
+  if (!clientResult.ok) {
+    return clientResult;
+  }
+
+  const { data, error } =
+    await clientResult.data.rpc<BillingPlanVersionMutation[]>(
+      "update_billing_plan_draft_version",
+      {
+        target_annual_price_cents: input.draft.annualPriceCents,
+        target_billing_plan_version_id: input.billingPlanVersionId,
+        target_center_limit: input.draft.centerLimit,
+        target_description: input.draft.description,
+        target_display_name: input.draft.displayName,
+        target_features: input.draft.features,
+        target_future_client_limit: input.draft.futureClientLimit,
+        target_monthly_price_cents: input.draft.monthlyPriceCents,
+        target_plan_code: input.draft.planCode,
+        target_setup_description: input.draft.setupDescription,
+        target_setup_price_cents: input.draft.setupPriceCents,
+        target_staff_seat_limit: input.draft.staffSeatLimit,
+        target_storage_gb: input.draft.storageGb,
+        target_stripe_annual_price_id: input.draft.stripeAnnualPriceId,
+        target_stripe_monthly_price_id: input.draft.stripeMonthlyPriceId,
+        target_stripe_product_id: input.draft.stripeProductId,
+        target_support_level: input.draft.supportLevel,
+      },
+    );
+
+  if (error) {
+    return failure(mapBillingDatabaseError(error, "billing-save-failed"));
+  }
+
+  const [updated] = data ?? [];
+
+  return updated ? success(updated) : failure("billing-save-failed");
+}
+
 export async function publishBillingPlanVersion(
   billingPlanVersionId: string,
 ): Promise<BillingResult<BillingPlanVersionMutation>> {
@@ -645,7 +692,33 @@ export function formatPlanPrice(plan: {
           style: "currency",
         }).format(plan.annual_price_cents / 100);
 
-  return annual ? `${monthly}/mes o ${annual}/ano` : `${monthly}/mes`;
+  return annual ? `${monthly}/mes o ${annual}/año` : `${monthly}/mes`;
+}
+
+export function getPlanAnnualDiscountPercent(plan: {
+  annual_price_cents?: number | null;
+  monthly_price_cents?: number | null;
+}) {
+  if (
+    typeof plan.monthly_price_cents !== "number" ||
+    typeof plan.annual_price_cents !== "number" ||
+    plan.monthly_price_cents <= 0 ||
+    plan.annual_price_cents <= 0
+  ) {
+    return null;
+  }
+
+  const annualizedMonthlyPrice = plan.monthly_price_cents * 12;
+
+  if (plan.annual_price_cents >= annualizedMonthlyPrice) {
+    return null;
+  }
+
+  const discountPercent = Math.round(
+    (1 - plan.annual_price_cents / annualizedMonthlyPrice) * 100,
+  );
+
+  return discountPercent > 0 ? discountPercent : null;
 }
 
 export function getBillingPlanMonthlySortValue(plan: {
@@ -657,7 +730,7 @@ export function getBillingPlanMonthlySortValue(plan: {
   }
 
   if (typeof plan.annual_price_cents === "number") {
-    return Math.round(plan.annual_price_cents / 10);
+    return Math.round(plan.annual_price_cents / 12);
   }
 
   return Number.POSITIVE_INFINITY;

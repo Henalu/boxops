@@ -19,14 +19,16 @@ import {
   archiveScheduleTemplate,
   applyScheduleTemplateToWeek,
   createScheduleTemplate,
-  createScheduleTemplateBlock,
   restoreScheduleTemplate,
   updateScheduleTemplate,
   updateScheduleTemplateBlock,
 } from "./actions";
 import { TemplateArchiveSubmit } from "./template-archive-submit";
 import { TemplateApplySubmit } from "./template-apply-submit";
-import { TemplateBlocksEditor } from "./template-blocks-editor";
+import {
+  TemplateBlockCreateForm,
+  TemplateBlocksEditor,
+} from "./template-blocks-editor";
 import { TemplateExpansionControls } from "./template-expansion-controls";
 import {
   CollapsibleActionPanel,
@@ -74,6 +76,7 @@ import {
   getScheduleTemplateDefaultCoachDetail,
   getScheduleTemplateDefaultCoachLabel,
   getScheduleTemplateDayLabel,
+  getScheduleTemplateEditorSettings,
   getScheduleTemplateRequiredCoachesLabel,
   getScheduleTemplateStatusLabel,
   scheduleTemplateBlockRequiresCoach,
@@ -103,6 +106,7 @@ type ScheduleTemplateRow = Pick<
   | "archived_at"
   | "center_id"
   | "id"
+  | "metadata"
   | "name"
   | "recoverable_until"
   | "status"
@@ -195,7 +199,10 @@ const templateDayShortLabels: Record<TemplateDay, string> = {
 
 const successMessages: Record<string, string> = {
   "template-archived": "Plantilla archivada.",
+  "template-block-copied": "Bloque de plantilla copiado.",
   "template-block-created": "Bloque de plantilla creado.",
+  "template-blocks-copied": "Bloques de plantilla copiados.",
+  "template-blocks-created": "Bloques de plantilla creados.",
   "template-block-updated": "Bloque de plantilla actualizado.",
   "template-created": "Plantilla creada.",
   "template-restored": "Plantilla recuperada como borrador.",
@@ -214,6 +221,8 @@ const errorMessages: Record<string, string> = {
   "invalid-date": "Usa fechas válidas para la plantilla.",
   "invalid-date-range": "La fecha fin no puede ser anterior a la fecha inicio.",
   "invalid-day": "El día de la semana no es válido.",
+  "invalid-editor-time":
+    "El horario visible de la plantilla debe tener inicio y fin válidos.",
   "invalid-reference":
     "Alguna referencia de plantilla ya no está disponible.",
   "invalid-required-coaches":
@@ -236,6 +245,8 @@ const errorMessages: Record<string, string> = {
     "Para archivar una plantilla usa Eliminar plantilla y confirma el aviso.",
   "template-block-delete-confirmation-required":
     "Para eliminar bloques de plantilla confirma el aviso.",
+  "template-block-duplicate":
+    "Ya existe un bloque igual en ese día, centro, actividad y horario.",
   "template-block-required": "No se ha recibido el bloque de plantilla.",
   "template-empty": "La plantilla necesita al menos un bloque antes de aplicarse.",
   "template-not-active": "Solo se pueden aplicar plantillas activas.",
@@ -275,7 +286,7 @@ async function getScheduleTemplates(organizationId: string) {
   const { data, error } = await supabase
     .from("schedule_templates")
     .select(
-      "id, center_id, name, status, valid_from, valid_until, archived_at, recoverable_until, updated_at",
+      "id, center_id, name, status, valid_from, valid_until, archived_at, recoverable_until, metadata, updated_at",
     )
     .eq("organization_id", organizationId)
     .eq("template_type", "weekly")
@@ -1140,6 +1151,8 @@ function TemplateMetaForm({
   view: TemplateView;
   weekStart: string;
 }) {
+  const editorSettings = getScheduleTemplateEditorSettings(template.metadata);
+
   return (
     <form
       action={updateScheduleTemplate}
@@ -1186,6 +1199,26 @@ function TemplateMetaForm({
           defaultValue={template.valid_until ?? ""}
           name="validUntil"
           type="date"
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Horario desde</span>
+        <Input
+          defaultValue={editorSettings.startTime}
+          name="editorStartTime"
+          required
+          type="time"
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Horario hasta</span>
+        <Input
+          defaultValue={editorSettings.endTime}
+          name="editorEndTime"
+          required
+          type="time"
         />
       </label>
 
@@ -1305,74 +1338,6 @@ function TemplateBlockFields({
         />
       </label>
     </>
-  );
-}
-
-function TemplateBlockCreateForm({
-  activeCenters,
-  activeClassTypes,
-  assignableCoaches,
-  centers,
-  organizationId,
-  selectedDay,
-  templateCenterId,
-  templateId,
-  view,
-  weekStart,
-}: {
-  activeCenters: CenterRow[];
-  activeClassTypes: ClassTypeRow[];
-  assignableCoaches: CoachDisplay[];
-  centers: CenterRow[];
-  organizationId: string;
-  selectedDay: TemplateDay;
-  templateCenterId?: string | null;
-  templateId: string;
-  view: TemplateView;
-  weekStart: string;
-}) {
-  const hasUsableCenter = templateCenterId
-    ? centers.some((center) => center.id === templateCenterId)
-    : activeCenters.length > 0;
-  const canCreate = hasUsableCenter && activeClassTypes.length > 0;
-  const centerOptions = templateCenterId ? centers : activeCenters;
-
-  return (
-    <InlineEditDetails label="Añadir bloque">
-      <form
-        action={createScheduleTemplateBlock}
-        className="grid gap-4 lg:grid-cols-6"
-      >
-        <TemplateHiddenInputs
-          organizationId={organizationId}
-          selectedDay={selectedDay}
-          templateId={templateId}
-          view={view}
-          weekStart={weekStart}
-        />
-        <TemplateBlockFields
-          assignableCoaches={assignableCoaches}
-          centers={centerOptions}
-          classTypes={activeClassTypes}
-          defaultDay={selectedDay}
-          disabled={!canCreate}
-          templateCenterId={templateCenterId}
-        />
-        <div className="flex items-end lg:col-span-6">
-          <Button disabled={!canCreate} type="submit">
-            <Plus aria-hidden="true" />
-            Crear bloque de plantilla
-          </Button>
-        </div>
-      </form>
-
-      {!canCreate ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Hace falta un centro disponible y un tipo de actividad activo antes de
-          crear bloques de plantilla.
-        </p>
-      ) : null}
-    </InlineEditDetails>
   );
 }
 
@@ -2269,7 +2234,7 @@ function TemplateArchiveDangerZone({
           Eliminar plantilla
         </p>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Archiva esta plantilla durante 30 dias. Los horarios ya generados se
+          Archiva esta plantilla durante 30 días. Los horarios ya generados se
           conservan sin cambios.
         </p>
       </div>
@@ -2413,6 +2378,7 @@ function TemplateCard({
   ).length;
   const vacantBlockCount = blocksRequiringCoach.length - assignedBlockCount;
   const noRequirementBlockCount = blocks.length - blocksRequiringCoach.length;
+  const editorSettings = getScheduleTemplateEditorSettings(template.metadata);
 
   return (
     <Card>
@@ -2457,12 +2423,15 @@ function TemplateCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <MetaGrid className="lg:grid-cols-3">
+        <MetaGrid className="lg:grid-cols-4">
           <MetaItem label="Válida desde">
             {formatDate(template.valid_from)}
           </MetaItem>
           <MetaItem label="Válida hasta">
             {formatDate(template.valid_until)}
+          </MetaItem>
+          <MetaItem label="Horario visible">
+            {editorSettings.startTime} - {editorSettings.endTime}
           </MetaItem>
           <MetaItem label="Al aplicar">
             Crea horarios y asigna entrenadores por defecto cuando corresponde.
@@ -2540,31 +2509,52 @@ function TemplateCard({
                   : "Lista completa ordenada por día y hora."}
               </p>
             </div>
-            <Badge variant="outline">{blocks.length} total</Badge>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {canManageTemplates && !templateArchived ? (
+                <TemplateBlockCreateForm
+                  activeCenters={activeCenters}
+                  activeClassTypes={activeClassTypes}
+                  assignableCoaches={assignableCoaches}
+                  centers={centers}
+                  editorSettings={editorSettings}
+                  organizationId={organizationId}
+                  selectedDay={selectedDay}
+                  templateCenterId={template.center_id}
+                  templateId={template.id}
+                  view={view}
+                  weekStart={weekStart}
+                />
+              ) : null}
+              <Badge variant="outline">{blocks.length} total</Badge>
+            </div>
           </div>
 
-          {blocks.length === 0 ? (
+          {canManageTemplates && !templateArchived ? (
+            <TemplateBlocksEditor
+              activeCenters={activeCenters}
+              activeClassTypes={activeClassTypes}
+              assignableCoaches={assignableCoaches}
+              blocks={blocks}
+              centers={centers}
+              classTypes={classTypes}
+              coachDisplays={Array.from(coachDisplaysById.values())}
+              editorSettings={editorSettings}
+              initialEditBlockId={editBlockId}
+              initialSelectedDay={selectedDay}
+              mode={view}
+              organizationId={organizationId}
+              templateCenterId={template.center_id}
+              templateId={template.id}
+              view={view}
+              weekStart={weekStart}
+            />
+          ) : blocks.length === 0 ? (
             <div className="rounded-lg border border-border p-4">
               <p className="text-sm text-muted-foreground">
                 Esta plantilla todavía no tiene bloques. Añade el primer bloque
                 antes de aplicarla a una semana.
               </p>
             </div>
-          ) : canManageTemplates && !templateArchived ? (
-            <TemplateBlocksEditor
-              assignableCoaches={assignableCoaches}
-              blocks={blocks}
-              centers={centers}
-              classTypes={classTypes}
-              coachDisplays={Array.from(coachDisplaysById.values())}
-              initialEditBlockId={editBlockId}
-              initialSelectedDay={selectedDay}
-              mode={view}
-              organizationId={organizationId}
-              templateCenterId={template.center_id}
-              view={view}
-              weekStart={weekStart}
-            />
           ) : view === "week" ? (
             <TemplateBlocksWeekView
               assignableCoaches={assignableCoaches}
@@ -2600,21 +2590,6 @@ function TemplateCard({
             />
           )}
         </section>
-
-        {canManageTemplates && !templateArchived ? (
-          <TemplateBlockCreateForm
-            activeCenters={activeCenters}
-            activeClassTypes={activeClassTypes}
-            assignableCoaches={assignableCoaches}
-            centers={centers}
-            organizationId={organizationId}
-            selectedDay={selectedDay}
-            templateCenterId={template.center_id}
-            templateId={template.id}
-            view={view}
-            weekStart={weekStart}
-          />
-        ) : null}
           </div>
         </details>
       </CardContent>

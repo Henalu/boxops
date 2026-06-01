@@ -4,11 +4,14 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
+  ChevronRight,
   CreditCard,
   Database,
   MapPin,
   ReceiptText,
   ShieldCheck,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 
 import { changeTenantBillingPlanAction } from "@/lib/billing-actions";
@@ -16,6 +19,7 @@ import {
   formatPlanLimit,
   formatPlanPrice,
   getOrganizationBillingOverview,
+  getPlanAnnualDiscountPercent,
   listBillingActiveCenters,
   listPublishedBillingPlans,
   type BillingCenterOption,
@@ -23,22 +27,20 @@ import {
   type BillingPlanVersion,
   type OrganizationBillingOverview,
 } from "@/lib/billing";
-import {
-  PageHeader,
-  SectionHeader,
-} from "@/components/features/operations-ui";
+import { PageHeader } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
   canReadTenantBilling,
@@ -49,7 +51,8 @@ import {
   getAuthenticatedUser,
   resolveActiveOrganization,
 } from "@/lib/auth/tenant";
-import { getCentersPath } from "@/lib/navigation/app-paths";
+import { getAppPath, getCentersPath } from "@/lib/navigation/app-paths";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -73,25 +76,25 @@ const planOrder = [
 
 const successMessages: Record<string, string> = {
   "plan-changed":
-    "Plan actualizado. La organizacion ya usa el nuevo snapshot comercial.",
+    "Plan actualizado. La organización ya usa el nuevo snapshot comercial.",
   "plan-changed-centers-deactivated":
     "Plan actualizado. Los centros no seleccionados han quedado inactivos.",
 };
 
 const errorMessages: Partial<Record<BillingErrorCode, string>> = {
-  "authentication-required": "Inicia sesion para revisar el plan.",
+  "authentication-required": "Inicia sesión para revisar el plan.",
   "billing-catalog-load-failed":
-    "No se pudo cargar la informacion comercial de la organizacion.",
+    "No se pudo cargar la información comercial de la organización.",
   "billing-change-forbidden": "Tu rol no permite cambiar el plan.",
-  "billing-plan-not-found": "Ese plan ya no esta disponible.",
+  "billing-plan-not-found": "Ese plan ya no está disponible.",
   "billing-save-failed": "No se pudo guardar el cambio de plan.",
   "downgrade-selection-invalid":
-    "La seleccion de centros no pertenece a esta organizacion.",
+    "La selección de centros no pertenece a esta organización.",
   "downgrade-selection-required":
     "El nuevo plan incluye menos centros activos. Elige cuales se mantienen activos.",
   forbidden: "Tu rol no permite ver la facturacion.",
-  "invalid-input": "La solicitud no tiene datos validos.",
-  "invalid-plan-code": "El codigo de plan no es valido.",
+  "invalid-input": "La solicitud no tiene datos válidos.",
+  "invalid-plan-code": "El código de plan no es válido.",
 };
 
 const subscriptionStatusLabels: Record<string, string> = {
@@ -187,6 +190,83 @@ function BillingFeedback({
   return null;
 }
 
+function formatStorageLimit(value: number | null) {
+  return value === null ? "A medida" : `${formatPlanLimit(value)} GB`;
+}
+
+function BillingPlansHero({
+  organizationId,
+  organizationName,
+  roleLabel,
+}: {
+  organizationId: string;
+  organizationName: string;
+  roleLabel: string;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav
+          aria-label="Ruta"
+          className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
+        >
+          <Link
+            className="rounded-md outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            href={getAppPath("/app", { organizationId })}
+          >
+            Inicio
+          </Link>
+          <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+          <span className="min-w-0 truncate text-foreground">
+            Plan y facturacion
+          </span>
+        </nav>
+        <Badge className="min-h-7 px-2.5" variant="outline">
+          <ReceiptText aria-hidden="true" className="size-3.5" />
+          Catalogo versionado
+        </Badge>
+      </div>
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold leading-tight">
+            <span className="sr-only">Plan y facturacion - </span>
+            Planes disponibles
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+            Cada cambio aplica un snapshot de precio y límites a esta
+            organización. No se piden datos de tarjeta.
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Badge variant="secondary">{organizationName}</Badge>
+          <Badge variant="outline">{roleLabel}</Badge>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PlanLimitMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="grid min-w-0 justify-items-center gap-1 text-center">
+      <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+      <p className="max-w-full truncate font-semibold">{value}</p>
+      <p className="max-w-full truncate text-xs text-muted-foreground">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 function UsageLine({
   description,
   label,
@@ -198,6 +278,11 @@ function UsageLine({
   limit: number | null;
   used: number | null;
 }) {
+  const percent =
+    typeof used === "number" && typeof limit === "number" && limit > 0
+      ? Math.min(100, Math.round((used / limit) * 100))
+      : null;
+
   return (
     <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-3">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -207,6 +292,21 @@ function UsageLine({
           {formatPlanLimit(limit)}
         </p>
       </div>
+      {percent !== null ? (
+        <div
+          aria-label={`${label}: ${percent}% usado`}
+          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          role="meter"
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={percent}
+        >
+          <div
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      ) : null}
       {description ? (
         <p className="text-xs leading-5 text-muted-foreground">
           {description}
@@ -216,74 +316,82 @@ function UsageLine({
   );
 }
 
-function CurrentPlanCard({
+function CurrentPlanPanel({
   overview,
 }: {
   overview: OrganizationBillingOverview;
 }) {
+  const annualDiscountPercent = getPlanAnnualDiscountPercent(overview);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CreditCard aria-hidden="true" className="size-4" />
-          Plan actual
-        </CardTitle>
-        <CardDescription>
-          Snapshot efectivo de precio y limites. Si el catalogo cambia, esta
-          organizacion conserva estos valores hasta cambiar de plan.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <CreditCard aria-hidden="true" className="size-4" />
+          </span>
           <div className="min-w-0">
-            <h2 className="truncate text-xl font-semibold tracking-tight">
-              {overview.display_name}
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {overview.description}
+            <h2 className="text-lg font-semibold">Plan actual</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Snapshot efectivo de precio y límites. Si el catálogo cambia,
+              esta organización conserva estos valores hasta cambiar de plan.
             </p>
           </div>
-          <Badge variant={getStatusVariant(overview.subscription_status)}>
-            {subscriptionStatusLabels[overview.subscription_status] ??
-              overview.subscription_status}
-          </Badge>
         </div>
+        <Badge variant={getStatusVariant(overview.subscription_status)}>
+          {subscriptionStatusLabels[overview.subscription_status] ??
+            overview.subscription_status}
+        </Badge>
+      </div>
 
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Precio</dt>
-            <dd className="mt-1 font-medium">{formatPlanPrice(overview)}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Version</dt>
-            <dd className="mt-1 font-mono text-xs">
-              {overview.plan_version ?? "legacy"}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Setup</dt>
-            <dd className="mt-1 font-medium">
-              {formatCents(overview.setup_price_cents, "A medida")}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-muted-foreground">Soporte</dt>
-            <dd className="mt-1 font-medium">
-              {overview.support_level ?? "Manual"}
-            </dd>
-          </div>
-        </dl>
-
-        <p className="text-xs leading-5 text-muted-foreground">
-          Precios founder sin IVA. El pago se conectara mas adelante; no hay
-          datos bancarios ni cobro real en este corte.
+      <div className="mt-5 min-w-0">
+        <h3 className="truncate text-xl font-semibold">
+          {overview.display_name}
+        </h3>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {overview.description}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+
+      <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="min-w-0 rounded-lg bg-muted/30 p-3">
+          <dt className="text-muted-foreground">Precio</dt>
+          <dd className="mt-1 font-medium">{formatPlanPrice(overview)}</dd>
+          {annualDiscountPercent ? (
+            <dd className="mt-1 text-xs text-primary">
+              Ahorro anual {annualDiscountPercent}%
+            </dd>
+          ) : null}
+        </div>
+        <div className="min-w-0 rounded-lg bg-muted/30 p-3">
+          <dt className="text-muted-foreground">Version</dt>
+          <dd className="mt-1 font-mono text-xs">
+            {overview.plan_version ?? "legacy"}
+          </dd>
+        </div>
+        <div className="min-w-0 rounded-lg bg-muted/30 p-3">
+          <dt className="text-muted-foreground">Setup</dt>
+          <dd className="mt-1 font-medium">
+            {formatCents(overview.setup_price_cents, "A medida")}
+          </dd>
+        </div>
+        <div className="min-w-0 rounded-lg bg-muted/30 p-3">
+          <dt className="text-muted-foreground">Soporte</dt>
+          <dd className="mt-1 font-medium">
+            {overview.support_level ?? "Manual"}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="mt-4 text-xs leading-5 text-muted-foreground">
+        Precios founder sin IVA. El pago se conectara mas adelante; no hay
+        datos bancarios ni cobro real en este corte.
+      </p>
+    </article>
   );
 }
 
-function UsageCard({
+function UsagePanel({
   centersPath,
   overview,
 }: {
@@ -291,18 +399,21 @@ function UsageCard({
   overview: OrganizationBillingOverview;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <article className="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <MapPin aria-hidden="true" className="size-4" />
-          Uso y limites
-        </CardTitle>
-        <CardDescription>
-          Los centros activos ya se aplican al crear nuevos centros. El resto de
-          limites queda preparado como contrato comercial.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3">
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">Uso y límites</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Los centros activos ya se aplican al crear nuevos centros. El resto
+            de límites queda preparado como contrato comercial.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3">
         <UsageLine
           label="Centros activos"
           limit={overview.effective_center_limit}
@@ -332,8 +443,8 @@ function UsageCard({
             <ArrowRight aria-hidden="true" />
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }
 
@@ -356,8 +467,8 @@ function DowngradeCenterSelector({
           </p>
           <p className="mt-1 text-xs leading-5 text-orange-900/85">
             El plan {planCode} permite {formatPlanLimit(limit)} centros. Los no
-            seleccionados pasaran a inactivos: no admitiran nueva operativa ni
-            reservas futuras, pero conservaran historico, horarios,
+            seleccionados pasarán a inactivos: no admitirán nueva operativa ni
+            reservas futuras, pero conservarán histórico, horarios,
             asignaciones y documentos vinculados.
           </p>
         </div>
@@ -394,15 +505,59 @@ function DowngradeCenterSelector({
   );
 }
 
+function DowngradePlanRequestDisclosure({
+  activeCenters,
+  featured,
+  limit,
+  planCode,
+}: {
+  activeCenters: BillingCenterOption[];
+  featured: boolean;
+  limit: number;
+  planCode: string;
+}) {
+  return (
+    <details className="group grid gap-3">
+      <summary className="list-none rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <span
+          className={cn(
+            buttonVariants({
+              className: "w-full cursor-pointer",
+              variant: featured ? "default" : "outline",
+            }),
+          )}
+        >
+          <ReceiptText aria-hidden="true" />
+          Solicitar cambio manual
+        </span>
+      </summary>
+
+      <div className="grid gap-3 pt-3">
+        <DowngradeCenterSelector
+          activeCenters={activeCenters}
+          limit={limit}
+          planCode={planCode}
+        />
+        <Button className="w-full" type="submit">
+          <ReceiptText aria-hidden="true" />
+          Confirmar cambio manual
+        </Button>
+      </div>
+    </details>
+  );
+}
+
 function PlanOptionCard({
   activeCenters,
   canChangePlan,
+  featured,
   organizationId,
   overview,
   plan,
 }: {
   activeCenters: BillingCenterOption[];
   canChangePlan: boolean;
+  featured: boolean;
   organizationId: string;
   overview: OrganizationBillingOverview;
   plan: BillingPlanVersion;
@@ -413,111 +568,264 @@ function PlanOptionCard({
   const requiresCenterSelection =
     plan.center_limit !== null &&
     overview.active_centers_count > plan.center_limit;
-  const storageLabel =
-    plan.storage_gb === null ? "A medida" : `${formatPlanLimit(plan.storage_gb)} GB`;
+  const isCustomPrice = plan.monthly_price_cents === null;
+  const monthlyPrice = formatCents(plan.monthly_price_cents);
+  const annualPrice =
+    plan.annual_price_cents === null
+      ? null
+      : formatCents(plan.annual_price_cents);
+  const annualDiscountPercent = getPlanAnnualDiscountPercent(plan);
 
   return (
-    <Card size="sm">
-      <CardContent className="grid gap-4">
-        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+    <article
+      className={cn(
+        "flex h-full flex-col rounded-xl border bg-card p-4 text-card-foreground shadow-sm",
+        "transition-colors hover:border-primary/35 sm:p-5",
+        featured || isCurrentPlan
+          ? "border-primary/45 ring-1 ring-primary/25"
+          : "border-border",
+      )}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {featured ? (
+              <Badge className="bg-primary/10 text-primary" variant="secondary">
+                Mas popular
+              </Badge>
+            ) : null}
+            {isCurrentPlan ? <Badge>Actual</Badge> : null}
+            <Badge variant="outline">v{plan.version}</Badge>
+          </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold tracking-tight">
-                {plan.display_name}
-              </h3>
-              {isCurrentPlan ? <Badge>Actual</Badge> : null}
-              <Badge variant="outline">v{plan.version}</Badge>
-            </div>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <h3 className="text-xl font-semibold">{plan.display_name}</h3>
+            <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
               {plan.description}
             </p>
           </div>
-          <div className="text-right">
-            <p className="font-semibold">{formatPlanPrice(plan)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">sin IVA</p>
-          </div>
         </div>
+      </div>
 
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-muted-foreground">Centros</dt>
-            <dd className="mt-1 font-medium">
-              {formatPlanLimit(plan.center_limit)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Equipo</dt>
-            <dd className="mt-1 font-medium">
-              {formatPlanLimit(plan.staff_seat_limit)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Clientes futuros</dt>
-            <dd className="mt-1 font-medium">
-              {formatPlanLimit(plan.future_client_limit)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Almacenamiento</dt>
-            <dd className="mt-1 font-medium">{storageLabel}</dd>
-          </div>
-        </dl>
-
-        <div className="grid gap-2 text-sm text-muted-foreground">
-          <p>
-            Setup: {formatCents(plan.setup_price_cents, "A medida")}
-            {plan.setup_description ? ` - ${plan.setup_description}` : ""}
+      <div className="mt-6">
+        {isCustomPrice ? (
+          <p className="text-3xl font-semibold">A medida</p>
+        ) : (
+          <p className="flex flex-wrap items-baseline gap-2">
+            <span className="text-3xl font-semibold">{monthlyPrice}</span>
+            <span className="text-lg text-muted-foreground">/mes</span>
           </p>
-          <p>{plan.support_level}</p>
-        </div>
-
-        {plan.features.length > 0 ? (
-          <ul className="grid gap-1.5 text-sm text-muted-foreground sm:grid-cols-2">
-            {plan.features.slice(0, 6).map((feature) => (
-              <li className="flex min-w-0 items-start gap-2" key={feature}>
-                <CheckCircle2
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
+        )}
+        <p className="mt-2 text-sm font-medium">
+          {annualPrice ? `o ${annualPrice}/año` : "Contrato manual"}
+          <Badge className="ml-2 align-middle" variant="secondary">
+            sin IVA
+          </Badge>
+        </p>
+        {annualDiscountPercent ? (
+          <p className="mt-1 text-sm font-medium text-primary">
+            Ahorro anual {annualDiscountPercent}%
+          </p>
         ) : null}
+      </div>
 
+      <div className="mt-6 grid grid-cols-2 gap-3 border-y border-border py-4 text-sm sm:grid-cols-4">
+        <PlanLimitMetric
+          icon={MapPin}
+          label="Centros"
+          value={formatPlanLimit(plan.center_limit)}
+        />
+        <PlanLimitMetric
+          icon={UsersRound}
+          label="Equipo"
+          value={formatPlanLimit(plan.staff_seat_limit)}
+        />
+        <PlanLimitMetric
+          icon={ShieldCheck}
+          label="Clientes futuros"
+          value={formatPlanLimit(plan.future_client_limit)}
+        />
+        <PlanLimitMetric
+          icon={Database}
+          label="Almacenamiento"
+          value={formatStorageLimit(plan.storage_gb)}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
+        <p>
+          Setup: {formatCents(plan.setup_price_cents, "A medida")}
+          {plan.setup_description ? ` - ${plan.setup_description}` : ""}
+        </p>
+        <p>{plan.support_level}</p>
+      </div>
+
+      {plan.features.length > 0 ? (
+        <ul className="mt-5 grid gap-2 text-sm text-muted-foreground">
+          {plan.features.slice(0, 6).map((feature) => (
+            <li className="flex min-w-0 items-start gap-2" key={feature}>
+              <CheckCircle2
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-primary"
+              />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="mt-auto pt-6">
         {!canChangePlan ? (
-          <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
-            Tu rol puede revisar planes, pero solo el propietario puede cambiar
-            el plan de la organizacion.
-          </p>
+          <Button className="w-full" disabled variant="outline">
+            <ReceiptText aria-hidden="true" />
+            Solo propietario
+          </Button>
         ) : (
           <form action={changeTenantBillingPlanAction} className="grid gap-3">
             <input name="organizationId" type="hidden" value={organizationId} />
             <input name="planCode" type="hidden" value={plan.plan_code} />
             <input name="version" type="hidden" value={plan.version} />
 
-            {requiresCenterSelection && plan.center_limit !== null ? (
-              <DowngradeCenterSelector
+            {isCurrentPlan ? (
+              <Button className="w-full" disabled type="submit">
+                <ReceiptText aria-hidden="true" />
+                Plan actual
+              </Button>
+            ) : requiresCenterSelection && plan.center_limit !== null ? (
+              <DowngradePlanRequestDisclosure
                 activeCenters={activeCenters}
+                featured={featured}
                 limit={plan.center_limit}
                 planCode={plan.display_name}
               />
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button disabled={isCurrentPlan} type="submit">
+            ) : (
+              <Button
+                className="w-full"
+                type="submit"
+                variant={featured ? "default" : "outline"}
+              >
                 <ReceiptText aria-hidden="true" />
-                {isCurrentPlan ? "Plan actual" : "Solicitar cambio manual"}
+                Solicitar cambio manual
               </Button>
-              <p className="text-xs leading-5 text-muted-foreground">
-                El cambio queda manual hasta conectar el pago. El precio anual
-                equivale a 10 meses.
-              </p>
-            </div>
+            )}
           </form>
         )}
-      </CardContent>
-    </Card>
+        <p className="mt-3 text-center text-xs leading-5 text-muted-foreground">
+          El cambio queda manual hasta conectar el pago. El ahorro anual se
+          conserva en el snapshot contratado.
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function PlanGuidanceCard() {
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ShieldCheck aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold">
+              No sabes que plan elegir?
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Compara los planes en detalle o contacta con nuestro equipo para
+              asesorarte.
+            </p>
+          </div>
+        </div>
+        <Button asChild className="w-full sm:w-auto" variant="outline">
+          <a href="#plan-comparison">
+            Ver comparacion
+            <ArrowRight aria-hidden="true" />
+          </a>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function PlanComparisonSection({
+  overview,
+  plans,
+}: {
+  overview: OrganizationBillingOverview;
+  plans: BillingPlanVersion[];
+}) {
+  return (
+    <section className="scroll-mt-24 space-y-3" id="plan-comparison">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">Comparacion de planes</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Límites publicados del catálogo. El plan actual conserva su
+            snapshot hasta que se solicita otro cambio.
+          </p>
+        </div>
+        <Badge variant="secondary">Actual: {overview.display_name}</Badge>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Plan</TableHead>
+              <TableHead>Precio</TableHead>
+              <TableHead>Centros</TableHead>
+              <TableHead>Equipo</TableHead>
+              <TableHead>Clientes futuros</TableHead>
+              <TableHead>Storage</TableHead>
+              <TableHead>Soporte</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {plans.map((plan) => {
+              const isCurrentPlan =
+                overview.plan_code === plan.plan_code &&
+                overview.plan_version === plan.version;
+
+              return (
+                <TableRow key={`${plan.plan_code}-${plan.version}`}>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <span>{plan.display_name}</span>
+                      {isCurrentPlan ? <Badge>Actual</Badge> : null}
+                    </span>
+                  </TableCell>
+                  <TableCell>{formatPlanPrice(plan)}</TableCell>
+                  <TableCell>{formatPlanLimit(plan.center_limit)}</TableCell>
+                  <TableCell>
+                    {formatPlanLimit(plan.staff_seat_limit)}
+                  </TableCell>
+                  <TableCell>
+                    {formatPlanLimit(plan.future_client_limit)}
+                  </TableCell>
+                  <TableCell>{formatStorageLimit(plan.storage_gb)}</TableCell>
+                  <TableCell>{plan.support_level}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+function BillingSummarySection({
+  centersPath,
+  overview,
+}: {
+  centersPath: string;
+  overview: OrganizationBillingOverview;
+}) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.82fr)]">
+      <CurrentPlanPanel overview={overview} />
+      <UsagePanel centersPath={centersPath} overview={overview} />
+    </section>
   );
 }
 
@@ -527,7 +835,7 @@ function BillingLoadError() {
       <AlertCircle aria-hidden="true" />
       <AlertTitle>No se pudo cargar la facturacion</AlertTitle>
       <AlertDescription>
-        Revisa la base local o los permisos de la organizacion activa.
+        Revisa la base local o los permisos de la organización activa.
       </AlertDescription>
     </Alert>
   );
@@ -554,7 +862,7 @@ export default async function BillingSettingsPage({
       <div className="space-y-6">
         <PageHeader
           badge="Plan"
-          description="Plan comercial, limites y uso de la organizacion."
+          description="Plan comercial, límites y uso de la organización."
           title="Plan y facturacion"
         />
         <OrganizationResolutionState
@@ -586,8 +894,8 @@ export default async function BillingSettingsPage({
           <ShieldCheck aria-hidden="true" />
           <AlertTitle>Modo lectura no disponible</AlertTitle>
           <AlertDescription>
-            Esta informacion comercial esta reservada al propietario de la
-            organizacion y administradores autorizados.
+            Esta información comercial está reservada al propietario de la
+            organización y administradores autorizados.
           </AlertDescription>
         </Alert>
       </div>
@@ -606,19 +914,16 @@ export default async function BillingSettingsPage({
   const centersPath = getCentersPath({
     organizationId: resolution.organization.id,
   });
+  const featuredPlanCode = plans.some((plan) => plan.plan_code === "starter")
+    ? "starter"
+    : plans[0]?.plan_code;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        badge="Plan"
-        description="Founder pricing sin IVA, limites efectivos y cambios manuales mientras Stripe queda preparado para mas adelante."
-        meta={
-          <>
-            <Badge variant="secondary">{resolution.organization.name}</Badge>
-            <Badge variant="outline">{roleLabel}</Badge>
-          </>
-        }
-        title="Plan y facturacion"
+      <BillingPlansHero
+        organizationId={resolution.organization.id}
+        organizationName={resolution.organization.name}
+        roleLabel={roleLabel}
       />
 
       <BillingFeedback error={error} status={status} />
@@ -627,23 +932,7 @@ export default async function BillingSettingsPage({
         <BillingLoadError />
       ) : (
         <>
-          <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-            <CurrentPlanCard overview={overview} />
-            <UsageCard centersPath={centersPath} overview={overview} />
-          </section>
-
           <section className="space-y-3">
-            <SectionHeader
-              action={
-                <Badge variant="outline">
-                  <Database aria-hidden="true" className="size-3" />
-                  Catalogo versionado
-                </Badge>
-              }
-              description="Cada cambio aplica un snapshot de precio y limites a esta organizacion. No se piden datos de tarjeta."
-              title="Planes disponibles"
-            />
-
             {activeCentersResult.ok ? null : (
               <Alert>
                 <AlertCircle aria-hidden="true" />
@@ -655,11 +944,23 @@ export default async function BillingSettingsPage({
               </Alert>
             )}
 
-            <div className="grid gap-3">
+            {plans.length === 0 ? (
+              <Alert>
+                <ReceiptText aria-hidden="true" />
+                <AlertTitle>Catalogo sin planes publicados</AlertTitle>
+                <AlertDescription>
+                  Publica una versión desde Console para mostrar opciones de
+                  cambio a la organización.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {plans.map((plan) => (
                 <PlanOptionCard
                   activeCenters={activeCenters}
                   canChangePlan={canChangePlan}
+                  featured={plan.plan_code === featuredPlanCode}
                   key={`${plan.plan_code}-${plan.version}`}
                   organizationId={resolution.organization.id}
                   overview={overview}
@@ -668,6 +969,14 @@ export default async function BillingSettingsPage({
               ))}
             </div>
           </section>
+
+          {plans.length > 0 ? (
+            <>
+              <PlanGuidanceCard />
+              <PlanComparisonSection overview={overview} plans={plans} />
+            </>
+          ) : null}
+          <BillingSummarySection centersPath={centersPath} overview={overview} />
         </>
       )}
     </div>

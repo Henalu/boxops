@@ -125,7 +125,7 @@ function getLocalParts(value: string, timezone: string) {
 
 function formatEventSummary(event: OperationalEventRow, timezone: string) {
   if (event.all_day) {
-    return "Todo el dia";
+    return "Todo el día";
   }
 
   const start = getLocalParts(event.starts_at, timezone);
@@ -271,7 +271,7 @@ export function ScheduleOperationalEventPanels({
             </h2>
             <p className="truncate text-sm text-muted-foreground">
               {startParts.date}
-              {center ? ` / ${center.name}` : " / Toda la organizacion"}
+              {center ? ` / ${center.name}` : " / Toda la organización"}
             </p>
           </div>
           <Button asChild size="icon" variant="ghost">
@@ -325,7 +325,7 @@ export function ScheduleOperationalEventPanels({
                   defaultValue={selectedEvent.center_id ?? ""}
                   name="centerId"
                 >
-                  <option value="">Toda la organizacion</option>
+                  <option value="">Toda la organización</option>
                   {centers.map((centerOption) => (
                     <option key={centerOption.id} value={centerOption.id}>
                       {centerOption.name}
@@ -403,7 +403,7 @@ export function ScheduleOperationalEventPanels({
                   name="allDay"
                   type="checkbox"
                 />
-                <span>Todo el dia</span>
+                <span>Todo el día</span>
               </label>
               <label className="grid min-w-0 gap-2 md:col-span-4">
                 <span className="text-sm font-medium">Notas</span>

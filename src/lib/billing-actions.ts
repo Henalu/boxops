@@ -9,6 +9,7 @@ import {
   archiveBillingPlan,
   createBillingPlanDraftVersion,
   publishBillingPlanVersion,
+  updateBillingPlanDraftVersion,
   type BillingErrorCode,
   type BillingPlanDraftInput,
 } from "@/lib/billing";
@@ -18,6 +19,7 @@ import { isPostgresUuid } from "@/lib/uuid";
 const PLAN_CODE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SAFE_STRIPE_PRODUCT_ID_PATTERN = /^prod_[A-Za-z0-9_]+$/;
 const SAFE_STRIPE_PRICE_ID_PATTERN = /^price_[A-Za-z0-9_]+$/;
+const DEFAULT_ANNUAL_DISCOUNT_RATE = 0.05;
 
 function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -113,6 +115,16 @@ function parseOptionalEuroCents(value: string) {
   return Number.isInteger(cents) && cents >= 1 ? cents : undefined;
 }
 
+function calculateDefaultAnnualPriceCents(monthlyPriceCents: number | null) {
+  if (monthlyPriceCents === null) {
+    return null;
+  }
+
+  return Math.round(
+    monthlyPriceCents * 12 * (1 - DEFAULT_ANNUAL_DISCOUNT_RATE),
+  );
+}
+
 function parseOptionalStripeReference(
   value: string,
   pattern: RegExp,
@@ -168,9 +180,12 @@ function validatePlanDraftInput(formData: FormData):
   const monthlyPriceCents = parseOptionalEuroCents(
     getFormString(formData, "monthlyPrice"),
   );
-  const annualPriceCents = parseOptionalEuroCents(
-    getFormString(formData, "annualPrice"),
-  );
+  const rawAnnualPrice = getFormString(formData, "annualPrice");
+  const parsedAnnualPriceCents = parseOptionalEuroCents(rawAnnualPrice);
+  const annualPriceCents =
+    parsedAnnualPriceCents === null && typeof monthlyPriceCents === "number"
+      ? calculateDefaultAnnualPriceCents(monthlyPriceCents)
+      : parsedAnnualPriceCents;
   const setupPriceCents = parseOptionalEuroCents(
     getFormString(formData, "setupPrice"),
   );
@@ -309,6 +324,35 @@ export async function createBillingPlanDraftAction(formData: FormData) {
 
   revalidatePath("/console/plans");
   redirect(getConsolePlansPath({ status: "draft-created" }));
+}
+
+export async function updateBillingPlanDraftAction(formData: FormData) {
+  const billingPlanVersionId = getFormString(formData, "billingPlanVersionId");
+  const validation = validatePlanDraftInput(formData);
+
+  if (!isPostgresUuid(billingPlanVersionId) || !validation.ok) {
+    redirect(
+      getConsolePlansPath({
+        error: validation.ok ? "invalid-input" : validation.error,
+      }),
+    );
+  }
+
+  const result = await updateBillingPlanDraftVersion({
+    billingPlanVersionId,
+    draft: validation.input,
+  });
+
+  if (!result.ok) {
+    if (result.error === "authentication-required") {
+      redirect(getLoginPath("/console/plans"));
+    }
+
+    redirect(getConsolePlansPath({ error: result.error }));
+  }
+
+  revalidatePath("/console/plans");
+  redirect(getConsolePlansPath({ status: "draft-updated" }));
 }
 
 export async function publishBillingPlanVersionAction(formData: FormData) {

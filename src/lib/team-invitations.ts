@@ -98,10 +98,10 @@ export function buildTeamInvitationEmail({
     `Hola ${recipientName},`,
     "",
     `${invitedByName} te ha invitado a entrar en ${organizationName} en BoxOps.`,
-    "Acepta la invitacion desde este enlace:",
+    "Acepta la invitación desde este enlace:",
     acceptUrl,
     "",
-    "El enlace caduca en 14 dias. Si no esperabas esta invitacion, puedes ignorar este correo.",
+    "El enlace caduca en 14 días. Si no esperabas esta invitación, puedes ignorar este correo.",
   ].join("\n");
   const html = `
     <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
@@ -109,11 +109,11 @@ export function buildTeamInvitationEmail({
       <p>${safeInvitedByName} te ha invitado a entrar en <strong>${safeOrganizationName}</strong> en BoxOps.</p>
       <p>
         <a href="${safeAcceptUrl}" style="display: inline-block; border-radius: 8px; background: #0f172a; color: #ffffff; padding: 10px 14px; text-decoration: none;">
-          Aceptar invitacion
+          Aceptar invitación
         </a>
       </p>
-      <p style="color: #475569; font-size: 14px;">El enlace caduca en 14 dias. Si no esperabas esta invitacion, puedes ignorar este correo.</p>
-      <p style="color: #475569; font-size: 14px;">Si el boton no funciona, abre este enlace:<br />${safeAcceptUrl}</p>
+      <p style="color: #475569; font-size: 14px;">El enlace caduca en 14 días. Si no esperabas esta invitación, puedes ignorar este correo.</p>
+      <p style="color: #475569; font-size: 14px;">Si el botón no funciona, abre este enlace:<br />${safeAcceptUrl}</p>
     </div>
   `;
 

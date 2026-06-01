@@ -51,6 +51,11 @@ import {
   getWorkWindowsPath,
 } from "@/lib/navigation/app-paths";
 
+export type AppNavigationMembership = {
+  organizationId: string;
+  role: string;
+};
+
 type AppNavigationProps = {
   memberships: {
     organizationId: string;
@@ -59,7 +64,7 @@ type AppNavigationProps = {
   placement: "bottom" | "sidebar";
 };
 
-type NavigationItem = {
+export type NavigationItem = {
   readonly href: string;
   readonly icon: LucideIcon;
   readonly label: string;
@@ -67,7 +72,7 @@ type NavigationItem = {
   readonly tour?: string;
 };
 
-const mainItems = [
+export const mainItems = [
   {
     href: "/app",
     icon: Home,
@@ -101,7 +106,7 @@ const mainItems = [
   },
 ] as const satisfies readonly NavigationItem[];
 
-const managementItems = [
+export const managementItems = [
   {
     href: "/app/centers",
     icon: MapPin,
@@ -136,7 +141,7 @@ const managementItems = [
   },
 ] as const satisfies readonly NavigationItem[];
 
-const personalItems = [
+export const personalItems = [
   {
     href: "/app/absences",
     icon: CalendarOff,
@@ -182,11 +187,11 @@ const mobileMorePaths = [
 
 const secondaryMorePaths = ["/app/stats"];
 
-function getNavigationRole({
+export function getNavigationRole({
   memberships,
   organizationId,
 }: {
-  memberships: AppNavigationProps["memberships"];
+  memberships: AppNavigationMembership[];
   organizationId: string | null;
 }) {
   const selectedMembership = organizationId
@@ -196,7 +201,7 @@ function getNavigationRole({
   return selectedMembership?.role ?? memberships[0]?.role ?? null;
 }
 
-function isActivePath(pathname: string, href: string) {
+export function isActivePath(pathname: string, href: string) {
   if (href === "/app/more") {
     return (
       pathname === href ||
@@ -222,7 +227,7 @@ function isBottomActivePath(pathname: string, href: string) {
   return isActivePath(pathname, href);
 }
 
-function normalizeSearchValue(value: string) {
+export function normalizeSearchValue(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -235,7 +240,7 @@ function getItemSearchValue(item: NavigationItem) {
   );
 }
 
-function filterNavigationItems<T extends NavigationItem>(
+export function filterNavigationItems<T extends NavigationItem>(
   items: readonly T[],
   query: string,
 ) {
@@ -244,6 +249,78 @@ function filterNavigationItems<T extends NavigationItem>(
   }
 
   return items.filter((item) => getItemSearchValue(item).includes(query));
+}
+
+export function resolveAppNavigationHref({
+  href,
+  organizationId,
+  week,
+}: {
+  href: string;
+  organizationId: string | null;
+  week: string | null;
+}) {
+  if (href === "/app") {
+    return getAppPath("/app", { organizationId, week });
+  }
+
+  if (href === "/app/schedule") {
+    return getSchedulePath({ organizationId, week });
+  }
+
+  if (href === "/app/coverage") {
+    return getCoveragePath({ organizationId, week });
+  }
+
+  if (href === "/app/coaches") {
+    return getCoachesPath({ organizationId });
+  }
+
+  if (href === "/app/more") {
+    return getMorePath({ organizationId, week });
+  }
+
+  if (href === "/app/account") {
+    return getAccountPath({ organizationId });
+  }
+
+  if (href === "/app/requests") {
+    return getRequestsPath({ organizationId, week });
+  }
+
+  if (href === "/app/absences") {
+    return getAbsencesPath({ organizationId });
+  }
+
+  if (href === "/app/documents") {
+    return getDocumentsPath({ organizationId });
+  }
+
+  if (href === "/app/time") {
+    return getTimePath({ organizationId });
+  }
+
+  if (href === "/app/centers") {
+    return getCentersPath({ organizationId });
+  }
+
+  if (href === "/app/class-types") {
+    return getClassTypesPath({ organizationId });
+  }
+
+  if (href === "/app/work-windows") {
+    return getWorkWindowsPath({ organizationId, week });
+  }
+
+  if (href === "/app/settings") {
+    return getSettingsPath({ organizationId });
+  }
+
+  if (href === "/app/settings/billing") {
+    return getSettingsBillingPath({ organizationId });
+  }
+
+  return getScheduleTemplatesPath({ organizationId, week });
 }
 
 export function AppNavigation({ memberships, placement }: AppNavigationProps) {
@@ -334,70 +411,6 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [placement]);
 
-  function resolveHref(href: string) {
-    if (href === "/app") {
-      return getAppPath("/app", { organizationId, week });
-    }
-
-    if (href === "/app/schedule") {
-      return getSchedulePath({ organizationId, week });
-    }
-
-    if (href === "/app/coverage") {
-      return getCoveragePath({ organizationId, week });
-    }
-
-    if (href === "/app/coaches") {
-      return getCoachesPath({ organizationId });
-    }
-
-    if (href === "/app/more") {
-      return getMorePath({ organizationId, week });
-    }
-
-    if (href === "/app/account") {
-      return getAccountPath({ organizationId });
-    }
-
-    if (href === "/app/requests") {
-      return getRequestsPath({ organizationId, week });
-    }
-
-    if (href === "/app/absences") {
-      return getAbsencesPath({ organizationId });
-    }
-
-    if (href === "/app/documents") {
-      return getDocumentsPath({ organizationId });
-    }
-
-    if (href === "/app/time") {
-      return getTimePath({ organizationId });
-    }
-
-    if (href === "/app/centers") {
-      return getCentersPath({ organizationId });
-    }
-
-    if (href === "/app/class-types") {
-      return getClassTypesPath({ organizationId });
-    }
-
-    if (href === "/app/work-windows") {
-      return getWorkWindowsPath({ organizationId, week });
-    }
-
-    if (href === "/app/settings") {
-      return getSettingsPath({ organizationId });
-    }
-
-    if (href === "/app/settings/billing") {
-      return getSettingsBillingPath({ organizationId });
-    }
-
-    return getScheduleTemplatesPath({ organizationId, week });
-  }
-
   function renderSidebarLink(item: NavigationItem) {
     const Icon = item.icon;
     const active = isActivePath(pathname, item.href);
@@ -411,7 +424,7 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
             "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
         )}
         data-tour={item.tour}
-        href={resolveHref(item.href)}
+        href={resolveAppNavigationHref({ href: item.href, organizationId, week })}
         key={item.href}
       >
         <Icon aria-hidden="true" className="size-4 shrink-0" />
@@ -447,7 +460,11 @@ export function AppNavigation({ memberships, placement }: AppNavigationProps) {
                     active && "text-primary",
                   )}
                   data-tour={item.tour}
-                  href={resolveHref(item.href)}
+                  href={resolveAppNavigationHref({
+                    href: item.href,
+                    organizationId,
+                    week,
+                  })}
                   key={item.href}
                 >
                   <span

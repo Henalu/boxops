@@ -16,6 +16,7 @@ import {
   ReceiptText,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Timer,
   UserRound,
   UsersRound,
@@ -35,7 +36,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
@@ -113,6 +113,72 @@ function MobileHubLink({
   );
 }
 
+function MoreSectionHeader({
+  description,
+  icon: Icon,
+  title,
+}: {
+  description?: string;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/10">
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        {description ? (
+          <p className="mt-1 hidden text-sm text-muted-foreground md:block">
+            {description}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FeaturedHubLink({
+  description,
+  href,
+  icon: Icon,
+  label,
+  title,
+}: {
+  description: string;
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  title: string;
+}) {
+  return (
+    <Link
+      className="group flex min-h-24 flex-col gap-4 rounded-xl bg-primary/5 p-4 text-left text-sm text-card-foreground ring-1 ring-primary/20 transition-[background-color,box-shadow] hover:bg-primary/10 hover:shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:flex-row md:items-center md:justify-between"
+      href={href}
+    >
+      <span className="flex min-w-0 items-start gap-4">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+          <Icon aria-hidden="true" className="size-5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block font-semibold leading-snug">{title}</span>
+          <span className="mt-1 block max-w-2xl text-sm leading-5 text-muted-foreground">
+            {description}
+          </span>
+        </span>
+      </span>
+      <span className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-background px-3 text-sm font-medium text-primary transition-colors group-hover:bg-background/80">
+        {label}
+        <ArrowRight
+          aria-hidden="true"
+          className="size-3.5 transition-transform group-hover:translate-x-0.5"
+        />
+      </span>
+    </Link>
+  );
+}
+
 export default async function MorePage({ searchParams }: MorePageProps) {
   const user = await getAuthenticatedUser();
 
@@ -176,13 +242,11 @@ export default async function MorePage({ searchParams }: MorePageProps) {
 
       {canManageOperational ? (
         <section className="space-y-2.5 md:space-y-3">
-          <div className="space-y-1">
-            <SectionHeader title="Gestión" />
-            <p className="hidden text-sm text-muted-foreground md:block">
-              Pantallas de administración que no necesitan estar siempre en la
-              navegación principal.
-            </p>
-          </div>
+          <MoreSectionHeader
+            description="Pantallas de administración que no necesitan estar siempre en la navegación principal."
+            icon={SlidersHorizontal}
+            title="Gestión"
+          />
           <div className="grid gap-2.5 md:hidden">
             <MobileHubLink
               description="Sedes y estado operativo"
@@ -224,14 +288,14 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             />
             {canReadBilling ? (
               <MobileHubLink
-                description="Plan, limites y uso"
+                description="Plan, límites y uso"
                 href={getSettingsBillingPath(baseOptions)}
                 icon={ReceiptText}
                 title="Plan y facturacion"
               />
             ) : null}
           </div>
-          <div className="hidden gap-3 md:grid md:grid-cols-2">
+          <div className="hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-3">
             <ActionCard
               description="Gestiona sedes activas e inactivas del box."
               href={getCentersPath(baseOptions)}
@@ -262,7 +326,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             />
             {canManageWorkWindows ? (
               <ActionCard
-                description="Gestiona franjas previstas por persona, dia, centro y vigencia."
+                description="Gestiona franjas previstas por persona, día, centro y vigencia."
                 href={getWorkWindowsPath(baseOptions)}
                 icon={CalendarClock}
                 label="Abrir jornadas"
@@ -285,7 +349,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
             />
             {canReadBilling ? (
               <ActionCard
-                description="Revisa plan, limites incluidos y uso actual de la organizacion."
+                description="Revisa plan, límites incluidos y uso actual de la organización."
                 href={getSettingsBillingPath(baseOptions)}
                 icon={ReceiptText}
                 label="Abrir plan"
@@ -349,7 +413,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               title="Centros"
             />
             <ActionCard
-              description="Consulta el catalogo operativo de clases y actividades."
+              description="Consulta el catálogo operativo de clases y actividades."
               href={getClassTypesPath(baseOptions)}
               icon={Dumbbell}
               label="Abrir tipos"
@@ -562,8 +626,9 @@ export default async function MorePage({ searchParams }: MorePageProps) {
 
       {canOpenConsole ? (
         <section className="space-y-2.5 md:space-y-3">
-          <SectionHeader
-            description="Acceso interno de plataforma separado de la gestion diaria del box."
+          <MoreSectionHeader
+            description="Acceso interno de plataforma separado de la gestión diaria del box."
+            icon={ShieldCheck}
             title="Plataforma"
           />
           <div className="grid gap-2.5 md:hidden">
@@ -574,8 +639,8 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               title="BoxOps Console"
             />
           </div>
-          <div className="hidden gap-3 md:grid md:grid-cols-2">
-            <ActionCard
+          <div className="hidden md:block">
+            <FeaturedHubLink
               description="Abre el dashboard interno de plataforma para organizaciones, soporte y suscripciones."
               href="/console"
               icon={ShieldCheck}
@@ -587,45 +652,73 @@ export default async function MorePage({ searchParams }: MorePageProps) {
       ) : null}
 
       <section className="space-y-3">
-        <SectionHeader title="Ayuda" />
+        <MoreSectionHeader
+          description="Recursos para empezar y acceder a lo que necesitas."
+          icon={CircleHelp}
+          title="Ayuda"
+        />
         <div className="grid gap-3 md:grid-cols-2">
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CircleHelp aria-hidden="true" className="size-4" />
-                Guía inicial
-              </CardTitle>
-              <CardDescription>
-                Vuelve a ver la guía de navegación del MVP.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <OnboardingLaunchButton label="Reiniciar guía" />
+          <Card className="min-h-36" size="sm">
+            <CardContent className="flex h-full flex-col gap-4">
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                  <CircleHelp aria-hidden="true" className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <CardTitle>Guía inicial</CardTitle>
+                  <CardDescription className="mt-1">
+                    Vuelve a ver la guía de navegación del MVP.
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="mt-auto">
+                <OnboardingLaunchButton label="Reiniciar guía" />
+              </div>
             </CardContent>
           </Card>
 
+          {canManageOperational ? (
+            <Card className="min-h-36" size="sm">
+              <CardContent className="flex h-full flex-col gap-4">
+                <div>
+                  <CardTitle>Acceso actual</CardTitle>
+                  <CardDescription className="mt-1">
+                    Estás trabajando en {resolution.organization.name} con rol{" "}
+                    {roleLabel}.
+                  </CardDescription>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="min-w-0 rounded-lg bg-muted/45 p-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin aria-hidden="true" className="size-3.5" />
+                      Organización
+                    </div>
+                    <p className="mt-1 truncate text-sm font-medium">
+                      {resolution.organization.name}
+                    </p>
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-muted/45 p-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck aria-hidden="true" className="size-3.5" />
+                      Rol
+                    </div>
+                    <p className="mt-1 truncate text-sm font-medium">
+                      {roleLabel}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  href={getScheduleTemplatesPath(baseOptions)}
+                >
+                  Ir a plantillas semanales
+                  <ArrowRight aria-hidden="true" className="size-3.5" />
+                </Link>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </section>
-
-      {canManageOperational ? (
-        <Card className="hidden md:flex">
-          <CardHeader>
-            <CardTitle>Acceso actual</CardTitle>
-            <CardDescription>
-              Estás trabajando en {resolution.organization.name} con rol{" "}
-              {roleLabel}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link
-              className="text-sm font-medium underline underline-offset-4"
-              href={getScheduleTemplatesPath(baseOptions)}
-            >
-              Ir a plantillas semanales
-            </Link>
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

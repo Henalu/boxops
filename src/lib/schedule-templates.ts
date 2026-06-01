@@ -7,6 +7,10 @@ export const SCHEDULE_TEMPLATE_STATUSES = [
 ] as const;
 
 export const SCHEDULE_TEMPLATE_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+export const SCHEDULE_TEMPLATE_EDITOR_DEFAULT_START_TIME = "07:00";
+export const SCHEDULE_TEMPLATE_EDITOR_DEFAULT_END_TIME = "21:00";
+export const SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES = 30;
+export const SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES = 60;
 
 export type ScheduleTemplateStatus =
   (typeof SCHEDULE_TEMPLATE_STATUSES)[number];
@@ -14,10 +18,19 @@ export type ScheduleTemplateDay = (typeof SCHEDULE_TEMPLATE_DAYS)[number];
 
 export type ScheduleTemplateFormValues = {
   centerId: string | null;
+  editorEndTime: string;
+  editorStartTime: string;
   name: string;
   status: ScheduleTemplateStatus;
   validFrom: string | null;
   validUntil: string | null;
+};
+
+export type ScheduleTemplateEditorSettings = {
+  defaultDurationMinutes: number;
+  endTime: string;
+  slotMinutes: number;
+  startTime: string;
 };
 
 export type ScheduleTemplateBlockFormValues = {
@@ -31,6 +44,17 @@ export type ScheduleTemplateBlockFormValues = {
   startTime: string;
   templateId: string;
 };
+
+type ScheduleTemplateBlockValidationError =
+  | "invalid-center"
+  | "invalid-class-type"
+  | "invalid-coach"
+  | "invalid-day"
+  | "invalid-required-coaches"
+  | "invalid-template"
+  | "invalid-time"
+  | "missing-fields"
+  | "notes-too-long";
 
 export type ScheduleTemplateCoachAvailabilityBlockInput = {
   default_coach_profile_id: string | null;
@@ -59,6 +83,7 @@ export type ScheduleTemplateValidationResult =
         | "invalid-center"
         | "invalid-date"
         | "invalid-date-range"
+        | "invalid-editor-time"
         | "invalid-status"
         | "missing-fields"
         | "name-too-long";
@@ -71,16 +96,17 @@ export type ScheduleTemplateBlockValidationResult =
     }
   | {
       ok: false;
-      error:
-        | "invalid-center"
-        | "invalid-class-type"
-        | "invalid-coach"
-        | "invalid-day"
-        | "invalid-required-coaches"
-        | "invalid-template"
-        | "invalid-time"
-        | "missing-fields"
-        | "notes-too-long";
+      error: ScheduleTemplateBlockValidationError;
+    };
+
+export type ScheduleTemplateBlockCreateValidationResult =
+  | {
+      ok: true;
+      values: ScheduleTemplateBlockFormValues[];
+    }
+  | {
+      ok: false;
+      error: ScheduleTemplateBlockValidationError;
     };
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -171,10 +197,23 @@ function getFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getFormStrings(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .flatMap((value) => (typeof value === "string" ? [value.trim()] : []))
+    .filter(Boolean);
+}
+
 function normalizeTime(value: string) {
   const candidate = value.slice(0, 5);
 
   return TIME_PATTERN.test(candidate) ? candidate : null;
+}
+
+function getRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function timeToMinutes(value: string) {
@@ -315,6 +354,14 @@ export function validateScheduleTemplateForm(
   const rawStatus = getFormString(formData, "status") || "draft";
   const rawValidFrom = getFormString(formData, "validFrom");
   const rawValidUntil = getFormString(formData, "validUntil");
+  const editorStartTime = normalizeTime(
+    getFormString(formData, "editorStartTime") ||
+      SCHEDULE_TEMPLATE_EDITOR_DEFAULT_START_TIME,
+  );
+  const editorEndTime = normalizeTime(
+    getFormString(formData, "editorEndTime") ||
+      SCHEDULE_TEMPLATE_EDITOR_DEFAULT_END_TIME,
+  );
   const centerId = parseOptionalUuid(rawCenterId);
   const validFrom = parseOptionalDate(rawValidFrom);
   const validUntil = parseOptionalDate(rawValidUntil);
@@ -354,6 +401,18 @@ export function validateScheduleTemplateForm(
     };
   }
 
+  if (
+    !editorStartTime ||
+    !editorEndTime ||
+    timeToMinutes(editorStartTime) + SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES >
+      timeToMinutes(editorEndTime)
+  ) {
+    return {
+      ok: false,
+      error: "invalid-editor-time",
+    };
+  }
+
   if (!isScheduleTemplateStatus(rawStatus)) {
     return {
       ok: false,
@@ -365,6 +424,8 @@ export function validateScheduleTemplateForm(
     ok: true,
     values: {
       centerId,
+      editorEndTime,
+      editorStartTime,
       name,
       status: rawStatus,
       validFrom,
@@ -373,11 +434,92 @@ export function validateScheduleTemplateForm(
   };
 }
 
+export function getScheduleTemplateEditorSettings(
+  metadata: unknown,
+): ScheduleTemplateEditorSettings {
+  const editor = getRecord(getRecord(metadata)?.editor);
+  const startTime =
+    normalizeTime(String(editor?.startTime ?? "")) ??
+    SCHEDULE_TEMPLATE_EDITOR_DEFAULT_START_TIME;
+  const endTime =
+    normalizeTime(String(editor?.endTime ?? "")) ??
+    SCHEDULE_TEMPLATE_EDITOR_DEFAULT_END_TIME;
+  const slotMinutes =
+    typeof editor?.slotMinutes === "number" &&
+    [15, 30, 60].includes(editor.slotMinutes)
+      ? editor.slotMinutes
+      : SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES;
+  const defaultDurationMinutes =
+    typeof editor?.defaultDurationMinutes === "number" &&
+    editor.defaultDurationMinutes >= 15 &&
+    editor.defaultDurationMinutes <= 240
+      ? editor.defaultDurationMinutes
+      : SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES;
+
+  if (timeToMinutes(startTime) + slotMinutes > timeToMinutes(endTime)) {
+    return {
+      defaultDurationMinutes: SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES,
+      endTime: SCHEDULE_TEMPLATE_EDITOR_DEFAULT_END_TIME,
+      slotMinutes: SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES,
+      startTime: SCHEDULE_TEMPLATE_EDITOR_DEFAULT_START_TIME,
+    };
+  }
+
+  return {
+    defaultDurationMinutes,
+    endTime,
+    slotMinutes,
+    startTime,
+  };
+}
+
 export function validateScheduleTemplateBlockForm(
   formData: FormData,
 ): ScheduleTemplateBlockValidationResult {
+  return validateScheduleTemplateBlockFormForDay(
+    formData,
+    getFormString(formData, "dayOfWeek"),
+  );
+}
+
+export function validateScheduleTemplateBlockCreateForm(
+  formData: FormData,
+): ScheduleTemplateBlockCreateValidationResult {
+  const rawDayOfWeeks = [...new Set(getFormStrings(formData, "dayOfWeek"))];
+
+  if (rawDayOfWeeks.length === 0) {
+    return {
+      ok: false,
+      error: "missing-fields",
+    };
+  }
+
+  const values: ScheduleTemplateBlockFormValues[] = [];
+
+  for (const rawDayOfWeek of rawDayOfWeeks) {
+    const validation = validateScheduleTemplateBlockFormForDay(
+      formData,
+      rawDayOfWeek,
+    );
+
+    if (!validation.ok) {
+      return validation;
+    }
+
+    values.push(validation.values);
+  }
+
+  return {
+    ok: true,
+    values,
+  };
+}
+
+function validateScheduleTemplateBlockFormForDay(
+  formData: FormData,
+  rawDayOfWeek: string,
+): ScheduleTemplateBlockValidationResult {
   const templateId = getFormString(formData, "templateId");
-  const rawDayOfWeek = getFormString(formData, "dayOfWeek");
   const startTime = normalizeTime(getFormString(formData, "startTime"));
   const endTime = normalizeTime(getFormString(formData, "endTime"));
   const centerId = getFormString(formData, "centerId");

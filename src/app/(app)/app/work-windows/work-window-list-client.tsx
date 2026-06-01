@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw } from "lucide-react";
+import {
+  ArrowUp,
+  CalendarOff,
+  ListChecks,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +18,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export type WorkWindowListFilters = {
   centerId: string;
   dayOfWeek: string;
   personProfileId: string;
+  query: string;
   windowStatus: string;
 };
 
@@ -30,6 +38,7 @@ export type WorkWindowListItemFilterData = {
   dayOfWeek: string;
   id: string;
   personProfileId: string;
+  searchText: string;
   status: string;
 };
 
@@ -38,6 +47,7 @@ const EMPTY_LIST_FILTERS: WorkWindowListFilters = {
   centerId: "",
   dayOfWeek: "",
   personProfileId: "",
+  query: "",
   windowStatus: "",
 };
 
@@ -52,7 +62,7 @@ const dayOptions = [
 ];
 
 const selectClassName = [
-  "h-11 w-full min-w-0 truncate rounded-md border border-input bg-background py-1 pl-3 pr-9 text-sm md:h-9",
+  "h-11 w-full min-w-0 truncate rounded-lg border border-input bg-background py-1 pl-3 pr-9 text-sm md:h-9",
   "outline-none transition-colors focus-visible:border-ring",
   "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
@@ -62,8 +72,17 @@ function hasActiveListFilters(filters: WorkWindowListFilters) {
     filters.centerId ||
       filters.dayOfWeek ||
       filters.personProfileId ||
+      filters.query ||
       filters.windowStatus,
   );
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function getWorkWindowsListPath({
@@ -82,6 +101,10 @@ function getWorkWindowsListPath({
 
   if (filters.personProfileId) {
     params.set("person_profile_id", filters.personProfileId);
+  }
+
+  if (filters.query) {
+    params.set("q", filters.query);
   }
 
   if (filters.centerId) {
@@ -106,6 +129,7 @@ function getFiltersFromSearch(search: string) {
     centerId: params.get("center_id") ?? "",
     dayOfWeek: params.get("day") ?? "",
     personProfileId: params.get("person_profile_id") ?? "",
+    query: params.get("q") ?? "",
     windowStatus: params.get("window_status") ?? "",
   } satisfies WorkWindowListFilters;
 }
@@ -137,6 +161,7 @@ function normalizeFilters({
     personProfileId: personIds.has(filters.personProfileId)
       ? filters.personProfileId
       : "",
+    query: filters.query.trim().slice(0, 80),
     windowStatus:
       filters.windowStatus === "active" || filters.windowStatus === "inactive"
         ? filters.windowStatus
@@ -148,7 +173,16 @@ function matchesFilters(
   item: WorkWindowListItemFilterData,
   filters: WorkWindowListFilters,
 ) {
-  if (filters.personProfileId && item.personProfileId !== filters.personProfileId) {
+  const query = normalizeSearch(filters.query);
+
+  if (query && !normalizeSearch(item.searchText).includes(query)) {
+    return false;
+  }
+
+  if (
+    filters.personProfileId &&
+    item.personProfileId !== filters.personProfileId
+  ) {
     return false;
   }
 
@@ -277,26 +311,55 @@ export function WorkWindowListClient({
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Lista de jornadas
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Abre una fila para editar persona, centro, dia, horas, vigencia,
-            estado o notas.
-          </p>
-        </div>
-        <Badge aria-live="polite" variant="outline">
-          {visibleRows.length} visibles / {items.length} total
-        </Badge>
-      </div>
+    <section>
+      <Card>
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                <ListChecks aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <CardTitle>Lista de jornadas</CardTitle>
+                <CardDescription className="mt-1">
+                  Abre una fila para editar persona, centro, día, horas,
+                  vigencia, estado o notas.
+                </CardDescription>
+              </div>
+            </div>
 
-      <Card size="sm">
-        <CardContent>
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:justify-end">
+              <label className="relative min-w-0 flex-1 lg:w-80">
+                <span className="sr-only">Buscar jornadas</span>
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  className="pl-9"
+                  name="q"
+                  onChange={(event) =>
+                    updateFilter("query", event.currentTarget.value)
+                  }
+                  placeholder="Buscar jornadas..."
+                  type="search"
+                  value={filters.query}
+                />
+              </label>
+              <Badge
+                aria-live="polite"
+                className="min-h-11 justify-center px-3 md:min-h-9"
+                variant="outline"
+              >
+                {visibleRows.length} visibles / {items.length} total
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
           <form
-            className="grid gap-3 lg:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(130px,0.75fr)_minmax(130px,0.75fr)_auto]"
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(130px,0.75fr)_minmax(130px,0.75fr)_auto]"
             onSubmit={(event) => event.preventDefault()}
           >
             <label className="grid min-w-0 gap-2">
@@ -331,7 +394,7 @@ export function WorkWindowListClient({
                 <option value="">Todos</option>
                 {hasOrganizationWideWindows ? (
                   <option value={ORGANIZATION_CENTER_FILTER}>
-                    Toda la organizacion
+                    Toda la organización
                   </option>
                 ) : null}
                 {centerOptions.map((option) => (
@@ -343,7 +406,7 @@ export function WorkWindowListClient({
             </label>
 
             <label className="grid min-w-0 gap-2">
-              <span className="text-sm font-medium">Dia</span>
+              <span className="text-sm font-medium">Día</span>
               <select
                 className={selectClassName}
                 name="day"
@@ -377,48 +440,69 @@ export function WorkWindowListClient({
               </select>
             </label>
 
-            {hasFilters ? (
-              <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-wrap items-end gap-2">
+              {hasFilters ? (
                 <Button
                   onClick={() => setFilters(EMPTY_LIST_FILTERS)}
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                 >
                   <RotateCcw aria-hidden="true" />
                   Limpiar
                 </Button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </form>
+
+          {items.length === 0 ? (
+            <div className="flex min-h-80 flex-col items-center justify-center rounded-xl border border-border bg-background/70 px-4 py-10 text-center">
+              <span className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
+                <CalendarOff aria-hidden="true" className="size-8" />
+              </span>
+              <div className="mt-5 max-w-xl space-y-2">
+                <CardTitle>No hay jornadas previstas en esta semana</CardTitle>
+                <CardDescription>
+                  Crea la primera franja para que Horario y Mi fichaje puedan
+                  usar el contexto planificado.
+                </CardDescription>
+              </div>
+              <Button asChild className="mt-5" variant="outline">
+                <a href="#crear-franjas">
+                  Volver a crear franjas
+                  <ArrowUp aria-hidden="true" />
+                </a>
+              </Button>
+              <p className="mt-6 border-t border-border pt-4 text-sm text-muted-foreground">
+                Las jornadas creadas aquí serán visibles para Horario y Mi
+                fichaje.
+              </p>
+            </div>
+          ) : visibleRows.length === 0 ? (
+            <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/70 px-4 py-8 text-center">
+              <CardTitle>No hay jornadas con esos filtros</CardTitle>
+              <CardDescription className="mt-2 max-w-lg">
+                Ajusta búsqueda, persona, centro, día o estado para ampliar la
+                lista.
+              </CardDescription>
+              <Button
+                className="mt-5"
+                onClick={() => setFilters(EMPTY_LIST_FILTERS)}
+                type="button"
+                variant="outline"
+              >
+                <RotateCcw aria-hidden="true" />
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {visibleRows.map(({ item, node }) => (
+                <React.Fragment key={item.id}>{node}</React.Fragment>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {items.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No hay jornadas previstas en esta semana</CardTitle>
-            <CardDescription>
-              Crea la primera franja para que Horario y Mi fichaje puedan usar
-              el contexto planificado.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : visibleRows.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No hay jornadas con esos filtros</CardTitle>
-            <CardDescription>
-              Ajusta persona, centro, dia o estado para ampliar la lista.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-2">
-          {visibleRows.map(({ item, node }) => (
-            <React.Fragment key={item.id}>{node}</React.Fragment>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

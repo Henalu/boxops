@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  AlertTriangle,
+  CheckCircle2,
   Filter,
   KeyRound,
   Mail,
   RotateCcw,
   Save,
+  Search,
   Trash2,
+  UserPlus,
+  UsersRound,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -213,7 +219,7 @@ const errorMessages: Record<string, string> = {
   "account-create-rollback-failed":
     "No se ha podido completar el alta. Revisa Auth antes de reintentarlo.",
   "account-email-already-exists":
-    "Ya existe una cuenta Auth con ese email. Usa invitacion o revisa sus accesos antes de crear otra alta.",
+    "Ya existe una cuenta Auth con ese email. Usa invitación o revisa sus accesos antes de crear otra alta.",
   "account-link-conflict":
     "Esa cuenta ya está vinculada a otra persona o datos operativos del equipo.",
   "account-linked-to-other-coach":
@@ -221,7 +227,7 @@ const errorMessages: Record<string, string> = {
   "account-linked-to-other-person":
     "Esa cuenta ya está vinculada a otra persona de esta organización.",
   "auth-user-not-found":
-    "No se ha encontrado esa cuenta. Para altas nuevas, envia una invitacion o crea una cuenta directa.",
+    "No se ha encontrado esa cuenta. Para altas nuevas, envía una invitación o crea una cuenta directa.",
   "auth-account-create-failed":
     "No se ha podido crear la cuenta Auth con esos datos.",
   "auth-admin-not-configured":
@@ -965,6 +971,65 @@ function TeamLinkStatusBadge({ status }: { status: CoachProfileLinkStatus }) {
   return <StatusBadge tone={tone}>{getTeamLinkStatusLabel(status)}</StatusBadge>;
 }
 
+function getTeamInitials(label: string) {
+  const words = label
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return "U";
+  }
+
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
+function TeamAvatar({ label }: { label: string }) {
+  return (
+    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary ring-1 ring-primary/15">
+      {getTeamInitials(label)}
+    </span>
+  );
+}
+
+function TeamMetricPill({
+  icon: Icon,
+  label,
+  tone = "neutral",
+}: {
+  icon?: LucideIcon;
+  label: string;
+  tone?: "neutral" | "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-emerald-500"
+      : tone === "warning"
+        ? "bg-amber-500"
+        : "bg-muted-foreground";
+  const iconClass =
+    tone === "success"
+      ? "text-emerald-700"
+      : tone === "warning"
+        ? "text-amber-700"
+        : "text-muted-foreground";
+
+  return (
+    <span className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-card px-3 text-sm font-medium ring-1 ring-foreground/10">
+      {Icon ? (
+        <Icon aria-hidden="true" className={`size-4 ${iconClass}`} />
+      ) : (
+        <span className={`size-2 rounded-full ${toneClass}`} />
+      )}
+      {label}
+    </span>
+  );
+}
+
 function isOpenTeamInvitation(invitation: TeamInvitationRow) {
   return OPEN_TEAM_INVITATION_STATUSES.includes(
     invitation.status as (typeof OPEN_TEAM_INVITATION_STATUSES)[number],
@@ -1008,7 +1073,7 @@ function TeamLinkingReviewNotice({
       <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)] lg:items-start">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-            <KeyRound aria-hidden="true" className="size-4" />
+            <AlertTriangle aria-hidden="true" className="size-4 text-amber-700" />
             Revisar datos de acceso
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -1259,96 +1324,106 @@ function TeamInvitationsSection({
         title="Invitaciones"
       />
 
-      {openInvitations.length === 0 ? (
-        <EmptyState
-          description="Cuando envíes una invitación, aparecerá aquí hasta que se acepte o se cancele."
-          title="No hay invitaciones pendientes"
-        />
-      ) : (
-        <div className="grid gap-3">
-          {openInvitations.map((invitation) => {
-            const personProfile = personProfiles.byId.get(
-              invitation.person_profile_id,
-            );
+      <Card size="sm">
+        <CardContent>
+          {openInvitations.length === 0 ? (
+            <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
+              <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+                <Mail aria-hidden="true" className="size-6" />
+              </span>
+              <h3 className="mt-4 text-base font-semibold tracking-tight">
+                No hay invitaciones pendientes
+              </h3>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
+                Cuando envíes una invitación, aparecerá aquí hasta que se acepte
+                o se cancele.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {openInvitations.map((invitation) => {
+                const personProfile = personProfiles.byId.get(
+                  invitation.person_profile_id,
+                );
 
-            return (
-              <Card key={invitation.id} size="sm">
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto] lg:items-start">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-semibold tracking-tight">
-                        {personProfile?.display_name ?? "Ficha pendiente"}
-                      </h3>
-                      <p className="mt-1 truncate text-sm text-muted-foreground">
-                        {invitation.email_normalized}
+                return (
+                  <div className="space-y-4 py-4 first:pt-0 last:pb-0" key={invitation.id}>
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto] lg:items-start">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold tracking-tight">
+                          {personProfile?.display_name ?? "Ficha pendiente"}
+                        </h3>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">
+                          {invitation.email_normalized}
+                        </p>
+                      </div>
+                      <MetaGrid className="lg:grid-cols-3">
+                        <MetaItem label="Rol">
+                          {getMembershipRoleLabel(invitation.role)}
+                        </MetaItem>
+                        <MetaItem label="Último envío">
+                          {formatDate(
+                            invitation.last_sent_at ?? invitation.sent_at,
+                            timezone,
+                          )}
+                        </MetaItem>
+                        <MetaItem label="Caduca">
+                          {formatDate(invitation.expires_at, timezone)}
+                        </MetaItem>
+                      </MetaGrid>
+                      <div className="flex justify-start lg:justify-end">
+                        <TeamInvitationStatusBadge status={invitation.status} />
+                      </div>
+                    </div>
+
+                    {invitation.last_error ? (
+                      <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        {invitation.last_error}
                       </p>
-                    </div>
-                    <MetaGrid className="lg:grid-cols-3">
-                      <MetaItem label="Rol">
-                        {getMembershipRoleLabel(invitation.role)}
-                      </MetaItem>
-                      <MetaItem label="Último envío">
-                        {formatDate(
-                          invitation.last_sent_at ?? invitation.sent_at,
-                          timezone,
-                        )}
-                      </MetaItem>
-                      <MetaItem label="Caduca">
-                        {formatDate(invitation.expires_at, timezone)}
-                      </MetaItem>
-                    </MetaGrid>
-                    <div className="flex justify-start lg:justify-end">
-                      <TeamInvitationStatusBadge status={invitation.status} />
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <form action={resendTeamInvitation}>
+                        <input
+                          name="organizationId"
+                          type="hidden"
+                          value={organizationId}
+                        />
+                        <input
+                          name="invitationId"
+                          type="hidden"
+                          value={invitation.id}
+                        />
+                        <Button size="sm" type="submit" variant="outline">
+                          <RotateCcw aria-hidden="true" />
+                          Reenviar
+                        </Button>
+                      </form>
+
+                      <form action={cancelTeamInvitation}>
+                        <input
+                          name="organizationId"
+                          type="hidden"
+                          value={organizationId}
+                        />
+                        <input
+                          name="invitationId"
+                          type="hidden"
+                          value={invitation.id}
+                        />
+                        <Button size="sm" type="submit" variant="outline">
+                          <XCircle aria-hidden="true" />
+                          Cancelar
+                        </Button>
+                      </form>
                     </div>
                   </div>
-
-                  {invitation.last_error ? (
-                    <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                      {invitation.last_error}
-                    </p>
-                  ) : null}
-
-                  <div className="flex flex-wrap gap-2">
-                    <form action={resendTeamInvitation}>
-                      <input
-                        name="organizationId"
-                        type="hidden"
-                        value={organizationId}
-                      />
-                      <input
-                        name="invitationId"
-                        type="hidden"
-                        value={invitation.id}
-                      />
-                      <Button size="sm" type="submit" variant="outline">
-                        <RotateCcw aria-hidden="true" />
-                        Reenviar
-                      </Button>
-                    </form>
-
-                    <form action={cancelTeamInvitation}>
-                      <input
-                        name="organizationId"
-                        type="hidden"
-                        value={organizationId}
-                      />
-                      <input
-                        name="invitationId"
-                        type="hidden"
-                        value={invitation.id}
-                      />
-                      <Button size="sm" type="submit" variant="outline">
-                        <XCircle aria-hidden="true" />
-                        Cancelar
-                      </Button>
-                    </form>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }
@@ -1411,21 +1486,27 @@ function TeamUserCard({
   );
 
   return (
-    <Card size="sm">
+    <Card
+      className="transition-[background-color,box-shadow] hover:bg-background hover:shadow-sm"
+      size="sm"
+    >
       <CardContent className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto] lg:items-start">
-          <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold tracking-tight">
-              {row.label}
-              {isSelf ? (
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  tu usuario
-                </span>
-              ) : null}
-            </h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {row.detail}
-            </p>
+        <div className="grid gap-4 xl:grid-cols-[minmax(16rem,1.35fr)_minmax(0,2fr)_auto] xl:items-center">
+          <div className="flex min-w-0 items-center gap-3">
+            <TeamAvatar label={row.label} />
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-semibold tracking-tight">
+                {row.label}
+                {isSelf ? (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    tu usuario
+                  </span>
+                ) : null}
+              </h3>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {row.detail}
+              </p>
+            </div>
           </div>
           <MetaGrid className="lg:grid-cols-4">
             <MetaItem label="Rol">
@@ -1464,7 +1545,7 @@ function TeamUserCard({
             <div className="grid gap-4">
               {isSelf && canManageAccess ? (
                 <p className="text-sm text-muted-foreground">
-                  Tu propio acceso esta protegido.
+                  Tu propio acceso está protegido.
                 </p>
               ) : null}
 
@@ -1691,18 +1772,12 @@ function TeamUserFiltersCard({
   totalCount: number;
 }) {
   return (
-    <Card size="sm">
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <Filter aria-hidden="true" className="size-4" />
-              Filtrar usuarios
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {filteredCount} de {totalCount} usuarios visibles.
-            </p>
-          </div>
+    <Card className="shadow-sm" size="sm">
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 md:hidden">
+          <p className="text-sm text-muted-foreground">
+            {filteredCount} de {totalCount} usuarios visibles.
+          </p>
           {activeFilterCount > 0 ? (
             <Badge variant="secondary">
               {activeFilterCount} filtro
@@ -1711,17 +1786,27 @@ function TeamUserFiltersCard({
           ) : null}
         </div>
 
-        <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-6" method="get">
+        <form
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(15rem,2fr)_repeat(4,minmax(8rem,1fr))_auto]"
+          method="get"
+        >
           <input name="organizationId" type="hidden" value={organizationId} />
 
-          <label className="grid min-w-0 gap-2 md:col-span-2 xl:col-span-2">
+          <label className="grid min-w-0 gap-2 md:col-span-2 xl:col-span-1">
             <span className="text-sm font-medium">Buscar</span>
-            <Input
-              defaultValue={filters.query}
-              name="q"
-              placeholder="Nombre, rol, centro o notas"
-              type="search"
-            />
+            <span className="relative">
+              <Input
+                className="pr-9"
+                defaultValue={filters.query}
+                name="q"
+                placeholder="Nombre, rol, centro o notas"
+                type="search"
+              />
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+            </span>
           </label>
 
           <label className="grid min-w-0 gap-2">
@@ -1790,8 +1875,9 @@ function TeamUserFiltersCard({
             </select>
           </label>
 
-          <div className="grid gap-2 md:grid-cols-2 md:items-end xl:col-span-6 xl:flex xl:justify-end">
+          <div className="grid gap-2 md:grid-cols-2 md:items-end xl:min-w-48 xl:self-end">
             <Button className="min-h-11 md:min-h-9" type="submit">
+              <Filter aria-hidden="true" />
               Aplicar
             </Button>
             <Button asChild className="min-h-11 md:min-h-9" variant="outline">
@@ -1838,11 +1924,29 @@ function TeamUsersSection({
     rows.length === totalRows
       ? `${totalRows} usuarios`
       : `${rows.length} de ${totalRows} usuarios`;
+  const operationalRowsCount = rows.filter(
+    (row) => row.profile?.status === "active",
+  ).length;
+  const missingOperationalRowsCount = rows.filter((row) => !row.profile).length;
 
   return (
     <section className="space-y-3">
       <SectionHeader
-        action={<Badge variant="outline">{usersBadgeLabel}</Badge>}
+        action={
+          <div className="hidden flex-wrap gap-2 md:flex">
+            <TeamMetricPill icon={UsersRound} label={usersBadgeLabel} />
+            <TeamMetricPill
+              icon={CheckCircle2}
+              label={`${operationalRowsCount} operativos`}
+              tone="success"
+            />
+            <TeamMetricPill
+              icon={AlertTriangle}
+              label={`${missingOperationalRowsCount} sin datos operativos`}
+              tone="warning"
+            />
+          </div>
+        }
         description={
           showingArchived
             ? "Usuarios o datos operativos conservados por historial."
@@ -1877,11 +1981,11 @@ function TeamUsersSection({
               ? "Prueba con otro nombre, centro, rol, estado o cuenta."
               : canManageAccess || canManageProfiles
                 ? showingArchived
-                  ? "Los usuarios archivados apareceran aqui cuando existan."
+                  ? "Los usuarios archivados aparecerán aquí cuando existan."
                   : "Invita o crea usuarios para empezar a gestionar el equipo."
                 : showingArchived
-                  ? "No hay usuarios archivados visibles para esta organizacion."
-                  : "Todavia no hay usuarios visibles para esta organizacion."
+                  ? "No hay usuarios archivados visibles para esta organización."
+                  : "Todavía no hay usuarios visibles para esta organización."
           }
           title={
             hasActiveFilters
@@ -1892,7 +1996,17 @@ function TeamUsersSection({
           }
         />
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
+          <div className="hidden rounded-xl bg-card px-4 py-3 text-xs font-medium text-muted-foreground ring-1 ring-foreground/10 xl:grid xl:grid-cols-[minmax(16rem,1.35fr)_minmax(0,2fr)_auto] xl:items-center">
+            <span>Usuario</span>
+            <div className="grid grid-cols-4 gap-3">
+              <span>Rol</span>
+              <span>Centro principal</span>
+              <span>Horas semanales</span>
+              <span>Entrada</span>
+            </div>
+            <span className="text-right">Estado y acciones</span>
+          </div>
           {rows.map((row) => (
             <TeamUserCard
               canDeleteProfiles={canDeleteProfiles}
@@ -2050,10 +2164,11 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
       ) : null}
 
       {canManageAccess ? (
-        <div className="space-y-3">
+        <div className="grid gap-3 lg:grid-cols-2">
           <CollapsibleActionPanel
             actionLabel="Invitar"
-            description="Crea o reutiliza datos operativos y envia un enlace de acceso por email."
+            description="Crea o reutiliza datos operativos y envía un enlace de acceso por email."
+            featured
             icon={Mail}
             title="Invitar usuario"
           >
@@ -2068,7 +2183,8 @@ export default async function CoachesPage({ searchParams }: CoachesPageProps) {
           <CollapsibleActionPanel
             actionLabel="Crear"
             description="Crea usuario, datos operativos y contraseña temporal sin enviar invitación."
-            icon={KeyRound}
+            featured
+            icon={UserPlus}
             title="Crear cuenta"
           >
             <DirectTeamAccountCreateForm

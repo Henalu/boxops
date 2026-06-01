@@ -11,6 +11,11 @@ import {
 } from "@/lib/auth/tenant";
 import { isCenterStatus, validateCenterForm } from "@/lib/centers";
 import { getCentersPath } from "@/lib/navigation/app-paths";
+import {
+  auditFieldSet,
+  auditFieldTouched,
+  recordOperationalAuditEvent,
+} from "@/lib/operational-audit";
 import { createClient } from "@/lib/supabase/server";
 
 function getRequiredFormString(formData: FormData, key: string) {
@@ -72,17 +77,35 @@ export async function createCenter(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("centers").insert({
-    organization_id: context.organization.id,
-    name: validation.values.name,
-    slug: validation.values.slug,
-    timezone: validation.values.timezone,
-    status: validation.values.status,
-  });
+  const { data: center, error } = await supabase
+    .from("centers")
+    .insert({
+      organization_id: context.organization.id,
+      name: validation.values.name,
+      slug: validation.values.slug,
+      timezone: validation.values.timezone,
+      status: validation.values.status,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error)));
+  if (error || !center) {
+    redirect(getErrorPath(context.organization.id, getMutationError(error ?? undefined)));
   }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      name: auditFieldTouched(),
+      slug: auditFieldSet(validation.values.slug),
+      status: auditFieldSet(validation.values.status),
+      timezone: auditFieldSet(validation.values.timezone),
+    },
+    entityId: center.id,
+    entityType: "centers",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCentersPath({
@@ -106,7 +129,7 @@ export async function updateCenter(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: center, error } = await supabase
     .from("centers")
     .update({
       name: validation.values.name,
@@ -119,9 +142,23 @@ export async function updateCenter(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error)));
+  if (error || !center) {
+    redirect(getErrorPath(context.organization.id, getMutationError(error ?? undefined)));
   }
+
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields: {
+      name: auditFieldTouched(),
+      slug: auditFieldSet(validation.values.slug),
+      status: auditFieldSet(validation.values.status),
+      timezone: auditFieldSet(validation.values.timezone),
+    },
+    entityId: center.id,
+    entityType: "centers",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCentersPath({
@@ -145,7 +182,7 @@ export async function setCenterStatus(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: center, error } = await supabase
     .from("centers")
     .update({ status: nextStatus })
     .eq("id", centerId)
@@ -153,9 +190,20 @@ export async function setCenterStatus(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error)));
+  if (error || !center) {
+    redirect(getErrorPath(context.organization.id, getMutationError(error ?? undefined)));
   }
+
+  await recordOperationalAuditEvent({
+    action: nextStatus === "active" ? "reactivated" : "deactivated",
+    changedFields: {
+      status: auditFieldSet(nextStatus),
+    },
+    entityId: center.id,
+    entityType: "centers",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   redirect(
     getCentersPath({

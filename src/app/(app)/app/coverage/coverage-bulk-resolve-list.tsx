@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { CheckSquare, Save, Square, X } from "lucide-react";
+import { CheckSquare, MoreHorizontal, Save, Square, X } from "lucide-react";
 
 import { updateSelectedCoverageBlocks } from "./actions";
-import { CoverageRiskCard } from "@/components/features/operations-ui";
+import { RouteStateButton } from "@/components/features/route-state-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +22,14 @@ type Tone =
 export type CoverageBulkRiskItem = {
   blockId: string;
   center: string;
+  className: string;
+  coachDetail: string;
+  coachLabel: string;
+  date: string;
   href: string;
   meta: string;
+  priority: string;
+  recommendation: string;
   status: string;
   time: string;
   title: string;
@@ -108,6 +114,34 @@ function BulkSubmitButton({
       <Save aria-hidden="true" />
     </Button>
   );
+}
+
+function getPriorityClass(tone: Tone) {
+  if (tone === "critical") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+
+  if (tone === "warning") {
+    return "border-amber-300 bg-amber-50 text-amber-700";
+  }
+
+  return "border-border bg-muted/40 text-muted-foreground";
+}
+
+function getStatusClass(tone: Tone) {
+  if (tone === "critical") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+
+  if (tone === "warning") {
+    return "border-amber-300 bg-amber-50 text-amber-700";
+  }
+
+  if (tone === "success") {
+    return "border-emerald-300 bg-emerald-50 text-emerald-700";
+  }
+
+  return "border-border bg-muted/40 text-muted-foreground";
 }
 
 export function CoverageBulkResolveList({
@@ -410,38 +444,109 @@ export function CoverageBulkResolveList({
         </div>
       ) : null}
 
-      {items.map((item) => {
-        const isSelected = selectedBlockIds.has(item.blockId);
+      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+        <div className="hidden bg-muted/35 px-4 py-3 text-xs font-medium text-muted-foreground lg:grid lg:grid-cols-[116px_136px_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:gap-4">
+          <span>Prioridad</span>
+          <span>Día y hora</span>
+          <span>Clase</span>
+          <span>Centro</span>
+          <span>Situación</span>
+          <span>Entrenador</span>
+          <span>Acción</span>
+        </div>
 
-        return (
-          <CoverageRiskCard
-            actionLabel={canManageSchedule ? "Resolver" : "Abrir"}
-            center={item.center}
-            detailTrigger="coverage-block"
-            href={item.href}
-            key={item.blockId}
-            leading={
-              canManageSchedule ? (
-                <input
-                  aria-label={`Seleccionar ${item.title}`}
-                  checked={isSelected}
-                  className="size-4 rounded border-border accent-primary"
-                  onChange={() => toggleSelected(item.blockId)}
-                  type="checkbox"
-                />
-              ) : undefined
-            }
-            meta={item.meta}
-            preserveRouteState
-            scroll={false}
-            selected={isSelected}
-            status={item.status}
-            time={item.time}
-            title={item.title}
-            tone={item.tone}
-          />
-        );
-      })}
+        <div className="divide-y divide-border">
+          {items.map((item) => {
+            const isSelected = selectedBlockIds.has(item.blockId);
+
+            return (
+              <div
+                className={[
+                  "grid gap-3 px-4 py-4 transition-colors lg:grid-cols-[116px_136px_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center lg:gap-4",
+                  isSelected ? "bg-primary/5" : "hover:bg-muted/25",
+                ].join(" ")}
+                key={item.blockId}
+              >
+                <div className="flex items-center gap-2">
+                  {canManageSchedule ? (
+                    <input
+                      aria-label={`Seleccionar ${item.title}`}
+                      checked={isSelected}
+                      className="size-4 rounded border-border accent-primary"
+                      onChange={() => toggleSelected(item.blockId)}
+                      type="checkbox"
+                    />
+                  ) : null}
+                  <span
+                    className={`inline-flex min-h-7 items-center rounded-lg border px-2 text-xs font-medium ${getPriorityClass(
+                      item.tone,
+                    )}`}
+                  >
+                    {item.priority}
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{item.date}</p>
+                  <p className="mt-1 font-mono text-sm text-muted-foreground">
+                    {item.time}
+                  </p>
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {item.className}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {item.meta}
+                  </p>
+                </div>
+
+                <p className="truncate text-sm text-muted-foreground">
+                  {item.center}
+                </p>
+
+                <div className="min-w-0">
+                  <span
+                    className={`inline-flex min-h-7 items-center rounded-lg border px-2 text-xs font-medium ${getStatusClass(
+                      item.tone,
+                    )}`}
+                  >
+                    {item.status}
+                  </span>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {item.recommendation}
+                  </p>
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {item.coachLabel}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {item.coachDetail}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 lg:justify-end">
+                  <Button asChild size="sm" variant="outline">
+                    <RouteStateButton
+                      data-operational-detail-trigger="coverage-block"
+                      href={item.href}
+                    >
+                      {canManageSchedule ? "Resolver" : "Abrir"}
+                    </RouteStateButton>
+                  </Button>
+                  <MoreHorizontal
+                    aria-hidden="true"
+                    className="hidden size-4 text-muted-foreground lg:block"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {canManageSchedule && selectedCount === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">

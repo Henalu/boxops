@@ -268,7 +268,7 @@ export function SignaturePadForm({
       >
         {!hasInk ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-muted-foreground">
-            Dibuja aqui tu firma con el raton, trackpad o dedo.
+            Dibuja aquí tu firma con el ratón, trackpad o dedo.
           </div>
         ) : null}
         <canvas

@@ -51,6 +51,35 @@ function findMigrationWith(needle: string) {
   return `supabase/migrations/${matches[0]}`;
 }
 
+function readMigrationsWith(needle: string) {
+  const migrationsDirectory = path.join(process.cwd(), "supabase/migrations");
+  const matches = readdirSync(migrationsDirectory)
+    .filter((entry) => entry.endsWith(".sql"))
+    .filter((entry) =>
+      readFileSync(path.join(migrationsDirectory, entry), "utf8").includes(
+        needle,
+      ),
+    )
+    .sort();
+
+  expect(matches, `migrations containing ${needle}`).not.toEqual([]);
+
+  return matches
+    .map((entry) => readFileSync(path.join(migrationsDirectory, entry), "utf8"))
+    .join("\n");
+}
+
+function getFunctionSource(source: string, functionName: string) {
+  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(
+    new RegExp(`(?:export\\s+)?function\\s+${escapedName}\\([\\s\\S]+?\\n}\\r?\\n`, "m"),
+  );
+
+  expect(match, `function ${functionName} exists`).not.toBeNull();
+
+  return match?.[0] ?? "";
+}
+
 function expectPolicyDropBeforeCreate(
   source: string,
   policyName: string,
@@ -292,7 +321,13 @@ test.describe("BoxOps Console visible surface guardrails", () => {
     expect(consoleSource).toContain("Abrir soporte temporal");
     expect(consoleSource).toContain('name="durationMinutes"');
     expect(consoleSource).toContain("sesion tecnica auditada");
-    expect(consoleSource).toContain("No crea usuarios permanentes");
+    expect(consoleSource).toContain("Cambiar estado de acceso");
+    expect(consoleSource).toContain("Plan y suscripcion");
+    expect(consoleSource).toContain("Sin acceso sensible");
+    expect(consoleSource).toContain("Permite ajustes operativos auditados");
+    expect(consoleSource).toContain(
+      "No concede acceso a documentos, fichaje ni nominas",
+    );
     expect(consoleSource).not.toMatch(/href=["']\/app[/?'"]/);
     expect(consoleSource).not.toMatch(/INSERT INTO public\.organization_memberships/i);
     expect(consoleListPage).not.toContain("Suspender acceso");
@@ -421,10 +456,8 @@ test.describe("BoxOps Console visible surface guardrails", () => {
     );
   });
 
-  test("keeps support-session RLS policies idempotent without widening access", () => {
-    const migration = readProjectFile(
-      findMigrationWith("has_active_platform_support_session"),
-    );
+  test("keeps support-session read policies idempotent without sensitive access", () => {
+    const migration = readMigrationsWith("has_active_platform_support_session");
 
     expectPolicyDropBeforeCreate(
       migration,
@@ -464,11 +497,169 @@ test.describe("BoxOps Console visible surface guardrails", () => {
     }
 
     expect(migration).not.toMatch(
-      /CREATE POLICY "Platform support sessions can read[\s\S]{0,180}FOR\s+(?:ALL|INSERT|UPDATE|DELETE)\s+TO authenticated/i,
-    );
-    expect(migration).not.toMatch(
       /Platform support sessions can read (?:documents|time records|payroll|signatures)/i,
     );
+  });
+
+  test("allows audited support operational management without sensitive modules", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260528202951_platform_support_operational_management.sql",
+    );
+    const permissionsSource = readProjectFile("src/lib/auth/permissions.ts");
+    const coachesActionsSource = readProjectFile(
+      "src/app/(app)/app/coaches/actions.ts",
+    );
+    const centersActionsSource = readProjectFile(
+      "src/app/(app)/app/centers/actions.ts",
+    );
+    const classTypesActionsSource = readProjectFile(
+      "src/app/(app)/app/class-types/actions.ts",
+    );
+    const layoutSource = readProjectFile("src/app/(app)/app/layout.tsx");
+    const docsSource = readProjectFile(
+      "docs/architecture/tenancy-and-billing.md",
+    );
+
+    expect(permissionsSource).toContain("PLATFORM_SUPPORT_ACCESS_ROLE");
+    for (const helper of [
+      "canManageOperationalData",
+      "canManageOperationalTeamProfiles",
+      "canManageTeamAccess",
+      "canReadOperationalData",
+      "canManageStaffWorkWindows",
+      "canReadOperationalEvents",
+      "canManageOperationalEvents",
+    ]) {
+      expect(getFunctionSource(permissionsSource, helper)).toContain(
+        "isPlatformSupportRole(role)",
+      );
+    }
+
+    for (const helper of [
+      "canManageTenantSettings",
+      "canReadTenantBilling",
+      "canReviewTimeTracking",
+      "canManageAbsenceRequests",
+      "canReviewOvertimeCandidates",
+    ]) {
+      expect(getFunctionSource(permissionsSource, helper)).not.toContain(
+        "isPlatformSupportRole(role)",
+      );
+    }
+
+    expect(layoutSource).toContain("sesion auditada de soporte");
+    expect(layoutSource).not.toContain("ni crear memberships");
+    expect(coachesActionsSource).toContain(
+      'context.membership.accessMode === "platform_support"',
+    );
+    expect(centersActionsSource).toContain('entityType: "centers"');
+    expect(classTypesActionsSource).toContain('entityType: "class_types"');
+
+    expect(migration).toContain("platform_support_session_id uuid");
+    expect(migration).toContain("ALTER COLUMN actor_membership_id DROP NOT NULL");
+    expect(migration).toContain(
+      "DROP CONSTRAINT IF EXISTS operational_audit_events_organization_id_actor_user_id_fkey",
+    );
+    expect(migration).toContain(
+      "operational_audit_events_platform_support_session_id_organization_id_fkey",
+    );
+    expect(migration).toContain(
+      "public.has_active_platform_support_session(target_organization_id)",
+    );
+    expect(migration).toContain(
+      "current_support_session public.platform_support_sessions",
+    );
+    expect(migration).toContain("platform_support_session_id,");
+    expect(migration).toContain("'centers'");
+    expect(migration).toContain("'class_types'");
+
+    for (const [policyName, tableName, command] of [
+      ["Platform support sessions can create centers", "centers", "INSERT"],
+      ["Platform support sessions can update centers", "centers", "UPDATE"],
+      [
+        "Platform support sessions can create memberships",
+        "organization_memberships",
+        "INSERT",
+      ],
+      [
+        "Platform support sessions can update memberships",
+        "organization_memberships",
+        "UPDATE",
+      ],
+      [
+        "Platform support sessions can delete memberships",
+        "organization_memberships",
+        "DELETE",
+      ],
+      [
+        "Platform support sessions can create team invitations",
+        "team_invitations",
+        "INSERT",
+      ],
+      [
+        "Platform support sessions can update team invitations",
+        "team_invitations",
+        "UPDATE",
+      ],
+      [
+        "Platform support sessions can create schedule blocks",
+        "schedule_blocks",
+        "INSERT",
+      ],
+      [
+        "Platform support sessions can update schedule blocks",
+        "schedule_blocks",
+        "UPDATE",
+      ],
+      [
+        "Platform support sessions can delete schedule blocks",
+        "schedule_blocks",
+        "DELETE",
+      ],
+      [
+        "Platform support sessions can create template blocks",
+        "schedule_template_blocks",
+        "INSERT",
+      ],
+      [
+        "Platform support sessions can update template blocks",
+        "schedule_template_blocks",
+        "UPDATE",
+      ],
+      [
+        "Platform support sessions can delete template blocks",
+        "schedule_template_blocks",
+        "DELETE",
+      ],
+      [
+        "Platform support sessions can create staff work windows",
+        "staff_work_windows",
+        "INSERT",
+      ],
+      [
+        "Platform support sessions can update staff work windows",
+        "staff_work_windows",
+        "UPDATE",
+      ],
+    ] as const) {
+      expect(migration).toContain(
+        `DROP POLICY IF EXISTS "${policyName}"\n  ON public.${tableName};`,
+      );
+      expect(migration).toContain(
+        `CREATE POLICY "${policyName}"\n  ON public.${tableName} FOR ${command} TO authenticated`,
+      );
+    }
+
+    expect(migration).not.toMatch(
+      /Platform support sessions can (?:read|create|update|delete) (?:documents|time records|payroll|signatures)/i,
+    );
+    expect(migration).not.toMatch(
+      /ON public\.(?:documents|document_versions|document_access_grants|time_records|time_punches|time_weekly_approvals|overtime_candidates)/i,
+    );
+    expect(migration).not.toMatch(/stripe|checkout|webhook|customer\s*portal/i);
+    expect(docsSource).toContain("mutacion operativa auditada");
+    expect(docsSource).toContain("platform_support_session_id");
+    expect(docsSource).toContain("no concede politicas de lectura para documentos");
   });
 
   test("keeps manual tenant suspension audited and away from memberships", () => {

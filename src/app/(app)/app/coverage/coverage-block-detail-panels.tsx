@@ -271,7 +271,7 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision";
+    return "Ausencia en revisión";
   }
 
   return null;
@@ -279,11 +279,11 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
 
 function getAbsenceImpactMessage(coverage: ScheduleBlockCoverage) {
   if (coverage.absenceImpact.coverageNeededCount > 0) {
-    return "Impacto de ausencia aprobado: una asignacion sigue en el horario, pero requiere revision de cobertura.";
+    return "Impacto de ausencia aprobado: una asignación sigue en el horario, pero requiere revisión de cobertura.";
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision: puede requerir cobertura si se aprueba.";
+    return "Ausencia en revisión: puede requerir cobertura si se aprueba.";
   }
 
   return null;

@@ -935,14 +935,17 @@ export function OnboardingTour({ memberships = [] }: OnboardingTourProps) {
 
 export function OnboardingLaunchButton({
   className,
+  onLaunch,
   label = "Guía",
 }: {
   className?: string;
   label?: string;
+  onLaunch?: () => void;
 }) {
   function openTour() {
     clearSeenTour();
     window.dispatchEvent(new Event(OPEN_EVENT));
+    onLaunch?.();
   }
 
   return (

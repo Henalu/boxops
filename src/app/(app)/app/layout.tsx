@@ -5,6 +5,10 @@ import { Clock3, LifeBuoy, ShieldCheck } from "lucide-react";
 
 import { AppNavigation } from "@/components/layout/app-navigation";
 import {
+  MobileHeaderActions,
+  type MobileHeaderProfile,
+} from "@/components/layout/mobile-header-actions";
+import {
   NextAssignedShellLink,
   type NextAssignedShellItem,
 } from "@/components/layout/next-assigned-shell-link";
@@ -23,6 +27,11 @@ import { getActiveMemberships, getAuthenticatedUser } from "@/lib/auth/tenant";
 import { getOwnNextAssignedScheduleBlock } from "@/lib/own-schedule";
 import { getActivePlatformAdmin } from "@/lib/platform-console";
 import { endPlatformSupportSessionAction } from "@/lib/platform-console-actions";
+import {
+  AVATAR_SIGNED_URL_TTL_SECONDS,
+  PROFILE_ASSETS_BUCKET,
+} from "@/lib/profile-assets";
+import { createClient } from "@/lib/supabase/server";
 
 function formatSupportExpiresAt(value: string) {
   try {
@@ -34,6 +43,89 @@ function formatSupportExpiresAt(value: string) {
   } catch {
     return "caducidad no disponible";
   }
+}
+
+function getFallbackProfileName({
+  email,
+  userId,
+}: {
+  email: string | null | undefined;
+  userId: string;
+}) {
+  return email?.split("@")[0] || userId.slice(0, 8) || "Tu perfil";
+}
+
+async function getMobileHeaderProfiles({
+  fallbackName,
+  memberships,
+  userEmail,
+  userId,
+}: {
+  fallbackName: string;
+  memberships: Awaited<ReturnType<typeof getActiveMemberships>>;
+  userEmail: string | null | undefined;
+  userId: string;
+}): Promise<MobileHeaderProfile[]> {
+  const supabase = await createClient();
+
+  return Promise.all(
+    memberships.map(async (membership) => {
+      let avatarSignedUrl: string | null = null;
+      let displayName =
+        membership.accessMode === "platform_support"
+          ? "Soporte BoxOps"
+          : fallbackName;
+
+      try {
+        if (membership.accessMode !== "platform_support") {
+          const { data: profile } = await supabase
+            .from("person_profiles")
+            .select("id, display_name")
+            .eq("organization_id", membership.organization.id)
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          if (profile?.display_name) {
+            displayName = profile.display_name;
+          }
+
+          if (profile?.id) {
+            const { data: asset } = await supabase
+              .from("profile_assets")
+              .select("storage_path")
+              .eq("organization_id", membership.organization.id)
+              .eq("person_profile_id", profile.id)
+              .eq("asset_type", "avatar")
+              .eq("status", "active")
+              .order("created_at", { ascending: false })
+              .maybeSingle();
+
+            if (asset?.storage_path) {
+              const { data: signedUrlData } = await supabase.storage
+                .from(PROFILE_ASSETS_BUCKET)
+                .createSignedUrl(
+                  asset.storage_path,
+                  AVATAR_SIGNED_URL_TTL_SECONDS,
+                );
+
+              avatarSignedUrl = signedUrlData?.signedUrl ?? null;
+            }
+          }
+        }
+      } catch {
+        avatarSignedUrl = null;
+      }
+
+      return {
+        avatarSignedUrl,
+        displayName,
+        email: userEmail ?? null,
+        organizationId: membership.organization.id,
+        organizationName: membership.organization.name,
+        role: membership.role,
+      };
+    }),
+  );
 }
 
 function PlatformSupportModeBanner({
@@ -49,7 +141,7 @@ function PlatformSupportModeBanner({
 }) {
   return (
     <section className="border-b border-amber-300/50 bg-amber-50 text-amber-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-3 py-3 sm:px-4 md:flex-row md:items-center md:justify-between md:px-5 lg:px-6 2xl:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-4 md:flex-row md:items-center md:justify-between md:px-5 lg:px-6 2xl:px-8">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800">
             <LifeBuoy aria-hidden="true" className="size-4" />
@@ -60,8 +152,8 @@ function PlatformSupportModeBanner({
             </p>
             <p className="mt-1 text-sm leading-5 text-amber-900/85">
               Estas revisando{" "}
-              <span className="font-medium">{organizationName}</span> sin
-              suplantar usuarios ni crear memberships. Caduca el{" "}
+              <span className="font-medium">{organizationName}</span> con una
+              sesión auditada de soporte, sin suplantar usuarios. Caduca el{" "}
               {formatSupportExpiresAt(supportSession.expiresAt)}.
             </p>
           </div>
@@ -106,10 +198,20 @@ export default async function ProtectedAppLayout({
   }
 
   const memberships = await getActiveMemberships(user.id);
+  const fallbackProfileName = getFallbackProfileName({
+    email: user.email,
+    userId: user.id,
+  });
   const navigationMemberships = memberships.map((membership) => ({
     organizationId: membership.organization.id,
     role: membership.role,
   }));
+  const mobileHeaderProfiles = await getMobileHeaderProfiles({
+    fallbackName: fallbackProfileName,
+    memberships,
+    userEmail: user.email,
+    userId: user.id,
+  });
   const themeOrganizations = memberships.map((membership) => ({
     id: membership.organization.id,
     themeConfig: membership.organization.theme_config,
@@ -225,7 +327,10 @@ export default async function ProtectedAppLayout({
                   items={nextAssignedShellItems}
                   placement="mobile-header"
                 />
-                <OnboardingLaunchButton className="shrink-0" label="Guía" />
+                <MobileHeaderActions
+                  memberships={navigationMemberships}
+                  profiles={mobileHeaderProfiles}
+                />
               </div>
             </header>
 
@@ -237,7 +342,7 @@ export default async function ProtectedAppLayout({
               />
             ) : null}
 
-            <main className="mx-auto w-full max-w-7xl px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-5 md:pb-8 md:pt-8 lg:px-6 2xl:px-8">
+            <main className="mx-auto w-full max-w-[1600px] px-3 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-3 sm:px-4 md:px-5 md:pb-8 md:pt-8 lg:px-6 2xl:px-8">
               {children}
             </main>
           </div>

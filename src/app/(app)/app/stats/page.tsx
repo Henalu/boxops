@@ -1340,7 +1340,7 @@ function VacationReadinessCard() {
           {[
             "Saldos legales por coach",
             "Ausencias aprobadas con impacto",
-            "Ausencias en revision",
+            "Ausencias en revisión",
           ].map((title) => (
             <div className="rounded-lg border border-dashed border-border p-4" key={title}>
               <p className="font-medium">{title}</p>
@@ -1352,7 +1352,7 @@ function VacationReadinessCard() {
         </div>
         <p className="mt-4 text-sm leading-6 text-muted-foreground">
           No se calculan saldos ni devengos desde bloques planificados. Las
-          ausencias aprobadas o en revision pueden marcar riesgo de cobertura,
+          ausencias aprobadas o en revisión pueden marcar riesgo de cobertura,
           pero no modifican semanas ni asignaciones ya creadas.
         </p>
       </CardContent>
@@ -1583,7 +1583,7 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
           <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
           <AlertDescription>
             Las estadisticas se muestran sin cruzar ausencias aprobadas o en
-            revision.
+            revisión.
           </AlertDescription>
         </Alert>
       ) : null}

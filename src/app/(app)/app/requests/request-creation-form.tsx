@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
+import { CalendarDays, Settings2, UsersRound } from "lucide-react";
 
 import { RequestCreationSubmitButton } from "./creation-submit-button";
-import { SectionHeader } from "@/components/features/operations-ui";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -19,6 +21,7 @@ import type {
   ChangeRequestCreationOptions,
   ChangeRequestCreationTargetRestrictionReason,
 } from "@/lib/change-requests";
+import { getSchedulePath } from "@/lib/navigation/app-paths";
 import { cn } from "@/lib/utils";
 
 type RequestCreationFormProps = {
@@ -35,7 +38,7 @@ type CreationAssignmentOption =
 const creationRequestTypeOptions = [
   {
     description:
-      "Para que otro entrenador te cubra ese dia o intercambie turno contigo.",
+      "Para que otro entrenador te cubra ese día o intercambie turno contigo.",
     label: "Pedir cobertura",
     value: "coverage_request",
   },
@@ -103,6 +106,38 @@ function getInitialAssignmentId({
     )?.assignmentId ??
     sortedAssignmentOptions[0]?.assignmentId ??
     ""
+  );
+}
+
+function CreationEmptyState({
+  description,
+  organizationId,
+  title,
+}: {
+  description: string;
+  organizationId: string;
+  title: string;
+}) {
+  return (
+    <div className="flex items-start gap-4 rounded-xl border border-dashed border-border bg-muted/20 p-4">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <CalendarDays aria-hidden="true" className="size-5" />
+      </span>
+      <div className="min-w-0 space-y-3">
+        <div className="space-y-1">
+          <p className="font-semibold">{title}</p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <Link href={getSchedulePath({ organizationId })}>
+            <Settings2 aria-hidden="true" />
+            Gestionar clases
+          </Link>
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -222,46 +257,55 @@ export function RequestCreationForm({
   }
 
   return (
-    <section className="space-y-3">
-      <SectionHeader
-        description="Pide que otro entrenador te cubra o intercambie una clase contigo."
-        title="Pedir cobertura"
-      />
-
-      <Card>
+    <section className="scroll-mt-24" id="request-creation">
+      <Card className="shadow-sm">
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle>Clase y destinatarios</CardTitle>
-              <CardDescription>
-                Elige primero el dia, despues la clase y los entrenadores que
-                podrian cubrirla.
-              </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <UsersRound aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg">Pedir cobertura</CardTitle>
+                <CardDescription>
+                  Pide que otro entrenador te cubra o intercambie una clase
+                  contigo.
+                </CardDescription>
+              </div>
             </div>
-            <Badge variant="outline">
-              {creationOptions.canManage ? "Gestion" : "Propia"}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                {creationOptions.canManage ? "Gestion" : "Propia"}
+              </Badge>
+              <Button asChild variant="outline">
+                <Link href={getSchedulePath({ organizationId })}>
+                  <Settings2 aria-hidden="true" />
+                  Gestionar clases
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
+            <p>
+              Elige primero el día, después la clase y los entrenadores que
+              podrían cubrirla. Solo se muestran opciones compatibles con tu
+              rol y la organización activa.
+            </p>
           </div>
         </CardHeader>
         <CardContent>
           {creationOptions.assignmentOptions.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="font-medium">No hay clases para pedir cobertura</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                No encontramos clases asignadas disponibles. Revisa el horario
-                o cambia de organizacion si trabajas en otra.
-              </p>
-            </div>
+            <CreationEmptyState
+              description="No encontramos clases asignadas disponibles. Revisa el horario o cambia de organización si trabajas en otra."
+              organizationId={organizationId}
+              title="No hay clases para pedir cobertura"
+            />
           ) : creationOptions.targetOptions.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="font-medium">
-                No hay entrenadores para solicitar cobertura
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                No encontramos entrenadores activos que puedan recibir
-                solicitudes en esta organizacion.
-              </p>
-            </div>
+            <CreationEmptyState
+              description="No encontramos entrenadores activos que puedan recibir solicitudes en esta organización."
+              organizationId={organizationId}
+              title="No hay entrenadores para solicitar cobertura"
+            />
           ) : (
             <form action={action} className="space-y-5">
               <input
@@ -288,10 +332,10 @@ export function RequestCreationForm({
 
                     <div className="space-y-2">
                       <Label htmlFor="scheduleBlockAssignmentId">
-                        Clase de ese dia
+                        Clase de ese día
                       </Label>
                       <select
-                        className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-8 md:text-sm"
                         id="scheduleBlockAssignmentId"
                         name="scheduleBlockAssignmentId"
                         onChange={(event) =>
@@ -302,7 +346,7 @@ export function RequestCreationForm({
                       >
                         {assignmentsForSelectedDate.length === 0 ? (
                           <option disabled value="">
-                            No hay clases asignadas ese dia
+                            No hay clases asignadas ese día
                           </option>
                         ) : null}
                         {assignmentsForSelectedDate.map((assignment) => (
@@ -325,7 +369,7 @@ export function RequestCreationForm({
 
                   <p className="text-xs text-muted-foreground">
                     {creationOptions.canManage
-                      ? "En gestion puedes preparar cobertura de clases del equipo."
+                      ? "En gestión puedes preparar cobertura de clases del equipo."
                       : "Solo aparecen clases asignadas a tu usuario."}
                   </p>
                 </div>
@@ -333,12 +377,13 @@ export function RequestCreationForm({
                 <div className="space-y-2">
                   <Label htmlFor="requestType">Tipo de solicitud</Label>
                   <select
-                    className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-8 md:text-sm"
                     id="requestType"
                     name="requestType"
                     onChange={(event) =>
                       setCurrentRequestType(
-                        event.currentTarget.value as CreationRequestTypeOptionValue,
+                        event.currentTarget
+                          .value as CreationRequestTypeOptionValue,
                       )
                     }
                     required
@@ -380,8 +425,10 @@ export function RequestCreationForm({
                     return (
                       <label
                         className={cn(
-                          "flex min-h-16 items-start gap-3 rounded-lg border border-border px-3 py-2 text-sm",
-                          disabled && "bg-muted/45 text-muted-foreground",
+                          "flex min-h-16 items-start gap-3 rounded-lg border border-border px-3 py-2 text-sm transition-colors",
+                          disabled
+                            ? "bg-muted/45 text-muted-foreground"
+                            : "bg-background hover:bg-muted/35",
                         )}
                         key={target.coachProfileId}
                       >
@@ -390,7 +437,7 @@ export function RequestCreationForm({
                             !disabled &&
                             selectedTargetIds.includes(target.coachProfileId)
                           }
-                          className="mt-1 size-4 rounded border-input"
+                          className="mt-1 size-4 rounded border-input accent-primary"
                           disabled={disabled}
                           name="targetCoachProfileIds"
                           onChange={(event) =>
@@ -427,29 +474,33 @@ export function RequestCreationForm({
                     id="reasonSummary"
                     maxLength={160}
                     name="reasonSummary"
-                    placeholder="Ej. Alguien puede cubrirme esta clase?"
+                    placeholder="Ej. ¿Alguien puede cubrirme esta clase?"
                     rows={3}
                   />
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Mensaje breve. Evita salud, documentos, nómina, ubicación,
+                    URLs o datos personales sensibles.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="expiresAt">Responder antes de</Label>
                   <Input id="expiresAt" name="expiresAt" type="datetime-local" />
                   <p className="text-xs text-muted-foreground">
-                    Opcional. No puede superar 30 dias desde hoy.
+                    Opcional. No puede superar 30 días desde hoy.
                   </p>
                 </div>
               </div>
 
               <label className="flex items-start gap-3 rounded-lg bg-muted/45 px-3 py-2 text-sm">
                 <input
-                  className="mt-1 size-4 rounded border-input"
+                  className="mt-1 size-4 rounded border-input accent-primary"
                   name="creationConfirmed"
                   required
                   type="checkbox"
                 />
                 <span>
                   Entiendo que esta solicitud organiza cobertura o intercambio
-                  sobre esta clase. Las ausencias, nominas y horas extra se
+                  sobre esta clase. Las ausencias, nóminas y horas extra se
                   gestionan aparte.
                 </span>
               </label>

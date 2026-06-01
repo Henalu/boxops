@@ -12,7 +12,7 @@ import {
 import { StaffWorkWindowPersonCenterSelects } from "./staff-work-window-person-center-selects";
 
 const selectClassName = [
-  "h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
+  "h-11 w-full min-w-0 truncate rounded-lg border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
   "outline-none transition-colors focus-visible:border-ring",
   "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
@@ -50,11 +50,11 @@ export function StaffWorkWindowFields({
           <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-4">
             {Array.from({ length: 7 }, (_, index) => index + 1).map((day) => (
               <label
-                className="flex min-h-11 items-center gap-2 rounded-md border border-input bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-muted/45 md:min-h-9"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-input bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-muted/45 has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground md:min-h-9"
                 key={day}
               >
                 <input
-                  className="size-4 shrink-0 accent-primary"
+                  className="size-4 shrink-0 rounded border-input accent-current"
                   defaultChecked={day === selectedDayOfWeek}
                   name="dayOfWeek"
                   type="checkbox"

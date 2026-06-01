@@ -17,6 +17,7 @@ import {
   canManageTenantSettings,
   canManageTimeLocationSettings,
   canManageTimeTrackingSettings,
+  canReadOperationalData,
   canReadOperationalEvents,
   canReviewTimeTracking,
   canReviewOvertimeCandidates,
@@ -46,6 +47,11 @@ import {
   validateStaffWorkWindowCreateForm,
   validateStaffWorkWindowForm,
 } from "../../src/lib/staff-work-windows";
+import {
+  getScheduleTemplateEditorSettings,
+  validateScheduleTemplateBlockCreateForm,
+  validateScheduleTemplateForm,
+} from "../../src/lib/schedule-templates";
 
 function readProjectFile(relativePath: string) {
   return readFileSync(path.join(process.cwd(), relativePath), "utf8");
@@ -4060,6 +4066,130 @@ test.describe("staff work window validator local helper guardrails", () => {
   });
 });
 
+test.describe("schedule template block validator local helper guardrails", () => {
+  const validTemplateBlockValues = {
+    centerId: "00000000-0000-0000-0000-000000000002",
+    classTypeId: "00000000-0000-0000-0000-000000000003",
+    dayOfWeek: "2",
+    defaultCoachProfileId: "none",
+    endTime: "08:00",
+    notes: "Clase base",
+    requiredCoaches: "0",
+    startTime: "07:00",
+    templateId: "00000000-0000-0000-0000-000000000001",
+  };
+
+  function makeScheduleTemplateBlockForm(
+    overrides: Partial<typeof validTemplateBlockValues> = {},
+  ) {
+    return makeFormData({
+      ...validTemplateBlockValues,
+      ...overrides,
+    });
+  }
+
+  test("allows creating the same template block for several days", () => {
+    const multiDayForm = makeScheduleTemplateBlockForm({
+      dayOfWeek: undefined,
+    });
+    multiDayForm.append("dayOfWeek", "1");
+    multiDayForm.append("dayOfWeek", "3");
+    multiDayForm.append("dayOfWeek", "3");
+
+    expect(validateScheduleTemplateBlockCreateForm(multiDayForm)).toEqual({
+      ok: true,
+      values: [
+        {
+          centerId: "00000000-0000-0000-0000-000000000002",
+          classTypeId: "00000000-0000-0000-0000-000000000003",
+          dayOfWeek: 1,
+          defaultCoachProfileId: null,
+          endTime: "08:00",
+          notes: "Clase base",
+          requiredCoaches: 0,
+          startTime: "07:00",
+          templateId: "00000000-0000-0000-0000-000000000001",
+        },
+        {
+          centerId: "00000000-0000-0000-0000-000000000002",
+          classTypeId: "00000000-0000-0000-0000-000000000003",
+          dayOfWeek: 3,
+          defaultCoachProfileId: null,
+          endTime: "08:00",
+          notes: "Clase base",
+          requiredCoaches: 0,
+          startTime: "07:00",
+          templateId: "00000000-0000-0000-0000-000000000001",
+        },
+      ],
+    });
+
+    expect(
+      validateScheduleTemplateBlockCreateForm(
+        makeScheduleTemplateBlockForm({ dayOfWeek: undefined }),
+      ),
+    ).toEqual({ error: "missing-fields", ok: false });
+  });
+});
+
+test.describe("schedule template editor settings guardrails", () => {
+  const validTemplateValues = {
+    centerId: "",
+    editorEndTime: "21:00",
+    editorStartTime: "07:00",
+    name: "Semana base",
+    status: "draft",
+    validFrom: "2026-05-25",
+    validUntil: "",
+  };
+
+  function makeScheduleTemplateForm(
+    overrides: Partial<typeof validTemplateValues> = {},
+  ) {
+    return makeFormData({
+      ...validTemplateValues,
+      ...overrides,
+    });
+  }
+
+  test("validates and normalizes template editor hours without creating blocks", () => {
+    expect(validateScheduleTemplateForm(makeScheduleTemplateForm())).toEqual({
+      ok: true,
+      values: {
+        centerId: null,
+        editorEndTime: "21:00",
+        editorStartTime: "07:00",
+        name: "Semana base",
+        status: "draft",
+        validFrom: "2026-05-25",
+        validUntil: null,
+      },
+    });
+
+    expect(
+      validateScheduleTemplateForm(
+        makeScheduleTemplateForm({ editorEndTime: "07:00" }),
+      ),
+    ).toEqual({ error: "invalid-editor-time", ok: false });
+
+    expect(
+      getScheduleTemplateEditorSettings({
+        editor: {
+          defaultDurationMinutes: 60,
+          endTime: "20:30",
+          slotMinutes: 30,
+          startTime: "07:30",
+        },
+      }),
+    ).toEqual({
+      defaultDurationMinutes: 60,
+      endTime: "20:30",
+      slotMinutes: 30,
+      startTime: "07:30",
+    });
+  });
+});
+
 test.describe("personal profile validator local helper guardrails", () => {
   const validProfileValues = {
     displayName: "Ada Lovelace",
@@ -6864,6 +6994,48 @@ test.describe("base role permission helper guardrails", () => {
         expect(checkCapability(role), `${role} ${capability}`).toBe(false);
       }
     }
+  });
+
+  test("grants platform support only audited operational assistance capabilities", () => {
+    const role = "platform_support";
+
+    expect(canReadOperationalData(role), "support operational read").toBe(true);
+    expect(canManageOperationalData(role), "support operational data").toBe(true);
+    expect(canManageOperationalTeamProfiles(role), "support team profiles").toBe(
+      true,
+    );
+    expect(canManageTeamAccess(role), "support team access").toBe(true);
+    expect(canManageStaffWorkWindows(role), "support work windows").toBe(true);
+    expect(canReadOperationalEvents(role), "support event read").toBe(true);
+    expect(canManageOperationalEvents(role), "support event management").toBe(
+      true,
+    );
+
+    expect(canManageTenantSettings(role), "support tenant settings").toBe(false);
+    expect(canDeleteOperationalTeamProfiles(role), "support profile delete").toBe(
+      false,
+    );
+    expect(canManageTimeTrackingSettings(role), "support time settings").toBe(
+      false,
+    );
+    expect(canReviewTimeTracking(role), "support time review").toBe(false);
+    expect(canManageTimeLocationSettings(role), "support location settings").toBe(
+      false,
+    );
+    expect(
+      canActivateTimeLocationSettings(role),
+      "support location activation",
+    ).toBe(false);
+    expect(canManageChangeRequests(role), "support change requests").toBe(false);
+    expect(canManageAbsenceRequests(role), "support absence requests").toBe(
+      false,
+    );
+    expect(canReviewOvertimeCandidates(role), "support overtime review").toBe(
+      false,
+    );
+    expect(canUseAbsenceSelfService(role), "support absence self service").toBe(
+      false,
+    );
   });
 });
 

@@ -479,7 +479,7 @@ export function ScheduleSlotCreateDialog({
                     <Gift aria-hidden="true" className="size-4" />
                     <span className="font-medium">Festivo</span>
                     <span className="text-sm text-muted-foreground">
-                      Cierre o dia especial visible como contexto.
+                      Cierre o día especial visible como contexto.
                     </span>
                   </button>
                 </div>
@@ -650,7 +650,7 @@ export function ScheduleSlotCreateDialog({
                           defaultValue={defaultCenterId ?? ""}
                           name="centerId"
                         >
-                          <option value="">Toda la organizacion</option>
+                          <option value="">Toda la organización</option>
                           {activeCenters.map((center) => (
                             <option key={center.id} value={center.id}>
                               {center.name}
@@ -732,7 +732,7 @@ export function ScheduleSlotCreateDialog({
                           name="allDay"
                           type="checkbox"
                         />
-                        <span>Todo el dia</span>
+                        <span>Todo el día</span>
                       </label>
                       <label className="grid min-w-0 gap-2 md:col-span-4">
                         <span className="text-sm font-medium">Notas</span>

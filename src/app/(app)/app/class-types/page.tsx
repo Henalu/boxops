@@ -1,5 +1,19 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CircleOff, Plus, Save } from "lucide-react";
+import type React from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Award,
+  CheckCircle2,
+  CircleOff,
+  Folder,
+  Info,
+  ListChecks,
+  ListFilter,
+  Plus,
+  Save,
+  Search,
+} from "lucide-react";
 
 import {
   createClassType,
@@ -10,13 +24,12 @@ import { ColorPaletteField } from "@/components/features/color-palette-field";
 import {
   CollapsibleActionPanel,
   InlineEditDetails,
-  MetaGrid,
-  MetaItem,
 } from "@/components/features/management-ui";
 import {
   EmptyState,
   PageHeader,
   SectionHeader,
+  StatusBadge,
 } from "@/components/features/operations-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
@@ -40,17 +53,25 @@ import {
   CLASS_TYPE_STATUSES,
   getClassTypeCategoryLabel,
   getClassTypeStatusLabel,
+  type ClassTypeCategory,
   type ClassTypeStatus,
 } from "@/lib/class-types";
+import { getClassTypesPath } from "@/lib/navigation/app-paths";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
 
 type ClassTypesPageProps = {
   searchParams: Promise<{
+    certification?: string | string[];
+    class_type_category?: string | string[];
+    class_type_status?: string | string[];
     error?: string | string[];
     organizationId?: string | string[];
+    q?: string | string[];
+    required_coaches?: string | string[];
     status?: string | string[];
   }>;
 };
@@ -68,6 +89,29 @@ type ClassTypeRow = Pick<
   | "updated_at"
 >;
 
+type ClassTypeCertificationFilter = "all" | "not_required" | "required";
+
+type ClassTypeRequiredCoachesFilter = "all" | "0" | "1" | "2" | "3_plus";
+
+type ClassTypeFilterValues = {
+  category: ClassTypeCategory | "all";
+  certification: ClassTypeCertificationFilter;
+  q: string;
+  requiredCoaches: ClassTypeRequiredCoachesFilter;
+  status: ClassTypeStatus | "all";
+};
+
+const REQUIRED_COACHES_FILTERS: Array<{
+  label: string;
+  value: ClassTypeRequiredCoachesFilter;
+}> = [
+  { label: "Todos", value: "all" },
+  { label: "Sin requisito", value: "0" },
+  { label: "1 entrenador", value: "1" },
+  { label: "2 entrenadores", value: "2" },
+  { label: "3 o mas", value: "3_plus" },
+];
+
 const successMessages: Record<string, string> = {
   activated: "Tipo activado.",
   created: "Tipo creado.",
@@ -78,7 +122,7 @@ const successMessages: Record<string, string> = {
 const successDescriptions: Record<string, string> = {
   activated: "Los horarios y plantillas volveran a leer este tipo como activo.",
   created: "Ya puedes usarlo al crear bloques o plantillas.",
-  deactivated: "No se elimina ningun bloque historico vinculado.",
+  deactivated: "No se elimina ningún bloque histórico vinculado.",
   updated:
     "Todos los bloques de plantilla y los horarios actuales o futuros vinculados se sincronizan sin tocar fechas pasadas.",
 };
@@ -140,15 +184,160 @@ function getSafeColor(value: string | null) {
   return value && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
 }
 
-function selectClassName(className = "") {
+function getColorAccentStyle(
+  value: string | null,
+): React.CSSProperties | undefined {
+  const safeColor = getSafeColor(value);
+
+  if (!safeColor) {
+    return undefined;
+  }
+
+  return {
+    backgroundColor: `${safeColor}14`,
+    borderColor: `${safeColor}33`,
+    color: safeColor,
+  };
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase("es-ES")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function parseClassTypeCategoryFilter(
+  value?: string,
+): ClassTypeFilterValues["category"] {
+  if (CLASS_TYPE_CATEGORIES.includes(value as ClassTypeCategory)) {
+    return value as ClassTypeCategory;
+  }
+
+  return "all";
+}
+
+function parseClassTypeStatusFilter(
+  value?: string,
+): ClassTypeFilterValues["status"] {
+  if (CLASS_TYPE_STATUSES.includes(value as ClassTypeStatus)) {
+    return value as ClassTypeStatus;
+  }
+
+  return "all";
+}
+
+function parseCertificationFilter(
+  value?: string,
+): ClassTypeCertificationFilter {
+  return value === "required" || value === "not_required" ? value : "all";
+}
+
+function parseRequiredCoachesFilter(
+  value?: string,
+): ClassTypeRequiredCoachesFilter {
+  return REQUIRED_COACHES_FILTERS.some((filter) => filter.value === value)
+    ? (value as ClassTypeRequiredCoachesFilter)
+    : "all";
+}
+
+function getClassTypeFilters(
+  params: Awaited<ClassTypesPageProps["searchParams"]>,
+): ClassTypeFilterValues {
+  return {
+    category: parseClassTypeCategoryFilter(getParam(params.class_type_category)),
+    certification: parseCertificationFilter(getParam(params.certification)),
+    q: getParam(params.q)?.trim() ?? "",
+    requiredCoaches: parseRequiredCoachesFilter(
+      getParam(params.required_coaches),
+    ),
+    status: parseClassTypeStatusFilter(getParam(params.class_type_status)),
+  };
+}
+
+function applyClassTypeFilters(
+  classTypes: ClassTypeRow[],
+  filters: ClassTypeFilterValues,
+) {
+  const query = normalizeSearch(filters.q);
+
+  return classTypes.filter((classType) => {
+    if (filters.category !== "all" && classType.category !== filters.category) {
+      return false;
+    }
+
+    if (filters.status !== "all" && classType.status !== filters.status) {
+      return false;
+    }
+
+    if (
+      filters.certification === "required" &&
+      !classType.requires_certification
+    ) {
+      return false;
+    }
+
+    if (
+      filters.certification === "not_required" &&
+      classType.requires_certification
+    ) {
+      return false;
+    }
+
+    if (
+      filters.requiredCoaches === "0" &&
+      classType.required_coaches !== 0
+    ) {
+      return false;
+    }
+
+    if (
+      filters.requiredCoaches === "1" &&
+      classType.required_coaches !== 1
+    ) {
+      return false;
+    }
+
+    if (
+      filters.requiredCoaches === "2" &&
+      classType.required_coaches !== 2
+    ) {
+      return false;
+    }
+
+    if (
+      filters.requiredCoaches === "3_plus" &&
+      classType.required_coaches < 3
+    ) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    return normalizeSearch(`${classType.name} ${classType.slug}`).includes(
+      query,
+    );
+  });
+}
+
+function getActiveFilterCount(filters: ClassTypeFilterValues) {
   return [
-    "h-11 w-full rounded-md border border-input bg-transparent px-2.5 text-sm md:h-9",
-    "outline-none transition-colors focus-visible:border-ring",
-    "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+    filters.q !== "",
+    filters.category !== "all",
+    filters.status !== "all",
+    filters.certification !== "all",
+    filters.requiredCoaches !== "all",
+  ].filter(Boolean).length;
+}
+
+function selectClassName(className = "") {
+  return cn(
+    "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:h-9",
     className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  );
 }
 
 function ClassTypeCategorySelect({ defaultValue }: { defaultValue?: string }) {
@@ -185,9 +374,9 @@ function ClassTypeStatusSelect({ defaultValue }: { defaultValue?: string }) {
 
 function ClassTypeStatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant={status === "active" ? "secondary" : "outline"}>
+    <StatusBadge tone={status === "active" ? "success" : "neutral"}>
       {getClassTypeStatusLabel(status)}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -203,21 +392,252 @@ function ColorSwatch({ color }: { color: string | null }) {
   );
 }
 
+function CertificationBadge({ required }: { required: boolean }) {
+  return (
+    <StatusBadge tone={required ? "warning" : "neutral"}>
+      {required ? "Requiere" : "No"}
+    </StatusBadge>
+  );
+}
+
 function CertificationCheckbox({
   defaultChecked,
 }: {
   defaultChecked?: boolean;
 }) {
   return (
-    <label className="flex min-h-11 items-center gap-2 rounded-md border border-border px-2.5 text-sm md:min-h-9">
+    <label className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border px-3 text-sm md:min-h-9">
       <input
-        className="size-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="size-4 shrink-0 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         defaultChecked={defaultChecked}
         name="requiresCertification"
         type="checkbox"
       />
-      <span>Requiere certificacion</span>
+      <span>Requiere certificación</span>
     </label>
+  );
+}
+
+function ClassTypeSummaryCard({
+  description,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: "info" | "neutral" | "success" | "warning";
+  value: React.ReactNode;
+}) {
+  const iconClassName =
+    tone === "success"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200/70"
+      : tone === "warning"
+        ? "bg-amber-50 text-amber-700 ring-amber-200/70"
+        : tone === "info"
+          ? "bg-blue-50 text-blue-700 ring-blue-200/70"
+          : "bg-primary/10 text-primary ring-primary/10";
+
+  return (
+    <Card size="sm">
+      <CardContent className="space-y-3 px-5 py-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-xl ring-1",
+              iconClassName,
+            )}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+        </div>
+        <p className="break-words text-2xl font-semibold leading-tight tracking-tight md:text-3xl">
+          {value}
+        </p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClassTypeSummary({ classTypes }: { classTypes: ClassTypeRow[] }) {
+  const activeClassTypes = classTypes.filter(
+    (classType) => classType.status === "active",
+  );
+  const certifiedClassTypes = classTypes.filter(
+    (classType) => classType.requires_certification,
+  );
+  const categoryCount = new Set(
+    classTypes.map((classType) => classType.category),
+  ).size;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ClassTypeSummaryCard
+        description="Tipos configurados"
+        icon={ListChecks}
+        label="Total de tipos"
+        value={classTypes.length}
+      />
+      <ClassTypeSummaryCard
+        description={
+          classTypes.length > 0
+            ? `${Math.round((activeClassTypes.length / classTypes.length) * 100)}% del total`
+            : "Sin catálogo todavía"
+        }
+        icon={CheckCircle2}
+        label="Activos"
+        tone="success"
+        value={activeClassTypes.length}
+      />
+      <ClassTypeSummaryCard
+        description={
+          classTypes.length > 0
+            ? `${Math.round((certifiedClassTypes.length / classTypes.length) * 100)}% del total`
+            : "Sin requisitos especiales"
+        }
+        icon={Award}
+        label="Requieren certificación"
+        tone="warning"
+        value={certifiedClassTypes.length}
+      />
+      <ClassTypeSummaryCard
+        description={
+          categoryCount === 1 ? "Categoría usada" : "Categorías usadas"
+        }
+        icon={Folder}
+        label="Categorías"
+        tone="info"
+        value={categoryCount}
+      />
+    </div>
+  );
+}
+
+function ClassTypeFilterControls({
+  activeFilterCount,
+  filters,
+  organizationId,
+  resetPath,
+}: {
+  activeFilterCount: number;
+  filters: ClassTypeFilterValues;
+  organizationId: string;
+  resetPath: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <form
+          action="/app/class-types"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_repeat(4,minmax(8rem,0.75fr))_auto_auto] xl:items-end"
+          method="get"
+        >
+          <input name="organizationId" type="hidden" value={organizationId} />
+
+          <label className="grid gap-1.5 md:col-span-2 xl:col-span-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              Buscar
+            </span>
+            <span className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                className="pl-9"
+                defaultValue={filters.q}
+                name="q"
+                placeholder="Nombre o slug"
+                type="search"
+              />
+            </span>
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Categoría
+            </span>
+            <select
+              className={selectClassName()}
+              defaultValue={filters.category}
+              name="class_type_category"
+            >
+              <option value="all">Todas</option>
+              {CLASS_TYPE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {getClassTypeCategoryLabel(category)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Estado
+            </span>
+            <select
+              className={selectClassName()}
+              defaultValue={filters.status}
+              name="class_type_status"
+            >
+              <option value="all">Todos</option>
+              {CLASS_TYPE_STATUSES.map((statusOption) => (
+                <option key={statusOption} value={statusOption}>
+                  {getClassTypeStatusLabel(statusOption)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Certificacion
+            </span>
+            <select
+              className={selectClassName()}
+              defaultValue={filters.certification}
+              name="certification"
+            >
+              <option value="all">Todas</option>
+              <option value="required">Requiere</option>
+              <option value="not_required">No requiere</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Entrenadores necesarios
+            </span>
+            <select
+              className={selectClassName()}
+              defaultValue={filters.requiredCoaches}
+              name="required_coaches"
+            >
+              {REQUIRED_COACHES_FILTERS.map((filter) => (
+                <option key={filter.value} value={filter.value}>
+                  {filter.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <Button className="w-full xl:w-auto" type="submit">
+            <ListFilter aria-hidden="true" />
+            Aplicar
+          </Button>
+
+          {activeFilterCount > 0 ? (
+            <Button asChild className="w-full xl:w-auto" variant="outline">
+              <Link href={resetPath}>Limpiar</Link>
+            </Button>
+          ) : null}
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -272,6 +692,109 @@ function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
   );
 }
 
+function ClassTypeIdentity({ classType }: { classType: ClassTypeRow }) {
+  return (
+    <div className="flex min-w-0 items-start gap-4">
+      <span
+        className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-primary/10 text-primary ring-1 ring-primary/10"
+        style={getColorAccentStyle(classType.color)}
+      >
+        <ListChecks aria-hidden="true" className="size-5" />
+      </span>
+
+      <div className="min-w-0 space-y-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold tracking-tight md:text-lg">
+            {classType.name}
+          </h3>
+          <p className="mt-1 truncate font-mono text-sm text-muted-foreground">
+            {classType.slug}
+          </p>
+        </div>
+        <div className="xl:hidden">
+          <ClassTypeStatusBadge status={classType.status} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClassTypeMetaField({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <dt className="text-xs font-medium text-muted-foreground xl:sr-only">
+        {label}
+      </dt>
+      <dd className="truncate text-sm font-medium">{children}</dd>
+    </div>
+  );
+}
+
+function ClassTypeColorPill({ classType }: { classType: ClassTypeRow }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted/35 px-2.5 py-1 text-xs font-medium">
+      <ColorSwatch color={classType.color} />
+      <span className="truncate font-mono">
+        {getSafeColor(classType.color) ?? "Sin color"}
+      </span>
+    </span>
+  );
+}
+
+function ClassTypeCardSummary({
+  classType,
+  timezone,
+}: {
+  classType: ClassTypeRow;
+  timezone: string;
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(14rem,1.35fr)_minmax(7rem,0.7fr)_minmax(7rem,0.65fr)_minmax(8rem,0.7fr)_minmax(8rem,0.85fr)_minmax(8rem,0.85fr)_auto] xl:items-center">
+      <ClassTypeIdentity classType={classType} />
+      <dl className="contents">
+        <ClassTypeMetaField label="Categoría">
+          {getClassTypeCategoryLabel(classType.category)}
+        </ClassTypeMetaField>
+        <ClassTypeMetaField label="Entrenadores">
+          {classType.required_coaches}
+        </ClassTypeMetaField>
+        <ClassTypeMetaField label="Certificacion">
+          <CertificationBadge required={classType.requires_certification} />
+        </ClassTypeMetaField>
+        <ClassTypeMetaField label="Color">
+          <ClassTypeColorPill classType={classType} />
+        </ClassTypeMetaField>
+        <ClassTypeMetaField label="Actualizado">
+          {formatUpdatedAt(classType.updated_at, timezone)}
+        </ClassTypeMetaField>
+      </dl>
+      <div className="hidden justify-end xl:flex">
+        <ClassTypeStatusBadge status={classType.status} />
+      </div>
+    </div>
+  );
+}
+
+function ClassTypeListHeader() {
+  return (
+    <div className="hidden rounded-xl bg-card px-5 py-3 text-xs font-medium text-muted-foreground ring-1 ring-foreground/10 xl:grid xl:grid-cols-[minmax(14rem,1.35fr)_minmax(7rem,0.7fr)_minmax(7rem,0.65fr)_minmax(8rem,0.7fr)_minmax(8rem,0.85fr)_minmax(8rem,0.85fr)_auto] xl:items-center">
+      <span>Tipo de actividad</span>
+      <span>Categoría</span>
+      <span>Entrenadores</span>
+      <span>Certificacion</span>
+      <span>Color</span>
+      <span>Actualizado</span>
+      <span className="text-right">Estado</span>
+    </div>
+  );
+}
+
 function ClassTypeReadOnlyCard({
   classType,
   timezone,
@@ -281,31 +804,8 @@ function ClassTypeReadOnlyCard({
 }) {
   return (
     <Card size="sm">
-      <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.2fr)_auto] lg:items-start">
-        <div className="min-w-0">
-          <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight">
-            <ColorSwatch color={classType.color} />
-            <span className="truncate">{classType.name}</span>
-          </h3>
-          <p className="mt-1 truncate text-sm text-muted-foreground">
-            {classType.slug}
-          </p>
-        </div>
-        <MetaGrid className="lg:grid-cols-4">
-          <MetaItem label="Categoría">
-            {getClassTypeCategoryLabel(classType.category)}
-          </MetaItem>
-          <MetaItem label="Entrenadores">{classType.required_coaches}</MetaItem>
-          <MetaItem label="Certificacion">
-            {classType.requires_certification ? "Si" : "No"}
-          </MetaItem>
-          <MetaItem label="Actualizado">
-            {formatUpdatedAt(classType.updated_at, timezone)}
-          </MetaItem>
-        </MetaGrid>
-        <div className="flex justify-start lg:justify-end">
-          <ClassTypeStatusBadge status={classType.status} />
-        </div>
+      <CardContent className="px-5 py-2">
+        <ClassTypeCardSummary classType={classType} timezone={timezone} />
       </CardContent>
     </Card>
   );
@@ -325,122 +825,128 @@ function ClassTypeAdminCard({
 
   return (
     <Card size="sm">
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2.2fr)_auto] lg:items-start">
-          <div className="min-w-0">
-            <h3 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight">
-              <ColorSwatch color={classType.color} />
-              <span className="truncate">{classType.name}</span>
-            </h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground">
-              {classType.slug}
-            </p>
-          </div>
-          <MetaGrid className="lg:grid-cols-4">
-            <MetaItem label="Categoría">
-              {getClassTypeCategoryLabel(classType.category)}
-            </MetaItem>
-            <MetaItem label="Entrenadores">{classType.required_coaches}</MetaItem>
-            <MetaItem label="Certificacion">
-              {classType.requires_certification ? "Si" : "No"}
-            </MetaItem>
-            <MetaItem label="Actualizado">
-              {formatUpdatedAt(classType.updated_at, timezone)}
-            </MetaItem>
-          </MetaGrid>
-          <div className="flex justify-start lg:justify-end">
-            <ClassTypeStatusBadge status={classType.status} />
-          </div>
-        </div>
+      <CardContent className="space-y-4 px-5 py-2">
+        <ClassTypeCardSummary classType={classType} timezone={timezone} />
 
-        <InlineEditDetails label="Gestionar">
-          <div className="space-y-4">
-            <form
-              action={updateClassType}
-              className="grid gap-4 lg:grid-cols-6"
-            >
-              <input
-                name="organizationId"
-                type="hidden"
-                value={organizationId}
-              />
-              <input name="classTypeId" type="hidden" value={classType.id} />
-
-              <label className="grid gap-2 lg:col-span-2">
-                <span className="text-sm font-medium">Nombre</span>
-                <Input name="name" required defaultValue={classType.name} />
-              </label>
-
-              <label className="grid gap-2 lg:col-span-2">
-                <span className="text-sm font-medium">Slug interno</span>
-                <Input name="slug" required defaultValue={classType.slug} />
-              </label>
-
-              <label className="grid gap-2">
-                <span className="text-sm font-medium">Categoría</span>
-                <ClassTypeCategorySelect defaultValue={classType.category} />
-              </label>
-
-              <label className="grid gap-2">
-                <span className="text-sm font-medium">Entrenadores</span>
-                <Input
-                  defaultValue={classType.required_coaches}
-                  max="20"
-                  min="0"
-                  name="requiredCoaches"
-                  required
-                  type="number"
-                />
-              </label>
-
-              <div className="lg:col-span-2">
-                <ColorPaletteField
-                  defaultValue={classType.color}
-                  label="Color"
-                  name="color"
-                  placeholder="#2563eb"
-                />
-              </div>
-
-              <label className="grid gap-2">
-                <span className="text-sm font-medium">Estado</span>
-                <ClassTypeStatusSelect defaultValue={classType.status} />
-              </label>
-
-              <div className="flex items-end lg:col-span-2">
-                <CertificationCheckbox
-                  defaultChecked={classType.requires_certification}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2 lg:col-span-6">
-                <Button type="submit">
-                  <Save aria-hidden="true" />
-                  Guardar cambios
-                </Button>
-              </div>
-            </form>
-
-            <form action={setClassTypeStatus}>
-              <input
-                name="organizationId"
-                type="hidden"
-                value={organizationId}
-              />
-              <input name="classTypeId" type="hidden" value={classType.id} />
-              <input name="nextStatus" type="hidden" value={nextStatus} />
-              <Button
-                type="submit"
-                variant={nextStatus === "inactive" ? "destructive" : "outline"}
+        <div className="border-t border-border pt-4">
+          <InlineEditDetails label="Gestionar">
+            <div className="space-y-4">
+              <form
+                action={updateClassType}
+                className="space-y-4"
               >
-                <CircleOff aria-hidden="true" />
-                {nextStatus === "inactive"
-                  ? "Desactivar tipo"
-                  : "Activar tipo"}
-              </Button>
-            </form>
-          </div>
-        </InlineEditDetails>
+                <input
+                  name="organizationId"
+                  type="hidden"
+                  value={organizationId}
+                />
+                <input name="classTypeId" type="hidden" value={classType.id} />
+
+                <div className="grid gap-4 lg:grid-cols-6">
+                  <label className="grid gap-2 lg:col-span-2">
+                    <span className="text-sm font-medium">Nombre</span>
+                    <Input name="name" required defaultValue={classType.name} />
+                  </label>
+
+                  <label className="grid gap-2 lg:col-span-2">
+                    <span className="text-sm font-medium">Slug interno</span>
+                    <Input name="slug" required defaultValue={classType.slug} />
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-sm font-medium">Categoría</span>
+                    <ClassTypeCategorySelect defaultValue={classType.category} />
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-sm font-medium">Entrenadores</span>
+                    <Input
+                      defaultValue={classType.required_coaches}
+                      max="20"
+                      min="0"
+                      name="requiredCoaches"
+                      required
+                      type="number"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.42fr)] lg:items-start">
+                  <ColorPaletteField
+                    defaultValue={classType.color}
+                    label="Color"
+                    name="color"
+                    placeholder="#2563eb"
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    <label className="grid gap-2">
+                      <span className="text-sm font-medium">Estado</span>
+                      <ClassTypeStatusSelect defaultValue={classType.status} />
+                    </label>
+
+                    <div className="grid content-start gap-2">
+                      <span className="text-sm font-medium">Certificación</span>
+                      <CertificationCheckbox
+                        defaultChecked={classType.requires_certification}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit">
+                    <Save aria-hidden="true" />
+                    Guardar cambios
+                  </Button>
+                </div>
+              </form>
+
+              <form action={setClassTypeStatus}>
+                <input
+                  name="organizationId"
+                  type="hidden"
+                  value={organizationId}
+                />
+                <input name="classTypeId" type="hidden" value={classType.id} />
+                <input name="nextStatus" type="hidden" value={nextStatus} />
+                <Button
+                  type="submit"
+                  variant={
+                    nextStatus === "inactive" ? "destructive" : "outline"
+                  }
+                >
+                  <CircleOff aria-hidden="true" />
+                  {nextStatus === "inactive"
+                    ? "Desactivar tipo"
+                    : "Activar tipo"}
+                </Button>
+              </form>
+            </div>
+          </InlineEditDetails>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClassTypesInfoCard() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+          <Info aria-hidden="true" className="size-5" />
+        </span>
+        <div className="max-w-3xl space-y-1">
+          <h2 className="font-semibold tracking-tight">
+            ¿Qué es un tipo de actividad?
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Es la unidad básica que representa una clase, sesión o bloque
+            operativo. Define cómo se planifica, qué recursos requiere y cómo se
+            lee después en horarios, plantillas y cobertura.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -482,6 +988,15 @@ export default async function ClassTypesPage({
   const canManageClassTypes = canManageOperationalData(
     resolution.membership.role,
   );
+  const classTypeFilters = getClassTypeFilters(params);
+  const filteredClassTypes = applyClassTypeFilters(
+    classTypes,
+    classTypeFilters,
+  );
+  const activeFilterCount = getActiveFilterCount(classTypeFilters);
+  const filterResetPath = getClassTypesPath({
+    organizationId: resolution.organization.id,
+  });
   const roleLabel = getApplicationRoleLabel(resolution.membership.role);
 
   return (
@@ -514,10 +1029,13 @@ export default async function ClassTypesPage({
         />
       ) : null}
 
+      <ClassTypeSummary classTypes={classTypes} />
+
       {canManageClassTypes ? (
         <CollapsibleActionPanel
           actionLabel="Crear"
           description="Añade clases, recepción u otras actividades que luego se programan como bloques."
+          featured
           icon={Plus}
           title="Crear tipo de actividad"
         >
@@ -533,10 +1051,25 @@ export default async function ClassTypesPage({
         </Alert>
       )}
 
-      <section className="space-y-3">
+      <section className="space-y-4">
+        {classTypes.length > 0 ? (
+          <ClassTypeFilterControls
+            activeFilterCount={activeFilterCount}
+            filters={classTypeFilters}
+            organizationId={resolution.organization.id}
+            resetPath={filterResetPath}
+          />
+        ) : null}
+
         <SectionHeader
-          action={<Badge variant="outline">{classTypes.length} tipos</Badge>}
-          description="Nombre, categoría, entrenadores necesarios, certificación y color."
+          action={
+            <Badge variant="outline">
+              {activeFilterCount > 0
+                ? `${filteredClassTypes.length} de ${classTypes.length}`
+                : `${classTypes.length} tipos`}
+            </Badge>
+          }
+          description="Nombre, categoría, entrenadores necesarios, certificación, color y estado."
           title="Catálogo"
         />
 
@@ -549,9 +1082,20 @@ export default async function ClassTypesPage({
             }
             title="No hay tipos de actividad todavía"
           />
+        ) : filteredClassTypes.length === 0 ? (
+          <EmptyState
+            action={
+              <Button asChild variant="outline">
+                <Link href={filterResetPath}>Limpiar filtros</Link>
+              </Button>
+            }
+            description="No hay tipos que coincidan con la búsqueda o los filtros actuales."
+            title="Sin resultados"
+          />
         ) : (
-          <div className="grid gap-3">
-            {classTypes.map((classType) =>
+          <div className="grid gap-2">
+            <ClassTypeListHeader />
+            {filteredClassTypes.map((classType) =>
               canManageClassTypes ? (
                 <ClassTypeAdminCard
                   classType={classType}
@@ -571,14 +1115,7 @@ export default async function ClassTypesPage({
         )}
       </section>
 
-      <Alert>
-        <CircleOff aria-hidden="true" className="size-4" />
-        <AlertTitle>Fuera de este corte</AlertTitle>
-        <AlertDescription>
-          Esta pantalla solo define el catálogo de actividades. El horario y la
-          cobertura se gestionan en sus secciones.
-        </AlertDescription>
-      </Alert>
+      <ClassTypesInfoCard />
     </div>
   );
 }

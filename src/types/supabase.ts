@@ -1472,7 +1472,7 @@ export type Database = {
       operational_audit_events: {
         Row: {
           action: string
-          actor_membership_id: string
+          actor_membership_id: string | null
           actor_person_profile_id: string | null
           actor_user_id: string
           changed_fields: Json
@@ -1481,12 +1481,13 @@ export type Database = {
           entity_type: string
           id: string
           organization_id: string
+          platform_support_session_id: string | null
           result: string
           retain_until: string
         }
         Insert: {
           action: string
-          actor_membership_id: string
+          actor_membership_id?: string | null
           actor_person_profile_id?: string | null
           actor_user_id: string
           changed_fields?: Json
@@ -1495,12 +1496,13 @@ export type Database = {
           entity_type: string
           id?: string
           organization_id: string
+          platform_support_session_id?: string | null
           result?: string
           retain_until: string
         }
         Update: {
           action?: string
-          actor_membership_id?: string
+          actor_membership_id?: string | null
           actor_person_profile_id?: string | null
           actor_user_id?: string
           changed_fields?: Json
@@ -1509,6 +1511,7 @@ export type Database = {
           entity_type?: string
           id?: string
           organization_id?: string
+          platform_support_session_id?: string | null
           result?: string
           retain_until?: string
         }
@@ -1528,18 +1531,18 @@ export type Database = {
             referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: "operational_audit_events_organization_id_actor_user_id_fkey"
-            columns: ["organization_id", "actor_user_id"]
-            isOneToOne: false
-            referencedRelation: "organization_memberships"
-            referencedColumns: ["organization_id", "user_id"]
-          },
-          {
             foreignKeyName: "operational_audit_events_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_audit_events_platform_support_session_id_organization_id_fkey"
+            columns: ["platform_support_session_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "platform_support_sessions"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -5079,7 +5082,7 @@ export type Database = {
         }
         Returns: {
           action: string
-          actor_membership_id: string
+          actor_membership_id: string | null
           actor_person_profile_id: string | null
           actor_user_id: string
           changed_fields: Json
@@ -5088,6 +5091,7 @@ export type Database = {
           entity_type: string
           id: string
           organization_id: string
+          platform_support_session_id: string | null
           result: string
           retain_until: string
         }[]
@@ -5199,7 +5203,7 @@ export type Database = {
         }
         Returns: {
           action: string
-          actor_membership_id: string
+          actor_membership_id: string | null
           actor_person_profile_id: string | null
           actor_user_id: string
           changed_fields: Json
@@ -5208,6 +5212,7 @@ export type Database = {
           entity_type: string
           id: string
           organization_id: string
+          platform_support_session_id: string | null
           result: string
           retain_until: string
         }[]
@@ -5618,7 +5623,7 @@ export type Database = {
         }
         Returns: {
           action: string
-          actor_membership_id: string
+          actor_membership_id: string | null
           actor_person_profile_id: string | null
           actor_user_id: string
           changed_fields: Json
@@ -5627,6 +5632,7 @@ export type Database = {
           entity_type: string
           id: string
           organization_id: string
+          platform_support_session_id: string | null
           result: string
           retain_until: string
         }

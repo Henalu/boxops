@@ -1,28 +1,32 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type React from "react";
 import {
+  Archive,
   Download,
   Eye,
   FileText,
+  FolderOpen,
+  Info,
   LockKeyhole,
   Plus,
+  type LucideIcon,
 } from "lucide-react";
 
 import { createDocumentWithInitialFileUpload } from "./actions";
 import { DocumentUploadSubmitButton } from "./document-upload-submit-button";
-import { CollapsibleActionPanel } from "@/components/features/management-ui";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
-import {
-  EmptyState,
-  PageHeader,
-  SectionHeader,
-  StatCard,
-} from "@/components/features/operations-ui";
+import { PageHeader } from "@/components/features/operations-ui";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getLoginPath } from "@/lib/auth/redirects";
@@ -69,9 +73,9 @@ const scopeLabels: Record<DocumentRepositoryScope, string> = {
 
 const scopeDescriptions: Record<DocumentRepositoryScope, string> = {
   certification: "Cursos, titulos y adjuntos autorizados.",
-  company: "Documentos internos de empresa visibles por grant o capacidad.",
-  management_private: "Documentos de gestion con permiso explicito.",
-  person_private: "Documentos asociados a tu persona o concedidos por grant.",
+  company: "Documentos internos de empresa visibles por rol o permiso.",
+  management_private: "Documentos de gestión con permiso explícito.",
+  person_private: "Documentos asociados a tu persona o autorizados para tu rol.",
   programming: "Programacion y material asociado al horario.",
 };
 
@@ -86,15 +90,15 @@ const errorMessages: Record<string, string> = {
   "file-extension-mismatch": "La extension no coincide con el tipo de archivo.",
   "file-name-invalid": "Usa un nombre de archivo simple, sin rutas ni barras.",
   "file-read-failed": "No se pudo leer el archivo completo.",
-  "file-too-large": "El archivo supera el tamano maximo permitido.",
-  "file-type-not-allowed": "Ese tipo de archivo no esta permitido en este corte.",
+  "file-too-large": "El archivo supera el tamaño máximo permitido.",
+  "file-type-not-allowed": "Ese tipo de archivo no está permitido en este corte.",
   forbidden: "Tu rol no permite crear documentos desde esta pantalla.",
-  "invalid-scope": "El ambito documental no esta disponible para subida.",
+  "invalid-scope": "El ámbito documental no está disponible para subida.",
   "invalid-title": "Usa un titulo entre 1 y 160 caracteres.",
   "metadata-save-failed": "No se pudo guardar la metadata documental.",
   no_active_memberships: "No hay accesos activos para este usuario.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
-  organization_required: "Elige una organizacion antes de gestionar documentos.",
+  organization_not_found: "La organización solicitada no está disponible.",
+  organization_required: "Elige una organización antes de gestionar documentos.",
   "upload-failed": "No se pudo subir el archivo al almacenamiento privado.",
   "upload-start-failed": "No se pudo preparar la version documental.",
 };
@@ -175,6 +179,189 @@ function getDefaultUploadScope(
     : "company";
 }
 
+type DocumentSummaryTone = "download" | "preview" | "visible";
+
+const documentSummaryToneClasses: Record<DocumentSummaryTone, string> = {
+  download: "bg-violet-50 text-violet-700 ring-violet-200/80",
+  preview: "bg-blue-50 text-blue-700 ring-blue-200/80",
+  visible: "bg-emerald-50 text-emerald-700 ring-emerald-200/80",
+};
+
+function DocumentSummaryCard({
+  description,
+  icon: Icon,
+  label,
+  tone,
+  value,
+}: {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone: DocumentSummaryTone;
+  value: number;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="flex min-h-36 flex-col gap-4">
+        <div className="flex items-start">
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-xl ring-1",
+              documentSummaryToneClasses[tone],
+            )}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className="font-mono text-3xl font-semibold leading-none tracking-tight">
+            {value}
+          </p>
+        </div>
+        <p className="mt-auto text-sm leading-5 text-muted-foreground">
+          {description}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DocumentUploadPanel({ children }: { children: React.ReactNode }) {
+  const allowedTypes = ["PDF", "PNG", "JPG", "TXT", "CSV"];
+
+  return (
+    <section className="scroll-mt-24" id="document-upload">
+      <Card className="border border-dashed border-primary/25 bg-card/95 shadow-sm">
+        <CardContent className="grid gap-5 py-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] lg:items-start">
+          <div className="flex min-w-0 gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+              <Plus aria-hidden="true" className="size-6" />
+            </span>
+            <div className="min-w-0 space-y-3">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Subir documento
+                </h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                  Sube un PDF, imagen, TXT o CSV para dejarlo disponible en
+                  este espacio según el ámbito elegido.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {allowedTypes.map((type) => (
+                  <Badge key={type} variant="outline">
+                    {type}
+                  </Badge>
+                ))}
+                <span className="h-4 w-px bg-border" aria-hidden="true" />
+                <span className="text-sm text-muted-foreground">
+                  Máximo {formatUploadLimit()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background/80 p-4 shadow-sm">
+            {children}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function DocumentRepositoryHeader({
+  metadataOnlyCount,
+  selectedScope,
+}: {
+  metadataOnlyCount: number;
+  selectedScope: DocumentRepositoryScope | null;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <h2 className="text-xl font-semibold tracking-tight">Repositorio</h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          {selectedScope
+            ? scopeDescriptions[selectedScope]
+            : "Todos los archivos visibles para tu rol."}
+        </p>
+      </div>
+      <Badge className="w-fit" variant="outline">
+        {metadataOnlyCount} solo metadata
+      </Badge>
+    </div>
+  );
+}
+
+function DocumentRepositoryEmptyState({
+  canCreateDocuments,
+  organizationId,
+  selectedScope,
+}: {
+  canCreateDocuments: boolean;
+  organizationId: string;
+  selectedScope: DocumentRepositoryScope | null;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex min-h-80 flex-col items-center justify-center gap-5 py-10 text-center">
+        <span className="relative flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+          <FolderOpen aria-hidden="true" className="size-9" />
+          <span className="absolute -right-1 bottom-2 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-card">
+            <Archive aria-hidden="true" className="size-3.5" />
+          </span>
+        </span>
+        <div className="max-w-xl space-y-2">
+          <CardTitle className="text-xl">Sin documentos visibles</CardTitle>
+          <CardDescription className="text-sm leading-6">
+            No hay versiones documentales disponibles para tu permiso en esta
+            organización.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {canCreateDocuments ? (
+            <Button asChild variant="outline">
+              <Link href="#document-upload">
+                <Plus aria-hidden="true" />
+                Subir documento
+              </Link>
+            </Button>
+          ) : null}
+          {selectedScope === "programming" ? (
+            <Button asChild variant="outline">
+              <Link
+                href={getSchedulePath({
+                  organizationId,
+                })}
+              >
+                Ir a horario
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DocumentsHelpNote() {
+  return (
+    <Alert
+      className="border-blue-200 bg-blue-50 text-blue-950"
+      id="document-help"
+    >
+      <Info aria-hidden="true" className="size-4 text-blue-700" />
+      <AlertTitle>¿Sabías que?</AlertTitle>
+      <AlertDescription className="leading-6 text-blue-900/85">
+        La visibilidad depende de tu rol y del ámbito de cada versión. Preview
+        y descarga pasan siempre por rutas backend controladas.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function DocumentCreateForm({
   organizationId,
   selectedScope,
@@ -223,7 +410,7 @@ function DocumentCreateForm({
         <Textarea
           maxLength={500}
           name="description"
-          placeholder="Contexto interno breve para encontrarlo despues."
+          placeholder="Contexto interno breve para encontrarlo después."
         />
       </label>
 
@@ -236,14 +423,14 @@ function DocumentCreateForm({
           type="file"
         />
         <span className="text-xs leading-5 text-muted-foreground">
-          PDF, imagen, TXT o CSV. Maximo {formatUploadLimit()}.
+          PDF, PNG, JPG, TXT o CSV. Maximo {formatUploadLimit()}.
         </span>
       </label>
 
       <div className="flex flex-wrap items-center gap-2">
         <DocumentUploadSubmitButton />
         <p className="text-xs leading-5 text-muted-foreground">
-          Se guardara en esta organizacion.
+          Se guardará en esta organización.
         </p>
       </div>
     </form>
@@ -440,8 +627,16 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
       data-document-repository-surface="minimal"
     >
       <PageHeader
+        actions={
+          <Button asChild variant="outline">
+            <Link href="#document-help">
+              <FileText aria-hidden="true" />
+              Guia de documentos
+            </Link>
+          </Button>
+        }
         badge="Documentos"
-        description="Consulta documentos internos, material de programacion y archivos compartidos con tu cuenta."
+        description="Consulta documentos internos, material de programación y archivos compartidos con tu cuenta."
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -468,51 +663,42 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
       ) : null}
 
       <section className="grid gap-3 md:grid-cols-3">
-        <StatCard
-          description="Versiones activas o archivadas visibles por sujeto, grant o capacidad."
+        <DocumentSummaryCard
+          description="Versiones activas o archivadas visibles para tu rol."
           icon={FileText}
           label="Visibles"
+          tone="visible"
           value={documents.length}
         />
-        <StatCard
-          description="Accesos que pasan por las rutas backend documentales."
+        <DocumentSummaryCard
+          description="Archivos que puedes previsualizar antes de descargar."
           icon={Eye}
           label="Con preview"
+          tone="preview"
           value={previewCount}
         />
-        <StatCard
-          description="Versiones descargables desde backend, sin URL firmada en cliente."
+        <DocumentSummaryCard
+          description="Versiones descargables con control de acceso aplicado."
           icon={Download}
           label="Con descarga"
+          tone="download"
           value={downloadCount}
         />
       </section>
 
       {canCreateDocuments ? (
-        <CollapsibleActionPanel
-          actionLabel="Adjuntar"
-          description="Sube un PDF, imagen, TXT o CSV para dejarlo disponible en este espacio."
-          icon={Plus}
-          title="Subir documento"
-        >
+        <DocumentUploadPanel>
           <DocumentCreateForm
             organizationId={resolution.organization.id}
             selectedScope={selectedScope}
           />
-        </CollapsibleActionPanel>
+        </DocumentUploadPanel>
       ) : null}
 
       <section className="space-y-3">
-        <SectionHeader
-          action={
-            <Badge className="hidden md:inline-flex" variant="outline">
-              {metadataOnlyCount} solo metadata
-            </Badge>
-          }
-          description={
-            selectedScope ? scopeDescriptions[selectedScope] : "Todos los ambitos visibles."
-          }
-          title="Repositorio"
+        <DocumentRepositoryHeader
+          metadataOnlyCount={metadataOnlyCount}
+          selectedScope={selectedScope}
         />
         <DocumentsScopeFilters
           organizationId={resolution.organization.id}
@@ -525,26 +711,14 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             <AlertTitle>No se pudo cargar el repositorio</AlertTitle>
             <AlertDescription>
               La consulta documental quedo bloqueada por entorno, tenant o
-              permisos. Revisa grants y datos reales antes de beta.
+              permisos. Revisa los accesos y datos reales antes de beta.
             </AlertDescription>
           </Alert>
         ) : documents.length === 0 ? (
-          <EmptyState
-            action={
-              selectedScope === "programming" ? (
-                <Button asChild variant="outline">
-                  <Link
-                    href={getSchedulePath({
-                      organizationId: resolution.organization.id,
-                    })}
-                  >
-                    Ir a horario
-                  </Link>
-                </Button>
-              ) : null
-            }
-            description="No hay versiones documentales disponibles para tu permiso en este tenant."
-            title="Sin documentos visibles"
+          <DocumentRepositoryEmptyState
+            canCreateDocuments={canCreateDocuments}
+            organizationId={resolution.organization.id}
+            selectedScope={selectedScope}
           />
         ) : (
           <div
@@ -560,6 +734,8 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
           </div>
         )}
       </section>
+
+      <DocumentsHelpNote />
     </div>
   );
 }

@@ -2,8 +2,10 @@
 
 import { type CSSProperties, useId, useMemo, useState } from "react";
 import {
+  Copy,
   ListFilter,
   Pencil,
+  Plus,
   Save,
   Trash2,
   TriangleAlert,
@@ -11,6 +13,8 @@ import {
 } from "lucide-react";
 
 import {
+  copyScheduleTemplateBlock,
+  createScheduleTemplateBlock,
   deleteScheduleTemplateBlock,
   deleteScheduleTemplateBlocksBulk,
   updateScheduleTemplateBlock,
@@ -35,6 +39,7 @@ import {
   getScheduleTemplateDayLabel,
   getScheduleTemplateRequiredCoachesLabel,
   scheduleTemplateBlockRequiresCoach,
+  type ScheduleTemplateEditorSettings,
 } from "@/lib/schedule-templates";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/types/supabase";
@@ -93,6 +98,205 @@ function selectClassName(className = "") {
 
 function formatTime(value: string) {
   return formatTimeForInput(value) || value;
+}
+
+const TEMPLATE_TIMELINE_SLOT_HEIGHT = 56;
+const TEMPLATE_TIMELINE_BLOCK_GAP = 6;
+const TEMPLATE_TIMELINE_BLOCK_INSET = 4;
+const TEMPLATE_TIMELINE_BLOCK_MIN_HEIGHT = 74;
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = formatTime(value).split(":").map(Number);
+
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(value: number) {
+  const bounded = Math.max(0, Math.min(23 * 60 + 59, value));
+  const hours = Math.floor(bounded / 60);
+  const minutes = bounded % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getTemplateTimelineRange({
+  blocks,
+  editorSettings,
+}: {
+  blocks: ScheduleTemplateBlockRow[];
+  editorSettings: ScheduleTemplateEditorSettings;
+}) {
+  const slotMinutes = editorSettings.slotMinutes;
+  let startMinute = timeToMinutes(editorSettings.startTime);
+  let endMinute = timeToMinutes(editorSettings.endTime);
+
+  for (const block of blocks) {
+    const blockStart = timeToMinutes(block.start_time);
+    const blockEnd = timeToMinutes(block.end_time);
+
+    startMinute = Math.min(
+      startMinute,
+      Math.floor(blockStart / slotMinutes) * slotMinutes,
+    );
+    endMinute = Math.max(
+      endMinute,
+      Math.ceil(blockEnd / slotMinutes) * slotMinutes,
+    );
+  }
+
+  startMinute = Math.max(0, startMinute);
+  endMinute = Math.min(24 * 60, endMinute);
+
+  if (startMinute + slotMinutes > endMinute) {
+    return {
+      endMinute: timeToMinutes(editorSettings.endTime),
+      slotMinutes,
+      startMinute: timeToMinutes(editorSettings.startTime),
+    };
+  }
+
+  return {
+    endMinute,
+    slotMinutes,
+    startMinute,
+  };
+}
+
+function getTemplateTimelineSlots({
+  blocks,
+  editorSettings,
+}: {
+  blocks: ScheduleTemplateBlockRow[];
+  editorSettings: ScheduleTemplateEditorSettings;
+}) {
+  const range = getTemplateTimelineRange({ blocks, editorSettings });
+  const slots: { endMinute: number; startMinute: number }[] = [];
+
+  for (
+    let minute = range.startMinute;
+    minute < range.endMinute;
+    minute += range.slotMinutes
+  ) {
+    slots.push({
+      endMinute: Math.min(minute + range.slotMinutes, range.endMinute),
+      startMinute: minute,
+    });
+  }
+
+  return {
+    ...range,
+    slots,
+  };
+}
+
+type TemplateTimeline = ReturnType<typeof getTemplateTimelineSlots>;
+
+function getTemplateTimelineSlotIndex(
+  minute: number,
+  timeline: TemplateTimeline,
+) {
+  if (timeline.slots.length === 0) {
+    return 0;
+  }
+
+  const slotIndex = Math.floor(
+    (minute - timeline.startMinute) / timeline.slotMinutes,
+  );
+
+  return Math.max(0, Math.min(timeline.slots.length - 1, slotIndex));
+}
+
+function getTemplateTimelineBlockHeight(
+  block: ScheduleTemplateBlockRow,
+  timeline: TemplateTimeline,
+) {
+  const startMinute = timeToMinutes(block.start_time);
+  const endMinute = timeToMinutes(block.end_time);
+  const slotSpan = Math.max(
+    1,
+    Math.ceil((endMinute - startMinute) / timeline.slotMinutes),
+  );
+
+  return Math.max(
+    TEMPLATE_TIMELINE_BLOCK_MIN_HEIGHT,
+    slotSpan * TEMPLATE_TIMELINE_SLOT_HEIGHT -
+      TEMPLATE_TIMELINE_BLOCK_INSET * 2,
+  );
+}
+
+function groupTemplateTimelineBlocksBySlot({
+  blocks,
+  timeline,
+}: {
+  blocks: ScheduleTemplateBlockRow[];
+  timeline: TemplateTimeline;
+}) {
+  const groups = new Map<number, ScheduleTemplateBlockRow[]>();
+
+  for (const block of blocks) {
+    const slotIndex = getTemplateTimelineSlotIndex(
+      timeToMinutes(block.start_time),
+      timeline,
+    );
+    const group = groups.get(slotIndex) ?? [];
+
+    group.push(block);
+    groups.set(slotIndex, group);
+  }
+
+  for (const [slotIndex, group] of groups.entries()) {
+    groups.set(
+      slotIndex,
+      [...group].sort((first, second) =>
+        `${first.start_time}-${first.end_time}-${first.id}`.localeCompare(
+          `${second.start_time}-${second.end_time}-${second.id}`,
+        ),
+      ),
+    );
+  }
+
+  return groups;
+}
+
+function getTemplateTimelineLayout({
+  blocksByDay,
+  timeline,
+}: {
+  blocksByDay: Map<number, ScheduleTemplateBlockRow[]>;
+  timeline: TemplateTimeline;
+}) {
+  const rowHeights = timeline.slots.map(() => TEMPLATE_TIMELINE_SLOT_HEIGHT);
+
+  for (const day of SCHEDULE_TEMPLATE_DAYS) {
+    const dayBlocks = blocksByDay.get(day) ?? [];
+    const blocksBySlot = groupTemplateTimelineBlocksBySlot({
+      blocks: dayBlocks,
+      timeline,
+    });
+
+    for (const [slotIndex, group] of blocksBySlot.entries()) {
+      const stackedHeight =
+        TEMPLATE_TIMELINE_BLOCK_INSET * 2 +
+        group.reduce(
+          (height, block) =>
+            height + getTemplateTimelineBlockHeight(block, timeline),
+          0,
+        ) +
+        Math.max(0, group.length - 1) * TEMPLATE_TIMELINE_BLOCK_GAP;
+
+      rowHeights[slotIndex] = Math.max(rowHeights[slotIndex], stackedHeight);
+    }
+  }
+
+  const rowTops: number[] = [];
+  let totalHeight = 0;
+
+  for (const rowHeight of rowHeights) {
+    rowTops.push(totalHeight);
+    totalHeight += rowHeight;
+  }
+
+  return { rowHeights, rowTops, totalHeight };
 }
 
 function getUnavailableCoachSummaries({
@@ -366,6 +570,57 @@ function DaySelect({
         </option>
       ))}
     </select>
+  );
+}
+
+function DayCheckboxGroup({
+  legend = "Días destino",
+  onChange,
+  selectedDays,
+  sourceDay,
+}: {
+  legend?: string;
+  onChange: (days: Set<TemplateDay>) => void;
+  selectedDays: Set<TemplateDay>;
+  sourceDay?: TemplateDay;
+}) {
+  function toggleDay(day: TemplateDay) {
+    const next = new Set(selectedDays);
+
+    if (next.has(day)) {
+      next.delete(day);
+    } else {
+      next.add(day);
+    }
+
+    onChange(next);
+  }
+
+  return (
+    <fieldset className="grid min-w-0 gap-2 sm:col-span-2">
+      <legend className="text-sm font-medium">{legend}</legend>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {SCHEDULE_TEMPLATE_DAYS.map((day) => (
+          <label
+            className="flex min-h-11 items-center gap-2 rounded-md border border-input bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-muted/45 md:min-h-9"
+            key={day}
+          >
+            <input
+              checked={selectedDays.has(day)}
+              className="size-4 shrink-0 accent-primary"
+              name="dayOfWeek"
+              onChange={() => toggleDay(day)}
+              type="checkbox"
+              value={day}
+            />
+            <span className="min-w-0 truncate">
+              {getScheduleTemplateDayLabel(day)}
+              {sourceDay === day ? " (origen)" : ""}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -926,6 +1181,581 @@ function TemplateBlocksBulkEditForm({
   );
 }
 
+function getUnavailableCoachIdsForCopiedBlock({
+  blocks,
+  endTime,
+  selectedDays,
+  startTime,
+}: {
+  blocks: ScheduleTemplateBlockRow[];
+  endTime: string;
+  selectedDays: Set<TemplateDay>;
+  startTime: string;
+}) {
+  const unavailable = new Set<string>();
+
+  for (const day of selectedDays) {
+    const dayUnavailableBlocks = getUnavailableScheduleTemplateCoachBlocks({
+      blocks,
+      targetBlock: {
+        day_of_week: day,
+        end_time: endTime,
+        start_time: startTime,
+      },
+    });
+
+    for (const unavailableBlock of dayUnavailableBlocks) {
+      unavailable.add(unavailableBlock.coachProfileId);
+    }
+  }
+
+  return unavailable;
+}
+
+function TemplateBlockCopyForm({
+  assignableCoaches,
+  block,
+  blocks,
+  centers,
+  classTypes,
+  onCancel,
+  organizationId,
+  selectedDay,
+  templateCenterId,
+  view,
+  weekStart,
+}: {
+  assignableCoaches: CoachDisplay[];
+  block: ScheduleTemplateBlockRow;
+  blocks: ScheduleTemplateBlockRow[];
+  centers: CenterRow[];
+  classTypes: ClassTypeRow[];
+  onCancel: () => void;
+  organizationId: string;
+  selectedDay: TemplateDay;
+  templateCenterId?: string | null;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const templateCenter = templateCenterId
+    ? centers.find((center) => center.id === templateCenterId)
+    : undefined;
+  const [selectedDays, setSelectedDays] = useState<Set<TemplateDay>>(
+    () => new Set(),
+  );
+  const [startTime, setStartTime] = useState(formatTime(block.start_time));
+  const [endTime, setEndTime] = useState(formatTime(block.end_time));
+  const [requiredCoaches, setRequiredCoaches] = useState(
+    block.required_coaches,
+  );
+  const unavailableCoachProfileIds = useMemo(
+    () =>
+      getUnavailableCoachIdsForCopiedBlock({
+        blocks,
+        endTime,
+        selectedDays,
+        startTime,
+      }),
+    [blocks, endTime, selectedDays, startTime],
+  );
+
+  return (
+    <form
+      action={copyScheduleTemplateBlock}
+      className="grid gap-4 sm:grid-cols-2"
+    >
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="day" type="hidden" value={String(selectedDay)} />
+      <input name="templateId" type="hidden" value={block.template_id} />
+      <input name="sourceTemplateBlockId" type="hidden" value={block.id} />
+      <input name="view" type="hidden" value={view} />
+      <input name="weekStart" type="hidden" value={weekStart} />
+
+      <DayCheckboxGroup
+        onChange={setSelectedDays}
+        selectedDays={selectedDays}
+        sourceDay={block.day_of_week as TemplateDay}
+      />
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Inicio</span>
+        <Input
+          name="startTime"
+          onChange={(event) => setStartTime(event.currentTarget.value)}
+          required
+          type="time"
+          value={startTime}
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Fin</span>
+        <Input
+          name="endTime"
+          onChange={(event) => setEndTime(event.currentTarget.value)}
+          required
+          type="time"
+          value={endTime}
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Centro</span>
+        {templateCenterId ? (
+          <CenterReadOnlyField center={templateCenter} />
+        ) : (
+          <CenterSelect centers={centers} defaultValue={block.center_id} />
+        )}
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Tipo de actividad</span>
+        <ClassTypeSelect
+          classTypes={classTypes}
+          defaultValue={block.class_type_id}
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Entrenadores necesarios</span>
+        <Input
+          max="20"
+          min="0"
+          name="requiredCoaches"
+          onChange={(event) => {
+            const nextValue = Number(event.currentTarget.value);
+
+            setRequiredCoaches(Number.isNaN(nextValue) ? 0 : nextValue);
+          }}
+          required
+          type="number"
+          value={requiredCoaches}
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Entrenador por defecto</span>
+        <CoachSelect
+          coaches={assignableCoaches}
+          defaultValue={block.default_coach_profile_id}
+          requiredCoaches={requiredCoaches}
+          unavailableCoachProfileIds={unavailableCoachProfileIds}
+        />
+      </label>
+
+      <label className="grid min-w-0 gap-2 sm:col-span-2">
+        <span className="text-sm font-medium">Notas</span>
+        <Textarea
+          defaultValue={block.notes ?? ""}
+          maxLength={1000}
+          name="notes"
+          placeholder="Notas que se copiarán al bloque"
+        />
+      </label>
+
+      <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+        <Button disabled={selectedDays.size === 0} type="submit">
+          <Copy aria-hidden="true" />
+          Copiar bloque
+        </Button>
+        <Button onClick={onCancel} type="button" variant="outline">
+          <X aria-hidden="true" />
+          Cerrar
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function TemplateBlockCreateForm({
+  activeCenters,
+  activeClassTypes,
+  assignableCoaches,
+  centers,
+  editorSettings,
+  organizationId,
+  selectedDay,
+  templateCenterId,
+  templateId,
+  view,
+  weekStart,
+}: {
+  activeCenters: CenterRow[];
+  activeClassTypes: ClassTypeRow[];
+  assignableCoaches: CoachDisplay[];
+  centers: CenterRow[];
+  editorSettings: ScheduleTemplateEditorSettings;
+  organizationId: string;
+  selectedDay: TemplateDay;
+  templateCenterId?: string | null;
+  templateId: string;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<TemplateDay>>(
+    () => new Set([selectedDay]),
+  );
+  const defaultRequiredCoaches = activeClassTypes[0]?.required_coaches ?? 1;
+  const [requiredCoaches, setRequiredCoaches] = useState(
+    defaultRequiredCoaches,
+  );
+  const titleId = useId();
+  const templateCenter = templateCenterId
+    ? centers.find((center) => center.id === templateCenterId)
+    : undefined;
+  const centerOptions = templateCenterId ? centers : activeCenters;
+  const hasUsableCenter = templateCenterId
+    ? Boolean(templateCenter)
+    : activeCenters.length > 0;
+  const canCreate = hasUsableCenter && activeClassTypes.length > 0;
+  const startMinute = timeToMinutes(editorSettings.startTime);
+  const defaultEndMinute = Math.min(
+    timeToMinutes(editorSettings.endTime),
+    startMinute + editorSettings.defaultDurationMinutes,
+  );
+  const contextDay = selectedDays.values().next().value ?? selectedDay;
+
+  function openDialog() {
+    setSelectedDays(new Set([selectedDay]));
+    setRequiredCoaches(defaultRequiredCoaches);
+    setIsOpen(true);
+  }
+
+  return (
+    <>
+      <Button onClick={openDialog} type="button">
+        <Plus aria-hidden="true" />
+        Añadir bloque
+      </Button>
+
+      {isOpen ? (
+        <div
+          aria-labelledby={titleId}
+          aria-modal="true"
+          className="fixed inset-0 z-[70] grid place-items-center bg-background/80 px-4 backdrop-blur-sm"
+          role="dialog"
+        >
+          <button
+            aria-label="Cerrar creación de bloque"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setIsOpen(false)}
+            type="button"
+          />
+          <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg">
+            <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+              <div className="min-w-0">
+                <h2
+                  className="text-base font-semibold tracking-tight"
+                  id={titleId}
+                >
+                  Crear bloque de plantilla
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Elige días, horario y contenido del bloque.
+                </p>
+              </div>
+              <Button
+                aria-label="Cerrar"
+                onClick={() => setIsOpen(false)}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <X aria-hidden="true" />
+              </Button>
+            </div>
+
+            <form
+              action={createScheduleTemplateBlock}
+              className="mt-4 grid gap-4 sm:grid-cols-2"
+            >
+              <input
+                name="organizationId"
+                type="hidden"
+                value={organizationId}
+              />
+              <input name="day" type="hidden" value={String(contextDay)} />
+              <input name="templateId" type="hidden" value={templateId} />
+              <input name="view" type="hidden" value={view} />
+              <input name="weekStart" type="hidden" value={weekStart} />
+
+              <DayCheckboxGroup
+                legend="Días"
+                onChange={setSelectedDays}
+                selectedDays={selectedDays}
+              />
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Inicio</span>
+                <Input
+                  defaultValue={editorSettings.startTime}
+                  name="startTime"
+                  required
+                  type="time"
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Fin</span>
+                <Input
+                  defaultValue={minutesToTime(defaultEndMinute)}
+                  name="endTime"
+                  required
+                  type="time"
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Centro</span>
+                {templateCenterId ? (
+                  <CenterReadOnlyField center={templateCenter} />
+                ) : (
+                  <CenterSelect centers={centerOptions} />
+                )}
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">Tipo de actividad</span>
+                <ClassTypeSelect classTypes={activeClassTypes} />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">
+                  Entrenadores necesarios
+                </span>
+                <Input
+                  max="20"
+                  min="0"
+                  name="requiredCoaches"
+                  onChange={(event) => {
+                    const nextValue = Number(event.currentTarget.value);
+
+                    setRequiredCoaches(Number.isNaN(nextValue) ? 0 : nextValue);
+                  }}
+                  required
+                  type="number"
+                  value={requiredCoaches}
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2">
+                <span className="text-sm font-medium">
+                  Entrenador por defecto
+                </span>
+                <CoachSelect
+                  coaches={assignableCoaches}
+                  requiredCoaches={requiredCoaches}
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-2 sm:col-span-2">
+                <span className="text-sm font-medium">Notas</span>
+                <Textarea
+                  maxLength={1000}
+                  name="notes"
+                  placeholder="Notas que se copiarán al bloque real"
+                />
+              </label>
+
+              {!canCreate ? (
+                <p className="rounded-lg border border-border bg-muted/35 px-3 py-2 text-sm text-muted-foreground sm:col-span-2">
+                  Hace falta un centro disponible y un tipo de actividad activo
+                  antes de crear bloques de plantilla.
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+                <Button
+                  disabled={!canCreate || selectedDays.size === 0}
+                  type="submit"
+                >
+                  <Plus aria-hidden="true" />
+                  Crear bloque de plantilla
+                </Button>
+                <Button
+                  onClick={() => setIsOpen(false)}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function TemplateSlotCreateDialog({
+  activeCenters,
+  activeClassTypes,
+  assignableCoaches,
+  centers,
+  onClose,
+  organizationId,
+  selectedDay,
+  slot,
+  templateCenterId,
+  templateId,
+  view,
+  weekStart,
+}: {
+  activeCenters: CenterRow[];
+  activeClassTypes: ClassTypeRow[];
+  assignableCoaches: CoachDisplay[];
+  centers: CenterRow[];
+  onClose: () => void;
+  organizationId: string;
+  selectedDay: TemplateDay;
+  slot: { day: TemplateDay; endTime: string; startTime: string };
+  templateCenterId?: string | null;
+  templateId: string;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const templateCenter = templateCenterId
+    ? centers.find((center) => center.id === templateCenterId)
+    : undefined;
+  const centerOptions = templateCenterId ? centers : activeCenters;
+  const defaultRequiredCoaches = activeClassTypes[0]?.required_coaches ?? 1;
+  const [requiredCoaches, setRequiredCoaches] = useState(
+    defaultRequiredCoaches,
+  );
+
+  return (
+    <div
+      aria-modal="true"
+      className="fixed inset-0 z-[70] grid place-items-center bg-background/80 px-4 backdrop-blur-sm"
+      role="dialog"
+    >
+      <button
+        aria-label="Cerrar creación rápida"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg">
+        <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight">
+              Crear bloque de plantilla
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {getScheduleTemplateDayLabel(slot.day)} / {slot.startTime} -{" "}
+              {slot.endTime}
+            </p>
+          </div>
+          <Button
+            aria-label="Cerrar"
+            onClick={onClose}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </div>
+
+        <form
+          action={createScheduleTemplateBlock}
+          className="mt-4 grid gap-4 sm:grid-cols-2"
+        >
+          <input name="organizationId" type="hidden" value={organizationId} />
+          <input name="day" type="hidden" value={String(selectedDay)} />
+          <input name="dayOfWeek" type="hidden" value={String(slot.day)} />
+          <input name="templateId" type="hidden" value={templateId} />
+          <input name="view" type="hidden" value={view} />
+          <input name="weekStart" type="hidden" value={weekStart} />
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Inicio</span>
+            <Input
+              defaultValue={slot.startTime}
+              name="startTime"
+              required
+              type="time"
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Fin</span>
+            <Input
+              defaultValue={slot.endTime}
+              name="endTime"
+              required
+              type="time"
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Centro</span>
+            {templateCenterId ? (
+              <CenterReadOnlyField center={templateCenter} />
+            ) : (
+              <CenterSelect centers={centerOptions} />
+            )}
+          </label>
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Tipo de actividad</span>
+            <ClassTypeSelect classTypes={activeClassTypes} />
+          </label>
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Entrenadores necesarios</span>
+            <Input
+              max="20"
+              min="0"
+              name="requiredCoaches"
+              onChange={(event) => {
+                const nextValue = Number(event.currentTarget.value);
+
+                setRequiredCoaches(Number.isNaN(nextValue) ? 0 : nextValue);
+              }}
+              required
+              type="number"
+              value={requiredCoaches}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2">
+            <span className="text-sm font-medium">Entrenador por defecto</span>
+            <CoachSelect
+              coaches={assignableCoaches}
+              requiredCoaches={requiredCoaches}
+            />
+          </label>
+
+          <label className="grid min-w-0 gap-2 sm:col-span-2">
+            <span className="text-sm font-medium">Notas</span>
+            <Textarea
+              maxLength={1000}
+              name="notes"
+              placeholder="Notas que se copiarán al bloque real"
+            />
+          </label>
+
+          <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+            <Button
+              disabled={centerOptions.length === 0 || activeClassTypes.length === 0}
+              type="submit"
+            >
+              <Plus aria-hidden="true" />
+              Crear bloque
+            </Button>
+            <Button onClick={onClose} type="button" variant="outline">
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function TemplateBlockCard({
   block,
   centersById,
@@ -937,6 +1767,7 @@ function TemplateBlockCard({
   isSelected,
   onEdit,
   onToggleSelected,
+  showCenter,
 }: {
   block: ScheduleTemplateBlockRow;
   centersById: Map<string, CenterRow>;
@@ -948,6 +1779,7 @@ function TemplateBlockCard({
   isSelected: boolean;
   onEdit: () => void;
   onToggleSelected: () => void;
+  showCenter: boolean;
 }) {
   const defaultCoach = block.default_coach_profile_id
     ? coachDisplaysById.get(block.default_coach_profile_id)
@@ -1004,11 +1836,13 @@ function TemplateBlockCard({
       </h4>
 
       <div className="mt-1.5 grid min-w-0 gap-0.5 text-[11px] leading-5 text-muted-foreground">
-        <p className="truncate">
-          <span className="font-medium text-foreground">
-            {center?.name ?? "Centro no disponible"}
-          </span>
-        </p>
+        {showCenter ? (
+          <p className="truncate">
+            <span className="font-medium text-foreground">
+              {center?.name ?? "Centro no disponible"}
+            </span>
+          </p>
+        ) : null}
         <p>{getScheduleTemplateRequiredCoachesLabel(block.required_coaches)}</p>
         {requiresCoach ? (
           <p className="truncate">{defaultCoachDetail}</p>
@@ -1018,6 +1852,97 @@ function TemplateBlockCard({
       <Button
         asChild
         className="mt-2 h-6 w-full min-w-0 justify-center px-2 text-xs"
+        size="xs"
+        variant={isEditing ? "secondary" : "outline"}
+      >
+        <RouteStateLink
+          data-template-block-edit-trigger="true"
+          href={isEditing ? closeHref : editHref}
+          onClick={onEdit}
+        >
+          {isEditing ? <X aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+          {isEditing ? "Cerrar" : "Editar"}
+        </RouteStateLink>
+      </Button>
+    </div>
+  );
+}
+
+function TemplateTimelineBlockCard({
+  block,
+  centersById,
+  classTypesById,
+  closeHref,
+  coachDisplaysById,
+  editHref,
+  isEditing,
+  isSelected,
+  onEdit,
+  onToggleSelected,
+  showCenter,
+}: {
+  block: ScheduleTemplateBlockRow;
+  centersById: Map<string, CenterRow>;
+  classTypesById: Map<string, ClassTypeRow>;
+  closeHref: string;
+  coachDisplaysById: Map<string, CoachDisplay>;
+  editHref: string;
+  isEditing: boolean;
+  isSelected: boolean;
+  onEdit: () => void;
+  onToggleSelected: () => void;
+  showCenter: boolean;
+}) {
+  const defaultCoach = block.default_coach_profile_id
+    ? coachDisplaysById.get(block.default_coach_profile_id)
+    : null;
+  const center = centersById.get(block.center_id);
+  const classType = classTypesById.get(block.class_type_id);
+  const requiresCoach = scheduleTemplateBlockRequiresCoach(
+    block.required_coaches,
+  );
+  const defaultCoachLabel = getScheduleTemplateDefaultCoachLabel({
+    defaultCoachLabel: defaultCoach?.label,
+    requiredCoaches: block.required_coaches,
+  });
+
+  return (
+    <div
+      className={cn(
+        "flex h-full min-w-0 flex-col overflow-hidden rounded-md border border-border bg-background px-2 py-1.5 text-xs shadow-sm",
+        isEditing ? "ring-2 ring-ring/30" : "",
+      )}
+      style={getClassTypeCardStyle(classType?.color ?? null)}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-1.5">
+        <p className="truncate font-mono text-[11px] font-medium text-muted-foreground">
+          {formatTime(block.start_time)} - {formatTime(block.end_time)}
+        </p>
+        <input
+          aria-label={`Seleccionar bloque ${formatTime(block.start_time)} ${
+            classType?.name ?? ""
+          }`}
+          checked={isSelected}
+          className="size-4 shrink-0 rounded border-border accent-primary"
+          onChange={onToggleSelected}
+          type="checkbox"
+        />
+      </div>
+      <p className="mt-1 flex min-w-0 items-center gap-1.5 font-semibold leading-snug">
+        <ColorSwatch color={classType?.color ?? null} />
+        <span className="truncate">{classType?.name ?? "Tipo no disponible"}</span>
+      </p>
+      {showCenter ? (
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {center?.name ?? "Centro no disponible"}
+        </p>
+      ) : null}
+      <p className="truncate text-[11px] text-muted-foreground">
+        {requiresCoach && defaultCoach ? defaultCoach.label : defaultCoachLabel}
+      </p>
+      <Button
+        asChild
+        className="mt-auto h-6 w-full justify-center px-2 text-xs"
         size="xs"
         variant={isEditing ? "secondary" : "outline"}
       >
@@ -1249,6 +2174,220 @@ function DesktopEditPanel({
   );
 }
 
+function TemplateBlocksTimelineGrid({
+  blocks,
+  blocksByDay,
+  centersById,
+  classTypesById,
+  coachDisplaysById,
+  editorSettings,
+  getCloseHref,
+  getEditorHref,
+  onEdit,
+  onSlotCreate,
+  onToggleSelected,
+  rangeBlocks,
+  selectedBlockId,
+  selectedBlockIds,
+  showCenter,
+}: {
+  blocks: ScheduleTemplateBlockRow[];
+  blocksByDay: Map<number, ScheduleTemplateBlockRow[]>;
+  centersById: Map<string, CenterRow>;
+  classTypesById: Map<string, ClassTypeRow>;
+  coachDisplaysById: Map<string, CoachDisplay>;
+  editorSettings: ScheduleTemplateEditorSettings;
+  getCloseHref: (day?: TemplateDay) => string;
+  getEditorHref: (block: ScheduleTemplateBlockRow) => string;
+  onEdit: (block: ScheduleTemplateBlockRow) => void;
+  onSlotCreate: (slot: {
+    day: TemplateDay;
+    endTime: string;
+    startTime: string;
+  }) => void;
+  onToggleSelected: (blockId: string) => void;
+  rangeBlocks: ScheduleTemplateBlockRow[];
+  selectedBlockId: string | null;
+  selectedBlockIds: Set<string>;
+  showCenter: boolean;
+}) {
+  const timeline = getTemplateTimelineSlots({
+    blocks: rangeBlocks,
+    editorSettings,
+  });
+  const timelineLayout = getTemplateTimelineLayout({
+    blocksByDay,
+    timeline,
+  });
+
+  return (
+    <div className="hidden overflow-x-auto rounded-lg border border-border bg-muted/20 md:block">
+      <div className="min-w-[1180px]">
+        <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]">
+          <div className="border-b border-r border-border bg-background px-2 py-3" />
+          {SCHEDULE_TEMPLATE_DAYS.map((day) => {
+            const dayBlocks = blocksByDay.get(day) ?? [];
+
+            return (
+              <div
+                className="border-b border-r border-border bg-background px-3 py-3 last:border-r-0"
+                key={day}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold tracking-tight">
+                    {getScheduleTemplateDayLabel(day)}
+                  </h4>
+                  <Badge variant="outline">{dayBlocks.length}</Badge>
+                </div>
+              </div>
+            );
+          })}
+
+          <div
+            className="relative border-r border-border bg-background/60"
+            style={{ height: timelineLayout.totalHeight }}
+          >
+            {timeline.slots.map((slot, index) => (
+              <div
+                className="absolute inset-x-0 border-b border-border/70 px-2 text-right"
+                key={slot.startMinute}
+                style={{
+                  height: timelineLayout.rowHeights[index],
+                  top: timelineLayout.rowTops[index],
+                }}
+              >
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {minutesToTime(slot.startMinute)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {SCHEDULE_TEMPLATE_DAYS.map((day) => {
+            const dayBlocks = blocksByDay.get(day) ?? [];
+            const blocksBySlot = groupTemplateTimelineBlocksBySlot({
+              blocks: dayBlocks,
+              timeline,
+            });
+
+            return (
+              <div
+                className="relative min-w-0 border-r border-border last:border-r-0"
+                key={day}
+                style={{ height: timelineLayout.totalHeight }}
+              >
+                {timeline.slots.map((slot, index) => {
+                  const defaultEndMinute = Math.min(
+                    slot.startMinute + editorSettings.defaultDurationMinutes,
+                    timeline.endMinute,
+                  );
+
+                  return (
+                    <button
+                      aria-label={`Crear bloque ${getScheduleTemplateDayLabel(
+                        day,
+                      )} ${minutesToTime(slot.startMinute)}`}
+                      className="absolute inset-x-1 z-0 rounded-md border-b border-dashed border-border/70 outline-none transition-colors hover:bg-primary/5 focus-visible:ring-3 focus-visible:ring-ring/50"
+                      key={`${day}-${slot.startMinute}`}
+                      onDoubleClick={() =>
+                        onSlotCreate({
+                          day,
+                          endTime: minutesToTime(
+                            Math.max(defaultEndMinute, slot.endMinute),
+                          ),
+                          startTime: minutesToTime(slot.startMinute),
+                        })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          onSlotCreate({
+                            day,
+                            endTime: minutesToTime(
+                              Math.max(defaultEndMinute, slot.endMinute),
+                            ),
+                            startTime: minutesToTime(slot.startMinute),
+                          });
+                        }
+                      }}
+                      style={{
+                        height: timelineLayout.rowHeights[index],
+                        top: timelineLayout.rowTops[index],
+                      }}
+                      title="Doble clic para crear bloque"
+                      type="button"
+                    />
+                  );
+                })}
+
+                {[...blocksBySlot.entries()].flatMap(([slotIndex, group]) =>
+                  group.map((block, stackIndex) => {
+                    const height = getTemplateTimelineBlockHeight(
+                      block,
+                      timeline,
+                    );
+                    const previousStackHeight = group
+                      .slice(0, stackIndex)
+                      .reduce(
+                        (total, previousBlock) =>
+                          total +
+                          getTemplateTimelineBlockHeight(
+                            previousBlock,
+                            timeline,
+                          ),
+                        0,
+                      );
+                    const top =
+                      timelineLayout.rowTops[slotIndex] +
+                      TEMPLATE_TIMELINE_BLOCK_INSET +
+                      previousStackHeight +
+                      stackIndex * TEMPLATE_TIMELINE_BLOCK_GAP;
+
+                    return (
+                      <div
+                        className="absolute z-10"
+                        key={block.id}
+                        style={{
+                          height,
+                          left: "0.5rem",
+                          right: "0.5rem",
+                          top,
+                        }}
+                      >
+                        <TemplateTimelineBlockCard
+                          block={block}
+                          centersById={centersById}
+                          classTypesById={classTypesById}
+                          closeHref={getCloseHref(
+                            block.day_of_week as TemplateDay,
+                          )}
+                          coachDisplaysById={coachDisplaysById}
+                          editHref={getEditorHref(block)}
+                          isEditing={selectedBlockId === block.id}
+                          isSelected={selectedBlockIds.has(block.id)}
+                          onEdit={() => onEdit(block)}
+                          onToggleSelected={() => onToggleSelected(block.id)}
+                          showCenter={showCenter}
+                        />
+                      </div>
+                    );
+                  }),
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {blocks.length === 0 ? (
+        <div className="border-t border-border bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+          Doble clic en cualquier franja para crear el primer bloque.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TemplateBlockFilters({
   assignmentFilter,
   classTypeFilter,
@@ -1366,29 +2505,37 @@ function TemplateBlockFilters({
 }
 
 export function TemplateBlocksEditor({
+  activeCenters,
+  activeClassTypes,
   assignableCoaches,
   blocks,
   centers,
   classTypes,
   coachDisplays,
+  editorSettings,
   initialEditBlockId,
   initialSelectedDay,
   mode,
   organizationId,
   templateCenterId,
+  templateId,
   view,
   weekStart,
 }: {
+  activeCenters: CenterRow[];
+  activeClassTypes: ClassTypeRow[];
   assignableCoaches: CoachDisplay[];
   blocks: ScheduleTemplateBlockRow[];
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplays: CoachDisplay[];
+  editorSettings: ScheduleTemplateEditorSettings;
   initialEditBlockId?: string | null;
   initialSelectedDay: TemplateDay;
   mode: TemplateView;
   organizationId: string;
   templateCenterId?: string | null;
+  templateId: string;
   view: TemplateView;
   weekStart: string;
 }) {
@@ -1397,7 +2544,13 @@ export function TemplateBlocksEditor({
     useState<AssignmentFilter>("all");
   const [bulkEditorOpen, setBulkEditorOpen] = useState(false);
   const [classTypeFilter, setClassTypeFilter] = useState("all");
+  const [copyEditorOpen, setCopyEditorOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickCreateSlot, setQuickCreateSlot] = useState<{
+    day: TemplateDay;
+    endTime: string;
+    startTime: string;
+  } | null>(null);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -1453,6 +2606,8 @@ export function TemplateBlocksEditor({
     () => filteredBlocks.filter((block) => selectedBlockIds.has(block.id)),
     [filteredBlocks, selectedBlockIds],
   );
+  const selectedBlockForCopy =
+    selectedBlocks.length === 1 ? selectedBlocks[0] : null;
   const displayedDay = selectedBlock
     ? (selectedBlock.day_of_week as TemplateDay)
     : activeDay;
@@ -1479,6 +2634,7 @@ export function TemplateBlocksEditor({
   function toggleBlock(block: ScheduleTemplateBlockRow) {
     setActiveDay(block.day_of_week as TemplateDay);
     setBulkEditorOpen(false);
+    setCopyEditorOpen(false);
   }
 
   function closeEditorForDay(day: TemplateDay = displayedDay) {
@@ -1507,12 +2663,14 @@ export function TemplateBlocksEditor({
 
     if (shouldCloseBulkEditor) {
       setBulkEditorOpen(false);
+      setCopyEditorOpen(false);
     }
   }
 
   function clearSelection() {
     setSelectedBlockIds(new Set());
     setBulkEditorOpen(false);
+    setCopyEditorOpen(false);
   }
 
   function pruneSelectionForFilters({
@@ -1545,6 +2703,7 @@ export function TemplateBlocksEditor({
 
     if (nextSelectedBlockIds.size === 0) {
       setBulkEditorOpen(false);
+      setCopyEditorOpen(false);
     }
   }
 
@@ -1584,6 +2743,22 @@ export function TemplateBlocksEditor({
       totalBlockCount={blocks.length}
     />
   );
+  const quickCreateDialog = quickCreateSlot ? (
+    <TemplateSlotCreateDialog
+      activeCenters={activeCenters}
+      activeClassTypes={activeClassTypes}
+      assignableCoaches={assignableCoaches}
+      centers={centers}
+      onClose={() => setQuickCreateSlot(null)}
+      organizationId={organizationId}
+      selectedDay={displayedDay}
+      slot={quickCreateSlot}
+      templateCenterId={templateCenterId}
+      templateId={templateId}
+      view={view}
+      weekStart={weekStart}
+    />
+  ) : null;
 
   const bulkSelectionPanel =
     selectedBlocks.length > 0 ? (
@@ -1604,6 +2779,7 @@ export function TemplateBlocksEditor({
             <Button
               onClick={() => {
                 closeEditor();
+                setCopyEditorOpen(false);
                 setBulkEditorOpen((current) => !current);
               }}
               type="button"
@@ -1612,6 +2788,20 @@ export function TemplateBlocksEditor({
               <Pencil aria-hidden="true" />
               {bulkEditorOpen ? "Ocultar edición" : "Editar selección"}
             </Button>
+            {selectedBlockForCopy ? (
+              <Button
+                onClick={() => {
+                  closeEditor();
+                  setBulkEditorOpen(false);
+                  setCopyEditorOpen((current) => !current);
+                }}
+                type="button"
+                variant={copyEditorOpen ? "secondary" : "outline"}
+              >
+                <Copy aria-hidden="true" />
+                {copyEditorOpen ? "Ocultar copia" : "Copiar"}
+              </Button>
+            ) : null}
             <Button onClick={clearSelection} type="button" variant="outline">
               Limpiar
             </Button>
@@ -1633,6 +2823,23 @@ export function TemplateBlocksEditor({
             />
           </div>
         ) : null}
+        {copyEditorOpen && selectedBlockForCopy ? (
+          <div className="border-t border-border pt-3">
+            <TemplateBlockCopyForm
+              assignableCoaches={assignableCoaches}
+              block={selectedBlockForCopy}
+              blocks={blocks}
+              centers={centers}
+              classTypes={classTypes}
+              onCancel={() => setCopyEditorOpen(false)}
+              organizationId={organizationId}
+              selectedDay={displayedDay}
+              templateCenterId={templateCenterId}
+              view={view}
+              weekStart={weekStart}
+            />
+          </div>
+        ) : null}
       </div>
     ) : null;
 
@@ -1640,6 +2847,7 @@ export function TemplateBlocksEditor({
     return (
       <div className="grid gap-3">
         {filterPanel}
+        {quickCreateDialog}
         {bulkSelectionPanel}
         {selectedBlock ? (
           <DesktopEditPanel
@@ -1715,6 +2923,7 @@ export function TemplateBlocksEditor({
   return (
     <div className="space-y-3">
       {filterPanel}
+      {quickCreateDialog}
       {bulkSelectionPanel}
       {selectedBlock ? (
         <DesktopEditPanel
@@ -1804,6 +3013,7 @@ export function TemplateBlocksEditor({
                     isSelected={selectedBlockIds.has(block.id)}
                     onEdit={() => toggleBlock(block)}
                     onToggleSelected={() => toggleSelectedBlock(block.id)}
+                    showCenter={!templateCenterId}
                   />
                   {isEditing ? (
                     <div
@@ -1833,54 +3043,26 @@ export function TemplateBlocksEditor({
         )}
       </section>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-border bg-muted/20 md:block">
-        <div className="grid min-w-[1120px] grid-cols-7 divide-x divide-border">
-          {SCHEDULE_TEMPLATE_DAYS.map((day) => {
-            const dayBlocks = blocksByDay.get(day) ?? [];
-
-            return (
-              <section className="min-w-0 scroll-mt-24" key={day}>
-                <div className="border-b border-border bg-background px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-sm font-semibold tracking-tight">
-                      {getScheduleTemplateDayLabel(day)}
-                    </h4>
-                    <Badge variant="outline">{dayBlocks.length}</Badge>
-                  </div>
-                </div>
-
-                {dayBlocks.length === 0 ? (
-                  <div className="p-2">
-                    <div className="rounded-lg border border-dashed border-border bg-background/70 px-3 py-5 text-sm text-muted-foreground">
-                      {hasActiveFilters
-                        ? "Sin bloques con estos filtros."
-                        : "Sin bloques."}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-2 p-2">
-                    {dayBlocks.map((block) => (
-                      <TemplateBlockCard
-                        block={block}
-                        centersById={centersById}
-                        classTypesById={classTypesById}
-                        closeHref={getCloseHref(block.day_of_week as TemplateDay)}
-                        coachDisplaysById={coachDisplaysById}
-                        editHref={getEditorHref(block)}
-                        isEditing={selectedBlockId === block.id}
-                        key={block.id}
-                        isSelected={selectedBlockIds.has(block.id)}
-                        onEdit={() => toggleBlock(block)}
-                        onToggleSelected={() => toggleSelectedBlock(block.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
-        </div>
-      </div>
+      <TemplateBlocksTimelineGrid
+        blocks={filteredBlocks}
+        blocksByDay={blocksByDay}
+        centersById={centersById}
+        classTypesById={classTypesById}
+        coachDisplaysById={coachDisplaysById}
+        editorSettings={editorSettings}
+        getCloseHref={getCloseHref}
+        getEditorHref={getEditorHref}
+        onEdit={toggleBlock}
+        onSlotCreate={(slot) => {
+          setActiveDay(slot.day);
+          setQuickCreateSlot(slot);
+        }}
+        onToggleSelected={toggleSelectedBlock}
+        rangeBlocks={blocks}
+        selectedBlockId={selectedBlockId}
+        selectedBlockIds={selectedBlockIds}
+        showCenter={!templateCenterId}
+      />
     </div>
   );
 }

@@ -2,20 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   BriefcaseBusiness,
   CalendarClock,
+  CalendarDays,
   CircleOff,
+  Info,
   Plus,
   Save,
+  Sparkles,
   UsersRound,
 } from "lucide-react";
 
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
-import {
-  PageHeader,
-  SectionHeader,
-  StatCard,
-} from "@/components/features/operations-ui";
+import { PageHeader, StatCard } from "@/components/features/operations-ui";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +74,7 @@ type WorkWindowsPageProps = {
     day?: string | string[];
     organizationId?: string | string[];
     person_profile_id?: string | string[];
+    q?: string | string[];
     status?: string | string[];
     week?: string | string[];
     window_status?: string | string[];
@@ -85,6 +86,7 @@ type WorkWindowListFilters = {
   centerId: string;
   dayOfWeek: string;
   personProfileId: string;
+  query: string;
   windowStatus: string;
 };
 type WorkWindowFilterOption = {
@@ -97,6 +99,7 @@ const EMPTY_LIST_FILTERS: WorkWindowListFilters = {
   centerId: "",
   dayOfWeek: "",
   personProfileId: "",
+  query: "",
   windowStatus: "",
 };
 
@@ -115,35 +118,35 @@ const successDescriptions: Partial<Record<keyof typeof successMessages, string>>
   "work-window-deactivated":
     "La franja deja de mostrarse como activa, sin borrar historial operativo.",
   "work-window-updated":
-    "La semana se recalcula al vuelo con la nueva planificacion prevista.",
+    "La semana se recalcula al vuelo con la nueva planificación prevista.",
 };
 
 const errorMessages: Record<string, string> = {
-  "authentication-required": "Vuelve a iniciar sesion para continuar.",
-  "center-inactive": "El centro seleccionado no esta activo.",
+  "authentication-required": "Vuelve a iniciar sesión para continuar.",
+  "center-inactive": "El centro seleccionado no está activo.",
   forbidden: "Tu rol no permite gestionar jornadas previstas.",
-  "invalid-center": "El centro seleccionado no es valido.",
-  "invalid-date": "La fecha de vigencia no es valida.",
-  "invalid-day": "El dia de la jornada prevista no es valido.",
+  "invalid-center": "El centro seleccionado no es válido.",
+  "invalid-date": "La fecha de vigencia no es válida.",
+  "invalid-day": "El día de la jornada prevista no es válido.",
   "invalid-notes":
     "Las notas no pueden incluir datos sensibles, URLs ni identificadores privados.",
   "invalid-person-profile":
-    "El perfil visible seleccionado no pertenece a esta organizacion.",
+    "El perfil visible seleccionado no pertenece a esta organización.",
   "invalid-reference":
-    "El centro o la persona seleccionada ya no estan disponibles.",
-  "invalid-status": "El estado seleccionado no es valido.",
+    "El centro o la persona seleccionada ya no están disponibles.",
+  "invalid-status": "El estado seleccionado no es válido.",
   "invalid-time": "La hora de inicio debe ser anterior a la hora de fin.",
   "missing-fields": "Completa los campos obligatorios.",
   "no-active-memberships": "No hay accesos activos para este usuario.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   "notes-too-long": "Las notas no pueden superar 240 caracteres.",
-  "organization-not-found": "La organizacion solicitada no esta disponible.",
-  organization_not_found: "La organizacion solicitada no esta disponible.",
+  "organization-not-found": "La organización solicitada no está disponible.",
+  organization_not_found: "La organización solicitada no está disponible.",
   "organization-required":
-    "Elige una organizacion antes de gestionar jornadas previstas.",
+    "Elige una organización antes de gestionar jornadas previstas.",
   organization_required:
-    "Elige una organizacion antes de gestionar jornadas previstas.",
-  "person-profile-inactive": "El perfil visible seleccionado no esta activo.",
+    "Elige una organización antes de gestionar jornadas previstas.",
+  "person-profile-inactive": "El perfil visible seleccionado no está activo.",
   "person-profile-internal":
     "Los perfiles internos no pueden usarse como jornada operativa.",
   "person-profile-without-active-coach":
@@ -161,6 +164,7 @@ function getListFilters(params: Awaited<WorkWindowsPageProps["searchParams"]>) {
     centerId: getParam(params.center_id) ?? "",
     dayOfWeek: getParam(params.day) ?? "",
     personProfileId: getParam(params.person_profile_id) ?? "",
+    query: getParam(params.q) ?? "",
     windowStatus: getParam(params.window_status) ?? "",
   } satisfies WorkWindowListFilters;
 }
@@ -193,6 +197,7 @@ function normalizeListFilters({
     personProfileId: personIds.has(filters.personProfileId)
       ? filters.personProfileId
       : "",
+    query: filters.query.trim().slice(0, 80),
     windowStatus:
       filters.windowStatus === "active" || filters.windowStatus === "inactive"
         ? filters.windowStatus
@@ -252,6 +257,10 @@ function getWorkWindowsListPath({
 
   if (filters.personProfileId) {
     params.set("person_profile_id", filters.personProfileId);
+  }
+
+  if (filters.query) {
+    params.set("q", filters.query);
   }
 
   if (filters.centerId) {
@@ -342,17 +351,34 @@ function WeekControls({
   weekEnd: string;
   weekStart: string;
 }) {
+  const isCurrentWeek = weekStart === currentWeekStart;
+
   return (
     <Card size="sm">
-      <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm font-medium">Semana de gestion</p>
-          <p className="text-sm text-muted-foreground">
-            {formatWeekRange(weekStart, weekEnd)}
-          </p>
+      <CardContent className="flex flex-col gap-4 px-5 py-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+            <CalendarDays aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold">Semana de gestión</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                {formatWeekRange(weekStart, weekEnd)}
+              </p>
+              {isCurrentWeek ? (
+                <Badge variant="secondary">Semana actual</Badge>
+              ) : null}
+            </div>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            className="min-h-11 md:min-h-9"
+            size="sm"
+            variant="outline"
+          >
             <Link
               data-week-start={getAdjacentWeekStart(weekStart, -1)}
               data-work-window-week-link="true"
@@ -366,7 +392,12 @@ function WeekControls({
               Anterior
             </Link>
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            className="min-h-11 md:min-h-9"
+            size="sm"
+            variant="outline"
+          >
             <Link
               data-week-start={currentWeekStart}
               data-work-window-week-link="true"
@@ -379,7 +410,12 @@ function WeekControls({
               Hoy
             </Link>
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button
+            asChild
+            className="min-h-11 md:min-h-9"
+            size="sm"
+            variant="outline"
+          >
             <Link
               data-week-start={getAdjacentWeekStart(weekStart, 1)}
               data-work-window-week-link="true"
@@ -390,6 +426,7 @@ function WeekControls({
               })}
             >
               Siguiente
+              <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
         </div>
@@ -408,52 +445,75 @@ function WeekPresenceSummary({
   const occurrencesByDate = groupOccurrencesByDate(occurrences);
 
   return (
-    <div className="grid gap-2 md:grid-cols-7">
-      {days.map((day) => {
-        const dayOccurrences = occurrencesByDate.get(day) ?? [];
-
-        return (
-          <div
-            className="min-h-24 rounded-lg border border-border/70 bg-background/70 p-3"
-            key={day}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">
-                  {formatServiceDate(day)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {dayOccurrences.length === 0
-                    ? "Sin jornada"
-                    : `${dayOccurrences.length} prevista${
-                        dayOccurrences.length === 1 ? "" : "s"
-                      }`}
-                </p>
-              </div>
-              <Badge variant="outline">{dayOccurrences.length}</Badge>
-            </div>
-            <div className="mt-3 space-y-1">
-              {dayOccurrences.slice(0, 2).map((occurrence) => (
-                <p
-                  className="truncate rounded-md bg-muted/45 px-2 py-1 text-xs"
-                  key={`${occurrence.id}-${occurrence.serviceDate}`}
-                  title={`${occurrence.personDisplayName} ${formatStaffWorkWindowTime(
-                    occurrence.start_time,
-                  )}-${formatStaffWorkWindowTime(occurrence.end_time)}`}
-                >
-                  {occurrence.personDisplayName}
-                </p>
-              ))}
-              {dayOccurrences.length > 2 ? (
-                <p className="text-xs text-muted-foreground">
-                  +{dayOccurrences.length - 2}
-                </p>
-              ) : null}
-            </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+            <CalendarDays aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>Resumen semanal</CardTitle>
+            <CardDescription className="mt-1">
+              Vista compacta de presencia prevista activa. La edición vive en
+              la lista inferior.
+            </CardDescription>
           </div>
-        );
-      })}
-    </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+          {days.map((day) => {
+            const dayOccurrences = occurrencesByDate.get(day) ?? [];
+
+            return (
+              <div
+                className="min-h-32 rounded-xl border border-border/70 bg-background/70 p-4"
+                key={day}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {formatServiceDate(day)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dayOccurrences.length === 0
+                        ? "Sin jornada"
+                        : `${dayOccurrences.length} prevista${
+                            dayOccurrences.length === 1 ? "" : "s"
+                          }`}
+                    </p>
+                  </div>
+                  <Badge variant="outline">{dayOccurrences.length}</Badge>
+                </div>
+                <div className="mt-4 space-y-1.5">
+                  {dayOccurrences.length === 0 ? (
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <CalendarDays aria-hidden="true" className="size-4" />
+                    </span>
+                  ) : null}
+                  {dayOccurrences.slice(0, 2).map((occurrence) => (
+                    <p
+                      className="truncate rounded-md bg-muted/55 px-2 py-1.5 text-xs"
+                      key={`${occurrence.id}-${occurrence.serviceDate}`}
+                      title={`${occurrence.personDisplayName} ${formatStaffWorkWindowTime(
+                        occurrence.start_time,
+                      )}-${formatStaffWorkWindowTime(occurrence.end_time)}`}
+                    >
+                      {occurrence.personDisplayName}
+                    </p>
+                  ))}
+                  {dayOccurrences.length > 2 ? (
+                    <p className="text-xs text-muted-foreground">
+                      +{dayOccurrences.length - 2}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -472,26 +532,44 @@ function WorkWindowListItem({
   weekStart: string;
   window: StaffWorkWindowDisplay;
 }) {
+  const isActive = window.status === "active";
+
   return (
-    <details className="group min-w-0 overflow-hidden rounded-lg border border-border/70 bg-background/70">
-      <summary className="flex min-w-0 cursor-pointer list-none flex-col gap-3 px-3 py-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:flex-row md:items-center md:justify-between [&::-webkit-details-marker]:hidden">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
+    <details className="group min-w-0 overflow-hidden rounded-xl border border-border/70 bg-background/70 transition-colors hover:border-border">
+      <summary className="grid min-w-0 cursor-pointer list-none gap-3 px-4 py-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:grid-cols-[minmax(12rem,1.2fr)_minmax(10rem,1fr)_minmax(10rem,1fr)_auto] lg:items-center [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/10">
+            <UsersRound aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
             <p className="truncate text-sm font-semibold">
               {window.personDisplayName}
             </p>
-            <Badge variant={window.status === "active" ? "secondary" : "outline"}>
-              {getStaffWorkWindowStatusLabel(window.status)}
-            </Badge>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {window.centerName ?? "Toda la organización"}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {getStaffWorkWindowDayLabel(window.day_of_week)} /{" "}
-            {formatStaffWorkWindowTime(window.start_time)}-
-            {formatStaffWorkWindowTime(window.end_time)} /{" "}
-            {window.centerName ?? "Toda la organizacion"}
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">Día</p>
+          <p className="mt-1 text-sm font-medium">
+            {getStaffWorkWindowDayLabel(window.day_of_week)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">Horario</p>
+          <p className="mt-1 font-mono text-sm font-medium">
+            {formatStaffWorkWindowTime(window.start_time)}-
+            {formatStaffWorkWindowTime(window.end_time)}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Badge variant={isActive ? "secondary" : "outline"}>
+            {getStaffWorkWindowStatusLabel(window.status)}
+          </Badge>
           <Badge variant="outline">
             Desde {formatServiceDate(window.valid_from)}
           </Badge>
@@ -585,8 +663,8 @@ export default async function WorkWindowsPage({
     return (
       <div className="space-y-6">
         <PageHeader
-          badge="Gestion"
-          description="La gestion de jornadas previstas queda limitada a roles operativos autorizados."
+          badge="Gestión"
+          description="La gestión de jornadas previstas queda limitada a roles operativos autorizados."
           meta={
             <>
               <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -596,7 +674,7 @@ export default async function WorkWindowsPage({
           title="Jornadas previstas"
         />
         <Alert>
-          <AlertTitle>Sin permisos de gestion</AlertTitle>
+          <AlertTitle>Sin permisos de gestión</AlertTitle>
           <AlertDescription>
             Puedes consultar el contexto de jornada desde Horario si tu rol
             tiene acceso operativo, pero no editar las franjas previstas.
@@ -675,8 +753,8 @@ export default async function WorkWindowsPage({
             </Link>
           </Button>
         }
-        badge="Gestion"
-        description="Administra franjas previstas por persona, dia, centro y vigencia sin mezclarlo con el tablero semanal."
+        badge="Gestión"
+        description="Administra franjas previstas por persona, día, centro y vigencia sin mezclarlo con el tablero semanal."
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -726,7 +804,7 @@ export default async function WorkWindowsPage({
         <Alert>
           <AlertTitle>Jornadas no disponibles</AlertTitle>
           <AlertDescription>
-            No se ha podido cargar la planificacion de esta semana.
+            No se ha podido cargar la planificación de esta semana.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -747,25 +825,44 @@ export default async function WorkWindowsPage({
           value={activePeopleCount}
         />
         <StatCard
-          description="Franjas sin centro concreto, aplicadas a toda la organizacion."
+          description="Franjas sin centro concreto, aplicadas a toda la organización."
           icon={CalendarClock}
-          label="Toda la organizacion"
+          label="Toda la organización"
           value={organizationWideCount}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear franjas</CardTitle>
-          <CardDescription>
-            Alta rapida con selector de varios dias para repetir horario sin
-            crear filas una a una.
-          </CardDescription>
+      <Card id="crear-franjas">
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                <Sparkles aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <CardTitle>Crear franjas</CardTitle>
+                <CardDescription className="mt-1">
+                  Crea franjas rápidas para repetir horario sin crear filas una
+                  a una.
+                </CardDescription>
+              </div>
+            </div>
+            <div className="inline-flex max-w-full items-start gap-2 rounded-lg border border-border bg-muted/45 px-3 py-2 text-sm text-foreground">
+              <Info
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              />
+              <span className="min-w-0 leading-5">
+                <span className="font-medium">Tip:</span> selecciona varios
+                días para crear la misma franja en bloque.
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <form
             action={createStaffWorkWindow}
-            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+            className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
           >
             <WorkWindowActionHiddenInputs
               organizationId={resolution.organization.id}
@@ -779,11 +876,15 @@ export default async function WorkWindowsPage({
               multiDay
               people={people}
             />
-            <div className="flex items-end xl:col-span-4">
+            <div className="flex flex-col gap-3 xl:col-span-4 xl:flex-row xl:items-center">
               <Button disabled={people.length === 0} type="submit">
                 <Plus aria-hidden="true" />
                 Crear franjas
               </Button>
+              <p className="text-sm text-muted-foreground">
+                Se crearán franjas activas para los días seleccionados en el
+                rango indicado.
+              </p>
             </div>
           </form>
           {people.length === 0 ? (
@@ -795,16 +896,10 @@ export default async function WorkWindowsPage({
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
-        <SectionHeader
-          description="Vista compacta de presencia prevista activa. La edicion vive en la lista inferior."
-          title="Resumen semanal"
-        />
-        <WeekPresenceSummary
-          days={week.days}
-          occurrences={windowsResult.data.occurrences}
-        />
-      </section>
+      <WeekPresenceSummary
+        days={week.days}
+        occurrences={windowsResult.data.occurrences}
+      />
 
       <WorkWindowListClient
         centerOptions={centerFilterOptions}
@@ -815,6 +910,15 @@ export default async function WorkWindowsPage({
           dayOfWeek: String(window.day_of_week),
           id: window.id,
           personProfileId: window.person_profile_id,
+          searchText: [
+            window.personDisplayName,
+            window.centerName ?? "Toda la organización",
+            getStaffWorkWindowDayLabel(window.day_of_week),
+            formatStaffWorkWindowTime(window.start_time),
+            formatStaffWorkWindowTime(window.end_time),
+            getStaffWorkWindowStatusLabel(window.status),
+            window.notes ?? "",
+          ].join(" "),
           status: window.status,
         }))}
         organizationId={resolution.organization.id}
@@ -833,7 +937,6 @@ export default async function WorkWindowsPage({
           />
         ))}
       </WorkWindowListClient>
-
     </div>
   );
 }

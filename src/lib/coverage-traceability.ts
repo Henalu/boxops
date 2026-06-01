@@ -394,7 +394,7 @@ function getChangeRequestDetail({
         }.`
       : "Sin eventos recientes visibles.";
 
-  return `Estado ${statusLabel}. ${eventSummary} Motivo y datos sensibles no se muestran aqui.`;
+  return `Estado ${statusLabel}. ${eventSummary} Motivo y datos sensibles no se muestran aquí.`;
 }
 
 function getChangedFieldNames(changedFields: Json) {
@@ -570,7 +570,7 @@ function addAbsenceTraceItems({
         kind: "absence_impact",
         occurredAt: null,
         source: "absence_requests",
-        title: "Ausencia en revision puede afectar cobertura",
+        title: "Ausencia en revisión puede afectar cobertura",
         tone: "warning",
       });
     }

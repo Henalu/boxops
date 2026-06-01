@@ -14,7 +14,7 @@ export function RequestExpireSubmitButton() {
       onClick={(event) => {
         if (
           !window.confirm(
-            "Cerrar esta solicitud como vencida o no accionable? La bandeja se recargara con el estado actualizado.",
+            "¿Cerrar esta solicitud como vencida o no accionable? La bandeja se recargará con el estado actualizado.",
           )
         ) {
           event.preventDefault();

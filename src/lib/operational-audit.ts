@@ -4,6 +4,8 @@ import type { Json, Tables } from "@/types/supabase";
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 export type OperationalAuditEntityType =
+  | "centers"
+  | "class_types"
   | "team_invitations"
   | "organization_memberships"
   | "person_profiles"

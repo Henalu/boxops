@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type React from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  CalendarDays,
   CheckCircle2,
   Inbox,
+  Info,
+  Plus,
   Send,
   ShieldCheck,
+  type LucideIcon,
   XCircle,
 } from "lucide-react";
 
@@ -23,10 +28,7 @@ import { RequestCreationForm } from "./request-creation-form";
 import { RequestExpireSubmitButton } from "./request-expire-submit-button";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
-  EmptyState,
   PageHeader,
-  SectionHeader,
-  StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
@@ -58,6 +60,7 @@ import {
 import { getSchedulePath } from "@/lib/navigation/app-paths";
 import { formatTimeForInput } from "@/lib/schedule-blocks";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +122,7 @@ const statusMessages: Record<string, string> = {
 };
 
 const errorMessages: Record<string, string> = {
-  "authentication-required": "Inicia sesion para revisar solicitudes.",
+  "authentication-required": "Inicia sesión para revisar solicitudes.",
   "coach-unavailable":
     "Ese entrenador ya tiene un bloque asignado que se solapa con esta franja.",
   "confirmation-required": "Confirma el alcance operativo antes de enviar.",
@@ -129,23 +132,23 @@ const errorMessages: Record<string, string> = {
   "invalid-change-request-target": "No hemos encontrado una oferta valida.",
   "invalid-coach-profile":
     "Selecciona destinatarios activos, visibles y asignables en esta organización.",
-  "invalid-organization": "La organizacion recibida no es valida.",
-  "invalid-request-type": "El tipo de solicitud recibido no esta habilitado.",
+  "invalid-organization": "La organización recibida no es válida.",
+  "invalid-request-type": "El tipo de solicitud recibido no está habilitado.",
   "invalid-response": "La respuesta recibida no es valida.",
-  "invalid-schedule-block": "La clase recibida no esta disponible.",
+  "invalid-schedule-block": "La clase recibida no está disponible.",
   "invalid-schedule-block-assignment":
-    "La asignacion de la clase no esta disponible.",
+    "La asignación de la clase no está disponible.",
   "invalid-summary":
-    "El mensaje debe ser breve y no incluir datos sensibles, legales o de nomina.",
-  "invalid-timestamp": "La fecha de vencimiento no es valida.",
+    "El mensaje debe ser breve y no incluir datos sensibles, legales o de nómina.",
+  "invalid-timestamp": "La fecha de vencimiento no es válida.",
   "load-failed": "No se han podido cargar los datos necesarios.",
   "no-active-memberships": "No hay accesos activos para este usuario.",
   "not-actionable":
     "Esta solicitud ya no admite cambios. Si vencio o la clase ya no puede modificarse, cierrala como vencida.",
   "not-approved": "La solicitud debe aprobarse antes de aplicarse.",
-  "not-found": "La solicitud ya no esta disponible.",
-  "organization-not-found": "La organizacion solicitada no esta disponible.",
-  "organization-required": "Elige una organizacion antes de revisar solicitudes.",
+  "not-found": "La solicitud ya no está disponible.",
+  "organization-not-found": "La organización solicitada no está disponible.",
+  "organization-required": "Elige una organización antes de revisar solicitudes.",
   "permission-denied": "No se pudo completar por permisos de seguridad.",
   "profile-missing":
     "Tu cuenta no tiene persona operativa vinculada en esta organización.",
@@ -447,15 +450,15 @@ function getActionBlockReason(
   const block = displayData.blocksById.get(item.request.schedule_block_id);
 
   if (!block) {
-    return "La clase ya no esta disponible.";
+    return "La clase ya no está disponible.";
   }
 
   if (isPastTimestamp(item.request.expires_at, now)) {
-    return "La solicitud esta vencida. Cierrala antes de hacer otro cambio.";
+    return "La solicitud está vencida. Ciérrala antes de hacer otro cambio.";
   }
 
   if (blockIsNotActionable(block.status)) {
-    return "La clase esta cancelada o completada.";
+    return "La clase está cancelada o completada.";
   }
 
   const acceptedTarget = item.request.accepted_target_id
@@ -463,7 +466,7 @@ function getActionBlockReason(
     : null;
 
   if (acceptedTarget && isPastTimestamp(acceptedTarget.expires_at, now)) {
-    return "La respuesta aceptada esta vencida. Cierra la solicitud antes de aplicarla.";
+    return "La respuesta aceptada está vencida. Cierra la solicitud antes de aplicarla.";
   }
 
   return null;
@@ -972,6 +975,61 @@ function RequestCard({
   );
 }
 
+type RequestsSummaryTone =
+  | "info"
+  | "neutral"
+  | "pending"
+  | "success"
+  | "warning";
+
+const requestsSummaryToneClasses: Record<RequestsSummaryTone, string> = {
+  info: "bg-primary/10 text-primary ring-primary/15",
+  neutral: "bg-muted text-muted-foreground ring-border",
+  pending: "bg-violet-50 text-violet-700 ring-violet-200",
+  success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  warning: "bg-amber-50 text-amber-700 ring-amber-200",
+};
+
+function RequestSummaryCard({
+  description,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: RequestsSummaryTone;
+  value: React.ReactNode;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold">{label}</p>
+            <p className="text-sm leading-5 text-muted-foreground">
+              {description}
+            </p>
+          </div>
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
+              requestsSummaryToneClasses[tone],
+            )}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+        </div>
+        <p className="font-mono text-3xl font-semibold tracking-tight">
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RequestsSummary({
   canManage,
   displayData,
@@ -995,23 +1053,29 @@ function RequestsSummary({
   ).length;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard icon={Inbox} label="En bandeja" value={items.length} />
-      <StatCard
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <RequestSummaryCard
+        description="Solicitudes nuevas que esperan tu revisión."
+        icon={Inbox}
+        label="En bandeja"
+        tone={items.length > 0 ? "info" : "neutral"}
+        value={items.length}
+      />
+      <RequestSummaryCard
         description="Ofertas que esperan tu respuesta."
         icon={CheckCircle2}
         label="Para responder"
         tone={ownOfferedTargets > 0 ? "warning" : "neutral"}
         value={ownOfferedTargets}
       />
-      <StatCard
+      <RequestSummaryCard
         description="Solicitudes listas para revisar."
         icon={ShieldCheck}
         label="Para revisar"
         tone={pendingApproval > 0 ? "warning" : "neutral"}
         value={canManage ? pendingApproval : "-"}
       />
-      <StatCard
+      <RequestSummaryCard
         description="Aprobadas y listas para actualizar horario."
         icon={Send}
         label="Para aplicar"
@@ -1019,6 +1083,74 @@ function RequestsSummary({
         value={canManage ? approved : "-"}
       />
     </div>
+  );
+}
+
+function RequestsInboxHeader({ count }: { count: number }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Inbox aria-hidden="true" className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">Bandeja</h2>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+            Responde, revisa o aplica segun tu rol y el estado de cada
+            solicitud.
+          </p>
+        </div>
+      </div>
+      <Badge variant="outline">{count} visibles</Badge>
+    </div>
+  );
+}
+
+function RequestsEmptyState({ organizationId }: { organizationId: string }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+          <CheckCircle2 aria-hidden="true" className="size-7" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-1">
+          <CardTitle>Sin solicitudes visibles</CardTitle>
+          <CardDescription className="leading-6">
+            No hay solicitudes de cambio o cobertura visibles para esta
+            organización y usuario.
+          </CardDescription>
+        </div>
+        <Button asChild variant="outline">
+          <Link href={getSchedulePath({ organizationId })}>
+            <CalendarDays aria-hidden="true" />
+            Abrir horario
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RequestsHelpNote({ organizationId }: { organizationId: string }) {
+  return (
+    <Alert className="border-primary/20 bg-primary/5">
+      <Info aria-hidden="true" className="size-4 text-primary" />
+      <AlertTitle>Consejo</AlertTitle>
+      <AlertDescription className="flex flex-col gap-3 text-sm md:flex-row md:items-center md:justify-between">
+        <span>
+          Puedes crear cobertura desde esta página o abrir el horario para
+          hacerlo desde una clase concreta. Las ausencias, nómina y horas extra
+          se gestionan en sus apartados.
+        </span>
+        <Button asChild size="sm" variant="outline">
+          <Link href={getSchedulePath({ organizationId })}>
+            Abrir horario
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -1076,7 +1208,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
           <AlertTitle>No se han podido cargar las solicitudes</AlertTitle>
           <AlertDescription>
             {errorMessages[requestsResult.error] ??
-              "Revisa sesion, organizacion activa y permisos."}
+              "Revisa sesión, organización activa y permisos."}
           </AlertDescription>
         </Alert>
       </div>
@@ -1100,7 +1232,16 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
   return (
     <div className="space-y-6">
       <PageHeader
+        actions={
+          <Button asChild size="lg">
+            <Link href="#request-creation">
+              <Plus aria-hidden="true" />
+              Pedir cobertura
+            </Link>
+          </Button>
+        }
         badge="Solicitudes"
+        description="Pide ayuda para cubrir clases, responde ofertas y aplica cambios aprobados al horario."
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -1109,28 +1250,29 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
         }
         title="Solicitudes"
       >
-        <details className="group max-w-3xl">
-          <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
-            <span>
-              Pide ayuda para cubrir clases, responde ofertas y aplica cambios
-              aprobados al horario.
-            </span>{" "}
-            <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
-              Más
-            </span>
-            <span className="hidden font-medium text-foreground underline underline-offset-4 group-open:inline-flex">
-              Menos
-            </span>
-          </summary>
+        <div className="max-w-3xl space-y-2">
+          <p className="text-sm leading-6 text-muted-foreground md:hidden">
+            Pide ayuda para cubrir clases, responde ofertas y aplica cambios
+            aprobados al horario.
+          </p>
+          <details className="group">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-primary outline-none hover:underline focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <Info aria-hidden="true" className="size-4" />
+              <span className="group-open:hidden">Mas informacion</span>
+              <span className="hidden group-open:inline">
+                Ocultar informacion
+              </span>
+            </summary>
 
-          <Alert className="mt-3">
-            <AlertTitle>Uso de esta bandeja</AlertTitle>
-            <AlertDescription>
-              Esta bandeja organiza cobertura sobre clases del horario. Las
-              ausencias, nominas y horas extra se gestionan en sus apartados.
-            </AlertDescription>
-          </Alert>
-        </details>
+            <Alert className="mt-3">
+              <AlertTitle>Uso de esta bandeja</AlertTitle>
+              <AlertDescription>
+                Esta bandeja organiza cobertura sobre clases del horario. Las
+                ausencias, nóminas y horas extra se gestionan en sus apartados.
+              </AlertDescription>
+            </Alert>
+          </details>
+        </div>
       </PageHeader>
 
       {status && statusMessages[status] ? (
@@ -1144,7 +1286,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
       {error && errorMessages[error] ? (
         <TransientFeedbackBanner
           description={errorMessages[error]}
-          title="No se ha podido completar la accion"
+          title="No se ha podido completar la acción"
           tone="error"
         />
       ) : null}
@@ -1176,27 +1318,9 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
       />
 
       <section className="space-y-3">
-        <SectionHeader
-          description="Responde, revisa o aplica segun tu rol y el estado de cada solicitud."
-          title="Bandeja"
-        />
+        <RequestsInboxHeader count={items.length} />
         {items.length === 0 ? (
-          <EmptyState
-            action={
-              <Button asChild variant="outline">
-                <Link
-                  href={getSchedulePath({
-                    organizationId: resolution.organization.id,
-                  })}
-                >
-                  Abrir horario
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </Button>
-            }
-            description="No hay solicitudes de cambio o cobertura visibles para esta organización y usuario."
-            title="Sin solicitudes visibles"
-          />
+          <RequestsEmptyState organizationId={resolution.organization.id} />
         ) : (
           <div className="grid gap-3">
             {items.map((item) => (
@@ -1213,6 +1337,7 @@ export default async function RequestsPage({ searchParams }: RequestsPageProps) 
           </div>
         )}
       </section>
+      <RequestsHelpNote organizationId={resolution.organization.id} />
     </div>
   );
 }

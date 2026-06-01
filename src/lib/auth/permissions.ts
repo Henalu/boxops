@@ -1,3 +1,5 @@
+import { PLATFORM_SUPPORT_ACCESS_ROLE } from "@/lib/platform-support-session-cookie";
+
 export const APPLICATION_ROLES = [
   "owner",
   "admin",
@@ -100,8 +102,12 @@ export function isManagedAccessRole(role: string): role is ManagedAccessRole {
   return MANAGED_ACCESS_ROLES.includes(role as ManagedAccessRole);
 }
 
+function isPlatformSupportRole(role: string) {
+  return role === PLATFORM_SUPPORT_ACCESS_ROLE;
+}
+
 export function getApplicationRoleLabel(role: string) {
-  if (role === "platform_support") {
+  if (isPlatformSupportRole(role)) {
     return "Soporte BoxOps";
   }
 
@@ -121,11 +127,17 @@ export function canManageTimeTrackingSettings(role: string) {
 }
 
 export function canManageOperationalData(role: string) {
-  return OPERATIONAL_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+  return (
+    OPERATIONAL_MANAGEMENT_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canManageOperationalTeamProfiles(role: string) {
-  return OPERATIONAL_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+  return (
+    OPERATIONAL_MANAGEMENT_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canDeleteOperationalTeamProfiles(role: string) {
@@ -133,11 +145,14 @@ export function canDeleteOperationalTeamProfiles(role: string) {
 }
 
 export function canManageTeamAccess(role: string) {
-  return TEAM_ACCESS_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+  return (
+    TEAM_ACCESS_MANAGEMENT_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canReadOperationalData(role: string) {
-  return isApplicationRole(role);
+  return isApplicationRole(role) || isPlatformSupportRole(role);
 }
 
 export function canUsePersonalFeatures(role: string) {
@@ -169,15 +184,24 @@ export function canManageAbsenceRequests(role: string) {
 }
 
 export function canManageStaffWorkWindows(role: string) {
-  return STAFF_WORK_WINDOW_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+  return (
+    STAFF_WORK_WINDOW_MANAGEMENT_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canReadOperationalEvents(role: string) {
-  return OPERATIONAL_EVENT_READ_ROLES.includes(role as ApplicationRole);
+  return (
+    OPERATIONAL_EVENT_READ_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canManageOperationalEvents(role: string) {
-  return OPERATIONAL_EVENT_MANAGEMENT_ROLES.includes(role as ApplicationRole);
+  return (
+    OPERATIONAL_EVENT_MANAGEMENT_ROLES.includes(role as ApplicationRole) ||
+    isPlatformSupportRole(role)
+  );
 }
 
 export function canReadOvertimeCandidates(role: string) {

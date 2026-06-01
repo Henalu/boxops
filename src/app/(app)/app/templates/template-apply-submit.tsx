@@ -68,7 +68,7 @@ export function TemplateApplySubmit({
                           existingBlockCount === 1 ? "" : "s"
                         }`
                       : ""}
-                    . Si confirmas, solo se sustituira esta semana.
+                    . Si confirmas, solo se sustituirá esta semana.
                   </p>
                 </div>
               </div>

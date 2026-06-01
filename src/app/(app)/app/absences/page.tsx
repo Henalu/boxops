@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type React from "react";
 import {
   AlertTriangle,
   CalendarOff,
+  CheckCircle2,
   Clock3,
+  Info,
   ListFilter,
+  Plus,
+  RotateCcw,
   ShieldCheck,
+  type LucideIcon,
+  UserRound,
 } from "lucide-react";
 
 import {
@@ -21,10 +28,7 @@ import {
 } from "./actions";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
-  EmptyState,
   PageHeader,
-  SectionHeader,
-  StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
@@ -67,6 +71,7 @@ import {
 } from "@/lib/auth/tenant";
 import { getAbsencesPath } from "@/lib/navigation/app-paths";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +130,7 @@ const statusMessages: Record<string, string> = {
   "absence-created-approved": "Solicitud creada y aprobada.",
   "absence-created-cancelled": "Solicitud creada, pero ya figura cancelada.",
   "absence-created-expired": "Solicitud creada, pero ya figura expirada.",
-  "absence-created-pending_review": "Solicitud creada y enviada a revision.",
+  "absence-created-pending_review": "Solicitud creada y enviada a revisión.",
   "absence-created-rejected": "Solicitud creada, pero ya figura rechazada.",
   "absence-created-requested": "Solicitud creada.",
   "absence-expired": "Solicitud cerrada como vencida.",
@@ -133,40 +138,40 @@ const statusMessages: Record<string, string> = {
 };
 
 const errorMessages: Record<AbsenceRequestErrorCode | string, string> = {
-  "authentication-required": "Inicia sesion para revisar ausencias.",
-  "date-range-invalid": "El periodo recibido no es valido.",
-  forbidden: "Tu rol o perfil no permite esa accion.",
+  "authentication-required": "Inicia sesión para revisar ausencias.",
+  "date-range-invalid": "El periodo recibido no es válido.",
+  forbidden: "Tu rol o perfil no permite esa acción.",
   "invalid-absence-request": "La solicitud recibida no es valida.",
-  "invalid-absence-type": "El tipo de ausencia no esta habilitado.",
-  "invalid-decision": "La decision recibida no es valida.",
-  "invalid-input": "Los datos recibidos no son validos.",
-  "invalid-limit": "El limite de listado no es valido.",
-  "invalid-organization": "La organizacion recibida no es valida.",
-  "invalid-period": "El periodo de ausencia no es valido.",
+  "invalid-absence-type": "El tipo de ausencia no está habilitado.",
+  "invalid-decision": "La decisión recibida no es válida.",
+  "invalid-input": "Los datos recibidos no son válidos.",
+  "invalid-limit": "El límite de listado no es válido.",
+  "invalid-organization": "La organización recibida no es válida.",
+  "invalid-period": "El periodo de ausencia no es válido.",
   "invalid-reason-summary":
     "El resumen debe ser corto y no puede incluir datos sensibles.",
-  "invalid-status": "El estado recibido no esta habilitado.",
+  "invalid-status": "El estado recibido no está habilitado.",
   "invalid-timezone": "La zona horaria no es valida.",
   "invalid-timestamp": "La fecha recibida no es valida.",
   "load-failed": "No se han podido cargar los datos necesarios.",
   "no-active-memberships": "No hay accesos activos para este usuario.",
-  "not-actionable": "La solicitud no admite esa accion ahora.",
-  "not-found": "La solicitud ya no esta disponible.",
-  "organization-not-found": "La organizacion solicitada no esta disponible.",
-  "organization-required": "Elige una organizacion antes de revisar ausencias.",
-  "permission-denied": "La base de datos ha denegado la operacion.",
+  "not-actionable": "La solicitud no admite esa acción ahora.",
+  "not-found": "La solicitud ya no está disponible.",
+  "organization-not-found": "La organización solicitada no está disponible.",
+  "organization-required": "Elige una organización antes de revisar ausencias.",
+  "permission-denied": "La base de datos ha denegado la operación.",
   "profile-missing":
-    "Tu cuenta no tiene persona operativa vinculada en esta organizacion.",
+    "Tu cuenta no tiene persona operativa vinculada en esta organización.",
   "save-failed": "No se han podido guardar los cambios.",
   "sensitive-summary":
-    "El resumen operativo debe evitar salud, diagnosticos, justificantes, familia, sanciones, salario/payroll, ubicacion, URLs, tokens e identificadores.",
+    "El resumen operativo debe evitar salud, diagnósticos, justificantes, familia, sanciones, salario/payroll, ubicación, URLs, tokens e identificadores.",
 };
 
 const absenceStatusLabels: Record<AbsenceRequestStatus, string> = {
   approved: "Aprobada",
   cancelled: "Cancelada",
   expired: "Expirada",
-  pending_review: "En revision",
+  pending_review: "En revisión",
   rejected: "Rechazada",
   requested: "Solicitada",
 };
@@ -210,7 +215,7 @@ function getValidatedFilters({
     if (ABSENCE_REQUEST_TYPES.includes(rawType as AbsenceRequestType)) {
       type = rawType as AbsenceRequestType;
     } else {
-      errors.push("Tipo de ausencia ignorado: no esta habilitado.");
+      errors.push("Tipo de ausencia ignorado: no está habilitado.");
     }
   }
 
@@ -220,7 +225,7 @@ function getValidatedFilters({
     ) {
       status = rawStatus as AbsenceRequestStatus;
     } else {
-      errors.push("Estado ignorado: no esta habilitado.");
+      errors.push("Estado ignorado: no está habilitado.");
     }
   }
 
@@ -228,7 +233,7 @@ function getValidatedFilters({
     if (ABSENCE_VIEW_FILTERS.includes(rawView as AbsenceViewFilter)) {
       view = rawView as AbsenceViewFilter;
     } else {
-      errors.push("Vista ignorada: usa propias, revision o todas.");
+      errors.push("Vista ignorada: usa propias, revisión o todas.");
     }
   }
 
@@ -442,10 +447,10 @@ function getNonActionableMessages({
   if (mode === "own") {
     if (item.request.status === "approved") {
       messages.push(
-        "Ya esta aprobada; la solicitud propia no puede cancelarse desde esta accion.",
+        "Ya está aprobada; la solicitud propia no puede cancelarse desde esta acción.",
       );
     } else if (CLOSED_STATUSES.has(item.request.status)) {
-      messages.push(`No puede cancelarse porque ya esta ${statusLabel}.`);
+      messages.push(`No puede cancelarse porque ya está ${statusLabel}.`);
     } else if (expiryReason) {
       messages.push(
         `No se muestra cancelar porque ya no es una solicitud activa: ${expiryReason}`,
@@ -464,7 +469,7 @@ function getNonActionableMessages({
       );
     } else if (CLOSED_STATUSES.has(item.request.status)) {
       messages.push(
-        `No puede aprobarse ni rechazarse porque ya esta ${statusLabel}.`,
+        `No puede aprobarse ni rechazarse porque ya está ${statusLabel}.`,
       );
     }
   }
@@ -472,7 +477,7 @@ function getNonActionableMessages({
   if (!expiryReason) {
     if (REVIEWABLE_STATUSES.has(item.request.status)) {
       messages.push(
-        "No puede cerrarse como vencida: aun no ha vencido y tiene periodos pendientes.",
+        "No puede cerrarse como vencida: aún no ha vencido y tiene periodos pendientes.",
       );
     } else {
       messages.push(
@@ -518,7 +523,7 @@ function getImpactSummary({
   if (potential > 0) {
     return {
       description:
-        "La solicitud aun no cambia el horario, pero puede afectar bloques asignados.",
+        "La solicitud aún no cambia el horario, pero puede afectar bloques asignados.",
       label: `${potential} impacto${potential === 1 ? "" : "s"} potencial${potential === 1 ? "" : "es"}`,
       tone: "pending" as const,
     };
@@ -615,24 +620,29 @@ function AbsenceCreationForm({
   timeZone: string;
 }) {
   return (
-    <section className="space-y-3">
-      <SectionHeader
-        description="Solicita vacaciones, permisos u otras ausencias para ti."
-        title="Nueva solicitud"
-      />
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle>Solicitud propia</CardTitle>
-              <CardDescription>
-                Al enviarla, quedara pendiente de revision del equipo
-                responsable. Si afecta al horario, la cobertura se gestiona
-                aparte.
-              </CardDescription>
+    <section className="scroll-mt-24" id="new-absence-request">
+      <Card className="shadow-sm">
+        <CardHeader className="gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <CalendarOff aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg">Nueva solicitud</CardTitle>
+                <CardDescription>
+                  Solicita vacaciones, permisos u otras ausencias para ti.
+                </CardDescription>
+              </div>
             </div>
             <Badge variant="outline">Propia</Badge>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
+            <p>
+              Al enviarla, quedará pendiente de revisión del equipo
+              responsable. Si afecta al horario, la cobertura se gestiona
+              aparte.
+            </p>
           </div>
         </CardHeader>
         <CardContent>
@@ -647,11 +657,11 @@ function AbsenceCreationForm({
               </Alert>
             ) : null}
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="absenceType">Tipo</Label>
                 <select
-                  className="flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base shadow-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-8 md:text-sm"
                   defaultValue="vacation"
                   id="absenceType"
                   name="absenceType"
@@ -671,7 +681,7 @@ function AbsenceCreationForm({
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
               <div className="space-y-2">
                 <Label htmlFor="absenceStartsAt">Inicio</Label>
                 <Input
@@ -692,9 +702,9 @@ function AbsenceCreationForm({
                 />
               </div>
 
-              <label className="flex min-h-10 items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
+              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-background px-3 py-2 text-sm transition-colors hover:bg-muted/35 md:min-h-8">
                 <input
-                  className="size-4 rounded border-input"
+                  className="size-4 rounded border-input accent-primary"
                   defaultChecked
                   name="allDay"
                   type="checkbox"
@@ -710,11 +720,11 @@ function AbsenceCreationForm({
                 maxLength={160}
                 name="reasonSummary"
                 placeholder="Ej. Vacaciones planificadas."
-                rows={3}
+                rows={4}
               />
-              <p className="text-xs text-muted-foreground">
-                Maximo 160 caracteres. No incluyas salud, diagnosticos,
-                justificantes, documentos, salario, payroll, ubicacion, URLs,
+              <p className="text-xs leading-5 text-muted-foreground">
+                Máximo 160 caracteres. No incluyas salud, diagnósticos,
+                justificantes, documentos, salario, payroll, ubicación, URLs,
                 tokens ni datos familiares.
               </p>
             </div>
@@ -731,7 +741,6 @@ function AbsenceCreationForm({
     </section>
   );
 }
-
 function PeriodList({
   periods,
   timeZone,
@@ -811,7 +820,7 @@ function AbsenceActions({
               organizationId={organizationId}
             />
             <AbsenceActionSubmitButton
-              confirmMessage="Cancelar esta solicitud propia? La bandeja se recargara con el estado actualizado."
+              confirmMessage="¿Cancelar esta solicitud propia? La bandeja se recargará con el estado actualizado."
               icon="cancel"
               label="Cancelar"
               pendingLabel="Cancelando..."
@@ -828,7 +837,7 @@ function AbsenceActions({
                 organizationId={organizationId}
               />
               <AbsenceActionSubmitButton
-                confirmMessage="Aprobar esta ausencia como decision operativa? No cambiara horario ni asignaciones."
+                confirmMessage="¿Aprobar esta ausencia como decisión operativa? No cambiará horario ni asignaciones."
                 icon="approve"
                 label="Aprobar"
                 pendingLabel="Aprobando..."
@@ -840,7 +849,7 @@ function AbsenceActions({
                 organizationId={organizationId}
               />
               <AbsenceActionSubmitButton
-                confirmMessage="Rechazar esta solicitud? La decision quedara como evento operativo minimizado."
+                confirmMessage="¿Rechazar esta solicitud? La decisión quedará como evento operativo minimizado."
                 icon="reject"
                 label="Rechazar"
                 pendingLabel="Rechazando..."
@@ -857,7 +866,7 @@ function AbsenceActions({
               organizationId={organizationId}
             />
             <AbsenceActionSubmitButton
-              confirmMessage="Cerrar esta solicitud como vencida? No resuelve cobertura ni cambia horario."
+              confirmMessage="¿Cerrar esta solicitud como vencida? No resuelve cobertura ni cambia horario."
               icon="expire"
               label="Cerrar vencida"
               pendingLabel="Cerrando..."
@@ -942,7 +951,7 @@ function AbsenceCard({
           <div className="min-w-0">
             <dt className="text-muted-foreground">Revision</dt>
             <dd className="truncate font-medium">
-              {item.request.review_required ? "Requiere revision" : "Directa"}
+              {item.request.review_required ? "Requiere revisión" : "Directa"}
             </dd>
           </div>
           <div className="min-w-0">
@@ -1009,6 +1018,20 @@ function AbsenceFiltersPanel({
 }) {
   return (
     <Card size="sm">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <ListFilter aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>Filtros</CardTitle>
+            <CardDescription>
+              Ajusta la vista por origen, tipo y estado sin perder el contexto
+              de la organización.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
       <CardContent>
         <form
           className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end"
@@ -1071,15 +1094,68 @@ function AbsenceFiltersPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="outline">
+            <Button type="submit">
               <ListFilter aria-hidden="true" />
               Filtrar
             </Button>
-            <Button asChild variant="ghost">
-              <Link href={getAbsencesPath({ organizationId })}>Limpiar</Link>
+            <Button asChild variant="outline">
+              <Link href={getAbsencesPath({ organizationId })}>
+                <RotateCcw aria-hidden="true" />
+                Limpiar
+              </Link>
             </Button>
           </div>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+type AbsenceSummaryTone = "info" | "neutral" | "pending" | "success" | "warning";
+
+const absenceSummaryToneClasses: Record<AbsenceSummaryTone, string> = {
+  info: "bg-primary/10 text-primary ring-primary/15",
+  neutral: "bg-muted text-muted-foreground ring-border",
+  pending: "bg-violet-50 text-violet-700 ring-violet-200",
+  success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  warning: "bg-amber-50 text-amber-700 ring-amber-200",
+};
+
+function AbsenceSummaryCard({
+  description,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: AbsenceSummaryTone;
+  value: React.ReactNode;
+}) {
+  return (
+    <Card size="sm">
+      <CardContent className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold">{label}</p>
+            <p className="text-sm leading-5 text-muted-foreground">
+              {description}
+            </p>
+          </div>
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
+              absenceSummaryToneClasses[tone],
+            )}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+        </div>
+        <p className="font-mono text-3xl font-semibold tracking-tight">
+          {value}
+        </p>
       </CardContent>
     </Card>
   );
@@ -1105,22 +1181,34 @@ function AbsencesSummary({
   ).length;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard icon={CalendarOff} label="Propias" value={ownCount} />
-      <StatCard
-        description="Solo Propietario, Administrador y Responsable."
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <AbsenceSummaryCard
+        description="Tus solicitudes visibles."
+        icon={UserRound}
+        label="Propias"
+        tone={ownCount > 0 ? "info" : "neutral"}
+        value={ownCount}
+      />
+      <AbsenceSummaryCard
+        description={
+          canManage
+            ? "Pendientes para gestión operativa."
+            : "Solo gestión operativa."
+        }
         icon={ShieldCheck}
         label="Revision"
         tone={queueCount > 0 ? "warning" : "neutral"}
         value={canManage ? queueCount : "-"}
       />
-      <StatCard
+      <AbsenceSummaryCard
+        description="Posibles conflictos o solapes."
         icon={Clock3}
         label="Potencial"
         tone={potentialCount > 0 ? "pending" : "neutral"}
         value={potentialCount}
       />
-      <StatCard
+      <AbsenceSummaryCard
+        description="Solicitudes que requieren cobertura."
         icon={AlertTriangle}
         label="A cubrir"
         tone={coverageNeededCount > 0 ? "warning" : "neutral"}
@@ -1134,10 +1222,114 @@ function SectionError({ error }: { error: string }) {
   return (
     <Alert variant="destructive">
       <AlertTriangle aria-hidden="true" className="size-4" />
-      <AlertTitle>No se ha podido cargar esta seccion</AlertTitle>
+      <AlertTitle>No se ha podido cargar esta sección</AlertTitle>
       <AlertDescription>
         {errorMessages[error] ??
-          "Revisa sesion, organizacion activa y permisos."}
+          "Revisa sesión, organización activa y permisos."}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function AbsencePanelHeader({
+  badge,
+  description,
+  icon: Icon,
+  title,
+}: {
+  badge?: React.ReactNode;
+  description: string;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon aria-hidden="true" className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+      </div>
+      {badge}
+    </div>
+  );
+}
+
+function AbsencePanelEmptyState({
+  action,
+  description,
+  icon: Icon = CheckCircle2,
+  title,
+  tone = "success",
+}: {
+  action?: React.ReactNode;
+  description: string;
+  icon?: LucideIcon;
+  title: string;
+  tone?: AbsenceSummaryTone;
+}) {
+  return (
+    <Card>
+      <CardContent className="space-y-5 py-5">
+        <div
+          className={cn(
+            "flex items-start gap-3 rounded-xl border p-4",
+            tone === "success"
+              ? "border-emerald-200 bg-emerald-50/70"
+              : tone === "info"
+                ? "border-primary/20 bg-primary/5"
+                : "border-border bg-muted/25",
+          )}
+        >
+          <span
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-lg ring-1",
+              absenceSummaryToneClasses[tone],
+            )}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <CardTitle>{title}</CardTitle>
+            <CardDescription className="leading-6">{description}</CardDescription>
+          </div>
+        </div>
+        {action ? <div>{action}</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AbsencesHelpNote({
+  canManage,
+  organizationId,
+}: {
+  canManage: boolean;
+  organizationId: string;
+}) {
+  return (
+    <Alert className="border-primary/20 bg-primary/5">
+      <Info aria-hidden="true" className="size-4 text-primary" />
+      <AlertTitle>Como funciona?</AlertTitle>
+      <AlertDescription className="flex flex-col gap-3 text-sm md:flex-row md:items-center md:justify-between">
+        <span>
+          Las solicitudes pasan por estados propios, revisión, impacto
+          potencial y cobertura a resolver. Esta vista no guarda motivos
+          sensibles ni cambia automaticamente horario, saldos o asignaciones.
+        </span>
+        {canManage ? (
+          <Button asChild size="sm" variant="outline">
+            <Link href={getAbsencesPath({ organizationId, view: "review" })}>
+              Ir a revisión
+              <ShieldCheck aria-hidden="true" />
+            </Link>
+          </Button>
+        ) : null}
       </AlertDescription>
     </Alert>
   );
@@ -1247,7 +1439,18 @@ export default async function AbsencesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        actions={
+          canCreateOwnAbsence ? (
+            <Button asChild size="lg">
+              <Link href="#new-absence-request">
+                <Plus aria-hidden="true" />
+                Nueva solicitud
+              </Link>
+            </Button>
+          ) : null
+        }
         badge="Ausencias"
+        description="Solicita vacaciones, permisos o no disponibilidad y consulta su estado."
         meta={
           <>
             <Badge variant="outline">{resolution.organization.name}</Badge>
@@ -1256,29 +1459,28 @@ export default async function AbsencesPage({
         }
         title="Ausencias"
       >
-        <details className="group max-w-3xl">
-          <summary className="cursor-pointer list-none text-sm leading-6 text-muted-foreground outline-none focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 md:text-base [&::-webkit-details-marker]:hidden">
-            <span>
-              Solicita vacaciones, permisos o no disponibilidad y consulta su
-              estado.
-            </span>{" "}
-            <span className="inline-flex font-medium text-foreground underline underline-offset-4 group-open:hidden">
-              Mas
-            </span>
-            <span className="hidden font-medium text-foreground underline underline-offset-4 group-open:inline-flex">
-              Menos
-            </span>
-          </summary>
+        <div className="max-w-3xl space-y-2">
+          <p className="text-sm leading-6 text-muted-foreground md:hidden">
+            Solicita vacaciones, permisos o no disponibilidad y consulta su
+            estado.
+          </p>
+          <details className="group">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-primary outline-none hover:underline focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              <Info aria-hidden="true" className="size-4" />
+              <span className="group-open:hidden">Mas informacion</span>
+              <span className="hidden group-open:inline">Ocultar informacion</span>
+            </summary>
 
-          <Alert className="mt-3">
-            <AlertTitle>Como afecta al horario</AlertTitle>
-            <AlertDescription>
-              Registrar o aprobar una ausencia no cambia el horario ni las
-              asignaciones por si solo. La pantalla muestra posibles impactos
-              para revisar cobertura; los saldos legales se gestionan aparte.
-            </AlertDescription>
-          </Alert>
-        </details>
+            <Alert className="mt-3">
+              <AlertTitle>Como afecta al horario</AlertTitle>
+              <AlertDescription>
+                Registrar o aprobar una ausencia no cambia el horario ni las
+                asignaciones por si solo. La pantalla muestra posibles impactos
+                para revisar cobertura; los saldos legales se gestionan aparte.
+              </AlertDescription>
+            </Alert>
+          </details>
+        </div>
       </PageHeader>
 
       {status && statusMessages[status] ? (
@@ -1292,7 +1494,7 @@ export default async function AbsencesPage({
       {error && errorMessages[error] ? (
         <TransientFeedbackBanner
           description={errorMessages[error]}
-          title="No se ha podido completar la accion"
+          title="No se ha podido completar la acción"
           tone="error"
         />
       ) : null}
@@ -1324,15 +1526,6 @@ export default async function AbsencesPage({
         />
       ) : null}
 
-      <section className="space-y-3">
-        <SectionHeader title="Filtros" />
-        <AbsenceFiltersPanel
-          canManage={canManage}
-          filters={filters}
-          organizationId={resolution.organization.id}
-        />
-      </section>
-
       <AbsencesSummary
         canManage={canManage}
         impactState={impactState}
@@ -1340,67 +1533,73 @@ export default async function AbsencesPage({
         queueCount={visibleQueueItems.length}
       />
 
-      <section className="space-y-3">
-        <SectionHeader title="Mis solicitudes" />
-        {!canUseSelfService ? null : ownResult && !ownResult.ok ? (
-          <SectionError error={ownResult.error} />
-        ) : filters.view === "review" ? (
-          <EmptyState
-            description="La vista de revision oculta tus solicitudes propias. Cambia a Todas o Propias para verlas."
-            title="Vista de revision activa"
-          />
-        ) : visibleOwnItems.length === 0 ? (
-          <EmptyState
-            description="No hay ausencias, vacaciones o permisos visibles con los filtros actuales."
-            title="Sin solicitudes propias"
-          />
-        ) : (
-          <div className="grid gap-3">
-            {visibleOwnItems.map((item) => (
-              <AbsenceCard
-                canManage={canManage}
-                displayData={displayData}
-                impactState={impactState}
-                item={item}
-                key={item.request.id}
-                mode="own"
-                now={now}
-                organizationId={resolution.organization.id}
-                timeZone={resolution.organization.timezone}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      <AbsenceFiltersPanel
+        canManage={canManage}
+        filters={filters}
+        organizationId={resolution.organization.id}
+      />
 
-      {canManage ? (
+      <div className={cn("grid gap-5", canManage ? "xl:grid-cols-2" : "")}>
         <section className="space-y-3">
-          <SectionHeader
-            description="Pendientes operativos para Propietario, Administrador y Responsable."
-            title="Revision operativa"
+          <AbsencePanelHeader
+            badge={<Badge variant="outline">{visibleOwnItems.length} visibles</Badge>}
+            description="Consulta tus vacaciones, permisos y no disponibilidad."
+            icon={CalendarOff}
+            title="Mis solicitudes"
           />
-          {queueResult && !queueResult.ok ? (
-            <SectionError error={queueResult.error} />
-          ) : filters.view === "own" ? (
-            <EmptyState
-              description="La vista de propias oculta la cola de revision. Cambia a Todas o Revision para verla."
-              title="Vista propia activa"
+          {!canUseSelfService ? (
+            <AbsencePanelEmptyState
+              description="Tu rol actual no tiene self-service de ausencias en esta organización."
+              icon={ShieldCheck}
+              title="Self-service no disponible"
+              tone="neutral"
             />
-          ) : visibleQueueItems.length === 0 ? (
-            <EmptyState
-              description="No hay solicitudes de revision operativa con los filtros actuales."
-              title="Cola vacia"
+          ) : ownResult && !ownResult.ok ? (
+            <SectionError error={ownResult.error} />
+          ) : filters.view === "review" ? (
+            <AbsencePanelEmptyState
+              action={
+                <Button asChild variant="outline">
+                  <Link
+                    href={getAbsencesPath({
+                      organizationId: resolution.organization.id,
+                      view: "all",
+                    })}
+                  >
+                    Ver todas
+                  </Link>
+                </Button>
+              }
+              description="La vista de revisión oculta tus solicitudes propias. Cambia a Todas o Propias para verlas."
+              icon={ListFilter}
+              title="Vista de revisión activa"
+              tone="info"
+            />
+          ) : visibleOwnItems.length === 0 ? (
+            <AbsencePanelEmptyState
+              action={
+                canCreateOwnAbsence ? (
+                  <Button asChild variant="outline">
+                    <Link href="#new-absence-request">
+                      <Plus aria-hidden="true" />
+                      Nueva solicitud
+                    </Link>
+                  </Button>
+                ) : null
+              }
+              description="No hay ausencias, vacaciones o permisos visibles con los filtros actuales."
+              title="Sin solicitudes propias"
             />
           ) : (
             <div className="grid gap-3">
-              {visibleQueueItems.map((item) => (
+              {visibleOwnItems.map((item) => (
                 <AbsenceCard
                   canManage={canManage}
                   displayData={displayData}
                   impactState={impactState}
                   item={item}
                   key={item.request.id}
-                  mode="queue"
+                  mode="own"
                   now={now}
                   organizationId={resolution.organization.id}
                   timeZone={resolution.organization.timezone}
@@ -1409,7 +1608,71 @@ export default async function AbsencesPage({
             </div>
           )}
         </section>
-      ) : null}
+
+        {canManage ? (
+          <section className="space-y-3">
+            <AbsencePanelHeader
+              badge={
+                <Badge variant="outline">
+                  {visibleQueueItems.length} pendientes
+                </Badge>
+              }
+              description="Pendientes operativos para Propietario, Administrador y Responsable."
+              icon={ShieldCheck}
+              title="Revision operativa"
+            />
+            {queueResult && !queueResult.ok ? (
+              <SectionError error={queueResult.error} />
+            ) : filters.view === "own" ? (
+              <AbsencePanelEmptyState
+                action={
+                  <Button asChild variant="outline">
+                    <Link
+                      href={getAbsencesPath({
+                        organizationId: resolution.organization.id,
+                        view: "all",
+                      })}
+                    >
+                      Ver todas
+                    </Link>
+                  </Button>
+                }
+                description="La vista de propias oculta la cola de revisión. Cambia a Todas o Revisión para verla."
+                icon={ListFilter}
+                title="Vista propia activa"
+                tone="info"
+              />
+            ) : visibleQueueItems.length === 0 ? (
+              <AbsencePanelEmptyState
+                description="No hay solicitudes pendientes de revisión operativa con los filtros actuales."
+                title="Cola vacía"
+                tone="info"
+              />
+            ) : (
+              <div className="grid gap-3">
+                {visibleQueueItems.map((item) => (
+                  <AbsenceCard
+                    canManage={canManage}
+                    displayData={displayData}
+                    impactState={impactState}
+                    item={item}
+                    key={item.request.id}
+                    mode="queue"
+                    now={now}
+                    organizationId={resolution.organization.id}
+                    timeZone={resolution.organization.timezone}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+      </div>
+
+      <AbsencesHelpNote
+        canManage={canManage}
+        organizationId={resolution.organization.id}
+      />
 
     </div>
   );

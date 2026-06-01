@@ -452,7 +452,7 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision";
+    return "Ausencia en revisión";
   }
 
   return null;
@@ -460,11 +460,11 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
 
 function getAbsenceImpactMessage(coverage: ScheduleBlockCoverage) {
   if (coverage.absenceImpact.coverageNeededCount > 0) {
-    return "Impacto de ausencia aprobado: una asignacion sigue en el horario, pero requiere revision de cobertura.";
+    return "Impacto de ausencia aprobado: una asignación sigue en el horario, pero requiere revisión de cobertura.";
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision: puede requerir cobertura si se aprueba.";
+    return "Ausencia en revisión: puede requerir cobertura si se aprueba.";
   }
 
   return null;
@@ -949,17 +949,17 @@ function DocumentProgrammingPanel({
         <h4 className="text-sm font-medium">Material de apoyo</h4>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">
-        Archivos para preparar esta sesion, si el equipo los ha vinculado al
+        Archivos para preparar esta sesión, si el equipo los ha vinculado al
         horario.
       </p>
 
       {loadError ? (
         <p className="text-sm text-muted-foreground">
-          No hemos podido cargar el material de esta sesion.
+          No hemos podido cargar el material de esta sesión.
         </p>
       ) : entries.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No hay material visible para esta sesion.
+          No hay material visible para esta sesión.
         </p>
       ) : (
         <ul className="grid gap-2">

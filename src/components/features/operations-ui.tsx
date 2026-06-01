@@ -174,27 +174,31 @@ export function ActionCard({
   title: string;
 }) {
   return (
-    <Card size="sm">
-      <CardContent className="flex h-full flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon aria-hidden="true" className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="font-medium">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
-        <div className="mt-auto">
-          <Button asChild variant="outline">
-            <Link href={href}>
-              {label}
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <Link
+      className="group flex h-full min-h-32 items-start gap-4 rounded-xl bg-card p-4 text-left text-sm text-card-foreground ring-1 ring-foreground/10 transition-[background-color,box-shadow] hover:bg-background hover:shadow-sm hover:ring-foreground/15 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      href={href}
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+        <Icon aria-hidden="true" className="size-5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col self-stretch">
+        <span className="font-semibold leading-snug">{title}</span>
+        <span className="mt-1 text-sm leading-5 text-muted-foreground">
+          {description}
+        </span>
+        <span className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-medium text-primary">
+          {label}
+          <ArrowRight
+            aria-hidden="true"
+            className="size-3.5 transition-transform group-hover:translate-x-0.5"
+          />
+        </span>
+      </span>
+      <ArrowRight
+        aria-hidden="true"
+        className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
   );
 }
 

@@ -8,7 +8,7 @@ import type {
 } from "@/lib/staff-work-windows";
 
 const selectClassName = [
-  "h-11 w-full min-w-0 truncate rounded-md border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
+  "h-11 w-full min-w-0 truncate rounded-lg border border-input bg-transparent py-1 pl-3 pr-9 text-sm md:h-9",
   "outline-none transition-colors focus-visible:border-ring",
   "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
@@ -94,7 +94,7 @@ export function StaffWorkWindowPersonCenterSelects({
           }}
           value={centerId}
         >
-          <option value="">Toda la organizacion</option>
+          <option value="">Toda la organización</option>
           {activeCenters.map((center) => (
             <option key={center.id} value={center.id}>
               {center.name}

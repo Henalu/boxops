@@ -15,6 +15,11 @@ import {
   validateClassTypeForm,
 } from "@/lib/class-types";
 import { getClassTypesPath } from "@/lib/navigation/app-paths";
+import {
+  auditFieldSet,
+  auditFieldTouched,
+  recordOperationalAuditEvent,
+} from "@/lib/operational-audit";
 import { getTodayDateString } from "@/lib/schedule-blocks";
 import { createClient } from "@/lib/supabase/server";
 
@@ -91,20 +96,38 @@ export async function createClassType(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("class_types").insert({
-    organization_id: context.organization.id,
-    name: validation.values.name,
-    slug: validation.values.slug,
-    category: validation.values.category,
-    required_coaches: validation.values.requiredCoaches,
-    requires_certification: validation.values.requiresCertification,
-    color: validation.values.color,
-    status: validation.values.status,
-  });
+  const { data: classType, error } = await supabase
+    .from("class_types")
+    .insert({
+      organization_id: context.organization.id,
+      name: validation.values.name,
+      slug: validation.values.slug,
+      category: validation.values.category,
+      required_coaches: validation.values.requiredCoaches,
+      requires_certification: validation.values.requiresCertification,
+      color: validation.values.color,
+      status: validation.values.status,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
+  if (error || !classType) {
+    redirect(getErrorPath(context.organization.id, getMutationError(error?.code)));
   }
+
+  await recordOperationalAuditEvent({
+    action: "created",
+    changedFields: {
+      category: auditFieldSet(validation.values.category),
+      name: auditFieldTouched(),
+      required_coaches: auditFieldSet(validation.values.requiredCoaches),
+      status: auditFieldSet(validation.values.status),
+    },
+    entityId: classType.id,
+    entityType: "class_types",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   revalidateClassTypeDependants();
 
@@ -147,6 +170,20 @@ export async function updateClassType(formData: FormData) {
     redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
   }
 
+  await recordOperationalAuditEvent({
+    action: "updated",
+    changedFields: {
+      category: auditFieldSet(validation.values.category),
+      name: auditFieldTouched(),
+      required_coaches: auditFieldSet(validation.values.requiredCoaches),
+      status: auditFieldSet(validation.values.status),
+    },
+    entityId: classTypeId,
+    entityType: "class_types",
+    organizationId: context.organization.id,
+    supabase,
+  });
+
   revalidateClassTypeDependants();
 
   redirect(
@@ -171,7 +208,7 @@ export async function setClassTypeStatus(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: classType, error } = await supabase
     .from("class_types")
     .update({ status: nextStatus })
     .eq("id", classTypeId)
@@ -179,9 +216,20 @@ export async function setClassTypeStatus(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) {
-    redirect(getErrorPath(context.organization.id, getMutationError(error.code)));
+  if (error || !classType) {
+    redirect(getErrorPath(context.organization.id, getMutationError(error?.code)));
   }
+
+  await recordOperationalAuditEvent({
+    action: nextStatus === "active" ? "reactivated" : "deactivated",
+    changedFields: {
+      status: auditFieldSet(nextStatus),
+    },
+    entityId: classType.id,
+    entityType: "class_types",
+    organizationId: context.organization.id,
+    supabase,
+  });
 
   revalidateClassTypeDependants();
 

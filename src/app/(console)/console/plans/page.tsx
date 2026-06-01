@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Database,
+  PencilLine,
   Plus,
   ReceiptText,
   Rocket,
@@ -19,11 +20,13 @@ import {
   archiveBillingPlanAction,
   createBillingPlanDraftAction,
   publishBillingPlanVersionAction,
+  updateBillingPlanDraftAction,
 } from "@/lib/billing-actions";
 import {
   formatPlanLimit,
   formatPlanPrice,
   getBillingPlanMonthlySortValue,
+  getPlanAnnualDiscountPercent,
   listConsoleBillingPlanVersions,
   type BillingErrorCode,
   type BillingPlanVersion,
@@ -35,9 +38,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +106,7 @@ const consoleErrorCopy: Partial<Record<PlatformConsoleErrorCode, string>> = {
 
 const successMessages: Record<string, string> = {
   "draft-created": "Borrador creado. Aun no afecta a ninguna organizacion.",
+  "draft-updated": "Borrador actualizado. Aun no afecta a ninguna organizacion.",
   "plan-archived":
     "Plan archivado. Las suscripciones existentes conservan su snapshot.",
   "plan-published":
@@ -317,26 +318,30 @@ function FieldHint({
 
 function TextInputField({
   hint,
+  id,
+  idPrefix,
   label,
   name,
   required = false,
   ...inputProps
 }: React.ComponentProps<typeof Input> & {
   hint?: string;
+  idPrefix?: string;
   label: string;
   name: string;
   required?: boolean;
 }) {
-  const hintId = hint ? `${name}-hint` : undefined;
+  const fieldId = id ?? (idPrefix ? `${idPrefix}-${name}` : name);
+  const hintId = hint ? `${fieldId}-hint` : undefined;
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>
+      <Label htmlFor={fieldId}>
         <FieldLabelText required={required}>{label}</FieldLabelText>
       </Label>
       <Input
         aria-describedby={hintId}
-        id={name}
+        id={fieldId}
         name={name}
         required={required}
         {...inputProps}
@@ -348,26 +353,30 @@ function TextInputField({
 
 function TextAreaField({
   hint,
+  id,
+  idPrefix,
   label,
   name,
   required = false,
   ...textareaProps
 }: React.ComponentProps<typeof Textarea> & {
   hint?: string;
+  idPrefix?: string;
   label: string;
   name: string;
   required?: boolean;
 }) {
-  const hintId = hint ? `${name}-hint` : undefined;
+  const fieldId = id ?? (idPrefix ? `${idPrefix}-${name}` : name);
+  const hintId = hint ? `${fieldId}-hint` : undefined;
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>
+      <Label htmlFor={fieldId}>
         <FieldLabelText required={required}>{label}</FieldLabelText>
       </Label>
       <Textarea
         aria-describedby={hintId}
-        id={name}
+        id={fieldId}
         name={name}
         required={required}
         {...textareaProps}
@@ -428,6 +437,241 @@ function ConsolePlansHeader({
   );
 }
 
+type PlanDraftFormDefaults = {
+  annualPrice?: string;
+  centerLimit?: string;
+  description?: string;
+  displayName?: string;
+  features?: string;
+  futureClientLimit?: string;
+  monthlyPrice?: string;
+  planCode?: string;
+  setupDescription?: string;
+  setupPrice?: string;
+  staffSeatLimit?: string;
+  storageGb?: string;
+  stripeAnnualPriceId?: string;
+  stripeMonthlyPriceId?: string;
+  stripeProductId?: string;
+  supportLevel?: string;
+};
+
+function formatEuroInput(value: number | null) {
+  if (value === null) {
+    return "";
+  }
+
+  const euros = value / 100;
+
+  return Number.isInteger(euros)
+    ? String(euros)
+    : euros.toFixed(2).replace(/0+$/, "").replace(/[.]$/, "");
+}
+
+function formatIntegerInput(value: number | null) {
+  return value === null ? "" : String(value);
+}
+
+function getPlanDraftDefaults(plan: BillingPlanVersion): PlanDraftFormDefaults {
+  return {
+    annualPrice: formatEuroInput(plan.annual_price_cents),
+    centerLimit: formatIntegerInput(plan.center_limit),
+    description: plan.description,
+    displayName: plan.display_name,
+    features: plan.features.join("\n"),
+    futureClientLimit: formatIntegerInput(plan.future_client_limit),
+    monthlyPrice: formatEuroInput(plan.monthly_price_cents),
+    planCode: plan.plan_code,
+    setupDescription: plan.setup_description ?? "",
+    setupPrice: formatEuroInput(plan.setup_price_cents),
+    staffSeatLimit: formatIntegerInput(plan.staff_seat_limit),
+    storageGb: formatIntegerInput(plan.storage_gb),
+    stripeAnnualPriceId: plan.stripe_annual_price_id ?? "",
+    stripeMonthlyPriceId: plan.stripe_monthly_price_id ?? "",
+    stripeProductId: plan.stripe_product_id ?? "",
+    supportLevel: plan.support_level,
+  };
+}
+
+function PlanDraftFields({
+  defaults = {},
+  idPrefix,
+  lockPlanCode = false,
+}: {
+  defaults?: PlanDraftFormDefaults;
+  idPrefix: string;
+  lockPlanCode?: boolean;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextInputField
+          className={lockPlanCode ? "font-mono" : undefined}
+          defaultValue={defaults.planCode}
+          hint={
+            lockPlanCode
+              ? "Mantiene el codigo estable y crea otra version del mismo plan."
+              : "Codigo estable: starter, box, growth..."
+          }
+          idPrefix={idPrefix}
+          label="Codigo de plan"
+          maxLength={64}
+          name="planCode"
+          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          readOnly={lockPlanCode}
+          required
+        />
+        <TextInputField
+          defaultValue={defaults.displayName}
+          hint="Nombre visible para Console y para el propietario del tenant."
+          idPrefix={idPrefix}
+          label="Nombre visible"
+          maxLength={80}
+          name="displayName"
+          required
+        />
+        <TextAreaField
+          className="min-h-24 md:col-span-2"
+          defaultValue={defaults.description}
+          hint="Texto comercial breve. No incluyas datos sensibles ni promesas de SLA."
+          idPrefix={idPrefix}
+          label="Descripcion"
+          maxLength={260}
+          minLength={8}
+          name="description"
+          required
+        />
+      </div>
+
+      <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
+        <TextInputField
+          defaultValue={defaults.monthlyPrice}
+          hint="Ej. 69 para 69 EUR/mes. Vacio para plan a medida."
+          idPrefix={idPrefix}
+          label="Precio mensual"
+          name="monthlyPrice"
+          placeholder="69"
+        />
+        <TextInputField
+          defaultValue={defaults.annualPrice}
+          hint="Si queda vacio y hay precio mensual, se calcula con 5% de descuento anual."
+          idPrefix={idPrefix}
+          label="Precio anual"
+          name="annualPrice"
+          placeholder="786.60"
+        />
+        <TextInputField
+          defaultValue={defaults.setupPrice}
+          hint="Setup opcional. Vacio si es a medida."
+          idPrefix={idPrefix}
+          label="Setup"
+          name="setupPrice"
+          placeholder="199"
+        />
+        <TextInputField
+          className="md:col-span-3"
+          defaultValue={defaults.setupDescription}
+          hint="Texto visible sobre el setup. Evita compromisos no acordados."
+          idPrefix={idPrefix}
+          label="Descripcion setup"
+          maxLength={160}
+          name="setupDescription"
+          placeholder="Setup opcional de puesta en marcha."
+        />
+      </div>
+
+      <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-4">
+        <TextInputField
+          defaultValue={defaults.centerLimit}
+          idPrefix={idPrefix}
+          label="Limite centros"
+          min={1}
+          name="centerLimit"
+          placeholder="2"
+          type="number"
+        />
+        <TextInputField
+          defaultValue={defaults.staffSeatLimit}
+          idPrefix={idPrefix}
+          label="Personas del equipo"
+          min={1}
+          name="staffSeatLimit"
+          placeholder="30"
+          type="number"
+        />
+        <TextInputField
+          defaultValue={defaults.futureClientLimit}
+          idPrefix={idPrefix}
+          label="Clientes futuros"
+          min={1}
+          name="futureClientLimit"
+          placeholder="1200"
+          type="number"
+        />
+        <TextInputField
+          defaultValue={defaults.storageGb}
+          idPrefix={idPrefix}
+          label="Almacenamiento GB"
+          min={1}
+          name="storageGb"
+          placeholder="10"
+          type="number"
+        />
+        <TextInputField
+          className="md:col-span-4"
+          defaultValue={defaults.supportLevel}
+          hint="No prometas soporte ilimitado ni SLA enterprise en planes bajos."
+          idPrefix={idPrefix}
+          label="Nivel de soporte"
+          maxLength={100}
+          name="supportLevel"
+          placeholder="Soporte por email prioritario"
+          required
+        />
+      </div>
+
+      <TextAreaField
+        className="min-h-32"
+        defaultValue={defaults.features}
+        hint="Una prestacion por linea, maximo 24."
+        idPrefix={idPrefix}
+        label="Prestaciones"
+        name="features"
+        placeholder={
+          "2 centros incluidos\n30 personas del equipo\n10 GB de almacenamiento"
+        }
+      />
+
+      <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
+        <TextInputField
+          defaultValue={defaults.stripeProductId}
+          hint="Opcional. Formato prod_; no inicia cobros."
+          idPrefix={idPrefix}
+          label="Referencia de producto futura"
+          name="stripeProductId"
+          placeholder="prod_..."
+        />
+        <TextInputField
+          defaultValue={defaults.stripeMonthlyPriceId}
+          hint="Opcional. Formato price_; no inicia cobros."
+          idPrefix={idPrefix}
+          label="Referencia mensual futura"
+          name="stripeMonthlyPriceId"
+          placeholder="price_..."
+        />
+        <TextInputField
+          defaultValue={defaults.stripeAnnualPriceId}
+          hint="Opcional. Formato price_; no inicia cobros."
+          idPrefix={idPrefix}
+          label="Referencia anual futura"
+          name="stripeAnnualPriceId"
+          placeholder="price_..."
+        />
+      </div>
+    </>
+  );
+}
+
 function PlanDraftForm() {
   return (
     <details className="group rounded-lg border border-border bg-card text-card-foreground shadow-xs">
@@ -463,132 +707,7 @@ function PlanDraftForm() {
 
       <form action={createBillingPlanDraftAction}>
         <div className="grid gap-6 border-t border-border p-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextInputField
-              hint="Codigo estable: starter, box, growth..."
-              label="Codigo de plan"
-              maxLength={64}
-              name="planCode"
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              required
-            />
-            <TextInputField
-              hint="Nombre visible para Console y para el propietario del tenant."
-              label="Nombre visible"
-              maxLength={80}
-              name="displayName"
-              required
-            />
-            <TextAreaField
-              className="min-h-24 md:col-span-2"
-              hint="Texto comercial breve. No incluyas datos sensibles ni promesas de SLA."
-              label="Descripcion"
-              maxLength={260}
-              minLength={8}
-              name="description"
-              required
-            />
-          </div>
-
-          <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
-            <TextInputField
-              hint="Ej. 69 para 69 EUR/mes. Vacio para plan a medida."
-              label="Precio mensual"
-              name="monthlyPrice"
-              placeholder="69"
-            />
-            <TextInputField
-              hint="Anual equivale a 10 meses pagados."
-              label="Precio anual"
-              name="annualPrice"
-              placeholder="690"
-            />
-            <TextInputField
-              hint="Setup opcional. Vacio si es a medida."
-              label="Setup"
-              name="setupPrice"
-              placeholder="199"
-            />
-            <TextInputField
-              className="md:col-span-3"
-              hint="Texto visible sobre el setup. Evita compromisos no acordados."
-              label="Descripcion setup"
-              maxLength={160}
-              name="setupDescription"
-              placeholder="Setup opcional de puesta en marcha."
-            />
-          </div>
-
-          <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-4">
-            <TextInputField
-              label="Limite centros"
-              min={1}
-              name="centerLimit"
-              placeholder="2"
-              type="number"
-            />
-            <TextInputField
-              label="Personas del equipo"
-              min={1}
-              name="staffSeatLimit"
-              placeholder="30"
-              type="number"
-            />
-            <TextInputField
-              label="Clientes futuros"
-              min={1}
-              name="futureClientLimit"
-              placeholder="1200"
-              type="number"
-            />
-            <TextInputField
-              label="Almacenamiento GB"
-              min={1}
-              name="storageGb"
-              placeholder="10"
-              type="number"
-            />
-            <TextInputField
-              className="md:col-span-4"
-              hint="No prometas soporte ilimitado ni SLA enterprise en planes bajos."
-              label="Nivel de soporte"
-              maxLength={100}
-              name="supportLevel"
-              placeholder="Soporte por email prioritario"
-              required
-            />
-          </div>
-
-          <TextAreaField
-            className="min-h-32"
-            hint="Una prestacion por linea, maximo 24."
-            label="Prestaciones"
-            name="features"
-            placeholder={
-              "2 centros incluidos\n30 personas del equipo\n10 GB de almacenamiento"
-            }
-          />
-
-          <div className="grid gap-4 border-t border-border pt-5 md:grid-cols-3">
-            <TextInputField
-              hint="Opcional. Formato prod_; no inicia cobros."
-              label="Referencia de producto futura"
-              name="stripeProductId"
-              placeholder="prod_..."
-            />
-            <TextInputField
-              hint="Opcional. Formato price_; no inicia cobros."
-              label="Referencia mensual futura"
-              name="stripeMonthlyPriceId"
-              placeholder="price_..."
-            />
-            <TextInputField
-              hint="Opcional. Formato price_; no inicia cobros."
-              label="Referencia anual futura"
-              name="stripeAnnualPriceId"
-              placeholder="price_..."
-            />
-          </div>
+          <PlanDraftFields idPrefix="new-plan" />
         </div>
 
         <div className="flex flex-col items-stretch gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -599,6 +718,63 @@ function PlanDraftForm() {
           <Button className="sm:ml-auto" type="submit">
             <Plus aria-hidden="true" />
             Crear borrador
+          </Button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
+function PlanVersionDraftForm({ plan }: { plan: BillingPlanVersion }) {
+  const defaults = getPlanDraftDefaults(plan);
+  const idPrefix = `edit-plan-${plan.billing_plan_version_id}`;
+  const isDraft = plan.status === "draft";
+
+  return (
+    <details className="rounded-lg border border-border bg-muted/15">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-3 py-3 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <PencilLine aria-hidden="true" className="size-4 text-primary" />
+          <span className="truncate text-sm font-medium">
+            {isDraft ? "Editar borrador" : "Editar como borrador"}
+          </span>
+        </div>
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+      </summary>
+
+      <form
+        action={
+          isDraft ? updateBillingPlanDraftAction : createBillingPlanDraftAction
+        }
+      >
+        {isDraft ? (
+          <input
+            name="billingPlanVersionId"
+            type="hidden"
+            value={plan.billing_plan_version_id}
+          />
+        ) : null}
+        <div className="grid gap-6 border-t border-border p-4">
+          <p className="text-sm leading-6 text-muted-foreground">
+            {isDraft
+              ? `Actualiza v${plan.version} mientras sigue en borrador.`
+              : `Crea una nueva version borrador pre-rellenada desde v${plan.version}.`}
+            {" "}Publicarla actualiza el catalogo, no los snapshots ya contratados.
+          </p>
+          <PlanDraftFields
+            defaults={defaults}
+            idPrefix={idPrefix}
+            lockPlanCode
+          />
+        </div>
+
+        <div className="flex flex-col items-stretch gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            Revisa precios, limites y prestaciones antes de crear el borrador.
+          </p>
+          <Button className="sm:ml-auto" type="submit">
+            <Plus aria-hidden="true" />
+            {isDraft ? "Guardar borrador" : "Crear borrador editado"}
           </Button>
         </div>
       </form>
@@ -632,6 +808,7 @@ function PlanVersionCard({
     plan.storage_gb === null
       ? "A medida"
       : `${formatPlanLimit(plan.storage_gb)} GB`;
+  const annualDiscountPercent = getPlanAnnualDiscountPercent(plan);
 
   return (
     <article className="grid gap-4 rounded-lg border border-border bg-background p-4">
@@ -652,6 +829,11 @@ function PlanVersionCard({
         </div>
         <div className="text-left sm:text-right">
           <p className="font-semibold">{formatPlanPrice(plan)}</p>
+          {annualDiscountPercent ? (
+            <p className="mt-1 text-xs font-medium text-primary">
+              Ahorro anual {annualDiscountPercent}%
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-muted-foreground">
             Setup {formatCents(plan.setup_price_cents)}
           </p>
@@ -717,29 +899,32 @@ function PlanVersionCard({
       </div>
 
       {isPlatformOwner ? (
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-          {plan.status === "draft" ? (
-            <form action={publishBillingPlanVersionAction}>
-              <input
-                name="billingPlanVersionId"
-                type="hidden"
-                value={plan.billing_plan_version_id}
-              />
-              <Button type="submit">
-                <Rocket aria-hidden="true" />
-                Publicar esta version
-              </Button>
-            </form>
-          ) : null}
-          {plan.billing_plan_status !== "archived" ? (
-            <form action={archiveBillingPlanAction}>
-              <input name="planCode" type="hidden" value={plan.plan_code} />
-              <Button type="submit" variant="outline">
-                <Archive aria-hidden="true" />
-                Archivar plan
-              </Button>
-            </form>
-          ) : null}
+        <div className="grid gap-3 border-t border-border pt-4">
+          <div className="flex flex-wrap gap-2">
+            {plan.status === "draft" ? (
+              <form action={publishBillingPlanVersionAction}>
+                <input
+                  name="billingPlanVersionId"
+                  type="hidden"
+                  value={plan.billing_plan_version_id}
+                />
+                <Button type="submit">
+                  <Rocket aria-hidden="true" />
+                  Publicar esta version
+                </Button>
+              </form>
+            ) : null}
+            {plan.billing_plan_status !== "archived" ? (
+              <form action={archiveBillingPlanAction}>
+                <input name="planCode" type="hidden" value={plan.plan_code} />
+                <Button type="submit" variant="outline">
+                  <Archive aria-hidden="true" />
+                  Archivar plan
+                </Button>
+              </form>
+            ) : null}
+          </div>
+          <PlanVersionDraftForm plan={plan} />
         </div>
       ) : (
         <p className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-sm text-muted-foreground">
@@ -767,6 +952,9 @@ function PlanGroup({
     group.versions.length === 1
       ? "1 version"
       : `${group.versions.length} versiones`;
+  const annualDiscountPercent = latest
+    ? getPlanAnnualDiscountPercent(latest)
+    : null;
 
   return (
     <details
@@ -786,6 +974,9 @@ function PlanGroup({
               {latest ? formatPlanPrice(latest) : "Precio no disponible"} -{" "}
               {versionLabel} - Codigo{" "}
               <span className="font-mono">{group.planCode}</span>
+              {annualDiscountPercent
+                ? ` - Ahorro anual ${annualDiscountPercent}%`
+                : ""}
             </p>
           </div>
         </div>
@@ -875,8 +1066,9 @@ export default async function ConsolePlansPage({
         <Database aria-hidden="true" />
         <AlertTitle>Catalogo sin cobro real</AlertTitle>
         <AlertDescription>
-          Publicar actualiza las opciones disponibles. Cada organizacion
-          mantiene su snapshot hasta que se le asigna otro plan.
+          Editar un plan crea una nueva version borrador. Publicar actualiza
+          las opciones disponibles; cada organizacion mantiene su snapshot
+          hasta renovacion o cambio manual.
         </AlertDescription>
       </Alert>
 

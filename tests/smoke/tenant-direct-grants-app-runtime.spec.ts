@@ -436,18 +436,19 @@ test.describe.serial("S.99 tenant direct grants app runtime smoke", () => {
       .filter({ hasText: "Detalle completo" })
       .first();
     await templateDetails.locator("summary").first().click();
-    const addBlockDetails = templateDetails
-      .locator("details")
-      .filter({ hasText: /A.adir bloque/i })
-      .first();
-    await addBlockDetails.locator("summary").first().click();
-    await addBlockDetails.locator('input[name="startTime"]').fill(times.startTime);
-    await addBlockDetails.locator('input[name="endTime"]').fill(times.endTime);
-    await addBlockDetails.locator('input[name="requiredCoaches"]').fill("0");
-    await addBlockDetails.locator('textarea[name="notes"]').fill(templateBlockNotes);
+    await templateDetails
+      .getByRole("button", { name: /A.adir bloque/i })
+      .click();
+    const addBlockDialog = page.getByRole("dialog", {
+      name: /Crear bloque de plantilla/i,
+    });
+    await addBlockDialog.locator('input[name="startTime"]').fill(times.startTime);
+    await addBlockDialog.locator('input[name="endTime"]').fill(times.endTime);
+    await addBlockDialog.locator('input[name="requiredCoaches"]').fill("0");
+    await addBlockDialog.locator('textarea[name="notes"]').fill(templateBlockNotes);
     await Promise.all([
       waitForStatus(page, "template-block-created"),
-      addBlockDetails
+      addBlockDialog
         .getByRole("button", { name: /Crear bloque de plantilla/i })
         .click(),
     ]);

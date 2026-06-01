@@ -6,8 +6,11 @@ import {
   AlertCircle,
   ArrowRight,
   Building2,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
   CreditCard,
+  Home,
   KeyRound,
   LifeBuoy,
   LockKeyhole,
@@ -298,9 +301,39 @@ function AccessDeniedState({ error }: { error: PlatformConsoleErrorCode }) {
   );
 }
 
+function ConsoleBreadcrumb() {
+  return (
+    <nav
+      aria-label="Miga de pan"
+      className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground"
+    >
+      <Link
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-md outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        href="/console"
+      >
+        <Home aria-hidden="true" className="size-3.5 shrink-0" />
+        <span className="sr-only">Inicio</span>
+      </Link>
+      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+      <Link
+        className="rounded-md outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        href="/console"
+      >
+        Inicio
+      </Link>
+      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="truncate text-foreground">BoxOps Console</span>
+    </nav>
+  );
+}
+
+function formatAdminIdentity(admin: PlatformAdminRow) {
+  return admin.display_name ?? `ID ${shortId(admin.user_id)}`;
+}
+
 function ConsolePageHeader({ admin }: { admin: PlatformAdminRow }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-end">
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:items-end">
       <div className="min-w-0">
         <Badge className="mb-3" variant="secondary">
           Operacion interna
@@ -314,16 +347,18 @@ function ConsolePageHeader({ admin }: { admin: PlatformAdminRow }) {
         </p>
       </div>
 
-      <Card size="sm">
+      <Card className="shadow-xs" size="sm">
         <CardContent>
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ShieldCheck aria-hidden="true" className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium">Sesion actual</p>
+              <p className="text-base font-semibold tracking-tight">
+                Sesion actual
+              </p>
               <p className="mt-1 truncate text-sm text-muted-foreground">
-                {admin.display_name ?? admin.user_id}
+                {formatAdminIdentity(admin)}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge>{consoleRoleLabels[admin.role]}</Badge>
@@ -339,11 +374,13 @@ function ConsolePageHeader({ admin }: { admin: PlatformAdminRow }) {
 
 function ConsoleInternalNav({ isPlatformOwner }: { isPlatformOwner: boolean }) {
   const items: {
+    description: string;
     href: string;
     icon: LucideIcon;
     label: string;
   }[] = [
     {
+      description: "Gestionar y revisar",
       href: "#organizations",
       icon: Building2,
       label: "Organizaciones",
@@ -351,6 +388,7 @@ function ConsoleInternalNav({ isPlatformOwner }: { isPlatformOwner: boolean }) {
     ...(isPlatformOwner
       ? [
           {
+            description: "Crear nueva organizacion",
             href: "#create-organization",
             icon: Plus,
             label: "Alta de organizacion",
@@ -358,11 +396,13 @@ function ConsoleInternalNav({ isPlatformOwner }: { isPlatformOwner: boolean }) {
         ]
       : []),
     {
+      description: "Sesiones y guias",
       href: "#support",
       icon: LifeBuoy,
       label: "Soporte",
     },
     {
+      description: "Planes y suscripciones",
       href: "#billing",
       icon: ReceiptText,
       label: "Facturacion",
@@ -372,21 +412,35 @@ function ConsoleInternalNav({ isPlatformOwner }: { isPlatformOwner: boolean }) {
   return (
     <nav
       aria-label="Navegacion interna de Console"
-      className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+      className={cn(
+        "grid gap-3 sm:grid-cols-2",
+        isPlatformOwner ? "lg:grid-cols-4" : "lg:grid-cols-3",
+      )}
     >
       {items.map((item) => {
         const Icon = item.icon;
 
         return (
           <a
-            className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl bg-card px-4 py-3 text-sm font-medium ring-1 ring-foreground/10 transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group flex min-h-20 min-w-0 items-center gap-3 rounded-xl bg-card px-4 py-3 text-sm ring-1 ring-foreground/10 shadow-xs transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             href={item.href}
             key={item.href}
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Icon aria-hidden="true" className="size-4" />
             </span>
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold tracking-tight text-foreground">
+                {item.label}
+              </span>
+              <span className="mt-1 block truncate text-muted-foreground">
+                {item.description}
+              </span>
+            </span>
+            <ChevronRight
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+            />
           </a>
         );
       })}
@@ -404,15 +458,19 @@ function MetricCard({
   value: number;
 }) {
   return (
-    <Card size="sm">
+    <Card className="shadow-xs" size="sm">
       <CardContent>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{label}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+              {new Intl.NumberFormat("es-ES").format(value)}
+            </p>
+          </div>
         </div>
-        <p className="mt-3 font-mono text-2xl font-semibold tracking-normal">
-          {new Intl.NumberFormat("es-ES").format(value)}
-        </p>
       </CardContent>
     </Card>
   );
@@ -514,7 +572,7 @@ function OrganizationTable({
   summaries: PlatformOrganizationSummary[];
 }) {
   return (
-    <div className="hidden overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10 md:block">
+    <div className="hidden overflow-x-auto rounded-xl bg-card ring-1 ring-foreground/10 shadow-xs md:block">
       <table className="w-full min-w-[920px] text-left text-sm">
         <caption className="sr-only">
           Resumen de organizaciones de BoxOps Console
@@ -649,7 +707,7 @@ function OrganizationSummarySurface({
   }
 
   return (
-    <section className="space-y-4" id="organizations">
+    <section className="space-y-5" id="organizations">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Building2}
@@ -674,18 +732,25 @@ function OrganizationSummarySurface({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Organizaciones
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Acceso, plan, limites y volumen operativo por organizacion.
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Building2 aria-hidden="true" className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Organizaciones
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Acceso, plan, limites y volumen operativo por organizacion.
+            </p>
+          </div>
         </div>
-        <Badge variant="outline">
-          <ReceiptText aria-hidden="true" className="size-3" />
-          Suscripcion manual
-        </Badge>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/console/plans">
+            <ReceiptText aria-hidden="true" />
+            Suscripcion manual
+          </Link>
+        </Button>
       </div>
 
       <OrganizationMobileList summaries={summaries} />
@@ -806,47 +871,42 @@ function TextInputField({
 
 function CreateOrganizationSection() {
   return (
-    <section className="space-y-3 scroll-mt-20" id="create-organization">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">
-            Alta de organizacion
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Crea una organizacion con propietario inicial y suscripcion manual.
-            Usa este flujo solo cuando el alta ya este revisada.
-          </p>
-        </div>
-        <Badge variant="secondary">Solo propietario plataforma</Badge>
-      </div>
-
-      <details className="group rounded-lg border border-border bg-card text-card-foreground shadow-xs">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 sm:px-5 [&::-webkit-details-marker]:hidden">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Plus aria-hidden="true" className="size-4" />
+    <section className="scroll-mt-20" id="create-organization">
+      <details className="group rounded-xl bg-card text-card-foreground ring-1 ring-foreground/10 shadow-xs">
+        <summary className="grid cursor-pointer list-none gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 sm:grid-cols-[1fr_auto] sm:items-center sm:px-5 [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Plus aria-hidden="true" className="size-5" />
             </span>
             <div className="min-w-0">
-              <p className="font-semibold tracking-tight">Datos de alta</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Completa lo minimo para que la organizacion pueda entrar y
-                operar. Los campos con * son obligatorios.
+              <h2 className="text-lg font-semibold tracking-tight">
+                Alta de organizacion
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Crea una organizacion con propietario inicial y suscripcion
+                manual. Datos de alta revisada y campos obligatorios dentro.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Los campos con * son obligatorios.
               </p>
             </div>
           </div>
-          <span
-            className={cn(
-              buttonVariants({ size: "sm", variant: "outline" }),
-              "min-h-11 shrink-0 px-3 md:min-h-0 md:px-2.5",
-            )}
-          >
-            <span className="group-open:hidden">Abrir</span>
-            <span className="hidden group-open:inline">Cerrar</span>
-            <ChevronDown
-              aria-hidden="true"
-              className="size-3.5 transition-transform group-open:rotate-180"
-            />
-          </span>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Badge variant="secondary">Solo propietario plataforma</Badge>
+            <span
+              className={cn(
+                buttonVariants({ size: "lg", variant: "default" }),
+                "min-h-11 px-3 md:min-h-0",
+              )}
+            >
+              <span className="group-open:hidden">Abrir</span>
+              <span className="hidden group-open:inline">Cerrar</span>
+              <ChevronDown
+                aria-hidden="true"
+                className="size-3.5 transition-transform group-open:rotate-180"
+              />
+            </span>
+          </div>
         </summary>
 
         <form action={createPlatformOrganizationAction}>
@@ -1059,21 +1119,23 @@ function PlaceholderCard({
   title: string;
 }) {
   return (
-    <Card id={id}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Icon aria-hidden="true" className="size-4" />
-          {title}
-        </CardTitle>
-        <CardDescription>{description}</CardDescription>
+    <Card className="shadow-xs" id={id}>
+      <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Icon aria-hidden="true" className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription className="mt-1">{description}</CardDescription>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="border-t border-border pt-4">
         <ul className="grid gap-2 text-sm text-muted-foreground">
           {items.map((item) => (
             <li className="flex min-w-0 items-start gap-2" key={item}>
-              <ArrowRight
+              <CheckCircle2
                 aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0"
+                className="mt-0.5 size-4 shrink-0 text-primary"
               />
               <span>{item}</span>
             </li>
@@ -1092,9 +1154,9 @@ function PlatformOperationsPlaceholders() {
         icon={LifeBuoy}
         id="support"
         items={[
-          "La sesion temporal queda auditada.",
+          "Permite ajustes operativos auditados.",
           "Caduca sola y muestra un indicador visible.",
-          "No crea usuarios permanentes ni da acceso a documentos o nominas.",
+          "No concede acceso a documentos, fichaje ni nominas.",
         ]}
         title="Soporte"
       />
@@ -1157,6 +1219,7 @@ export default async function ConsolePage({ searchParams }: ConsolePageProps) {
 
   return (
     <div className="space-y-6">
+      <ConsoleBreadcrumb />
       <ConsolePageHeader admin={adminResult.data} />
       <FeedbackState
         error={error}

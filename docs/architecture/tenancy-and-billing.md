@@ -221,7 +221,7 @@ Fuera del primer corte:
 
 ### Sesiones De Soporte Auditadas Desde Console
 
-Decision 2026-05-27: BoxOps Console puede abrir una entrada temporal y auditada a `/app` para revisar el contexto operativo de una organizacion sin suplantar usuarios ni crear memberships permanentes.
+Decision 2026-05-27, ampliada 2026-05-28: BoxOps Console puede abrir una entrada temporal y auditada a `/app` para revisar y asistir en la operativa de una organizacion sin suplantar usuarios ni convertir platform admins en miembros permanentes.
 
 Reglas aplicadas:
 
@@ -234,9 +234,11 @@ Reglas aplicadas:
 - La accion se audita en `platform_audit_events` como `support_started`; cerrar o expirar manualmente registra `support_ended`.
 - `/app` resuelve un acceso pseudo-membership con rol interno `platform_support` solo mientras existe cookie HttpOnly y sesion activa valida.
 - El indicador visible de modo soporte aparece antes de operar en `/app` y permite cerrar la sesion desde la propia app.
-- El modo soporte concede lectura operativa minima por RLS a organizacion, centros, memberships, equipo, tipos, horario, plantillas, asignaciones y eventos.
+- El modo soporte concede lectura operativa por RLS a organizacion, centros, memberships, equipo, invitaciones, tipos, horario, plantillas, jornadas previstas, asignaciones, eventos y auditoria operativa minimizada.
+- El modo soporte concede mutacion operativa auditada a centros, accesos/fichas de equipo, invitaciones, tipos, horario, plantillas, jornadas previstas, asignaciones y eventos. Los cambios en `operational_audit_events` quedan vinculados a `platform_support_session_id` cuando el actor opera desde soporte.
 - El modo soporte no concede politicas de lectura para documentos, payroll, fichaje, firmas ni datos sensibles futuros.
-- No usa `service_role`, no crea ni borra memberships, no suplantan usuarios y no convierte platform admins en miembros permanentes.
+- La creacion directa de cuentas Auth desde Equipo sigue usando la excepcion server-only existente de Auth Admin, igual que `owner`/`admin`; no se expone `service_role` al cliente ni se usa Console para saltarse RLS.
+- No suplantan usuarios y no convierte platform admins en miembros permanentes.
 
 Fuera de este corte:
 
@@ -253,14 +255,17 @@ Decision 2026-05-27: BoxOps ya tiene foundation comercial sin cobro real. El cat
 Reglas aplicadas:
 
 - Los planes iniciales son founder / early access pricing, sin IVA y versionables.
-- El precio anual equivale a 10 meses pagados.
+- Los planes founder v1 sembrados usan precio anual equivalente a 10 meses pagados. En nuevas revisiones, si Console crea un borrador con precio mensual y deja el anual vacio, la accion calcula un anual con 5% de descuento por defecto; un precio anual explicito siempre prevalece.
 - Los precios se guardan en centimos y `currency = EUR`.
 - Los IDs futuros de Stripe (`stripe_product_id`, `stripe_monthly_price_id`, `stripe_annual_price_id`) son nullable y se validan como referencias seguras, pero no cobran ni abren flujos de pago.
 - `platform_owner` puede crear borradores, publicar nuevas versiones, archivar planes y asignar/cambiar planes manualmente desde Console.
+- Editar un plan publicado no muta esa version: Console crea una nueva version `draft` pre-rellenada desde la version origen, se revisa y luego se publica. Si la version ya esta en `draft`, Console puede actualizar ese borrador sin crear otra version.
 - `billing` puede leer catalogo y suscripciones, pero no publicar ni archivar si el modelo de roles actual no lo concede.
 - Owner del tenant puede ver su plan, uso y planes publicados en `/app/settings/billing`; `admin` tiene lectura prudente.
 - El cambio autoservicio de plan desde `/app/settings/billing` queda manual mientras no exista Stripe real y se revalida en RPC.
 - Una organizacion conserva `plan_code`, `plan_version`, precio mensual/anual/setup, limites, soporte, prestaciones y referencias futuras de Stripe como snapshot aunque el catalogo publique otra version despues.
+- Publicar una nueva version actualiza el catalogo para compras/cambios futuros, pero no reescribe suscripciones activas. Para clientes ya contratados, el cambio efectivo debe gestionarse por reasignacion manual, renovacion/proxima facturacion o flujo Stripe futuro con fecha efectiva.
+- Los avisos automaticos a owners por cambios de politica/precio/limites quedan como corte posterior: deben encolarse con organizacion, version anterior, version nueva, `effective_at`, destinatarios owner/billing y estado de envio, sin mutar el snapshot antes de la fecha efectiva.
 - El limite efectivo de centros se calcula desde `organization_subscriptions.center_limit` solo cuando la suscripcion tiene `billing_plan_version_id` y no es legacy manual. Las suscripciones manuales antiguas sin version mantienen compatibilidad y no bloquean centros.
 - `center_limit` se aplica al crear centros activos. No bloquea editar centros existentes.
 - Si un downgrade permite menos centros que los activos actuales, la RPC exige elegir que centros quedan activos. Los no seleccionados pasan a `inactive`; no se borran y conservan historico operativo, horarios, asignaciones y documentos vinculados.

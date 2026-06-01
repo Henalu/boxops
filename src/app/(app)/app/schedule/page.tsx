@@ -235,7 +235,7 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "assignment-required": "No se ha recibido la asignación a retirar.",
-  "authentication-required": "Vuelve a iniciar sesion para continuar.",
+  "authentication-required": "Vuelve a iniciar sesión para continuar.",
   "block-required": "No se ha recibido el bloque a actualizar.",
   "block-not-assignable":
     "No se puede asignar entrenador a un bloque cancelado o completado.",
@@ -249,7 +249,7 @@ const errorMessages: Record<string, string> = {
   "duplicate-assignment":
     "Ese entrenador ya tiene una asignación lógica en este bloque.",
   forbidden: "Tu rol no permite gestionar bloques operativos.",
-  "center-inactive": "El centro seleccionado no esta activo.",
+  "center-inactive": "El centro seleccionado no está activo.",
   "invalid-assignment": "La asignación recibida no es válida.",
   "invalid-assignment-reference":
     "La asignación ya no apunta a un bloque o entrenador válido.",
@@ -257,16 +257,16 @@ const errorMessages: Record<string, string> = {
   "invalid-class-type": "El tipo de actividad seleccionado no es válido.",
   "invalid-center": "El centro seleccionado no es válido.",
   "invalid-coach": "El entrenador seleccionado no es válido.",
-  "invalid-day": "El dia de la jornada prevista no es valido.",
-  "invalid-event": "El evento recibido no es valido.",
-  "invalid-event-type": "El tipo de evento no esta habilitado.",
-  "invalid-impact-level": "El impacto de evento no esta habilitado.",
+  "invalid-day": "El día de la jornada prevista no es válido.",
+  "invalid-event": "El evento recibido no es válido.",
+  "invalid-event-type": "El tipo de evento no está habilitado.",
+  "invalid-impact-level": "El impacto de evento no está habilitado.",
   "invalid-input": "Revisa los datos del formulario.",
-  "invalid-limit": "El limite solicitado no es valido.",
+  "invalid-limit": "El límite solicitado no es válido.",
   "invalid-notes":
     "Las notas no pueden incluir datos sensibles, URLs ni identificadores privados.",
   "invalid-date": "La fecha del bloque no es válida.",
-  "invalid-organization": "La organizacion solicitada no es valida.",
+  "invalid-organization": "La organización solicitada no es válida.",
   "invalid-person-profile":
     "El perfil visible seleccionado no pertenece a esta organización.",
   "invalid-reference":
@@ -275,21 +275,21 @@ const errorMessages: Record<string, string> = {
     "Los entrenadores necesarios deben ser un número entero entre 0 y 20.",
   "invalid-status": "El estado seleccionado no es válido.",
   "invalid-time": "La hora de inicio debe ser anterior a la hora de fin.",
-  "invalid-timezone": "La zona horaria de la organizacion no es valida.",
-  "invalid-timestamp": "La fecha u hora del evento no es valida.",
+  "invalid-timezone": "La zona horaria de la organización no es válida.",
+  "invalid-timestamp": "La fecha u hora del evento no es válida.",
   "invalid-title": "El titulo del evento debe ser corto y seguro.",
-  "invalid-visibility": "La visibilidad de evento no esta habilitada.",
+  "invalid-visibility": "La visibilidad de evento no está habilitada.",
   "load-failed": "No se han podido cargar los datos.",
   "missing-fields": "Completa los campos obligatorios.",
   "no-active-memberships": "No hay accesos activos para este usuario.",
   no_active_memberships: "No hay accesos activos para este usuario.",
-  "not-actionable": "El evento no admite esa accion ahora.",
-  "not-found": "El evento ya no esta disponible.",
+  "not-actionable": "El evento no admite esa acción ahora.",
+  "not-found": "El evento ya no está disponible.",
   "notes-too-long": "Las notas no pueden superar 1000 caracteres.",
-  "organization-not-found": "La organizacion solicitada no esta disponible.",
+  "organization-not-found": "La organización solicitada no está disponible.",
   organization_not_found: "La organización solicitada no está disponible.",
   "organization-required":
-    "Elige una organizacion antes de gestionar contexto operativo.",
+    "Elige una organización antes de gestionar contexto operativo.",
   organization_required:
     "Elige una organización antes de gestionar bloques operativos.",
   "permission-denied": "Tu rol no permite gestionar eventos operativos.",
@@ -320,7 +320,7 @@ const successDescriptions: Partial<Record<keyof typeof successMessages, string>>
   "work-window-deactivated":
     "La franja deja de mostrarse como activa, sin borrar historial operativo.",
   "work-window-updated":
-    "La semana se recalcula al vuelo con la nueva planificacion prevista.",
+    "La semana se recalcula al vuelo con la nueva planificación prevista.",
   "operational-event-created":
     "El contexto ya aparece en la semana si su visibilidad lo permite.",
   "operational-event-updated": "El resumen semanal ya usa los datos actuales.",
@@ -1627,7 +1627,7 @@ function formatOperationalEventTimeLabel({
   const eventTimeZone = getOperationalEventTimeZone(event, timezone);
 
   if (event.all_day) {
-    return "Todo el dia";
+    return "Todo el día";
   }
 
   const start = formatOperationalEventClock(event.starts_at, eventTimeZone);
@@ -1896,7 +1896,7 @@ function getScheduleAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision";
+    return "Ausencia en revisión";
   }
 
   return null;
@@ -3301,7 +3301,7 @@ function listStaffWorkWindowSummariesForHourRow({
         current?.details ??
         new Map<string, StaffWorkWindowHourSummaryItem["details"][number]>();
       const detail = {
-        centerLabel: window.centerName ?? "Toda la organizacion",
+        centerLabel: window.centerName ?? "Toda la organización",
         dayLabel: formatServiceDate(window.serviceDate),
         sortKey: `${window.serviceDate}-${formatTime(window.start_time)}`,
         timeRange: `${formatTime(window.start_time)}-${formatTime(
@@ -4242,7 +4242,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         <Alert>
           <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
           <AlertDescription>
-            El horario se muestra sin cruzar ausencias aprobadas o en revision.
+            El horario se muestra sin cruzar ausencias aprobadas o en revisión.
           </AlertDescription>
         </Alert>
       ) : null}

@@ -5,8 +5,12 @@ import {
   AlertCircle,
   ArrowLeft,
   Building2,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
+  Clock3,
   CreditCard,
+  Database,
   LifeBuoy,
   LockKeyhole,
   MapPin,
@@ -217,6 +221,25 @@ function shortId(value: string) {
   return value.slice(0, 8);
 }
 
+function OrganizationReviewBreadcrumb() {
+  return (
+    <nav
+      aria-label="Miga de pan"
+      className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground"
+    >
+      <Link
+        className="inline-flex min-w-0 items-center gap-1.5 rounded-md font-medium text-primary outline-none transition-colors hover:text-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50"
+        href="/console"
+      >
+        <ArrowLeft aria-hidden="true" className="size-3.5 shrink-0" />
+        Console
+      </Link>
+      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="truncate text-foreground">Revision de organizacion</span>
+    </nav>
+  );
+}
+
 function ReviewMetric({
   icon: Icon,
   label,
@@ -227,15 +250,19 @@ function ReviewMetric({
   value: number;
 }) {
   return (
-    <Card size="sm">
+    <Card className="shadow-xs" size="sm">
       <CardContent>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{label}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+              {new Intl.NumberFormat("es-ES").format(value)}
+            </p>
+          </div>
         </div>
-        <p className="mt-3 font-mono text-2xl font-semibold tracking-normal">
-          {new Intl.NumberFormat("es-ES").format(value)}
-        </p>
       </CardContent>
     </Card>
   );
@@ -309,15 +336,10 @@ function OrganizationReviewHeader({
   summary: PlatformOrganizationSummary;
 }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-end">
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:items-end">
       <div className="min-w-0">
-        <Button asChild className="mb-4" variant="outline">
-          <Link href="/console">
-            <ArrowLeft aria-hidden="true" />
-            Console
-          </Link>
-        </Button>
-        <Badge className="mb-3" variant="secondary">
+        <OrganizationReviewBreadcrumb />
+        <Badge className="mb-3 mt-6" variant="secondary">
           Revision de organizacion
         </Badge>
         <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -329,16 +351,18 @@ function OrganizationReviewHeader({
         </p>
       </div>
 
-      <Card size="sm">
+      <Card className="shadow-xs" size="sm">
         <CardContent>
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ShieldCheck aria-hidden="true" className="size-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium">Revision actual</p>
-              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                {shortId(summary.organization_id)}
+              <p className="text-base font-semibold tracking-tight">
+                Revision actual
+              </p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                ID {shortId(summary.organization_id)}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge>{consoleRoleLabels[role]}</Badge>
@@ -369,41 +393,56 @@ function OrganizationAccessControlCard({
   const confirmationId = `access-confirmation-${summary.organization_id}`;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {tenantAccessAllowed ? (
-            <ShieldOff aria-hidden="true" className="size-4" />
-          ) : (
-            <ShieldCheck aria-hidden="true" className="size-4" />
-          )}
-          Acceso de la organizacion
-        </CardTitle>
-        <CardDescription>
-          Estado actual:{" "}
-          <span className="font-medium text-foreground">
-            {organizationStatusLabels[status] ?? status}
-          </span>
-          . Solo Prueba y Activa permiten entrar en la app.
-        </CardDescription>
+    <Card className="shadow-xs">
+      <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <ShieldCheck aria-hidden="true" className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <CardTitle>Acceso de la organizacion</CardTitle>
+          <CardDescription>
+            Gestiona si los usuarios activos de esta organizacion pueden
+            entrar en BoxOps.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert variant={tenantAccessAllowed ? "default" : "destructive"}>
-          {tenantAccessAllowed ? (
-            <ShieldCheck aria-hidden="true" />
-          ) : (
-            <LockKeyhole aria-hidden="true" />
+        <div
+          className={cn(
+            "grid gap-3 rounded-xl border p-4 sm:grid-cols-[auto_1fr]",
+            tenantAccessAllowed
+              ? "border-primary/30 bg-primary/5"
+              : "border-destructive/30 bg-destructive/5",
           )}
-          <AlertTitle>
-            {tenantAccessAllowed
-              ? "Acceso abierto"
-              : "Acceso bloqueado"}
-          </AlertTitle>
-          <AlertDescription>
-            Suspender impide entrar en BoxOps. No borra datos ni cambia
-            usuarios.
-          </AlertDescription>
-        </Alert>
+        >
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-xl",
+              tenantAccessAllowed
+                ? "bg-primary/10 text-primary"
+                : "bg-destructive/10 text-destructive",
+            )}
+          >
+            {tenantAccessAllowed ? (
+              <ShieldCheck aria-hidden="true" className="size-5" />
+            ) : (
+              <LockKeyhole aria-hidden="true" className="size-5" />
+            )}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">
+              Estado actual
+            </p>
+            <p className="mt-1 text-lg font-semibold tracking-tight">
+              {tenantAccessAllowed ? "Acceso abierto" : "Acceso bloqueado"}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {tenantAccessAllowed
+                ? "Prueba y Activa permiten entrar en la app diaria del tenant."
+                : "La organizacion queda fuera de la app hasta que se reactive."}
+            </p>
+          </div>
+        </div>
 
         {!isPlatformOwner ? (
           <p className="rounded-lg border border-border bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
@@ -429,6 +468,59 @@ function OrganizationAccessControlCard({
             />
 
             <div className="grid gap-2">
+              <p className="text-sm font-medium">Cambiar estado de acceso</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div
+                  className={cn(
+                    "flex min-w-0 items-start gap-3 rounded-xl border p-3 text-sm",
+                    tenantAccessAllowed
+                      ? "border-primary/50 bg-primary/5"
+                      : "border-border bg-muted/20",
+                  )}
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ShieldCheck aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {tenantAccessAllowed ? "Actual: abierto" : "Abrir acceso"}
+                    </span>
+                    <span className="mt-1 block text-muted-foreground">
+                      Usuarios activos pueden entrar.
+                    </span>
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "flex min-w-0 items-start gap-3 rounded-xl border p-3 text-sm",
+                    tenantAccessAllowed
+                      ? "border-border bg-muted/20"
+                      : "border-destructive/40 bg-destructive/5",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      tenantAccessAllowed
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-destructive/10 text-destructive",
+                    )}
+                  >
+                    <LockKeyhole aria-hidden="true" className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {tenantAccessAllowed
+                        ? "Suspender acceso"
+                        : "Actual: suspendido"}
+                    </span>
+                    <span className="mt-1 block text-muted-foreground">
+                      Nadie podra entrar hasta que se reactive.
+                    </span>
+                  </span>
+                </div>
+              </div>
+
               <Label htmlFor={reasonId}>Motivo del cambio</Label>
               <Textarea
                 id={reasonId}
@@ -470,27 +562,32 @@ function OrganizationAccessControlCard({
                     La organizacion no podra entrar hasta que se reactive
                     desde Console.
                   </span>
-                </span>
-              </label>
+                  </span>
+                </label>
             ) : null}
 
-            <Button
-              className="w-full sm:w-fit"
-              type="submit"
-              variant={tenantAccessAllowed ? "destructive" : "default"}
-            >
-              {tenantAccessAllowed ? (
-                <>
-                  <ShieldOff aria-hidden="true" />
-                  Suspender acceso
-                </>
-              ) : (
-                <>
-                  <ShieldCheck aria-hidden="true" />
-                  Reactivar acceso
-                </>
-              )}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button
+                className="w-full sm:w-fit"
+                type="submit"
+                variant={tenantAccessAllowed ? "destructive" : "default"}
+              >
+                {tenantAccessAllowed ? (
+                  <>
+                    <ShieldOff aria-hidden="true" />
+                    Suspender acceso
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck aria-hidden="true" />
+                    Reactivar acceso
+                  </>
+                )}
+              </Button>
+              <span className="text-xs leading-5 text-muted-foreground">
+                No borra datos ni cambia usuarios.
+              </span>
+            </div>
           </form>
         ) : null}
       </CardContent>
@@ -510,22 +607,47 @@ function formatCents(value: number | null, fallback = "A medida") {
   }).format(value / 100);
 }
 
+function CommercialFactItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2 text-sm">
+      <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+      <span className="min-w-0">
+        <span className="block text-muted-foreground">{label}</span>
+        <span className="mt-1 block truncate font-medium">{value}</span>
+      </span>
+    </div>
+  );
+}
+
 function CommercialUsageItem({
+  icon: Icon,
   label,
   limit,
   used,
 }: {
+  icon: LucideIcon;
   label: string;
   limit: number | null;
   used: number | null;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/20 p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-mono text-sm font-medium">
-        {used === null ? "Pendiente" : formatLimit(used)} /{" "}
-        {formatPlanLimit(limit)}
-      </p>
+    <div className="flex min-w-0 items-start gap-3 rounded-lg border border-border bg-background/70 p-3">
+      <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-medium">
+          {used === null ? "Pendiente" : formatLimit(used)} /{" "}
+          {formatPlanLimit(limit)}
+        </p>
+      </div>
     </div>
   );
 }
@@ -595,13 +717,18 @@ function ConsolePlanAssignmentRow({
   return (
     <form
       action={assignConsoleOrganizationBillingPlanAction}
-      className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3"
+      className={cn(
+        "grid gap-3 rounded-lg border p-3 transition-colors",
+        isCurrentPlan || requiresCenterSelection
+          ? "border-primary/50 bg-primary/5"
+          : "border-border bg-background/70",
+      )}
     >
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="planCode" type="hidden" value={plan.plan_code} />
       <input name="version" type="hidden" value={plan.version} />
 
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium">{plan.display_name}</p>
@@ -613,7 +740,9 @@ function ConsolePlanAssignmentRow({
             {formatPlanLimit(plan.staff_seat_limit)} personas del equipo
           </p>
         </div>
-        <p className="text-right text-sm font-medium">{formatPlanPrice(plan)}</p>
+        <p className="text-sm font-medium sm:text-right">
+          {formatPlanPrice(plan)}
+        </p>
       </div>
 
       {requiresCenterSelection && plan.center_limit !== null ? (
@@ -623,7 +752,7 @@ function ConsolePlanAssignmentRow({
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
         <Button disabled={isCurrentPlan} size="sm" type="submit">
           <CreditCard aria-hidden="true" />
           {isCurrentPlan ? "Asignado" : "Asignar manualmente"}
@@ -653,15 +782,17 @@ function OrganizationCommercialCard({
 }) {
   if (!canReadBilling || !billingOverview) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard aria-hidden="true" className="size-4" />
-            Suscripcion manual
-          </CardTitle>
-          <CardDescription>
-            Resumen comercial basico visible desde Console.
-          </CardDescription>
+      <Card className="shadow-xs">
+        <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <CreditCard aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>Suscripcion manual</CardTitle>
+            <CardDescription>
+              Resumen comercial basico visible desde Console.
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -700,18 +831,20 @@ function OrganizationCommercialCard({
 
   return (
     <section className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard aria-hidden="true" className="size-4" />
-            Plan y suscripcion
-          </CardTitle>
-          <CardDescription>
-            Snapshot comercial aplicado a esta organizacion. Cambiar el
-            catalogo no altera este contrato hasta asignar otro plan.
-          </CardDescription>
+      <Card className="shadow-xs">
+        <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <CreditCard aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <CardTitle>Plan y suscripcion</CardTitle>
+            <CardDescription>
+              Snapshot comercial aplicado a esta organizacion. Cambiar el
+              catalogo no altera este contrato hasta asignar otro plan.
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold">
@@ -727,50 +860,54 @@ function OrganizationCommercialCard({
             </Badge>
           </div>
 
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Precio</dt>
-              <dd className="mt-1 font-medium">
-                {formatPlanPrice(billingOverview)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Setup</dt>
-              <dd className="mt-1 font-medium">
-                {formatCents(billingOverview.setup_price_cents)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Version</dt>
-              <dd className="mt-1 font-mono text-xs">
-                {billingOverview.plan_version ?? "legacy"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Soporte</dt>
-              <dd className="mt-1 font-medium">
-                {billingOverview.support_level ?? "Manual"}
-              </dd>
-            </div>
-          </dl>
+          <div className="grid gap-4 border-y border-border py-4 sm:grid-cols-2 lg:grid-cols-4">
+            <CommercialFactItem
+              icon={CreditCard}
+              label="Precio"
+              value={formatPlanPrice(billingOverview)}
+            />
+            <CommercialFactItem
+              icon={CreditCard}
+              label="Setup"
+              value={formatCents(billingOverview.setup_price_cents)}
+            />
+            <CommercialFactItem
+              icon={Clock3}
+              label="Version"
+              value={
+                billingOverview.plan_version === null
+                  ? "Legacy"
+                  : `v${billingOverview.plan_version}`
+              }
+            />
+            <CommercialFactItem
+              icon={LifeBuoy}
+              label="Soporte"
+              value={billingOverview.support_level ?? "Manual"}
+            />
+          </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <CommercialUsageItem
+              icon={Building2}
               label="Centros activos"
               limit={billingOverview.effective_center_limit}
               used={billingOverview.active_centers_count}
             />
             <CommercialUsageItem
+              icon={UsersRound}
               label="Personas activas"
               limit={billingOverview.effective_staff_seat_limit}
               used={billingOverview.active_staff_count}
             />
             <CommercialUsageItem
+              icon={UserCog}
               label="Clientes futuros"
               limit={billingOverview.future_client_limit}
               used={0}
             />
             <CommercialUsageItem
+              icon={Database}
               label="Storage"
               limit={billingOverview.storage_gb}
               used={billingOverview.storage_used_gb}
@@ -780,7 +917,7 @@ function OrganizationCommercialCard({
       </Card>
 
       <details
-        className="group rounded-lg border border-border bg-card text-card-foreground shadow-xs"
+        className="group rounded-xl border border-border bg-card text-card-foreground shadow-xs"
         open={canManageBilling}
       >
         <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
@@ -860,16 +997,18 @@ function OrganizationIdentityCard({
   summary: PlatformOrganizationSummary;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 aria-hidden="true" className="size-4" />
-          Datos de organizacion
-        </CardTitle>
-        <CardDescription>
-          Identificacion basica para confirmar que estas revisando la entrada
-          correcta.
-        </CardDescription>
+    <Card className="shadow-xs">
+      <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Building2 aria-hidden="true" className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <CardTitle>Datos de organizacion</CardTitle>
+          <CardDescription>
+            Identificacion basica para confirmar que estas revisando la entrada
+            correcta.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -906,6 +1045,30 @@ function OrganizationIdentityCard({
   );
 }
 
+function SupportAssuranceItem({
+  description,
+  icon: Icon,
+  title,
+}: {
+  description: string;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-3 text-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-medium text-foreground">{title}</span>
+        <span className="mt-1 block leading-5 text-muted-foreground">
+          {description}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function ControlledSupportEntry({
   canPrepareSupportSession,
   summary,
@@ -918,22 +1081,37 @@ function ControlledSupportEntry({
     summary.organization_status === "active";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LifeBuoy aria-hidden="true" className="size-4" />
-          Soporte temporal
-        </CardTitle>
-        <CardDescription>
-          Abre la app con una sesion tecnica auditada.
-        </CardDescription>
+    <Card className="shadow-xs">
+      <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-start">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <LifeBuoy aria-hidden="true" className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <CardTitle>Soporte temporal</CardTitle>
+          <CardDescription>
+            Abre la app con una sesion tecnica auditada para revisar o ayudar
+            en operativa permitida.
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-        <p>
-          Usalo solo para revisar configuracion u operativa cuando el cliente
-          pida ayuda. La sesion caduca, muestra un aviso visible y no concede
-          documentos, nominas ni datos sensibles.
-        </p>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 md:grid-cols-3">
+          <SupportAssuranceItem
+            description="Toda actividad operativa queda registrada para trazabilidad."
+            icon={ShieldCheck}
+            title="Auditado"
+          />
+          <SupportAssuranceItem
+            description="La sesion expira al finalizar el tiempo seleccionado."
+            icon={Clock3}
+            title="Caduca automaticamente"
+          />
+          <SupportAssuranceItem
+            description="Sin documentos, fichaje, nominas ni RRHH sensible."
+            icon={LockKeyhole}
+            title="Sin acceso sensible"
+          />
+        </div>
 
         {!tenantAccessAllowed ? (
           <Alert variant="destructive">
@@ -951,54 +1129,75 @@ function ControlledSupportEntry({
         {canPrepareSupportSession && tenantAccessAllowed ? (
           <form
             action={createPlatformSupportSessionAction}
-            className="grid gap-4 pt-2"
+            className="grid gap-4 pt-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]"
           >
             <input
               name="organizationId"
               type="hidden"
               value={summary.organization_id}
             />
-            <div className="grid gap-2">
-              <Label htmlFor="support-reason">Motivo de soporte</Label>
-              <Textarea
-                defaultValue="Revision tecnica solicitada por la organizacion."
-                id="support-reason"
-                maxLength={160}
-                minLength={8}
-                name="reason"
-                placeholder="Ej. Revisar incidencia de horario comunicada por el propietario."
-                required
-                rows={3}
-              />
-              <p className="text-xs leading-5 text-muted-foreground">
-                Puedes dejar el motivo por defecto si no hace falta mas
-                contexto. No incluyas enlaces, tokens ni datos sensibles.
-              </p>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="support-reason">Motivo de soporte</Label>
+                <Textarea
+                  defaultValue="Revision tecnica solicitada por la organizacion."
+                  id="support-reason"
+                  maxLength={160}
+                  minLength={8}
+                  name="reason"
+                  placeholder="Ej. Revisar incidencia de horario comunicada por el propietario."
+                  required
+                  rows={3}
+                />
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Puedes dejar el motivo por defecto si no hace falta mas
+                  contexto. No incluyas enlaces, tokens ni datos sensibles.
+                </p>
+              </div>
+
+              <Button className="w-full sm:w-fit" type="submit">
+                <LifeBuoy aria-hidden="true" />
+                Abrir soporte temporal
+              </Button>
             </div>
-            <div className="grid gap-2 sm:max-w-xs">
-              <Label htmlFor="support-duration">
-                Duracion de la sesion
-              </Label>
-              <select
-                className="h-11 min-w-0 rounded-lg border border-input bg-background px-3 text-base text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-9 md:text-sm"
-                defaultValue="120"
-                id="support-duration"
-                name="durationMinutes"
-                required
-              >
-                <option value="30">30 minutos</option>
-                <option value="60">60 minutos</option>
-                <option value="120">120 minutos</option>
-              </select>
-              <p className="text-xs leading-5 text-muted-foreground">
-                La sesion caduca sola. Si necesitas mas tiempo, abre otra
-                desde Console.
-              </p>
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="support-duration">
+                  Duracion de la sesion
+                </Label>
+                <select
+                  className="h-11 min-w-0 rounded-lg border border-input bg-background px-3 text-base text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-9 md:text-sm"
+                  defaultValue="120"
+                  id="support-duration"
+                  name="durationMinutes"
+                  required
+                >
+                  <option value="30">30 minutos</option>
+                  <option value="60">60 minutos</option>
+                  <option value="120">120 minutos</option>
+                </select>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  La sesion caduca sola. Si necesitas mas tiempo, abre otra
+                  desde Console.
+                </p>
+              </div>
+              <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                <p className="flex min-w-0 items-center gap-2 font-medium">
+                  <CheckCircle2
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-primary"
+                  />
+                  Registro completo de actividad
+                </p>
+                <p className="flex min-w-0 items-center gap-2 font-medium">
+                  <CheckCircle2
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-primary"
+                  />
+                  Sin acceso a documentos ni nominas
+                </p>
+              </div>
             </div>
-            <Button className="w-full sm:w-fit" type="submit">
-              <LifeBuoy aria-hidden="true" />
-              Abrir soporte temporal
-            </Button>
           </form>
         ) : null}
       </CardContent>
@@ -1093,7 +1292,7 @@ export default async function OrganizationReviewPage({
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)] lg:items-start">
         <OrganizationIdentityCard summary={summary} />
         <OrganizationCommercialCard
           activeCenters={activeBillingCenters}

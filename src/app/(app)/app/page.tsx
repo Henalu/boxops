@@ -171,6 +171,12 @@ type RiskItem = {
   coverage: ScheduleBlockCoverage;
 };
 
+type CoverageOverview = {
+  activeBlockCount: number;
+  coveredPercent: number;
+  riskCount: number;
+};
+
 type WeeklyApprovalPersonRow = Pick<
   Tables<"person_profiles">,
   "display_name" | "full_name" | "id" | "preferred_alias" | "status"
@@ -577,7 +583,7 @@ function HomeActionFeedback({
           ) : null}
         </div>
       }
-      title="No se ha completado la accion"
+      title="No se ha completado la acción"
       tone="error"
     />
   );
@@ -1027,13 +1033,45 @@ function getCenterSummaries({
     );
 }
 
+function getCoverageOverview(data: DashboardData | null): CoverageOverview | null {
+  if (!data) {
+    return null;
+  }
+
+  const activeBlocks = data.blocks.filter(
+    (block) => block.status !== "cancelled" && block.status !== "completed",
+  );
+  const coverageItems = activeBlocks.flatMap((block) => {
+    const coverage = data.coverageByBlock.get(block.id);
+
+    return coverage ? [coverage] : [];
+  });
+  const coveredCount = coverageItems.filter(
+    (coverage) =>
+      coverage.state === "covered" || coverage.state === "not_required",
+  ).length;
+  const riskCount = coverageItems.filter(isScheduleCoverageRisk).length;
+  const coveredPercent =
+    activeBlocks.length === 0
+      ? 100
+      : Math.round((coveredCount / activeBlocks.length) * 100);
+
+  return {
+    activeBlockCount: activeBlocks.length,
+    coveredPercent,
+    riskCount,
+  };
+}
+
 function PageHeader({
+  coverageOverview,
   greetingName,
   organizationName,
   role,
   weekEnd,
   weekStart,
 }: {
+  coverageOverview?: CoverageOverview | null;
   greetingName?: string | null;
   organizationName?: string;
   role?: string;
@@ -1045,7 +1083,8 @@ function PageHeader({
   const canManageOperational = role ? canManageOperationalData(role) : false;
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
+      <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">Inicio</Badge>
         {organizationName ? (
@@ -1068,6 +1107,30 @@ function PageHeader({
         <div className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground lg:max-w-3xl">
           <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           <span>{formatWeekRange(weekStart, weekEnd)}</span>
+        </div>
+      ) : null}
+      </div>
+      {coverageOverview ? (
+        <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <p className="text-sm font-semibold">Cobertura semanal</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <p className="text-2xl font-semibold tracking-tight">
+              {coverageOverview.coveredPercent} %
+            </p>
+            <Badge variant={coverageOverview.riskCount > 0 ? "outline" : "secondary"}>
+              {coverageOverview.riskCount} riesgos
+            </Badge>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              aria-hidden="true"
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${coverageOverview.coveredPercent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {coverageOverview.activeBlockCount} bloques activos
+          </p>
         </div>
       ) : null}
     </section>
@@ -1282,7 +1345,7 @@ function getAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
   }
 
   if (coverage.absenceImpact.potentialCount > 0) {
-    return "Ausencia en revision";
+    return "Ausencia en revisión";
   }
 
   return null;
@@ -1453,12 +1516,12 @@ function RiskQueue({
                       </p>
                     ) : item.coverage.absenceImpact.coverageNeededCount > 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Impacto de ausencia aprobado: requiere revision de
+                        Impacto de ausencia aprobado: requiere revisión de
                         cobertura.
                       </p>
                     ) : item.coverage.absenceImpact.potentialCount > 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Ausencia en revision: puede requerir cobertura si se
+                        Ausencia en revisión: puede requerir cobertura si se
                         aprueba.
                       </p>
                     ) : (
@@ -1788,7 +1851,7 @@ function NextAssignedScheduleCard({
 
   return (
     <Card data-tour="next-assigned-block">
-      <CardContent className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <CardContent className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Tu próxima clase</Badge>
@@ -1809,6 +1872,9 @@ function NextAssignedScheduleCard({
             <ArrowRight aria-hidden="true" />
           </Link>
         </Button>
+        <div className="hidden size-20 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15 lg:flex">
+          <CalendarRange aria-hidden="true" className="size-9" />
+        </div>
       </CardContent>
     </Card>
   );
@@ -1863,6 +1929,110 @@ function WeeklyApprovalLoadNotice({
           .join(" ")}
       </AlertDescription>
     </Alert>
+  );
+}
+
+function WeeklyApprovalEmptyState({
+  description,
+  icon: Icon,
+  title,
+}: {
+  description: string;
+  icon: typeof ClipboardCheck;
+  title: string;
+}) {
+  return (
+    <div className="flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-8 text-center">
+      <span className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+        <Icon aria-hidden="true" className="size-7" />
+      </span>
+      <p className="mt-4 text-sm font-semibold">{title}</p>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function WeeklyApprovalSummaryStrip({
+  canReview,
+  data,
+  organizationId,
+}: {
+  canReview: boolean;
+  data: WeeklyApprovalHomeData;
+  organizationId: string;
+}) {
+  const correctionsCount =
+    data.recentRejections.length +
+    data.ownNotices.filter(
+      (approval) =>
+        approval.status === "rejected" ||
+        approval.status === "correction_required",
+    ).length;
+  const metrics = [
+    {
+      description: "Estado personal reciente",
+      icon: FileClock,
+      label: "Mis avisos",
+      value: data.ownNotices.length,
+    },
+    {
+      description: "Esperando revisión",
+      icon: ClipboardCheck,
+      label: "Pendientes",
+      value: canReview ? data.pendingReview.length : 0,
+    },
+    {
+      description: "Devueltas para cambios",
+      icon: Inbox,
+      label: "Correcciones",
+      value: correctionsCount,
+    },
+    {
+      description: "Problemas al cargar",
+      icon: AlertTriangle,
+      label: "Avisos de carga",
+      value: data.errors.length,
+    },
+  ];
+
+  return (
+    <Card className="py-0">
+      <CardContent className="divide-y divide-border p-0 md:grid md:grid-cols-4 md:divide-x md:divide-y-0">
+        {metrics.map((metric) => {
+          const Icon = metric.icon;
+
+          return (
+            <div className="flex items-start gap-3 p-4" key={metric.label}>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/10">
+                <Icon aria-hidden="true" className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {metric.label}
+                </p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight">
+                  {metric.value}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {metric.description}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">
+        <span>Resumen basado en tus avisos y la semana seleccionada.</span>
+        <Button asChild size="sm" variant="outline">
+          <Link href={getTimePath({ organizationId })}>
+            Ver fichajes
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -2107,14 +2277,11 @@ function WeeklyApprovalHomeSection({
             </CardHeader>
             <CardContent>
               {data.pendingReview.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border px-4 py-5">
-                  <p className="text-sm font-medium">
-                    No hay semanas por revisar
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Cuando alguien envíe su semana, aparecerá aquí.
-                  </p>
-                </div>
+                <WeeklyApprovalEmptyState
+                  description="Cuando alguien envíe su semana, aparecerá aquí."
+                  icon={ClipboardCheck}
+                  title="No hay semanas por revisar"
+                />
               ) : (
                 data.pendingReview.map((approval) => (
                   <WeeklyApprovalReviewRow
@@ -2140,15 +2307,11 @@ function WeeklyApprovalHomeSection({
             </CardHeader>
             <CardContent>
               {data.ownNotices.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border px-4 py-5">
-                  <p className="text-sm font-medium">
-                    Sin avisos por ahora
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Cuando envíes una semana o el equipo la revise, verás el
-                    estado aquí.
-                  </p>
-                </div>
+                <WeeklyApprovalEmptyState
+                  description="Cuando envíes una semana o el equipo la revise, verás el estado aquí."
+                  icon={CalendarDays}
+                  title="Sin avisos por ahora"
+                />
               ) : (
                 data.ownNotices.map((approval) => (
                   <OwnWeeklyNoticeRow
@@ -2172,14 +2335,11 @@ function WeeklyApprovalHomeSection({
               </CardHeader>
               <CardContent>
                 {data.recentRejections.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border px-4 py-5">
-                    <p className="text-sm font-medium">
-                      Sin correcciones recientes
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Cuando una semana necesite cambios, aparecerá aquí.
-                    </p>
-                  </div>
+                  <WeeklyApprovalEmptyState
+                    description="Cuando una semana necesite cambios, aparecerá aquí."
+                    icon={Inbox}
+                    title="Sin correcciones recientes"
+                  />
                 ) : (
                   data.recentRejections.map((approval) => (
                     <WeeklyApprovalReadOnlyRow
@@ -2196,7 +2356,82 @@ function WeeklyApprovalHomeSection({
           ) : null}
         </div>
       </div>
+      <WeeklyApprovalSummaryStrip
+        canReview={canReview}
+        data={data}
+        organizationId={organizationId}
+      />
     </section>
+  );
+}
+
+function addDaysToDateString(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return date.toISOString().slice(0, 10);
+}
+
+function WeeklyDaySummary({
+  blocks,
+  coverageByBlock,
+  weekStart,
+}: {
+  blocks: ScheduleBlockRow[];
+  coverageByBlock: Map<string, ScheduleBlockCoverage>;
+  weekStart: string;
+}) {
+  const activeBlocks = blocks.filter(
+    (block) => block.status !== "cancelled" && block.status !== "completed",
+  );
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = addDaysToDateString(weekStart, index);
+    const dayBlocks = activeBlocks.filter((block) => block.service_date === date);
+    const dayRiskCount = dayBlocks.filter((block) => {
+      const coverage = coverageByBlock.get(block.id);
+
+      return coverage ? isScheduleCoverageRisk(coverage) : false;
+    }).length;
+
+    return {
+      blockCount: dayBlocks.length,
+      date,
+      riskCount: dayRiskCount,
+    };
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Resumen semanal por día</CardTitle>
+        <CardDescription>
+          Vista rápida del volumen de bloques y riesgos por día.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+        {days.map((day) => (
+          <div
+            className="min-h-28 rounded-lg border border-border bg-muted/15 p-3"
+            key={day.date}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold">{formatServiceDate(day.date)}</p>
+              <Badge variant={day.riskCount > 0 ? "destructive" : "outline"}>
+                {day.riskCount}
+              </Badge>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarDays aria-hidden="true" className="size-4 shrink-0" />
+              <span>
+                {day.blockCount === 0
+                  ? "Sin jornada"
+                  : `${day.blockCount} bloque${day.blockCount === 1 ? "" : "s"}`}
+              </span>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -2236,7 +2471,7 @@ function AdminCoverageDashboard({
           <AlertTitle>Impacto de ausencia no disponible</AlertTitle>
           <AlertDescription>
             El dashboard se muestra sin cruzar ausencias aprobadas o en
-            revision.
+            revisión.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -2262,6 +2497,12 @@ function AdminCoverageDashboard({
           />
         </div>
       )}
+
+      <WeeklyDaySummary
+        blocks={data.blocks}
+        coverageByBlock={data.coverageByBlock}
+        weekStart={weekStart}
+      />
     </div>
   );
 }
@@ -2424,6 +2665,51 @@ function SupportModeHome({
   );
 }
 
+function QuickActionTile({
+  description,
+  href,
+  icon: Icon,
+  primary = false,
+  title,
+}: {
+  description: string;
+  href: string;
+  icon: typeof CalendarDays;
+  primary?: boolean;
+  title: string;
+}) {
+  return (
+    <Link
+      className={`group flex min-h-20 items-center gap-3 rounded-lg border p-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+        primary
+          ? "border-primary/30 bg-primary/10 text-foreground hover:bg-primary/15"
+          : "border-border bg-muted/15 text-foreground hover:bg-muted/30"
+      }`}
+      href={href}
+    >
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 ${
+          primary
+            ? "bg-primary text-primary-foreground ring-primary/20"
+            : "bg-background text-primary ring-foreground/10"
+        }`}
+      >
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{title}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      <ArrowRight
+        aria-hidden="true"
+        className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
+  );
+}
+
 function SurfaceLinks({
   canManageTemplates,
   organizationId,
@@ -2433,6 +2719,48 @@ function SurfaceLinks({
   organizationId: string;
   weekStart: string;
 }) {
+  const actions = [
+    {
+      description: "Ver y editar fichajes",
+      href: getTimePath({ organizationId, week: weekStart }),
+      icon: Timer,
+      primary: false,
+      title: "Gestionar fichajes",
+    },
+    {
+      description: "Resolver riesgos",
+      href: getCoveragePath({ organizationId, week: weekStart }),
+      icon: AlertTriangle,
+      primary: true,
+      title: "Resolver cobertura",
+    },
+    {
+      description: "Planificación semanal",
+      href: getSchedulePath({ organizationId, week: weekStart }),
+      icon: CalendarDays,
+      primary: false,
+      title: "Abrir horario",
+    },
+    {
+      description: "Accesos y fichas",
+      href: getCoachesPath({ organizationId }),
+      icon: UsersRound,
+      primary: false,
+      title: "Equipo",
+    },
+    ...(canManageTemplates
+      ? [
+          {
+            description: "Semanas tipo",
+            href: getScheduleTemplatesPath({ organizationId, week: weekStart }),
+            icon: CalendarRange,
+            primary: false,
+            title: "Plantillas",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <Card data-tour="quick-actions">
       <CardHeader>
@@ -2441,47 +2769,17 @@ function SurfaceLinks({
           Entra directo a las pantallas que se usan para preparar la semana.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
-        <Button asChild className="w-full md:w-auto">
-          <Link href={getCoveragePath({ organizationId, week: weekStart })}>
-            <AlertTriangle aria-hidden="true" />
-            Resolver cobertura
-          </Link>
-        </Button>
-        <Button asChild className="w-full md:w-auto" variant="outline">
-          <Link href={getSchedulePath({ organizationId, week: weekStart })}>
-            <CalendarDays aria-hidden="true" />
-            Abrir horario
-          </Link>
-        </Button>
-        <Button asChild className="w-full md:w-auto" variant="outline">
-          <Link href={getCentersPath({ organizationId })}>
-            <MapPin aria-hidden="true" />
-            Centros
-          </Link>
-        </Button>
-        <Button asChild className="w-full md:w-auto" variant="outline">
-          <Link href={getCoachesPath({ organizationId })}>
-            <UsersRound aria-hidden="true" />
-            Equipo
-          </Link>
-        </Button>
-        <Button asChild className="w-full md:w-auto" variant="outline">
-          <Link href={getClassTypesPath({ organizationId })}>
-            <Dumbbell aria-hidden="true" />
-            Tipos
-          </Link>
-        </Button>
-        {canManageTemplates ? (
-          <Button asChild className="w-full md:w-auto" variant="outline">
-            <Link
-              href={getScheduleTemplatesPath({ organizationId, week: weekStart })}
-            >
-              <CalendarRange aria-hidden="true" />
-              Plantillas
-            </Link>
-          </Button>
-        ) : null}
+      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {actions.map((action) => (
+          <QuickActionTile
+            description={action.description}
+            href={action.href}
+            icon={action.icon}
+            key={action.title}
+            primary={action.primary}
+            title={action.title}
+          />
+        ))}
       </CardContent>
     </Card>
   );
@@ -2563,10 +2861,12 @@ export default async function AppPage({ searchParams }: AppPageProps) {
     personProfile: greetingPersonProfile,
     userMetadata: user.user_metadata,
   });
+  const coverageOverview = getCoverageOverview(dashboardData);
 
   return (
     <div className="space-y-6">
       <PageHeader
+        coverageOverview={coverageOverview}
         greetingName={greetingName}
         organizationName={resolution.organization.name}
         role={resolution.membership.role}

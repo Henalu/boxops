@@ -149,6 +149,15 @@ test.describe("billing plans foundation guardrails", () => {
     expect(migration).toContain("list_console_billing_plan_versions");
     expect(migration).toContain("calculate_organization_billing_usage");
     expect(migration).toContain("assign_organization_billing_plan_manual");
+
+    const draftUpdateMigration = readProjectFile(
+      findMigrationWith("update_billing_plan_draft_version"),
+    );
+    expect(draftUpdateMigration).toContain(
+      "CREATE OR REPLACE FUNCTION public.update_billing_plan_draft_version",
+    );
+    expect(draftUpdateMigration).toContain("target_version.status <> 'draft'");
+    expect(draftUpdateMigration).toContain("GRANT EXECUTE ON FUNCTION public.update_billing_plan_draft_version");
   });
 
   test("enforces center limit on create and downgrades by inactivating centers", () => {
@@ -249,8 +258,11 @@ test.describe("billing plans foundation guardrails", () => {
     expect(ownerBillingPage).toContain("El pago se conectara mas adelante");
 
     expect(consolePlansPage).toContain("createBillingPlanDraftAction");
+    expect(consolePlansPage).toContain("updateBillingPlanDraftAction");
     expect(consolePlansPage).toContain("publishBillingPlanVersionAction");
     expect(consolePlansPage).toContain("archiveBillingPlanAction");
+    expect(consolePlansPage).toContain("Editar como borrador");
+    expect(consolePlansPage).toContain("PlanDraftFields");
     expect(consolePlansPage).toContain("groupByPlanCode");
     expect(consolePlansPage).toContain("getBillingPlanMonthlySortValue");
     expect(consolePlansPage).toContain("<details");
@@ -262,6 +274,8 @@ test.describe("billing plans foundation guardrails", () => {
 
     expect(billingActions).toContain("SAFE_STRIPE_PRODUCT_ID_PATTERN");
     expect(billingActions).toContain("SAFE_STRIPE_PRICE_ID_PATTERN");
+    expect(billingActions).toContain("DEFAULT_ANNUAL_DISCOUNT_RATE");
+    expect(source).toContain("getPlanAnnualDiscountPercent");
     expect(source).not.toMatch(
       /from\s+["']stripe["']|require\(["']stripe["']\)|process\.env\.STRIPE|checkout\.sessions|stripe\.webhooks|customerPortal|customer\s*portal/i,
     );

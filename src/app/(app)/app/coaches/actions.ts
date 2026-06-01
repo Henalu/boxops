@@ -136,7 +136,7 @@ function getTeamInvitationMutationError(errorCode?: string) {
 
 function getSafeInvitationEmailErrorMessage(errorCode: string) {
   if (errorCode === "email-not-configured") {
-    return "El envio de email no esta configurado para este entorno.";
+    return "El envío de email no está configurado para este entorno.";
   }
 
   return "No se pudo entregar el email.";
@@ -656,7 +656,10 @@ export async function createTeamInvitation(formData: FormData) {
       email_normalized: validation.values.email,
       expires_at: getInvitationExpiryDate().toISOString(),
       initial_access_status: validation.values.initialAccessStatus,
-      invited_by_membership_id: context.membership.id,
+      invited_by_membership_id:
+        context.membership.accessMode === "platform_support"
+          ? null
+          : context.membership.id,
       invited_by_user_id: context.user.id,
       organization_id: context.organization.id,
       person_profile_id: personProfileId,

@@ -36,7 +36,7 @@ const ACCESS_REASON_MAX_LENGTH = 160;
 const ACCESS_REASON_SENSITIVE_PATTERN =
   /(https?:\/\/|www[.]|data:|base64|token|secret|password|credential|signed-url|signed_url|storage\/v1|document-files|documento|document|archivo|file|payroll|salary|salario|nomina|iban|bank|card|cvv|mandate|account|routing|swift|bic|payment[_-]?method|dni|nif|ssn|national_id|geolocation|gps|latitude|longitude|coordinate|ubicacion|location|ip|fingerprint|health|medical|salud|diagnostic|diagnostico|baja)/i;
 const DEFAULT_SUPPORT_SESSION_REASON =
-  "Revision tecnica solicitada por la organizacion.";
+  "Revisión técnica solicitada por la organización.";
 
 function getConsolePath(params: {
   error?: PlatformConsoleErrorCode;

@@ -20,6 +20,7 @@ import {
   Timer,
   UserRound,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -33,8 +34,6 @@ import {
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import {
   PageHeader,
-  SectionHeader,
-  StatCard,
   StatusBadge,
 } from "@/components/features/operations-ui";
 import { CollapsibleSection } from "@/components/features/collapsible-section";
@@ -95,6 +94,7 @@ import {
   type TimeRecordRow,
   type TimeWeeklyApprovalRow,
 } from "@/lib/time-tracking";
+import { cn } from "@/lib/utils";
 import type { Json, Tables } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
@@ -203,7 +203,7 @@ const errorMessages: Record<string, string> = {
   invalid_input: "El formulario no tiene un formato válido.",
   invalid_metadata: "La metadata del fichaje no es válida.",
   invalid_notes:
-    "La nota de revisión es obligatoria al rechazar y no puede superar el limite permitido.",
+    "La nota de revisión es obligatoria al rechazar y no puede superar el límite permitido.",
   invalid_organization: "La organización no es válida.",
   invalid_punch_type: "El tipo de fichaje no es válido.",
   invalid_schedule_block: "El bloque vinculado no es válido.",
@@ -216,41 +216,41 @@ const errorMessages: Record<string, string> = {
     "El fichaje seleccionado no pertenece al registro propio indicado.",
   invalid_time_record: "El registro seleccionado no está disponible.",
   invalid_timestamp: "La fecha y hora del fichaje no son válidas.",
-  invalid_overtime_candidate: "Ese posible exceso ya no esta disponible.",
+  invalid_overtime_candidate: "Ese posible exceso ya no está disponible.",
   invalid_overtime_candidate_status:
-    "El estado operativo elegido no es valido para esta revision.",
+    "El estado operativo elegido no es válido para esta revisión.",
   load_failed: "No se han podido cargar los registros de fichaje.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required: "Elige una organización antes de fichar.",
   overtime_forbidden: "Tu rol no permite revisar posibles excesos.",
   overtime_detection_authentication_required:
-    "Inicia sesion de nuevo para detectar posibles excesos.",
+    "Inicia sesión de nuevo para detectar posibles excesos.",
   overtime_detection_date_range_invalid:
-    "El rango de deteccion no es valido para esta accion.",
+    "El rango de detección no es válido para esta acción.",
   overtime_detection_forbidden:
     "Tu rol no permite buscar posibles excesos.",
   overtime_detection_invalid_organization:
-    "La organizacion activa no es valida para esta deteccion.",
+    "La organización activa no es válida para esta detección.",
   overtime_detection_invalid_period:
-    "La semana enviada no es valida para esta deteccion.",
+    "La semana enviada no es válida para esta detección.",
   overtime_detection_load_failed:
     "No se ha podido leer el contexto operativo para detectar posibles excesos.",
   overtime_detection_no_active_memberships:
     "No hay accesos activos para detectar posibles excesos.",
   overtime_detection_organization_not_found:
-    "La organizacion solicitada no esta disponible.",
+    "La organización solicitada no está disponible.",
   overtime_detection_organization_required:
-    "Elige una organizacion antes de detectar posibles excesos.",
+    "Elige una organización antes de detectar posibles excesos.",
   overtime_detection_save_failed:
-    "No se ha podido guardar la deteccion de posibles excesos.",
-  overtime_invalid_candidate: "Ese posible exceso ya no esta disponible.",
+    "No se ha podido guardar la detección de posibles excesos.",
+  overtime_invalid_candidate: "Ese posible exceso ya no está disponible.",
   overtime_invalid_status:
-    "El estado operativo elegido no es valido para esta revision.",
+    "El estado operativo elegido no es válido para esta revisión.",
   overtime_load_failed:
     "No se ha podido cargar la lista de posibles excesos.",
   overtime_not_actionable:
-    "Este posible exceso esta cerrado o sustituido y ya no acepta cambios.",
+    "Este posible exceso está cerrado o sustituido y ya no acepta cambios.",
   overtime_permission_denied:
     "Tu rol no permite revisar posibles excesos.",
   overtime_save_failed: "No se ha podido actualizar el posible exceso.",
@@ -271,11 +271,11 @@ const overtimeCandidateTerminalStatuses = new Set<OvertimeCandidateStatus>([
 ]);
 const overtimeCandidateStatusOptions = [
   {
-    label: "Pendiente de revision",
+    label: "Pendiente de revisión",
     value: "needs_review",
   },
   {
-    label: "En revision operativa",
+    label: "En revisión operativa",
     value: "under_review",
   },
   {
@@ -687,11 +687,11 @@ function getOvertimeCandidateStatusLabel(status: string) {
   const labels: Record<string, string> = {
     closed: "Cerrado",
     detected: "Detectado",
-    needs_review: "Pendiente de revision",
+    needs_review: "Pendiente de revisión",
     operationally_rejected: "Rechazado operativo",
     operationally_validated: "Validado operativo",
     superseded: "Sustituido",
-    under_review: "En revision operativa",
+    under_review: "En revisión operativa",
   };
 
   return labels[status] ?? status;
@@ -1336,11 +1336,12 @@ function TimeCorrectionForm({
   return (
     <div id="correccion">
       <CollapsibleTimeSection
+        accent="success"
         defaultOpen={Boolean(selectedRecordId && hasCorrectablePunches)}
         description={
           correctionApprovalRequired
-            ? "Selecciona un registro propio reciente. La solicitud queda pendiente hasta revision."
-            : "Selecciona un registro propio reciente. La correccion se aplica al enviar."
+            ? "Selecciona un registro propio reciente. La solicitud queda pendiente hasta revisión."
+            : "Selecciona un registro propio reciente. La corrección se aplica al enviar."
         }
         summary={
           <Badge variant="outline">
@@ -1354,7 +1355,8 @@ function TimeCorrectionForm({
       >
         {!hasCorrectablePunches ? (
           <CompactEmptyState
-            description="Cuando exista una entrada o salida visible, podras solicitar o aplicar una correccion desde aqui."
+            description="Cuando exista una entrada o salida visible, podrás solicitar o aplicar una corrección desde aquí."
+            tone="success"
             title="No hay fichajes corregibles"
           />
         ) : (
@@ -1471,6 +1473,121 @@ function TimeCorrectionForm({
   );
 }
 
+type TimeCardTone =
+  | "critical"
+  | "info"
+  | "neutral"
+  | "pending"
+  | "success"
+  | "warning";
+
+const timeIconToneClassNames: Record<TimeCardTone, string> = {
+  critical:
+    "border-destructive/30 bg-destructive/10 text-destructive ring-destructive/15",
+  info: "border-primary/25 bg-primary/10 text-primary ring-primary/10",
+  neutral: "border-border bg-muted/45 text-muted-foreground ring-foreground/10",
+  pending: "border-amber-300/60 bg-amber-50 text-amber-800 ring-amber-200/70",
+  success:
+    "border-emerald-300/55 bg-emerald-50 text-emerald-800 ring-emerald-200/70",
+  warning:
+    "border-orange-300/60 bg-orange-50 text-orange-800 ring-orange-200/70",
+};
+
+const timeValueToneClassNames: Record<TimeCardTone, string> = {
+  critical: "text-destructive",
+  info: "text-foreground",
+  neutral: "text-foreground",
+  pending: "text-amber-800",
+  success: "text-emerald-800",
+  warning: "text-orange-800",
+};
+
+function TimeOverviewCard({
+  actionHref,
+  actionIcon: ActionIcon,
+  actionLabel,
+  description,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  actionHref: string;
+  actionIcon: LucideIcon;
+  actionLabel: string;
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: TimeCardTone;
+  value: ReactNode;
+}) {
+  return (
+    <Card className="h-full" size="sm">
+      <CardContent className="flex h-full min-h-40 flex-col gap-4 px-4 py-1 md:min-h-44 md:px-5">
+        <div className="flex items-start gap-4">
+          <span
+            className={`flex size-12 shrink-0 items-center justify-center rounded-xl border ring-1 ${timeIconToneClassNames[tone]}`}
+          >
+            <Icon aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+            <p
+              className={`font-mono text-2xl font-semibold leading-tight tracking-tight md:text-3xl ${timeValueToneClassNames[tone]}`}
+            >
+              {value}
+            </p>
+          </div>
+        </div>
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        <Button asChild className="mt-auto w-fit" size="sm" variant="outline">
+          <Link href={actionHref}>
+            <ActionIcon aria-hidden="true" />
+            {actionLabel}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeWeekMetricCard({
+  description,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  description: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: TimeCardTone;
+  value: ReactNode;
+}) {
+  return (
+    <Card className="h-full" size="sm">
+      <CardContent className="grid h-full min-h-36 grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-1">
+        <span
+          className={`flex size-10 shrink-0 items-center justify-center rounded-xl border ring-1 ${timeIconToneClassNames[tone]}`}
+        >
+          <Icon aria-hidden="true" className="size-4" />
+        </span>
+        <div className="min-w-0 space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p
+            className={`font-mono text-2xl font-semibold leading-tight tracking-tight md:text-3xl ${timeValueToneClassNames[tone]}`}
+          >
+            {value}
+          </p>
+          <p className="text-sm leading-5 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CurrentTimeState({
   correctionApprovalRequired,
   corrections,
@@ -1493,19 +1610,25 @@ function CurrentTimeState({
   ).length;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      <StatCard
+    <div className="grid gap-3 lg:grid-cols-3">
+      <TimeOverviewCard
+        actionHref="#registros"
+        actionIcon={FileSearch}
+        actionLabel="Ver historial"
         description={
           latestPunch
             ? formatDateTime(latestPunch.occurred_at, latestPunch.timezone)
             : "Aún no hay entradas o salidas registradas."
         }
         icon={Clock}
-        label="Ultimo fichaje"
+        label="Último fichaje"
         tone={latestPunch?.punch_type === "clock_out" ? "info" : "success"}
         value={latestPunch ? getPunchTypeLabel(latestPunch.punch_type) : "Sin datos"}
       />
-      <StatCard
+      <TimeOverviewCard
+        actionHref="#fichaje-semana"
+        actionIcon={CalendarDays}
+        actionLabel="Ver jornadas"
         description={
           latestRecord
             ? formatShortDate(latestRecord.local_work_date)
@@ -1516,7 +1639,10 @@ function CurrentTimeState({
         tone={getRecordStatusTone(latestRecord?.status ?? "open")}
         value={latestRecord ? getRecordStatusLabel(latestRecord.status) : "Sin datos"}
       />
-      <StatCard
+      <TimeOverviewCard
+        actionHref="#correcciones"
+        actionIcon={FileClock}
+        actionLabel="Ver correcciones"
         description={
           correctionApprovalRequired
             ? `Pendientes de revisión. Zona horaria: ${timezone}`
@@ -1594,22 +1720,22 @@ function TimeWeekSummaryCards({
       : "Sin capacidad semanal de perfil.";
 
   return (
-    <div className="grid gap-3 md:grid-cols-4">
-      <StatCard
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <TimeWeekMetricCard
         description={`${overview.assignedBlockCount} bloques asignados visibles. ${contractedCopy}`}
         icon={CalendarDays}
         label="Asignadas"
         tone="info"
         value={assignedValue}
       />
-      <StatCard
+      <TimeWeekMetricCard
         description="Suma de pares entrada/salida activos en la semana."
         icon={Clock}
         label="Fichadas"
         tone="neutral"
         value={workedValue}
       />
-      <StatCard
+      <TimeWeekMetricCard
         description={
           overview.totals.status === "excess"
             ? "Posible exceso operativo; no equivale a horas extra aprobadas."
@@ -1622,7 +1748,7 @@ function TimeWeekSummaryCards({
         tone={getWeekDayStatusTone(overview.totals.status)}
         value={getWeekBalanceCopy(overview.totals.balanceMinutes)}
       />
-      <StatCard
+      <TimeWeekMetricCard
         description={
           overview.totals.warningCount > 0
             ? "Revisa días con falta, exceso o fichaje abierto."
@@ -1713,9 +1839,13 @@ function TimeWeekDayColumn({
           <span>{day.punchCount} fichajes</span>
         </div>
         {visibleDayPunches.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border bg-muted/20 p-2.5 text-sm text-muted-foreground">
-            Sin entradas o salidas visibles.
-          </p>
+          <div className="flex min-h-20 items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-4 text-center text-sm leading-5 text-muted-foreground">
+            <CalendarDays
+              aria-hidden="true"
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+            <span>Sin entradas o salidas visibles.</span>
+          </div>
         ) : (
           <div className="space-y-2">
             {visibleDayPunches.slice(0, 4).map((punch) => (
@@ -1794,62 +1924,64 @@ function TimeWeekOverviewSection({
   );
 
   return (
-    <CollapsibleTimeSection
-      action={
-        <TimeWeekNavigation
-          currentWeekStart={currentWeekStart}
-          organizationId={organizationId}
-          weekStart={weekStart}
-        />
-      }
-      defaultOpen={Boolean(overview || error)}
-      description={
-        overview
-          ? formatWeekRange(overview.weekStart, overview.weekEnd)
-          : "No se ha podido cargar la semana seleccionada."
-      }
-      summary={summary}
-      title="Semana de fichaje"
-      tone="history"
-    >
-      <div className="grid gap-3">
-        {error ? (
-          <Alert variant="destructive">
-            <AlertTriangle aria-hidden="true" />
-            <AlertTitle>Semana no disponible</AlertTitle>
-            <AlertDescription>
-              {errorMessages[error] ??
-                "No se han podido comparar fichajes y asignaciones."}
-            </AlertDescription>
-          </Alert>
-        ) : null}
+    <div className="scroll-mt-24" id="fichaje-semana">
+      <CollapsibleTimeSection
+        action={
+          <TimeWeekNavigation
+            currentWeekStart={currentWeekStart}
+            organizationId={organizationId}
+            weekStart={weekStart}
+          />
+        }
+        defaultOpen={Boolean(overview || error)}
+        description={
+          overview
+            ? formatWeekRange(overview.weekStart, overview.weekEnd)
+            : "No se ha podido cargar la semana seleccionada."
+        }
+        summary={summary}
+        title="Semana de fichaje"
+        tone="history"
+      >
+        <div className="grid gap-3">
+          {error ? (
+            <Alert variant="destructive">
+              <AlertTriangle aria-hidden="true" />
+              <AlertTitle>Semana no disponible</AlertTitle>
+              <AlertDescription>
+                {errorMessages[error] ??
+                  "No se han podido comparar fichajes y asignaciones."}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        {overview ? (
-          <>
-            <TimeWeekSummaryCards overview={overview} />
+          {overview ? (
+            <>
+              <TimeWeekSummaryCards overview={overview} />
 
-            <div className="overflow-hidden rounded-lg border border-border bg-background">
-              <div className="overflow-x-auto">
-                <div className="grid min-w-[980px] grid-cols-7 md:min-w-0">
-                  {overview.days.map((day) => (
-                    <TimeWeekDayColumn
-                      canSubmit={canSubmit}
-                      correctionApprovalRequired={correctionApprovalRequired}
-                      day={day}
-                      key={day.date}
-                      organizationId={organizationId}
-                      punchesByRecordId={punchesByRecordId}
-                      records={records}
-                      weekStart={weekStart}
-                    />
-                  ))}
+              <div className="overflow-hidden rounded-lg border border-border bg-background">
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[980px] grid-cols-7 md:min-w-0">
+                    {overview.days.map((day) => (
+                      <TimeWeekDayColumn
+                        canSubmit={canSubmit}
+                        correctionApprovalRequired={correctionApprovalRequired}
+                        day={day}
+                        key={day.date}
+                        organizationId={organizationId}
+                        punchesByRecordId={punchesByRecordId}
+                        records={records}
+                        weekStart={weekStart}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </>
-        ) : null}
-      </div>
-    </CollapsibleTimeSection>
+            </>
+          ) : null}
+        </div>
+      </CollapsibleTimeSection>
+    </div>
   );
 }
 
@@ -2020,7 +2152,8 @@ function CorrectionsAndApprovals({
   if (corrections.length === 0 && approvals.length === 0) {
     return (
       <CompactEmptyState
-        description="Cuando existan correcciones solicitadas o semanas revisadas apareceran aqui."
+        tone="info"
+        description="Cuando existan correcciones solicitadas o semanas revisadas aparecerán aquí."
         title="Sin correcciones ni aprobaciones"
       />
     );
@@ -2122,96 +2255,106 @@ function TimeExportSection({
   people: ExportPersonOption[];
 }) {
   return (
-    <section className="space-y-3">
-      <SectionHeader
-        action={<Badge variant="outline">CSV interno</Badge>}
-        description="Descarga los fichajes de un periodo para revisarlos con el equipo responsable."
-        title="Exporte interno revisable"
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Download aria-hidden="true" className="size-4" />
-            Generar CSV
-          </CardTitle>
-          <CardDescription>
-            El archivo incluye estado del registro, entradas/salidas activas,
-            minutos trabajados calculados por pares seguros y estado de cierre
-            semanal. No incluye snapshots ni texto libre de correcciones.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error ? (
-            <Alert>
-              <AlertTriangle aria-hidden="true" />
-              <AlertTitle>Filtro de persona no disponible</AlertTitle>
-              <AlertDescription>
-                {errorMessages[error] ??
-                  "Puedes generar el exporte completo del rango."}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          <form
-            action="/app/time/export"
-            className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] lg:items-end"
-            method="get"
-          >
-            <input name="organizationId" type="hidden" value={organizationId} />
-
-            <div className="grid gap-2">
-              <Label htmlFor="time-export-from">Desde</Label>
-              <Input
-                defaultValue={dateFrom}
-                id="time-export-from"
-                name="from"
-                required
-                type="date"
-              />
+    <Card className="border-primary/20 bg-card shadow-sm">
+      <CardHeader className="border-b border-border pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary ring-1 ring-primary/10">
+              <Download aria-hidden="true" className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <CardTitle>Exportar CSV interno</CardTitle>
+              <CardDescription className="mt-1">
+                Descarga los fichajes de un periodo para revisarlos con el
+                equipo responsable.
+              </CardDescription>
             </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Badge variant="outline">Exporte interno revisable</Badge>
+            <Badge variant="outline">CSV interno</Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm leading-6 text-muted-foreground">
+          El archivo incluye estado del registro, entradas/salidas activas,
+          minutos trabajados calculados por pares seguros y estado de cierre
+          semanal. No incluye snapshots ni texto libre de correcciones.
+        </p>
 
-            <div className="grid gap-2">
-              <Label htmlFor="time-export-to">Hasta</Label>
-              <Input
-                defaultValue={dateTo}
-                id="time-export-to"
-                name="to"
-                required
-                type="date"
-              />
-            </div>
+        {error ? (
+          <Alert>
+            <AlertTriangle aria-hidden="true" />
+            <AlertTitle>Filtro de persona no disponible</AlertTitle>
+            <AlertDescription>
+              {errorMessages[error] ??
+                "Puedes generar el exporte completo del rango."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
-            <div className="grid gap-2">
-              <Label htmlFor="time-export-person">Persona opcional</Label>
-              <select
-                className={selectClassName}
-                id="time-export-person"
-                name="person_profile_id"
-              >
-                <option value="">Todas las personas visibles</option>
-                {people.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {getPersonLabel(person)}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <form
+          action="/app/time/export"
+          className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] lg:items-end"
+          method="get"
+        >
+          <input name="organizationId" type="hidden" value={organizationId} />
 
-            <Button type="submit">
-              <Download aria-hidden="true" />
-              Descargar CSV
-            </Button>
-          </form>
+          <div className="grid gap-2">
+            <Label htmlFor="time-export-from">Desde</Label>
+            <Input
+              defaultValue={dateFrom}
+              id="time-export-from"
+              name="from"
+              required
+              type="date"
+            />
+          </div>
 
-          <p className="text-sm leading-6 text-muted-foreground">
-            La descarga queda registrada para trazabilidad de la organizacion.
-            Usa el CSV como apoyo interno y revisalo antes de compartirlo fuera
+          <div className="grid gap-2">
+            <Label htmlFor="time-export-to">Hasta</Label>
+            <Input
+              defaultValue={dateTo}
+              id="time-export-to"
+              name="to"
+              required
+              type="date"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="time-export-person">Persona opcional</Label>
+            <select
+              className={selectClassName}
+              id="time-export-person"
+              name="person_profile_id"
+            >
+              <option value="">Todas las personas visibles</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {getPersonLabel(person)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button className="w-full lg:w-auto" type="submit">
+            <Download aria-hidden="true" />
+            Descargar CSV
+          </Button>
+        </form>
+
+        <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-3 text-sm leading-6 text-primary">
+          <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p className="text-primary/90">
+            La descarga queda registrada para trazabilidad de la organización.
+            Usa el CSV como apoyo interno y revísalo antes de compartirlo fuera
             del equipo.
           </p>
-        </CardContent>
-      </Card>
-    </section>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -2238,9 +2381,37 @@ function DetectOvertimeCandidatesForm({
   );
 }
 
+type TimePanelAccent =
+  | "default"
+  | "info"
+  | "pending"
+  | "review"
+  | "success"
+  | "warning";
+
+const timePanelClassNames: Record<TimePanelAccent, string> = {
+  default: "",
+  info: "border-blue-200/80 ring-1 ring-blue-100/70",
+  pending: "border-amber-200/80 ring-1 ring-amber-100/80",
+  review: "border-primary/25 ring-1 ring-primary/10",
+  success: "border-emerald-200/80 ring-1 ring-emerald-100/80",
+  warning: "border-orange-200/80 ring-1 ring-orange-100/80",
+};
+
+const timePanelContentClassNames: Record<TimePanelAccent, string> = {
+  default: "",
+  info: "bg-blue-50/15",
+  pending: "bg-amber-50/20",
+  review: "bg-primary/5",
+  success: "bg-emerald-50/20",
+  warning: "bg-orange-50/20",
+};
+
 function CollapsibleTimeSection({
+  accent = "default",
   action,
   children,
+  className,
   contentClassName,
   defaultOpen = false,
   description,
@@ -2248,8 +2419,10 @@ function CollapsibleTimeSection({
   title,
   tone = "default",
 }: {
+  accent?: TimePanelAccent;
   action?: ReactNode;
   children: ReactNode;
+  className?: string;
   contentClassName?: string;
   defaultOpen?: boolean;
   description: string;
@@ -2260,7 +2433,8 @@ function CollapsibleTimeSection({
   return (
     <CollapsibleSection
       action={action}
-      contentClassName={contentClassName}
+      className={cn(timePanelClassNames[accent], className)}
+      contentClassName={cn(timePanelContentClassNames[accent], contentClassName)}
       dataCollapsibleSection={title}
       dataTimeCollapsibleDetails={title}
       defaultOpen={defaultOpen}
@@ -2275,11 +2449,13 @@ function CollapsibleTimeSection({
 }
 
 function CollapsibleReviewQueue({
+  accent = "default",
   badge,
   children,
   defaultOpen = false,
   title,
 }: {
+  accent?: TimePanelAccent;
   badge: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
@@ -2287,8 +2463,8 @@ function CollapsibleReviewQueue({
 }) {
   return (
     <CollapsibleSection
-      className="rounded-lg shadow-none"
-      contentClassName="p-3"
+      className={cn("rounded-lg shadow-none", timePanelClassNames[accent])}
+      contentClassName={cn("p-3", timePanelContentClassNames[accent])}
       dataTimeCollapsibleDetails={title}
       dataTimeCollapsibleQueue={title}
       defaultOpen={defaultOpen}
@@ -2302,17 +2478,48 @@ function CollapsibleReviewQueue({
 
 function CompactEmptyState({
   description,
+  icon: Icon = CheckCircle2,
+  tone = "default",
   title,
 }: {
   description: string;
+  icon?: LucideIcon;
+  tone?: TimePanelAccent;
   title: string;
 }) {
+  const toneClassNames: Record<TimePanelAccent, string> = {
+    default: "border-border bg-muted/15 text-primary",
+    info: "border-blue-200/80 bg-blue-50/35 text-blue-700",
+    pending: "border-amber-200/80 bg-amber-50/45 text-amber-800",
+    review: "border-primary/25 bg-primary/5 text-primary",
+    success: "border-emerald-200/80 bg-emerald-50/40 text-emerald-700",
+    warning: "border-orange-200/80 bg-orange-50/40 text-orange-700",
+  };
+  const iconClassNames: Record<TimePanelAccent, string> = {
+    default: "bg-primary/10",
+    info: "bg-blue-100/80",
+    pending: "bg-amber-100/80",
+    review: "bg-primary/10",
+    success: "bg-emerald-100/80",
+    warning: "bg-orange-100/80",
+  };
+
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-muted/15 px-3 py-3">
-      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <CheckCircle2 aria-hidden="true" className="size-4" />
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-lg border border-dashed px-3 py-3",
+        toneClassNames[tone],
+      )}
+    >
+      <span
+        className={cn(
+          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg",
+          iconClassNames[tone],
+        )}
+      >
+        <Icon aria-hidden="true" className="size-4" />
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 text-foreground">
         <p className="text-sm font-semibold tracking-tight">{title}</p>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">
           {description}
@@ -2393,6 +2600,7 @@ function OvertimeCandidateReviewSection({
   return (
     <div data-overtime-candidates-review>
       <CollapsibleTimeSection
+        accent="review"
         action={
           <DetectOvertimeCandidatesForm
             organizationId={organizationId}
@@ -2412,7 +2620,7 @@ function OvertimeCandidateReviewSection({
           <AlertTitle>No se ha podido cargar la cola</AlertTitle>
           <AlertDescription>
             {errorMessages[error] ??
-              "La revision de candidatos operativos no esta disponible."}
+              "La revisión de candidatos operativos no está disponible."}
           </AlertDescription>
         </Alert>
       ) : references?.errors.length ? (
@@ -2425,7 +2633,8 @@ function OvertimeCandidateReviewSection({
 
       {!error && candidates && candidateCount === 0 ? (
         <CompactEmptyState
-          description="Cuando detectemos una diferencia que necesite revision, aparecera aqui."
+          description="Cuando detectemos una diferencia que necesite revisión, aparecerá aquí."
+          tone="review"
           title="No hay posibles excesos por revisar"
         />
       ) : null}
@@ -2452,7 +2661,7 @@ function OvertimeCandidateReviewSection({
                   <TableHead className="text-right">Trabajado</TableHead>
                   <TableHead className="text-right">Diferencia</TableHead>
                   <TableHead>Estado operativo</TableHead>
-                  <TableHead>Fuente de deteccion</TableHead>
+                  <TableHead>Fuente de detección</TableHead>
                   <TableHead>Fechas</TableHead>
                   <TableHead>Accion</TableHead>
                 </TableRow>
@@ -2825,11 +3034,12 @@ function TimeCorrectionReviewSection({
 
   return (
     <CollapsibleTimeSection
+      accent="info"
       defaultOpen={shouldOpen}
       description={
         correctionApprovalRequired
           ? "Revisa solicitudes de ajuste y aplica las aprobadas cuando corresponda."
-          : "La revision de nuevas correcciones esta desactivada. Puedes consultar solicitudes anteriores si existen."
+          : "La revisión de nuevas correcciones está desactivada. Puedes consultar solicitudes anteriores si existen."
       }
       summary={
         <Badge variant={canReview ? "secondary" : "outline"}>
@@ -2871,6 +3081,7 @@ function TimeCorrectionReviewSection({
       {canReview && !error && references ? (
         <div className="grid gap-3">
           <CollapsibleReviewQueue
+            accent="info"
             badge={<Badge variant="outline">{approvedCount} para aplicar</Badge>}
             defaultOpen={approvedCount > 0}
             title="Listas para aplicar"
@@ -2878,7 +3089,8 @@ function TimeCorrectionReviewSection({
 
             {approvedCount === 0 ? (
               <CompactEmptyState
-                description="Cuando una correccion este aprobada y pendiente de aplicar, aparecera aqui."
+                description="Cuando una corrección esté aprobada y pendiente de aplicar, aparecerá aquí."
+                tone="info"
                 title="No hay correcciones listas"
               />
             ) : (
@@ -2887,7 +3099,7 @@ function TimeCorrectionReviewSection({
                   <ClipboardCheck aria-hidden="true" />
                   <AlertTitle>Aplicar correcciones</AlertTitle>
                   <AlertDescription>
-                    Al aplicar una correccion aprobada, el historial de fichajes
+                    Al aplicar una corrección aprobada, el historial de fichajes
                     se actualiza segun la decision registrada.
                   </AlertDescription>
                 </Alert>
@@ -2907,6 +3119,7 @@ function TimeCorrectionReviewSection({
           </CollapsibleReviewQueue>
 
           <CollapsibleReviewQueue
+            accent="pending"
             badge={<Badge variant="outline">{pendingCount} pendientes</Badge>}
             defaultOpen={pendingCount > 0}
             title="Solicitudes pendientes"
@@ -2915,6 +3128,7 @@ function TimeCorrectionReviewSection({
             {pendingCount === 0 ? (
               <CompactEmptyState
                 description="Cuando alguien solicite una corrección pendiente, aparecerá aquí para revisarla con trazabilidad."
+                tone="pending"
                 title="Sin correcciones pendientes"
               />
             ) : (
@@ -3196,7 +3410,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
               <AlertTitle>Tus fichajes de la semana</AlertTitle>
               <AlertDescription>
                 Marca entradas y salidas desde la web y revisa el historial
-                semanal. Esta pantalla no solicita ubicacion.
+                semanal. Esta pantalla no solicita ubicación.
               </AlertDescription>
             </Alert>
 
@@ -3205,8 +3419,8 @@ export default async function TimePage({ searchParams }: TimePageProps) {
               <AlertTitle>Corregir fichajes</AlertTitle>
               <AlertDescription>
                 {timeTrackingSettings.correctionApprovalRequired
-                  ? "Si necesitas ajustar una hora, envia la correccion y el equipo la revisara."
-                  : "Si necesitas ajustar una hora, envia la correccion y quedara reflejada en el historial."}
+                  ? "Si necesitas ajustar una hora, envía la corrección y el equipo la revisará."
+                  : "Si necesitas ajustar una hora, envía la corrección y quedará reflejada en el historial."}
               </AlertDescription>
             </Alert>
           </div>
@@ -3230,7 +3444,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
       {error && errorMessages[error] ? (
         <TransientFeedbackBanner
           description={errorMessages[error]}
-          title="No se ha completado la accion"
+          title="No se ha completado la acción"
           tone="error"
         />
       ) : null}
@@ -3340,53 +3554,60 @@ export default async function TimePage({ searchParams }: TimePageProps) {
         weekStart={week.weekStart}
       />
 
-      <CollapsibleTimeSection
-        defaultOpen={records.length > 0}
-        description="Entradas, salidas y registros visibles de la semana seleccionada."
-        summary={<Badge variant="outline">{records.length} de la semana</Badge>}
-        title="Registros de la semana"
-        tone="history"
-      >
-        {records.length === 0 ? (
-          <CompactEmptyState
-            description="Cuando exista una entrada o salida en esta semana, BoxOps mostrara aqui su registro de jornada."
-            title="Sin fichajes en esta semana"
-          />
-        ) : (
-          <div className="grid gap-3">
-            {records.map((record) => (
-              <TimeRecordCard
-                centerName={
-                  record.center_id
-                    ? centerNames.get(record.center_id) ?? "Centro no disponible"
-                    : "Sin centro vinculado"
-                }
-                key={record.id}
-                punches={punchesByRecordId.get(record.id) ?? []}
-                record={record}
-              />
-            ))}
-          </div>
-        )}
-      </CollapsibleTimeSection>
+      <div className="scroll-mt-24" id="registros">
+        <CollapsibleTimeSection
+          accent="warning"
+          defaultOpen={records.length > 0}
+          description="Entradas, salidas y registros visibles de la semana seleccionada."
+          summary={<Badge variant="outline">{records.length} de la semana</Badge>}
+          title="Registros de la semana"
+          tone="history"
+        >
+          {records.length === 0 ? (
+            <CompactEmptyState
+              description="Cuando exista una entrada o salida en esta semana, BoxOps mostrará aquí su registro de jornada."
+              tone="warning"
+              title="Sin fichajes en esta semana"
+            />
+          ) : (
+            <div className="grid gap-3">
+              {records.map((record) => (
+                <TimeRecordCard
+                  centerName={
+                    record.center_id
+                      ? centerNames.get(record.center_id) ?? "Centro no disponible"
+                      : "Sin centro vinculado"
+                  }
+                  key={record.id}
+                  punches={punchesByRecordId.get(record.id) ?? []}
+                  record={record}
+                />
+              ))}
+            </div>
+          )}
+        </CollapsibleTimeSection>
+      </div>
 
-      <CollapsibleTimeSection
-        defaultOpen={corrections.length + approvals.length > 0}
-        description="Vista propia de solicitudes y cierres cuando existan."
-        summary={
-          <Badge variant="outline">
-            {corrections.length + approvals.length} movimientos
-          </Badge>
-        }
-        title="Correcciones y aprobaciones"
-        tone="history"
-      >
-        <CorrectionsAndApprovals
-          approvals={approvals}
-          corrections={corrections}
-          timezone={resolution.organization.timezone}
-        />
-      </CollapsibleTimeSection>
+      <div className="scroll-mt-24" id="correcciones">
+        <CollapsibleTimeSection
+          accent="info"
+          defaultOpen={corrections.length + approvals.length > 0}
+          description="Vista propia de solicitudes y cierres cuando existan."
+          summary={
+            <Badge variant="outline">
+              {corrections.length + approvals.length} movimientos
+            </Badge>
+          }
+          title="Correcciones y aprobaciones"
+          tone="history"
+        >
+          <CorrectionsAndApprovals
+            approvals={approvals}
+            corrections={corrections}
+            timezone={resolution.organization.timezone}
+          />
+        </CollapsibleTimeSection>
+      </div>
     </div>
   );
 }
