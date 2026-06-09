@@ -218,7 +218,7 @@ function BillingPlansHero({
           </Link>
           <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
           <span className="min-w-0 truncate text-foreground">
-            Plan y facturacion
+            Plan y facturación
           </span>
         </nav>
         <Badge className="min-h-7 px-2.5" variant="outline">
@@ -230,7 +230,7 @@ function BillingPlansHero({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-3xl font-semibold leading-tight">
-            <span className="sr-only">Plan y facturacion - </span>
+            <span className="sr-only">Plan y facturación - </span>
             Planes disponibles
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -591,7 +591,7 @@ function PlanOptionCard({
           <div className="flex flex-wrap items-center gap-2">
             {featured ? (
               <Badge className="bg-primary/10 text-primary" variant="secondary">
-                Mas popular
+                Más popular
               </Badge>
             ) : null}
             {isCurrentPlan ? <Badge>Actual</Badge> : null}
@@ -863,7 +863,7 @@ export default async function BillingSettingsPage({
         <PageHeader
           badge="Plan"
           description="Plan comercial, límites y uso de la organización."
-          title="Plan y facturacion"
+          title="Plan y facturación"
         />
         <OrganizationResolutionState
           basePath="/app/settings/billing"
@@ -888,7 +888,7 @@ export default async function BillingSettingsPage({
               <Badge variant="outline">{roleLabel}</Badge>
             </>
           }
-          title="Plan y facturacion"
+          title="Plan y facturación"
         />
         <Alert>
           <ShieldCheck aria-hidden="true" />

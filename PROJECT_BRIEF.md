@@ -38,7 +38,8 @@ Ya existe:
 - Gestion basica de centros por organizacion activa:
   - listar centros
   - crear centro minimo
-  - editar nombre, slug, timezone y status
+  - generar slug interno automatico al crear, unico por organizacion y estable aunque cambie el nombre
+  - editar nombre, timezone y status
   - activar/desactivar centro
 - Gestion basica de usuarios/coaches por organizacion activa:
   - listar memberships visibles del tenant
@@ -53,7 +54,8 @@ Ya existe:
 - Catalogo basico de tipos de clase/actividad por organizacion activa:
   - listar tipos del tenant
   - crear tipo minimo
-  - editar nombre, slug, categoria, coaches necesarios, certificacion, color y estado
+  - generar slug interno automatico al crear, unico por organizacion y estable aunque cambie el nombre
+  - editar nombre, categoria, coaches necesarios, certificacion, color, icono y estado
   - activar/desactivar tipos sin borrar filas
 - Primera gestion semanal de bloques operativos por organizacion activa:
   - listar bloques del tenant filtrados por semana
@@ -71,9 +73,10 @@ Ya existe:
 - Jornada prevista del personal en `/app/schedule`:
   - `staff_work_windows` como planificacion tenant-scoped de presencia prevista
   - franjas por persona, dia de semana, hora, rango de validez y centro opcional
+  - nuevas franjas activas bloqueadas si una misma persona ya tiene otra jornada activa solapada en dia, fechas y horario
   - expansion al vuelo para la semana visible, sin ocurrencias persistidas
   - resumen compacto por dia y contexto en detalle de bloque, sin bloquear cobertura ni asignaciones
-  - todos los miembros activos del tenant ven las franjas activas; `owner`, `admin` y `manager` gestionan y pueden revisar tambien inactivas
+  - todos los miembros activos del tenant ven las franjas activas; `owner`, `admin` y `manager` gestionan, eliminan y pueden revisar tambien inactivas
   - no es `schedule_blocks` ni `schedule_block_assignments`; puede alimentar fichaje automatico `schedule_auto` solo si el tenant activa `scheduleAutoPunchesEnabled`, sin probar presencia real ni payroll
 - Roles MVP aplicados:
   - `admin` gestiona centros
@@ -93,6 +96,9 @@ Ya existe:
   - evitar duplicar bloques al aplicar dos veces la misma plantilla sobre la misma semana
   - marcar `is_template_exception = true` cuando un bloque aplicado se edita o cancela
   - contraer/expandir plantillas individuales y todas las plantillas activas para reducir scroll
+  - enfocar la lista de "Plantillas semanales" por centro, con opcion global "Todas" y foco conservado al navegar o guardar
+  - mantener abierto el modal de creacion rapida de bloques tras guardar, con seleccion multiple de dias tambien desde el doble clic, para facilitar carga secuencial
+  - sincronizar la creacion rapida de bloques solo contra la semana visible, evitando barrer todo el rango activo en cada alta
   - archivar plantillas con confirmacion, ventana de recuperacion de 30 dias y recuperacion como borrador
   - retirar `schedule_blocks` generados activos/no excepcionales cuando se elimina su bloque de plantilla, conservando historial protegido desacoplado
   - conservar horarios ya generados como historico independiente al archivar una plantilla

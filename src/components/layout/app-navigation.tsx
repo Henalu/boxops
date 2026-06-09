@@ -136,7 +136,7 @@ export const managementItems = [
   {
     href: "/app/settings/billing",
     icon: ReceiptText,
-    label: "Plan y facturacion",
+    label: "Plan y facturación",
     keywords: ["billing", "facturacion", "plan", "limites"],
   },
 ] as const satisfies readonly NavigationItem[];

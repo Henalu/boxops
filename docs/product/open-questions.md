@@ -18,7 +18,7 @@ Estas respuestas informan MVP 1, pero no deben convertirse en reglas hardcodeada
 - Los cambios de turno/centro deben requerir aprobacion de `admin` o `manager`.
 - Se recibio un horario semanal real con dia, hora inicio, hora fin y actividad. Queda documentado en `docs/tenants/stl/README.md`.
 - Se recibio una lista inicial de coaches y centro principal inicial. Queda documentada en `docs/tenants/stl/README.md`.
-- Los bloques del horario recibido corresponden inicialmente a STL TremaÃ±es.
+- Los bloques del horario recibido corresponden inicialmente a STL Tremañes.
 - STL City debe usar las mismas franjas horarias iniciales, pero solo con actividades CrossFit y Wellness.
 - Las asignaciones iniciales de coaches a bloques pueden ser aleatorias por centro y editables por admin.
 - Los coaches no deben recibir cuentas creadas unilateralmente con correos inventados; deben registrarse o aceptar invitacion con el email que prefieran.
@@ -35,12 +35,12 @@ Estas respuestas informan MVP 1, pero no deben convertirse en reglas hardcodeada
 - `manager` sigue pendiente para permisos operativos de horarios/cobertura: no recibe permisos completos hasta una tarea explicita.
 - Task 014 implementa el primer dashboard admin basico en `/app`, con cola de riesgos calculada al vuelo y enlaces al bloque real.
 - Perfiles operativos iniciales STL pendientes de Auth:
-  - Roberto: `admin`, alias Rober, STL TremaÃ±es, 20 horas.
+  - Roberto: `admin`, alias Rober, STL Tremañes, 20 horas.
   - Juanma: `admin`, STL City, 20 horas.
-  - Nuria: `manager`, STL TremaÃ±es, 20 horas.
-  - Pedro: `manager`, alias Pedrin, STL TremaÃ±es, 20 horas.
-  - Valentina Oxley: `coach`, STL TremaÃ±es, 20 horas.
-  - Noah: `coach`, STL TremaÃ±es, 20 horas.
+  - Nuria: `manager`, STL Tremañes, 20 horas.
+  - Pedro: `manager`, alias Pedrin, STL Tremañes, 20 horas.
+  - Valentina Oxley: `coach`, STL Tremañes, 20 horas.
+  - Noah: `coach`, STL Tremañes, 20 horas.
   - Lucas: `coach`, STL City, 20 horas.
   - Valentina: `coach`, STL City, 20 horas.
   - Lucia: `coach`, STL City, 20 horas.
@@ -246,36 +246,36 @@ Siguen abiertas para implementacion concreta:
 
 - La semana de prueba L-V esta recibida y cargada localmente como fixture; falta confirmar centro por bloque.
 - Falta confirmar coach asignado por bloque real, o hueco vacante real, antes de convertir el fixture en semilla privada/anonimizada.
-- Â¿Cuantos coaches activos hay y cuantos trabajan en ambos centros?
-- Â¿Hay responsables distintos por centro?
-- Â¿Que tipos de clase usa STL hoy y cuales son imprescindibles para MVP 1?
-- Â¿Existen certificaciones necesarias por tipo de clase o es una validacion futura?
-- Â¿Que eventos/competiciones recurrentes afectan mas a la cobertura?
+- ¿Cuántos coaches activos hay y cuántos trabajan en ambos centros?
+- ¿Hay responsables distintos por centro?
+- ¿Qué tipos de clase usa STL hoy y cuáles son imprescindibles para MVP 1?
+- ¿Existen certificaciones necesarias por tipo de clase o es una validación futura?
+- ¿Qué eventos/competiciones recurrentes afectan más a la cobertura?
 
 ## Cambios Y Ausencias
 
-- Â¿Todos los cambios necesitan aprobacion admin o algunos pueden aplicarse con aceptacion entre coaches?
-- Â¿Hay diferencia entre cambio de turno, cambio de clase y cobertura puntual?
-- Â¿Se permite ofrecer una clase a cualquier coach o solo a coaches habilitados/disponibles?
-- Â¿Como se gestionan bajas o permisos largos?
-- Â¿Hay reglas de minimo de coaches disponibles por centro?
+- ¿Todos los cambios necesitan aprobación admin o algunos pueden aplicarse con aceptación entre coaches?
+- ¿Hay diferencia entre cambio de turno, cambio de clase y cobertura puntual?
+- ¿Se permite ofrecer una clase a cualquier coach o solo a coaches habilitados/disponibles?
+- ¿Cómo se gestionan bajas o permisos largos?
+- ¿Hay reglas de mínimo de coaches disponibles por centro?
 
 ## Horas Extra
 
-- Â¿Las horas extra se compensan, se pagan o ambas segun caso?
-- Â¿Quien valida horas extra: admin, manager, owner o responsable de centro?
-- Â¿Hay cierre mensual formal?
-- Â¿Se necesita export CSV/PDF en primeras fases?
-- Â¿Como se diferencian horas extra planificadas de horas extra detectadas por fichaje?
+- ¿Las horas extra se compensan, se pagan o ambas segun caso?
+- ¿Quién valida horas extra: admin, manager, owner o responsable de centro?
+- ¿Hay cierre mensual formal?
+- ¿Se necesita export CSV/PDF en primeras fases?
+- ¿Cómo se diferencian horas extra planificadas de horas extra detectadas por fichaje?
 
 ## Fichaje
 
-- Â¿El fichaje tiene obligacion legal desde el piloto o es control interno?
-- Â¿Debe existir tolerancia de minutos antes/despues del turno?
-- Â¿Que pasa si un coach trabaja en dos centros el mismo dia?
-- Â¿El fichaje asistido debe ser sugerencia o puede llegar a ser automatico?
-- Â¿Que evidencia se guarda en un fichaje corregido?
-- Â¿Que politica de retencion de fichajes aplica?
+- ¿El fichaje tiene obligación legal desde el piloto o es control interno?
+- ¿Debe existir tolerancia de minutos antes/después del turno?
+- ¿Qué pasa si un coach trabaja en dos centros el mismo día?
+- ¿El fichaje asistido debe ser sugerencia o puede llegar a ser automático?
+- ¿Qué evidencia se guarda en un fichaje corregido?
+- ¿Qué política de retención de fichajes aplica?
 
 ## Documentos
 
@@ -289,15 +289,15 @@ Siguen abiertas para implementacion concreta:
 - Los documentos de gestion/admin los ve solo `admin` o tambien `manager`/`document_admin` en una fase posterior?
 - Puede una persona pendiente de Auth tener documentos asignados antes de poder firmarlos?
 
-- Â¿Que documentos laborales se subiran al inicio?
-- Â¿Quien puede subir/ver nominas, contratos y anexos?
-- Â¿Los documentos deben requerir confirmacion de lectura?
-- Â¿Drive se integra como enlace simple o hace falta API?
-- Â¿La programacion por clase viene de PDFs, Drive, ambos u otro sistema?
+- ¿Qué documentos laborales se subirán al inicio?
+- ¿Quién puede subir/ver nóminas, contratos y anexos?
+- ¿Los documentos deben requerir confirmación de lectura?
+- ¿Drive se integra como enlace simple o hace falta API?
+- ¿La programación por clase viene de PDFs, Drive, ambos u otro sistema?
 
 ## Comercial
 
-- Â¿Pricing por organizacion, centro, coach activo o combinacion?
-- Â¿Setup fee para carga inicial de horarios/documentos?
-- Â¿El primer caso vendible sera "horarios y cobertura" o "fichaje para boxes"?
-- Â¿Que minimo necesita un segundo box para comprar sin personalizacion?
+- ¿Pricing por organización, centro, coach activo o combinación?
+- ¿Setup fee para carga inicial de horarios/documentos?
+- ¿El primer caso vendible será "horarios y cobertura" o "fichaje para boxes"?
+- ¿Qué mínimo necesita un segundo box para comprar sin personalización?

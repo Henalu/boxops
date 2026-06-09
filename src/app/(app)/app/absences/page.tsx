@@ -1467,7 +1467,7 @@ export default async function AbsencesPage({
           <details className="group">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-primary outline-none hover:underline focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
               <Info aria-hidden="true" className="size-4" />
-              <span className="group-open:hidden">Mas informacion</span>
+              <span className="group-open:hidden">Más información</span>
               <span className="hidden group-open:inline">Ocultar informacion</span>
             </summary>
 

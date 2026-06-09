@@ -275,7 +275,7 @@ export default async function ProtectedAppLayout({
               placement="sidebar"
             />
 
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-1">
+            <div className="scrollbar-auto-hide min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-1">
               <Suspense
                 fallback={
                   <nav aria-label="Navegación principal" className="h-40" />

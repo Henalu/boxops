@@ -280,7 +280,7 @@ export function MobileHeaderActions({
     profileLinks.push({
       href: getSettingsPath(baseOptions),
       icon: Settings,
-      label: "Configuracion",
+      label: "Configuración",
     });
   }
 

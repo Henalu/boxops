@@ -4,11 +4,14 @@ import * as React from "react";
 import {
   ArrowUp,
   CalendarOff,
+  CheckSquare,
   ListChecks,
   RotateCcw,
   Search,
+  Trash2,
 } from "lucide-react";
 
+import { deleteStaffWorkWindowsBulk } from "../schedule/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +69,7 @@ const selectClassName = [
   "outline-none transition-colors focus-visible:border-ring",
   "focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
 ].join(" ");
+const DELETE_CONFIRMATION_VALUE = "delete-staff-work-windows";
 
 function hasActiveListFilters(filters: WorkWindowListFilters) {
   return Boolean(
@@ -207,6 +211,120 @@ function matchesFilters(
   return true;
 }
 
+export function WorkWindowDeleteButton({
+  ids,
+  organizationId,
+  returnPath,
+  triggerLabel,
+  weekStart,
+}: {
+  ids: string[];
+  organizationId: string;
+  returnPath: string;
+  triggerLabel?: string;
+  weekStart: string;
+}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+  const count = ids.length;
+  const title =
+    count === 1
+      ? "Eliminar jornada prevista"
+      : `Eliminar ${count} jornadas previstas`;
+  const resolvedTriggerLabel =
+    triggerLabel ?? (count === 1 ? "Eliminar" : `Eliminar ${count}`);
+
+  return (
+    <>
+      <Button
+        disabled={count === 0}
+        onClick={() => setIsOpen(true)}
+        size="sm"
+        type="button"
+        variant="destructive"
+      >
+        <Trash2 aria-hidden="true" />
+        {resolvedTriggerLabel}
+      </Button>
+
+      {isOpen ? (
+        <div
+          aria-describedby={descriptionId}
+          aria-labelledby={titleId}
+          aria-modal="true"
+          className="fixed inset-0 z-[70] grid place-items-center bg-background/80 px-4 backdrop-blur-sm"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setIsOpen(false);
+            }
+          }}
+          role="dialog"
+        >
+          <button
+            aria-label="Cerrar confirmación"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setIsOpen(false)}
+            type="button"
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-background p-5 shadow-xl">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive ring-1 ring-destructive/20">
+                <Trash2 aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold" id={titleId}>
+                  {title}
+                </h2>
+                <p
+                  className="mt-2 text-sm leading-6 text-muted-foreground"
+                  id={descriptionId}
+                >
+                  Esta acción retira la franja de la planificación prevista. No
+                  borra fichajes ni otros registros históricos que ya existan.
+                </p>
+              </div>
+            </div>
+
+            <form
+              action={deleteStaffWorkWindowsBulk}
+              className="mt-5 flex flex-wrap justify-end gap-2"
+            >
+              <input name="organizationId" type="hidden" value={organizationId} />
+              <input name="weekStart" type="hidden" value={weekStart} />
+              <input name="returnPath" type="hidden" value={returnPath} />
+              <input
+                name="deleteConfirmation"
+                type="hidden"
+                value={DELETE_CONFIRMATION_VALUE}
+              />
+              {ids.map((id) => (
+                <input
+                  key={id}
+                  name="staffWorkWindowIds"
+                  type="hidden"
+                  value={id}
+                />
+              ))}
+              <Button
+                onClick={() => setIsOpen(false)}
+                type="button"
+                variant="outline"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive">
+                <Trash2 aria-hidden="true" />
+                {count === 1 ? "Eliminar jornada" : `Eliminar ${count}`}
+              </Button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function WorkWindowListClient({
   centerOptions,
   children,
@@ -233,6 +351,9 @@ export function WorkWindowListClient({
       items,
     }),
   );
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(
+    () => new Set(),
+  );
   const rowNodes = React.Children.toArray(children);
   const visibleRows = items
     .map((item, index) => ({
@@ -241,6 +362,13 @@ export function WorkWindowListClient({
       visible: matchesFilters(item, filters),
     }))
     .filter((row) => row.visible);
+  const visibleItemIds = visibleRows.map((row) => row.item.id);
+  const selectedVisibleIds = visibleItemIds.filter((id) => selectedIds.has(id));
+  const allVisibleSelected =
+    visibleItemIds.length > 0 &&
+    visibleItemIds.every((id) => selectedIds.has(id));
+  const partiallySelected =
+    selectedVisibleIds.length > 0 && !allVisibleSelected;
   const hasFilters = hasActiveListFilters(filters);
   const currentPath = getWorkWindowsListPath({
     filters,
@@ -257,6 +385,7 @@ export function WorkWindowListClient({
           items,
         }),
       );
+      setSelectedIds(new Set());
     }
 
     window.addEventListener("popstate", handlePopState);
@@ -308,6 +437,35 @@ export function WorkWindowListClient({
         items,
       }),
     );
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (allVisibleSelected) {
+        visibleItemIds.forEach((id) => next.delete(id));
+      } else {
+        visibleItemIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
   }
 
   return (
@@ -454,6 +612,54 @@ export function WorkWindowListClient({
             </div>
           </form>
 
+          {visibleRows.length > 0 ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/70 px-3 py-3 md:flex-row md:items-center md:justify-between">
+              <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-medium">
+                <input
+                  aria-label="Seleccionar jornadas visibles"
+                  checked={allVisibleSelected}
+                  className="size-4 shrink-0 rounded border-input accent-primary"
+                  onChange={toggleVisibleSelection}
+                  type="checkbox"
+                />
+                <CheckSquare
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground"
+                />
+                <span>
+                  {partiallySelected
+                    ? `${selectedVisibleIds.length} seleccionada${
+                        selectedVisibleIds.length === 1 ? "" : "s"
+                      }`
+                    : "Seleccionar visibles"}
+                </span>
+              </label>
+
+              {selectedVisibleIds.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                  <Badge variant="outline">
+                    {selectedVisibleIds.length} seleccionada
+                    {selectedVisibleIds.length === 1 ? "" : "s"}
+                  </Badge>
+                  <WorkWindowDeleteButton
+                    ids={selectedVisibleIds}
+                    organizationId={organizationId}
+                    returnPath={currentPath}
+                    weekStart={weekStart}
+                  />
+                  <Button
+                    onClick={() => setSelectedIds(new Set())}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Limpiar selección
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {items.length === 0 ? (
             <div className="flex min-h-80 flex-col items-center justify-center rounded-xl border border-border bg-background/70 px-4 py-10 text-center">
               <span className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/10">
@@ -497,7 +703,21 @@ export function WorkWindowListClient({
           ) : (
             <div className="grid gap-2">
               {visibleRows.map(({ item, node }) => (
-                <React.Fragment key={item.id}>{node}</React.Fragment>
+                <div
+                  className="grid min-w-0 gap-2 rounded-xl transition-colors sm:grid-cols-[auto_minmax(0,1fr)]"
+                  key={item.id}
+                >
+                  <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-border bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-muted/45 sm:min-h-0">
+                    <input
+                      aria-label={`Seleccionar jornada ${item.searchText}`}
+                      checked={selectedIds.has(item.id)}
+                      className="size-4 shrink-0 rounded border-input accent-primary"
+                      onChange={() => toggleSelection(item.id)}
+                      type="checkbox"
+                    />
+                  </label>
+                  <div className="min-w-0">{node}</div>
+                </div>
               ))}
             </div>
           )}

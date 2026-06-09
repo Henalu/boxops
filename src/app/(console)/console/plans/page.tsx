@@ -535,7 +535,7 @@ function PlanDraftFields({
           defaultValue={defaults.description}
           hint="Texto comercial breve. No incluyas datos sensibles ni promesas de SLA."
           idPrefix={idPrefix}
-          label="Descripcion"
+          label="Descripción"
           maxLength={260}
           minLength={8}
           name="description"
@@ -573,7 +573,7 @@ function PlanDraftFields({
           defaultValue={defaults.setupDescription}
           hint="Texto visible sobre el setup. Evita compromisos no acordados."
           idPrefix={idPrefix}
-          label="Descripcion setup"
+          label="Descripción setup"
           maxLength={160}
           name="setupDescription"
           placeholder="Setup opcional de puesta en marcha."

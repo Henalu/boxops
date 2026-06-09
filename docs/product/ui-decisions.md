@@ -1,5 +1,57 @@
 # UI Decisions - BoxOps
 
+## Slugs Internos En Gestion Basica
+
+Fecha: 2026-06-08.
+
+## Problema
+
+En user testing, los admins no entendian el campo "slug interno" al crear centros y tipos de actividad. Es un identificador tecnico, no una decision operativa del usuario.
+
+## Decisiones
+
+- Centros y tipos de actividad no muestran ni piden slug en creacion o edicion.
+- El servidor genera el slug al crear desde el nombre visible, normalizando minusculas, acentos, simbolos y espacios.
+- El slug se mantiene estable si despues cambia el nombre visible.
+- La unicidad del slug es por organizacion, no global de BoxOps.
+- Si ya existe el slug base, se usa el siguiente disponible con sufijo numerico.
+
+## Limites
+
+- No cambia schema ni constraints existentes.
+- No introduce una superficie avanzada para editar identificadores tecnicos.
+- La UI normal solo gestiona nombres visibles y datos operativos.
+
+## Foco Por Centro En Plantillas
+
+Fecha: 2026-06-08.
+
+## Problema
+
+En user testing, Plantillas mezclaba patrones de varios centros en la misma lista. En boxes multi-centro, eso obligaba al admin a revisar cada tarjeta para saber a que sede afectaba antes de crear o ajustar bloques.
+
+## Decisiones
+
+- La seccion "Plantillas semanales" incorpora un selector de centro con el mismo patron visual que Horario.
+- Por defecto se enfoca un centro disponible para reducir ruido operativo.
+- La opcion global se llama "Todas" y usa `center_id=all` para que una vista global no se confunda con una URL sin parametro.
+- Las plantillas con `schedule_templates.center_id` solo aparecen en su centro o en "Todas"; las plantillas sin centro fijo solo aparecen en "Todas".
+- Los formularios, pestanas, edicion de bloques y server actions conservan el foco elegido al guardar, copiar, archivar, restaurar o volver con error.
+- El filtro visual no sustituye el centro real de plantillas o bloques: `centerFilterId` es contexto de pantalla; `centerId` sigue siendo dato operativo.
+- La creacion rapida de bloques desde el grid semanal permite elegir varios dias, mantiene el modal abierto tras guardar y usa banner temporal flotante para confirmar la accion sin incrustar avisos en el formulario.
+- Al crear bloques de plantilla, la sincronizacion automatica queda acotada a la semana visible con `ensureScheduleTemplateCurrentWeekApplied(...)`; no barre todo el rango activo en una accion secuencial.
+- El grid semanal de plantillas mantiene scroll horizontal nativo, columna de horas fija y flechas laterales sin bandas difuminadas cuando hay dias ocultos; las flechas se centran sobre la parte visible del cuerpo del calendario, con margen vertical respecto a la cabecera y al final del grid, sin perder la referencia horaria.
+- Cuando un bloque comparte franja y la tarjeta queda estrecha, se elimina informacion redundante: la bolita de color no se muestra porque la tarjeta ya esta coloreada y la accion de editar pasa a icono de lapiz con etiqueta accesible. Si coinciden tres o mas bloques en paralelo, la tarjeta entra en modo minimo y oculta visualmente hora, centro y entrenador, conservando checkbox, icono de actividad y accion.
+
+## Limites
+
+- No cambia schema, RLS ni permisos.
+- No modifica el panel superior de creacion de plantilla.
+- No introduce preferencia persistida por cookie para Plantillas; la URL es la fuente de estado de esta vista.
+- La seleccion multiple de dias esta disponible tanto en "Anadir bloque" como en el modal rapido de doble clic; el modo secuencial aplica al modal rapido de un slot concreto.
+- La sincronizacion de rango se conserva para acciones que cambian una plantilla/bloque ya existente o aplican la plantilla, pero no para cada alta rapida de bloque.
+- Las barras de scroll de superficies densas deben ser discretas: transparentes en reposo y visibles durante actividad de scroll o foco, sin carriles permanentes que ensucien la lectura.
+
 ## Task 017 - Refactor UX/UI Operativo MVP 1
 
 Fecha: 2026-05-04.
@@ -124,6 +176,8 @@ La cola de `/app/coverage` mostraba riesgos accionables, pero el boton principal
 - No tocar estética cuando el bug reportado es funcional.
 - Antes de cambiar un patrón que ya funcionaba, comprobar links generados, estado de ruta, cierre, `returnPath` de server actions y persistencia tras guardar.
 - En interfaces en castellano, respetar `ñ`, acentos y caracteres propios del idioma.
+- Antes de cerrar cambios con copy en español, buscar mojibake real en los archivos tocados con `rg -n "\x{00c3}|\x{00c2}|\x{00e2}|\x{fffd}"` y verificar los casos dudosos con lectura UTF-8, no con la salida de PowerShell.
+- Los avisos de exito/error de pantalla deben usar `TransientFeedbackBanner` o una superficie temporal flotante equivalente; no insertar confirmaciones como bloques verdes dentro de formularios, modales o cards, salvo validaciones inline junto al campo afectado.
 - Si se introduce una solución temporal o incompleta, documentar motivo y camino recomendado para estabilizarla.
 - Ejecutar `npx playwright test --config=playwright.smoke.config.ts tests/smoke/operational-detail-panels.spec.ts` despues de tocar Horario, Cobertura, Plantillas, `RouteStateLink`, `operations-ui` o generadores de rutas con `block_id`/`edit_block_id`.
 
@@ -293,3 +347,22 @@ Tras abrir fichaje, solicitudes, proxima clase y plantillas grandes, varias pant
 - No reabrir copy tecnico como "tenant", "payload", "RPC" o "membership" en pantallas de usuario.
 - Si se toca Inicio, mantener `data-tour` y los targets reales de guia para Resumen de la semana y Pendiente.
 - Si se toca Plantillas, probar semana/agenda, filtros, seleccion multiple, edicion multiple y scroll horizontal controlado.
+
+## Decision 2026-06-08 - Iconos De Tipos De Actividad
+
+## Problema
+
+En plantillas y horarios densos, las tarjetas pueden quedar demasiado estrechas para mostrar el nombre completo de la actividad. Solo el color ayuda, pero no siempre basta para reconocer la clase de un vistazo.
+
+## Decision
+
+- `class_types` guarda un `icon_key` controlado por biblioteca interna, no un SVG libre ni una URL subida por usuario.
+- `/app/class-types` permite elegir el icono junto al color al crear o editar un tipo de actividad.
+- En tarjetas compactas de Plantillas y Horario, el icono acompaña al color y puede sobrevivir aunque el texto quede truncado u oculto.
+- La tarjeta ya aporta el color de actividad; en modo estrecho no se duplica con una bolita decorativa.
+
+## Verificacion
+
+- Crear/editar tipo de actividad conserva color e icono.
+- Plantillas y Horario siguen siendo legibles cuando varios bloques coinciden en la misma franja.
+- Si se toca esta superficie, revisar que los iconos no sustituyen etiquetas accesibles ni rompen el truncado.

@@ -10,6 +10,7 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type ScheduleTemplateApplicationStatus =
   | "applied"
   | "already-applied"
+  | "coach-missing-certification"
   | "coach-unavailable"
   | "invalid-coach"
   | "invalid-template"
@@ -145,7 +146,15 @@ function shouldBlockAutomaticApplication({
 }
 
 function getMutationStatus(errorCode?: string): ScheduleTemplateApplicationStatus {
-  return errorCode === "23P01" ? "coach-unavailable" : "save-failed";
+  if (errorCode === "23P01") {
+    return "coach-unavailable";
+  }
+
+  if (errorCode === "23514") {
+    return "coach-missing-certification";
+  }
+
+  return "save-failed";
 }
 
 async function validateDefaultCoachesForTemplateBlocks({
@@ -177,6 +186,44 @@ async function validateDefaultCoachesForTemplateBlocks({
 
     if (coachError) {
       return coachError;
+    }
+  }
+
+  for (const block of templateBlocks) {
+    if (
+      !scheduleTemplateBlockRequiresCoach(block.required_coaches) ||
+      !block.default_coach_profile_id
+    ) {
+      continue;
+    }
+
+    const { data: classType, error: classTypeError } = await supabase
+      .from("class_types")
+      .select("certification_id")
+      .eq("id", block.class_type_id)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    if (classTypeError || !classType) {
+      return "invalid-template" as const;
+    }
+
+    if (!classType.certification_id) {
+      continue;
+    }
+
+    const { data: coachCertification, error: certificationError } =
+      await supabase
+        .from("coach_certifications")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("coach_profile_id", block.default_coach_profile_id)
+        .eq("certification_id", classType.certification_id)
+        .eq("status", "active")
+        .maybeSingle();
+
+    if (certificationError || !coachCertification) {
+      return "coach-missing-certification" as const;
     }
   }
 
@@ -1066,6 +1113,51 @@ export async function ensureScheduleTemplateWeek({
   return result.status;
 }
 
+export async function ensureScheduleTemplateCurrentWeekApplied({
+  organizationId,
+  supabase,
+  templateId,
+  timezone,
+  weekStart,
+}: {
+  organizationId: string;
+  supabase: SupabaseServerClient;
+  templateId: string;
+  timezone: string;
+  weekStart: string;
+}) {
+  const templateResult = await loadTemplateForApplication({
+    organizationId,
+    supabase,
+    templateId,
+  });
+
+  if (
+    templateResult.error ||
+    !templateResult.template.valid_from ||
+    !templateResult.template.valid_until
+  ) {
+    return templateResult.error ?? "already-applied";
+  }
+
+  const week = resolveWeek(weekStart, timezone);
+
+  if (
+    templateResult.template.valid_from > week.weekEnd ||
+    templateResult.template.valid_until < week.weekStart
+  ) {
+    return "already-applied";
+  }
+
+  return ensureScheduleTemplateWeek({
+    organizationId,
+    supabase,
+    templateId,
+    timezone,
+    weekStart: week.weekStart,
+  });
+}
+
 export async function ensureScheduleTemplateRangeApplied({
   organizationId,
   supabase,
@@ -1110,6 +1202,7 @@ export async function ensureScheduleTemplateRangeApplied({
   });
 
   if (
+    syncResult.status === "coach-missing-certification" ||
     syncResult.status === "coach-unavailable" ||
     syncResult.status === "invalid-coach" ||
     syncResult.status === "save-failed"
@@ -1130,6 +1223,7 @@ export async function ensureScheduleTemplateRangeApplied({
     });
 
     if (
+      ensureStatus === "coach-missing-certification" ||
       ensureStatus === "coach-unavailable" ||
       ensureStatus === "invalid-coach" ||
       ensureStatus === "save-failed"

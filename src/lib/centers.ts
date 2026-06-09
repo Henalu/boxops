@@ -1,10 +1,11 @@
+import { isSlug, toSlug } from "@/lib/slugs";
+
 export const CENTER_STATUSES = ["active", "inactive"] as const;
 
 export type CenterStatus = (typeof CENTER_STATUSES)[number];
 
 export type CenterFormValues = {
   name: string;
-  slug: string;
   timezone: string;
   status: CenterStatus;
 };
@@ -28,12 +29,7 @@ export function getCenterStatusLabel(status: string) {
 }
 
 export function toCenterSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return toSlug(value, "centro");
 }
 
 function getFormString(formData: FormData, key: string) {
@@ -44,19 +40,17 @@ function getFormString(formData: FormData, key: string) {
 
 export function validateCenterForm(formData: FormData): CenterValidationResult {
   const name = getFormString(formData, "name");
-  const rawSlug = getFormString(formData, "slug");
   const timezone = getFormString(formData, "timezone");
   const rawStatus = getFormString(formData, "status") || "active";
-  const slug = rawSlug ? toCenterSlug(rawSlug) : toCenterSlug(name);
 
-  if (!name || !slug || !timezone) {
+  if (!name || !timezone) {
     return {
       ok: false,
       error: "missing-fields",
     };
   }
 
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  if (!isSlug(toCenterSlug(name))) {
     return {
       ok: false,
       error: "invalid-slug",
@@ -74,7 +68,6 @@ export function validateCenterForm(formData: FormData): CenterValidationResult {
     ok: true,
     values: {
       name,
-      slug,
       timezone,
       status: rawStatus,
     },

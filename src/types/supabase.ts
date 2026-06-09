@@ -295,6 +295,142 @@ export type Database = {
           },
         ]
       }
+      billing_plan_versions: {
+        Row: {
+          annual_price_cents: number | null
+          archived_at: string | null
+          billing_plan_id: string
+          center_limit: number | null
+          created_at: string
+          created_by_platform_admin_id: string | null
+          currency: string
+          description: string
+          display_name: string
+          features: Json
+          future_client_limit: number | null
+          id: string
+          monthly_price_cents: number | null
+          plan_code: string
+          published_at: string | null
+          setup_description: string | null
+          setup_price_cents: number | null
+          staff_seat_limit: number | null
+          status: string
+          storage_gb: number | null
+          stripe_annual_price_id: string | null
+          stripe_monthly_price_id: string | null
+          stripe_product_id: string | null
+          support_level: string
+          updated_at: string
+          updated_by_platform_admin_id: string | null
+          version: number
+        }
+        Insert: {
+          annual_price_cents?: number | null
+          archived_at?: string | null
+          billing_plan_id: string
+          center_limit?: number | null
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          currency?: string
+          description: string
+          display_name: string
+          features?: Json
+          future_client_limit?: number | null
+          id?: string
+          monthly_price_cents?: number | null
+          plan_code: string
+          published_at?: string | null
+          setup_description?: string | null
+          setup_price_cents?: number | null
+          staff_seat_limit?: number | null
+          status?: string
+          storage_gb?: number | null
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          support_level: string
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+          version: number
+        }
+        Update: {
+          annual_price_cents?: number | null
+          archived_at?: string | null
+          billing_plan_id?: string
+          center_limit?: number | null
+          created_at?: string
+          created_by_platform_admin_id?: string | null
+          currency?: string
+          description?: string
+          display_name?: string
+          features?: Json
+          future_client_limit?: number | null
+          id?: string
+          monthly_price_cents?: number | null
+          plan_code?: string
+          published_at?: string | null
+          setup_description?: string | null
+          setup_price_cents?: number | null
+          staff_seat_limit?: number | null
+          status?: string
+          storage_gb?: number | null
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          support_level?: string
+          updated_at?: string
+          updated_by_platform_admin_id?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_plan_versions_billing_plan_id_plan_code_fkey"
+            columns: ["billing_plan_id", "plan_code"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id", "plan_code"]
+          },
+          {
+            foreignKeyName: "billing_plan_versions_created_by_platform_admin_id_fkey"
+            columns: ["created_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_plan_versions_updated_by_platform_admin_id_fkey"
+            columns: ["updated_by_platform_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_plans: {
+        Row: {
+          created_at: string
+          id: string
+          plan_code: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_code: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_code?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       center_time_location_settings: {
         Row: {
           activated_at: string | null
@@ -462,6 +598,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "centers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certifications: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certifications_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -744,8 +921,10 @@ export type Database = {
       class_types: {
         Row: {
           category: string
+          certification_id: string | null
           color: string | null
           created_at: string
+          icon_key: string
           id: string
           metadata: Json
           name: string
@@ -758,8 +937,10 @@ export type Database = {
         }
         Insert: {
           category?: string
+          certification_id?: string | null
           color?: string | null
           created_at?: string
+          icon_key?: string
           id?: string
           metadata?: Json
           name: string
@@ -772,8 +953,10 @@ export type Database = {
         }
         Update: {
           category?: string
+          certification_id?: string | null
           color?: string | null
           created_at?: string
+          icon_key?: string
           id?: string
           metadata?: Json
           name?: string
@@ -785,6 +968,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "class_types_certification_fk"
+            columns: ["certification_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "certifications"
+            referencedColumns: ["id", "organization_id"]
+          },
           {
             foreignKeyName: "class_types_organization_id_fkey"
             columns: ["organization_id"]
@@ -842,6 +1032,61 @@ export type Database = {
           },
           {
             foreignKeyName: "coach_center_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_certifications: {
+        Row: {
+          certification_id: string
+          coach_profile_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          organization_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          certification_id: string
+          coach_profile_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          organization_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          certification_id?: string
+          coach_profile_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_certifications_certification_id_organization_id_fkey"
+            columns: ["certification_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "certifications"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "coach_certifications_coach_profile_id_organization_id_fkey"
+            columns: ["coach_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "coach_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "coach_certifications_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1538,7 +1783,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "operational_audit_events_platform_support_session_id_organization_id_fkey"
+            foreignKeyName: "operational_audit_events_platform_support_session_id_organizati"
             columns: ["platform_support_session_id", "organization_id"]
             isOneToOne: false
             referencedRelation: "platform_support_sessions"
@@ -1690,63 +1935,121 @@ export type Database = {
       }
       organization_subscriptions: {
         Row: {
+          annual_price_cents: number | null
           billing_email: string | null
+          billing_plan_version_id: string | null
           center_limit: number | null
           commercial_metadata: Json
           created_at: string
           created_by_platform_admin_id: string | null
+          currency: string
           current_period_ends_at: string | null
+          features: Json
+          future_client_limit: number | null
           id: string
+          monthly_price_cents: number | null
           organization_id: string
           plan_code: string
+          plan_description: string | null
+          plan_display_name: string | null
+          plan_version: number | null
           provider: string
           provider_customer_ref: string | null
           provider_subscription_ref: string | null
           seat_limit: number | null
+          setup_description: string | null
+          setup_price_cents: number | null
+          staff_seat_limit: number | null
           status: string
+          storage_gb: number | null
+          stripe_annual_price_id: string | null
+          stripe_monthly_price_id: string | null
+          stripe_product_id: string | null
+          support_level: string | null
           trial_ends_at: string | null
           updated_at: string
           updated_by_platform_admin_id: string | null
         }
         Insert: {
+          annual_price_cents?: number | null
           billing_email?: string | null
+          billing_plan_version_id?: string | null
           center_limit?: number | null
           commercial_metadata?: Json
           created_at?: string
           created_by_platform_admin_id?: string | null
+          currency?: string
           current_period_ends_at?: string | null
+          features?: Json
+          future_client_limit?: number | null
           id?: string
+          monthly_price_cents?: number | null
           organization_id: string
           plan_code?: string
+          plan_description?: string | null
+          plan_display_name?: string | null
+          plan_version?: number | null
           provider?: string
           provider_customer_ref?: string | null
           provider_subscription_ref?: string | null
           seat_limit?: number | null
+          setup_description?: string | null
+          setup_price_cents?: number | null
+          staff_seat_limit?: number | null
           status?: string
+          storage_gb?: number | null
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          support_level?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           updated_by_platform_admin_id?: string | null
         }
         Update: {
+          annual_price_cents?: number | null
           billing_email?: string | null
+          billing_plan_version_id?: string | null
           center_limit?: number | null
           commercial_metadata?: Json
           created_at?: string
           created_by_platform_admin_id?: string | null
+          currency?: string
           current_period_ends_at?: string | null
+          features?: Json
+          future_client_limit?: number | null
           id?: string
+          monthly_price_cents?: number | null
           organization_id?: string
           plan_code?: string
+          plan_description?: string | null
+          plan_display_name?: string | null
+          plan_version?: number | null
           provider?: string
           provider_customer_ref?: string | null
           provider_subscription_ref?: string | null
           seat_limit?: number | null
+          setup_description?: string | null
+          setup_price_cents?: number | null
+          staff_seat_limit?: number | null
           status?: string
+          storage_gb?: number | null
+          stripe_annual_price_id?: string | null
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          support_level?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           updated_by_platform_admin_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_billing_plan_version_id_fkey"
+            columns: ["billing_plan_version_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plan_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organization_subscriptions_created_by_platform_admin_id_fkey"
             columns: ["created_by_platform_admin_id"]
@@ -4152,6 +4455,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      archive_billing_plan: {
+        Args: { target_plan_code: string }
+        Returns: {
+          billing_plan_id: string
+          plan_code: string
+          status: string
+        }[]
+      }
+      assign_organization_billing_plan_manual: {
+        Args: {
+          target_keep_center_ids?: string[]
+          target_organization_id: string
+          target_plan_code: string
+          target_version?: number
+        }
+        Returns: {
+          active_centers_count: number
+          deactivated_centers_count: number
+          organization_id: string
+          plan_code: string
+          plan_version: number
+          subscription_id: string
+        }[]
+      }
       begin_document_version_upload: {
         Args: {
           target_document_hash: string
@@ -4258,6 +4585,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      billing_plan_features_are_safe: {
+        Args: { target_features: Json }
+        Returns: boolean
+      }
+      billing_plan_text_is_safe: {
+        Args: { max_length: number; min_length: number; target_text: string }
+        Returns: boolean
+      }
+      billing_stripe_price_ref_is_safe: {
+        Args: { target_reference: string }
+        Returns: boolean
+      }
+      billing_stripe_product_ref_is_safe: {
+        Args: { target_reference: string }
+        Returns: boolean
+      }
+      calculate_organization_billing_usage: {
+        Args: { target_organization_id: string }
+        Returns: {
+          active_centers_count: number
+          active_staff_count: number
+          organization_id: string
+          storage_used_gb: number
+        }[]
+      }
       can_access_document: {
         Args: {
           target_access_level?: string
@@ -4271,10 +4623,15 @@ export type Database = {
         Args: { target_organization_id: string }
         Returns: boolean
       }
+      can_change_organization_billing: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
       can_manage_absence_requests: {
         Args: { target_organization_id: string }
         Returns: boolean
       }
+      can_manage_billing_plan_catalog: { Args: never; Returns: boolean }
       can_manage_change_requests: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -4318,6 +4675,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_read_billing_plan_catalog: { Args: never; Returns: boolean }
       can_read_change_request: {
         Args: {
           target_change_request_id: string
@@ -4342,6 +4700,10 @@ export type Database = {
           target_operational_event_id: string
           target_organization_id: string
         }
+        Returns: boolean
+      }
+      can_read_organization_billing: {
+        Args: { target_organization_id: string }
         Returns: boolean
       }
       can_read_overtime_candidate: {
@@ -4524,6 +4886,32 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_billing_plan_draft_version: {
+        Args: {
+          target_annual_price_cents?: number
+          target_center_limit?: number
+          target_description: string
+          target_display_name: string
+          target_features?: Json
+          target_future_client_limit?: number
+          target_monthly_price_cents?: number
+          target_plan_code: string
+          target_setup_description?: string
+          target_setup_price_cents?: number
+          target_staff_seat_limit?: number
+          target_storage_gb?: number
+          target_stripe_annual_price_id?: string
+          target_stripe_monthly_price_id?: string
+          target_stripe_product_id?: string
+          target_support_level?: string
+        }
+        Returns: {
+          billing_plan_version_id: string
+          plan_code: string
+          status: string
+          version: number
+        }[]
       }
       create_document_programming_link: {
         Args: {
@@ -4854,6 +5242,21 @@ export type Database = {
           resolved_owner_user_id: string
         }[]
       }
+      create_platform_support_session: {
+        Args: {
+          target_duration_minutes?: number
+          target_organization_id: string
+          target_reason: string
+        }
+        Returns: {
+          audit_event_id: string
+          expires_at: string
+          organization_id: string
+          organization_name: string
+          started_at: string
+          support_session_id: string
+        }[]
+      }
       document_access_event_metadata_is_safe: {
         Args: { target_metadata: Json }
         Returns: boolean
@@ -4865,6 +5268,16 @@ export type Database = {
       document_file_extension_matches_mime: {
         Args: { target_file_extension: string; target_mime_type: string }
         Returns: boolean
+      }
+      end_platform_support_session: {
+        Args: { target_support_session_id: string }
+        Returns: {
+          audit_event_id: string
+          ended_at: string
+          ended_status: string
+          organization_id: string
+          support_session_id: string
+        }[]
       }
       expire_absence_request: {
         Args: {
@@ -4990,6 +5403,59 @@ export type Database = {
         Returns: string
       }
       get_active_platform_admin_id: { Args: never; Returns: string }
+      get_active_platform_support_session: {
+        Args: { target_support_session_id: string }
+        Returns: {
+          actor_user_id: string
+          expires_at: string
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          organization_status: string
+          organization_theme_config: Json
+          organization_time_tracking_config: Json
+          organization_timezone: string
+          platform_admin_id: string
+          platform_role: string
+          started_at: string
+          support_scope: string
+          support_session_id: string
+        }[]
+      }
+      get_organization_billing_overview: {
+        Args: { target_organization_id: string }
+        Returns: {
+          active_centers_count: number
+          active_staff_count: number
+          annual_price_cents: number
+          billing_email: string
+          billing_plan_version_id: string
+          center_limit: number
+          currency: string
+          current_period_ends_at: string
+          description: string
+          display_name: string
+          effective_center_limit: number
+          effective_staff_seat_limit: number
+          features: Json
+          future_client_limit: number
+          monthly_price_cents: number
+          organization_id: string
+          plan_code: string
+          plan_version: number
+          provider: string
+          setup_description: string
+          setup_price_cents: number
+          staff_seat_limit: number
+          storage_gb: number
+          storage_used_gb: number
+          subscription_id: string
+          subscription_status: string
+          support_level: string
+          trial_ends_at: string
+          updated_at: string
+        }[]
+      }
       get_own_person_profile_id: {
         Args: { target_organization_id: string }
         Returns: string
@@ -5006,6 +5472,19 @@ export type Database = {
           status: string
         }[]
       }
+      has_active_coach_certification: {
+        Args: {
+          target_certification_id: string
+          target_coach_profile_id: string
+          target_organization_id: string
+        }
+        Returns: boolean
+      }
+      has_active_platform_support_session: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
+      has_any_tenant_billing_role: { Args: never; Returns: boolean }
       has_document_capability: {
         Args: { target_capability: string; target_organization_id: string }
         Returns: boolean
@@ -5072,6 +5551,45 @@ export type Database = {
           version_number: number
           version_status: string
           version_updated_at: string
+        }[]
+      }
+      list_billing_active_centers: {
+        Args: { target_organization_id: string }
+        Returns: {
+          center_id: string
+          center_name: string
+          center_slug: string
+        }[]
+      }
+      list_console_billing_plan_versions: {
+        Args: never
+        Returns: {
+          annual_price_cents: number
+          archived_at: string
+          billing_plan_id: string
+          billing_plan_status: string
+          billing_plan_version_id: string
+          center_limit: number
+          created_at: string
+          currency: string
+          description: string
+          display_name: string
+          features: Json
+          future_client_limit: number
+          monthly_price_cents: number
+          plan_code: string
+          published_at: string
+          setup_description: string
+          setup_price_cents: number
+          staff_seat_limit: number
+          status: string
+          storage_gb: number
+          stripe_annual_price_id: string
+          stripe_monthly_price_id: string
+          stripe_product_id: string
+          support_level: string
+          updated_at: string
+          version: number
         }[]
       }
       list_coverage_trace_audit_events: {
@@ -5318,6 +5836,32 @@ export type Database = {
           trial_ends_at: string
         }[]
       }
+      list_published_billing_plan_versions: {
+        Args: never
+        Returns: {
+          annual_price_cents: number
+          billing_plan_id: string
+          billing_plan_version_id: string
+          center_limit: number
+          currency: string
+          description: string
+          display_name: string
+          features: Json
+          future_client_limit: number
+          monthly_price_cents: number
+          plan_code: string
+          published_at: string
+          setup_description: string
+          setup_price_cents: number
+          staff_seat_limit: number
+          storage_gb: number
+          stripe_annual_price_id: string
+          stripe_monthly_price_id: string
+          stripe_product_id: string
+          support_level: string
+          version: number
+        }[]
+      }
       list_time_location_events_for_record: {
         Args: {
           target_limit?: number
@@ -5358,6 +5902,14 @@ export type Database = {
           target_coach_profile_id: string
           target_organization_id: string
           target_service_date: string
+        }
+        Returns: undefined
+      }
+      lock_staff_work_window_person_day: {
+        Args: {
+          target_day_of_week: number
+          target_organization_id: string
+          target_person_profile_id: string
         }
         Returns: undefined
       }
@@ -5449,6 +6001,15 @@ export type Database = {
       platform_ref_is_safe: {
         Args: { target_reference: string }
         Returns: boolean
+      }
+      publish_billing_plan_version: {
+        Args: { target_billing_plan_version_id: string }
+        Returns: {
+          billing_plan_version_id: string
+          plan_code: string
+          status: string
+          version: number
+        }[]
       }
       purge_expired_operational_audit_events: {
         Args: { target_batch_size?: number }
@@ -6119,6 +6680,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_platform_organization_access_status: {
+        Args: {
+          target_next_status: string
+          target_organization_id: string
+          target_reason: string
+        }
+        Returns: {
+          audit_event_id: string
+          new_status: string
+          organization_id: string
+          previous_status: string
+        }[]
+      }
       submit_due_time_weekly_approvals: {
         Args: { target_now?: string; target_organization_id?: string }
         Returns: {
@@ -6229,12 +6803,41 @@ export type Database = {
         }
         Returns: Json
       }
+      update_billing_plan_draft_version: {
+        Args: {
+          target_annual_price_cents?: number
+          target_billing_plan_version_id: string
+          target_center_limit?: number
+          target_description: string
+          target_display_name: string
+          target_features?: Json
+          target_future_client_limit?: number
+          target_monthly_price_cents?: number
+          target_plan_code: string
+          target_setup_description?: string
+          target_setup_price_cents?: number
+          target_staff_seat_limit?: number
+          target_storage_gb?: number
+          target_stripe_annual_price_id?: string
+          target_stripe_monthly_price_id?: string
+          target_stripe_product_id?: string
+          target_support_level?: string
+        }
+        Returns: {
+          billing_plan_version_id: string
+          plan_code: string
+          status: string
+          version: number
+        }[]
+      }
       update_class_type_and_sync_defaults: {
         Args: {
           target_category: string
+          target_certification_id?: string
           target_class_type_id: string
           target_color: string
           target_effective_from?: string
+          target_icon_key?: string
           target_name: string
           target_organization_id: string
           target_required_coaches: number
@@ -6477,3 +7080,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

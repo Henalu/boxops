@@ -75,7 +75,13 @@ type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
 
 type ClassTypeRow = Pick<
   Tables<"class_types">,
-  "category" | "color" | "id" | "name" | "required_coaches" | "status"
+  | "category"
+  | "certification_id"
+  | "color"
+  | "id"
+  | "name"
+  | "required_coaches"
+  | "status"
 >;
 
 type ScheduleBlockAssignmentRow = Pick<
@@ -89,6 +95,7 @@ type ScheduleBlockAssignmentRow = Pick<
 >;
 
 type CoachDisplay = {
+  certificationIds?: string[];
   detail: string;
   id: string;
   isFallback: boolean;
@@ -286,6 +293,7 @@ function getScheduleCoachAvailability({
   assignableCoaches,
   block,
   blocks,
+  classType,
   coachDisplaysById,
 }: {
   activeAssignments: ScheduleBlockAssignmentRow[];
@@ -293,6 +301,7 @@ function getScheduleCoachAvailability({
   assignableCoaches: CoachDisplay[];
   block: ScheduleBlockRow;
   blocks: ScheduleBlockRow[];
+  classType?: ClassTypeRow | null;
   coachDisplaysById: Map<string, CoachDisplay>;
 }) {
   const logicalCoachProfileIds = new Set(
@@ -313,7 +322,9 @@ function getScheduleCoachAvailability({
   const availableCoaches = assignableCoaches.filter(
     (coach) =>
       !logicalCoachProfileIds.has(coach.id) &&
-      !unavailableCoachProfileIds.has(coach.id),
+      !unavailableCoachProfileIds.has(coach.id) &&
+      (!classType?.certification_id ||
+        coach.certificationIds?.includes(classType.certification_id)),
   );
 
   return {
@@ -830,6 +841,7 @@ function ScheduleCoachAssignForm({
   assignableCoaches,
   block,
   blocks,
+  classType,
   coachDisplaysById,
   filters,
   organizationId,
@@ -842,6 +854,7 @@ function ScheduleCoachAssignForm({
   assignableCoaches: CoachDisplay[];
   block: ScheduleBlockRow;
   blocks: ScheduleBlockRow[];
+  classType?: ClassTypeRow | null;
   coachDisplaysById: Map<string, CoachDisplay>;
   filters: ScheduleFilters;
   organizationId: string;
@@ -856,6 +869,7 @@ function ScheduleCoachAssignForm({
       assignableCoaches,
       block,
       blocks,
+      classType,
       coachDisplaysById,
     });
   const isActiveBlock = isCoverageActiveBlock(block.status);
@@ -894,7 +908,9 @@ function ScheduleCoachAssignForm({
           >
             {availableCoaches.length === 0 ? (
               <option value="">
-                {unavailableCoachProfileIds.size > 0
+                {classType?.certification_id
+                  ? "Sin entrenadores con la certificación requerida"
+                  : unavailableCoachProfileIds.size > 0
                   ? "Sin entrenadores libres en esta franja"
                   : "Sin entrenadores disponibles"}
               </option>
@@ -1565,6 +1581,9 @@ function ScheduleBlockAdminCard({
   weekStart: string;
 }) {
   const activeAssignments = getActiveScheduleAssignments(assignments);
+  const classType = classTypes.find(
+    (candidate) => candidate.id === block.class_type_id,
+  );
 
   return (
     <Card className="border-0 bg-transparent shadow-none ring-0">
@@ -1602,6 +1621,7 @@ function ScheduleBlockAdminCard({
           assignableCoaches={assignableCoaches}
           block={block}
           blocks={blocks}
+          classType={classType}
           coachDisplaysById={coachDisplaysById}
           filters={filters}
           organizationId={organizationId}

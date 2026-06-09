@@ -58,6 +58,8 @@ export type StaffWorkWindowReferenceError =
   | "person-profile-inactive"
   | "person-profile-internal";
 
+export type StaffWorkWindowOverlapError = "work-window-overlap";
+
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 type StaffWorkWindowRow = Pick<
@@ -437,6 +439,52 @@ export async function validateStaffWorkWindowReferences({
   }
 
   return null;
+}
+
+export async function findStaffWorkWindowOverlap({
+  excludeWindowId,
+  organizationId,
+  supabase,
+  values,
+}: {
+  excludeWindowId?: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+  values: StaffWorkWindowFormValues;
+}): Promise<StaffWorkWindowOverlapError | null> {
+  if (values.status !== "active") {
+    return null;
+  }
+
+  let query = supabase
+    .from("staff_work_windows")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("person_profile_id", values.personProfileId)
+    .eq("day_of_week", values.dayOfWeek)
+    .eq("status", "active")
+    .lt("start_time", values.endTime)
+    .gt("end_time", values.startTime)
+    .or(`valid_until.is.null,valid_until.gte.${values.validFrom}`)
+    .limit(1);
+
+  if (values.validUntil) {
+    query = query.lte("valid_from", values.validUntil);
+  }
+
+  if (excludeWindowId) {
+    query = query.neq("id", excludeWindowId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Could not check staff work window overlap: ${error.message}`,
+    );
+  }
+
+  return data ? "work-window-overlap" : null;
 }
 
 export async function listStaffWorkWindowPersonOptions({

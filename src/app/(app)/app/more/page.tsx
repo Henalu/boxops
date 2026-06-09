@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
+  Award,
   BarChart3,
   CalendarClock,
   CalendarDays,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/card";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  canManageCertifications,
   canManageStaffWorkWindows,
   canManageOperationalData,
   canReadTenantBilling,
@@ -56,6 +58,7 @@ import {
   getAbsencesPath,
   getAccountPath,
   getCentersPath,
+  getCertificationsPath,
   getClassTypesPath,
   getCoachesPath,
   getDocumentsPath,
@@ -211,6 +214,9 @@ export default async function MorePage({ searchParams }: MorePageProps) {
   const canManageOperational = canManageOperationalData(
     resolution.membership.role,
   );
+  const canManageCertificationCatalog = canManageCertifications(
+    resolution.membership.role,
+  );
   const canManageWorkWindows = canManageStaffWorkWindows(
     resolution.membership.role,
   );
@@ -260,6 +266,14 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               icon={Dumbbell}
               title="Tipos de actividad"
             />
+            {canManageCertificationCatalog ? (
+              <MobileHubLink
+                description="Requisitos de entrenadores"
+                href={getCertificationsPath(baseOptions)}
+                icon={Award}
+                title="Certificaciones"
+              />
+            ) : null}
             <MobileHubLink
               description="Semanas base reutilizables"
               href={getScheduleTemplatesPath(baseOptions)}
@@ -291,7 +305,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                 description="Plan, límites y uso"
                 href={getSettingsBillingPath(baseOptions)}
                 icon={ReceiptText}
-                title="Plan y facturacion"
+                title="Plan y facturación"
               />
             ) : null}
           </div>
@@ -317,6 +331,15 @@ export default async function MorePage({ searchParams }: MorePageProps) {
               label="Abrir tipos"
               title="Tipos de actividad"
             />
+            {canManageCertificationCatalog ? (
+              <ActionCard
+                description="Crea certificaciones y asigna qué entrenadores las tienen."
+                href={getCertificationsPath(baseOptions)}
+                icon={Award}
+                label="Abrir certificaciones"
+                title="Certificaciones"
+              />
+            ) : null}
             <ActionCard
               description="Crea semanas tipo y aplícalas al horario real."
               href={getScheduleTemplatesPath(baseOptions)}
@@ -353,7 +376,7 @@ export default async function MorePage({ searchParams }: MorePageProps) {
                 href={getSettingsBillingPath(baseOptions)}
                 icon={ReceiptText}
                 label="Abrir plan"
-                title="Plan y facturacion"
+                title="Plan y facturación"
               />
             ) : null}
           </div>

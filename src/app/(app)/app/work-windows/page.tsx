@@ -63,7 +63,10 @@ import {
   updateStaffWorkWindow,
 } from "../schedule/actions";
 import { StaffWorkWindowFields } from "../schedule/staff-work-window-form-fields";
-import { WorkWindowListClient } from "./work-window-list-client";
+import {
+  WorkWindowDeleteButton,
+  WorkWindowListClient,
+} from "./work-window-list-client";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +110,8 @@ const successMessages: Record<string, string> = {
   "work-window-created": "Jornada prevista creada.",
   "work-windows-created": "Jornadas previstas creadas.",
   "work-window-deactivated": "Jornada prevista desactivada.",
+  "work-window-deleted": "Jornada prevista eliminada.",
+  "work-windows-deleted": "Jornadas previstas eliminadas.",
   "work-window-updated": "Jornada prevista actualizada.",
 };
 
@@ -117,6 +122,10 @@ const successDescriptions: Partial<Record<keyof typeof successMessages, string>>
     "Las franjas quedan como presencia prevista, sin crear bloques ni fichajes.",
   "work-window-deactivated":
     "La franja deja de mostrarse como activa, sin borrar historial operativo.",
+  "work-window-deleted":
+    "La franja se ha retirado de la planificación prevista.",
+  "work-windows-deleted":
+    "Las franjas se han retirado de la planificación prevista.",
   "work-window-updated":
     "La semana se recalcula al vuelo con la nueva planificación prevista.",
 };
@@ -152,6 +161,15 @@ const errorMessages: Record<string, string> = {
   "person-profile-without-active-coach":
     "Elige una ficha de entrenador activa para crear jornadas previstas.",
   "save-failed": "No se han podido guardar los cambios.",
+  "work-window-delete-confirmation-required":
+    "Confirma la eliminación antes de borrar jornadas previstas.",
+  "work-window-delete-invalid":
+    "La selección contiene una jornada prevista no válida.",
+  "work-window-delete-limit":
+    "Selecciona menos jornadas para eliminarlas en una sola acción.",
+  "work-window-delete-required": "Selecciona al menos una jornada prevista.",
+  "work-window-overlap":
+    "Ya existe una jornada activa para esa persona que se solapa en ese día, fechas y horario.",
   "work-window-required": "No se ha recibido la jornada prevista.",
 };
 
@@ -618,6 +636,14 @@ function WorkWindowListItem({
             </Button>
           </form>
         ) : null}
+
+        <WorkWindowDeleteButton
+          ids={[window.id]}
+          organizationId={organizationId}
+          returnPath={returnPath}
+          triggerLabel="Eliminar"
+          weekStart={weekStart}
+        />
       </div>
     </details>
   );

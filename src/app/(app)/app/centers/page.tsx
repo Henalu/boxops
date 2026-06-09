@@ -95,11 +95,13 @@ const errorMessages: Record<string, string> = {
   "center-required": "No se ha recibido el centro a actualizar.",
   "center-limit-reached":
     "Has llegado al límite de centros activos incluido en tu plan.",
-  "duplicate-slug": "Ya existe un centro con ese slug en esta organización.",
+  "duplicate-slug":
+    "No se ha podido crear un identificador interno libre. Prueba con otro nombre.",
   forbidden: "Tu rol no permite gestionar centros.",
-  "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
+  "invalid-slug":
+    "No se ha podido preparar el identificador interno. Prueba con otro nombre.",
   "invalid-status": "El estado del centro no es válido.",
-  "missing-fields": "Completa nombre, slug y zona horaria.",
+  "missing-fields": "Completa nombre y zona horaria.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required: "Elige una organización antes de gestionar centros.",
@@ -333,18 +335,16 @@ function CenterCreateForm({
   timezone: string;
 }) {
   return (
-    <form action={createCenter} className="grid gap-4 lg:grid-cols-4">
+    <form
+      action={createCenter}
+      className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.7fr)_auto] lg:items-end"
+    >
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="status" type="hidden" value="active" />
 
       <label className="grid gap-2">
         <span className="text-sm font-medium">Nombre</span>
         <Input name="name" placeholder="Centro principal" required />
-      </label>
-
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Slug interno</span>
-        <Input name="slug" placeholder="centro-principal" />
       </label>
 
       <label className="grid gap-2">
@@ -398,7 +398,7 @@ function CenterFilterControls({
                 className="pl-9"
                 defaultValue={filters.q}
                 name="q"
-                placeholder="Nombre o slug del centro"
+                placeholder="Nombre del centro"
               />
             </span>
           </label>
@@ -480,9 +480,6 @@ function CenterIdentity({ center }: { center: CenterRow }) {
           <h3 className="truncate text-base font-semibold tracking-tight md:text-lg">
             {center.name}
           </h3>
-          <p className="mt-1 truncate font-mono text-sm text-muted-foreground">
-            {center.slug}
-          </p>
         </div>
         <CenterBadge status={center.status} />
       </div>
@@ -574,7 +571,7 @@ function CenterAdminCard({
         <div className="border-t border-border pt-4">
           <InlineEditDetails label="Gestionar">
             <div className="space-y-4">
-              <form action={updateCenter} className="grid gap-4 lg:grid-cols-4">
+              <form action={updateCenter} className="grid gap-4 lg:grid-cols-3">
                 <input
                   name="organizationId"
                   type="hidden"
@@ -585,11 +582,6 @@ function CenterAdminCard({
                 <label className="grid gap-2">
                   <span className="text-sm font-medium">Nombre</span>
                   <Input name="name" required defaultValue={center.name} />
-                </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-medium">Slug interno</span>
-                  <Input name="slug" required defaultValue={center.slug} />
                 </label>
 
                 <label className="grid gap-2">
@@ -606,7 +598,7 @@ function CenterAdminCard({
                   <StatusSelect defaultValue={center.status} />
                 </label>
 
-                <div className="flex flex-wrap gap-2 lg:col-span-4">
+                <div className="flex flex-wrap gap-2 lg:col-span-3">
                   <Button type="submit">
                     <Save aria-hidden="true" />
                     Guardar cambios
@@ -785,7 +777,7 @@ export default async function CentersPage({ searchParams }: CentersPageProps) {
                 se bloquea la edición de centros existentes. Para añadir otro,
                 revisa{" "}
                 <Link className="font-medium underline" href={billingPath}>
-                  Plan y facturacion
+                  Plan y facturación
                 </Link>
                 .
               </AlertDescription>

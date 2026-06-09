@@ -7206,7 +7206,7 @@ test.describe("base operational admin local source guardrails", () => {
       "supabase/migrations/00032_class_type_update_sync_defaults.sql",
     );
     const latestClassTypeSyncMigrationSource = readProjectFile(
-      "supabase/migrations/00033_class_type_sync_all_related_blocks.sql",
+      "supabase/migrations/20260608145203_class_type_icon_key.sql",
     );
 
     expect(getTsFunctionSource(centersActionsSource, "updateCenter")).toMatch(
@@ -7276,6 +7276,9 @@ test.describe("base operational admin local source guardrails", () => {
     expect(updateClassTypeSource).toMatch(
       /\.rpc\(\s*"update_class_type_and_sync_defaults"[\s\S]+target_organization_id: context\.organization\.id[\s\S]+target_required_coaches: validation\.values\.requiredCoaches/,
     );
+    expect(updateClassTypeSource).toMatch(
+      /target_icon_key: validation\.values\.iconKey/,
+    );
     expect(updateClassTypeSource).not.toMatch(
       /\.from\("class_types"\)[\s\S]+\.update\(/,
     );
@@ -7288,7 +7291,14 @@ test.describe("base operational admin local source guardrails", () => {
       /public\.has_org_role\(target_organization_id, ARRAY\['owner', 'admin', 'manager'\]\)/,
     );
     expect(latestClassTypeSyncSource).toMatch(
+      /target_icon_key text DEFAULT 'activity'/,
+    );
+    expect(latestClassTypeSyncSource).toMatch(/invalid_icon/);
+    expect(latestClassTypeSyncSource).toMatch(
       /FROM public\.class_types class_type[\s\S]+class_type\.id = target_class_type_id[\s\S]+class_type\.organization_id = target_organization_id/,
+    );
+    expect(latestClassTypeSyncSource).toMatch(
+      /UPDATE public\.class_types[\s\S]+icon_key = target_icon_key/,
     );
     expect(latestClassTypeSyncSource).toMatch(
       /UPDATE public\.schedule_template_blocks template_block[\s\S]+template_block\.organization_id = target_organization_id[\s\S]+template_block\.class_type_id = target_class_type_id/,
@@ -7303,6 +7313,12 @@ test.describe("base operational admin local source guardrails", () => {
       /REVOKE ALL ON FUNCTION public\.update_class_type_and_sync_defaults[\s\S]+FROM PUBLIC/,
     );
     expect(classTypeSyncMigrationSource).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.update_class_type_and_sync_defaults[\s\S]+TO authenticated/,
+    );
+    expect(latestClassTypeSyncMigrationSource).toMatch(
+      /REVOKE EXECUTE ON FUNCTION public\.update_class_type_and_sync_defaults[\s\S]+FROM PUBLIC/,
+    );
+    expect(latestClassTypeSyncMigrationSource).toMatch(
       /GRANT EXECUTE ON FUNCTION public\.update_class_type_and_sync_defaults[\s\S]+TO authenticated/,
     );
 

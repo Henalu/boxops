@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { CSSProperties } from "react";
 import { redirect } from "next/navigation";
 import {
@@ -29,7 +30,9 @@ import {
   TemplateBlockCreateForm,
   TemplateBlocksEditor,
 } from "./template-blocks-editor";
+import { TemplateCenterFocusSwitcher } from "./template-center-focus-switcher";
 import { TemplateExpansionControls } from "./template-expansion-controls";
+import { ClassTypeIcon } from "@/components/features/class-type-icon";
 import {
   CollapsibleActionPanel,
   InlineEditDetails,
@@ -69,6 +72,11 @@ import {
   getScheduleTemplatesPath,
 } from "@/lib/navigation/app-paths";
 import { formatTimeForInput, resolveWeek } from "@/lib/schedule-blocks";
+import {
+  getScheduleCenterPreferenceCookieName,
+  getTemplateCenterPreferenceCookieName,
+  isScheduleCenterPreferenceValue,
+} from "@/lib/schedule-center-preferences";
 import { ensureActiveScheduleTemplatesForWindow } from "@/lib/schedule-template-application";
 import {
   SCHEDULE_TEMPLATE_DAYS,
@@ -80,7 +88,9 @@ import {
   getScheduleTemplateRequiredCoachesLabel,
   getScheduleTemplateStatusLabel,
   scheduleTemplateBlockRequiresCoach,
+  type ScheduleTemplateCoachWorkWindow,
 } from "@/lib/schedule-templates";
+import { listStaffWorkWindowsForWeek } from "@/lib/staff-work-windows";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/types/supabase";
@@ -88,6 +98,13 @@ import type { Tables } from "@/types/supabase";
 export const dynamic = "force-dynamic";
 
 type TemplatesSearchParams = {
+  center_id?: string | string[];
+  create_block?: string | string[];
+  create_block_day?: string | string[];
+  create_block_days?: string | string[];
+  create_block_end?: string | string[];
+  create_block_start?: string | string[];
+  create_block_template_id?: string | string[];
   day?: string | string[];
   edit_block_id?: string | string[];
   error?: string | string[];
@@ -134,7 +151,14 @@ type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
 
 type ClassTypeRow = Pick<
   Tables<"class_types">,
-  "category" | "color" | "id" | "name" | "required_coaches" | "status"
+  | "category"
+  | "certification_id"
+  | "color"
+  | "icon_key"
+  | "id"
+  | "name"
+  | "required_coaches"
+  | "status"
 >;
 
 type CoachProfileRow = Pick<
@@ -153,10 +177,18 @@ type MembershipStatusRow = Pick<
 >;
 
 type CoachDisplay = {
+  certificationIds: string[];
   detail: string;
   id: string;
   isFallback: boolean;
   label: string;
+  personProfileId: string | null;
+};
+
+type CoachCertificationRow = {
+  certification_id: string;
+  coach_profile_id: string;
+  status: string;
 };
 
 type AppliedWeekTemplateSummary = {
@@ -187,6 +219,17 @@ const templateViews = [
 type TemplateView = (typeof templateViews)[number]["value"];
 type TemplateDay = (typeof SCHEDULE_TEMPLATE_DAYS)[number];
 
+const TEMPLATE_CENTER_FILTER_ALL = "all";
+const TEMPLATE_BLOCK_CREATE_OPEN_VALUE = "1";
+
+type TemplateCreateBlockSlot = {
+  day: TemplateDay;
+  endTime: string;
+  selectedDays: TemplateDay[];
+  startTime: string;
+  templateId: string;
+};
+
 const templateDayShortLabels: Record<TemplateDay, string> = {
   1: "L",
   2: "M",
@@ -211,6 +254,8 @@ const successMessages: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   forbidden: "Tu rol no permite gestionar plantillas.",
+  "coach-missing-certification":
+    "Ese entrenador no tiene la certificación requerida para esta actividad.",
   "coach-unavailable":
     "Ese entrenador ya está asignado por defecto en otro bloque solapado de la plantilla.",
   "invalid-center": "El centro seleccionado no es válido.",
@@ -257,6 +302,8 @@ const errorMessages: Record<string, string> = {
   "template-required": "No se ha recibido la plantilla.",
   "template-sync-coach-unavailable":
     "La plantilla se ha guardado, pero el horario generado no se ha sincronizado porque ese entrenador queda ocupado en otra franja.",
+  "template-sync-coach-missing-certification":
+    "La plantilla se ha guardado, pero el horario generado no se ha sincronizado porque un entrenador por defecto no tiene la certificación requerida.",
   "template-sync-failed":
     "La plantilla se ha guardado, pero no se ha podido sincronizar el horario generado.",
   "template-sync-invalid-coach":
@@ -264,6 +311,17 @@ const errorMessages: Record<string, string> = {
   "template-week-has-template":
     "Esta semana ya tiene una plantilla aplicada. Confirma la sustitución para reemplazar solo esa semana.",
 };
+
+function getSuccessDescription(status: string) {
+  if (
+    status === "template-block-created" ||
+    status === "template-blocks-created"
+  ) {
+    return "Puedes seguir creando bloques en el modal abierto.";
+  }
+
+  return "La lista ya muestra las plantillas actuales.";
+}
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -279,6 +337,58 @@ function resolveTemplateDay(value: string | string[] | undefined): TemplateDay {
   return SCHEDULE_TEMPLATE_DAYS.includes(day as TemplateDay)
     ? (day as TemplateDay)
     : SCHEDULE_TEMPLATE_DAYS[0];
+}
+
+function resolveTemplateCreateBlockDays(
+  value: string | string[] | undefined,
+  fallbackDay: TemplateDay,
+) {
+  const days = [
+    ...new Set(
+      (getParam(value) ?? "")
+        .split(",")
+        .map((day) => Number(day))
+        .filter((day): day is TemplateDay =>
+          SCHEDULE_TEMPLATE_DAYS.includes(day as TemplateDay),
+        ),
+    ),
+  ];
+
+  return days.length > 0 ? days : [fallbackDay];
+}
+
+function resolveTemplateCreateBlockSlot(
+  params: TemplatesSearchParams,
+): TemplateCreateBlockSlot | null {
+  if (getParam(params.create_block) !== TEMPLATE_BLOCK_CREATE_OPEN_VALUE) {
+    return null;
+  }
+
+  const templateId = getParam(params.create_block_template_id);
+  const day = Number(getParam(params.create_block_day));
+  const startTime = formatTimeForInput(getParam(params.create_block_start) ?? "");
+  const endTime = formatTimeForInput(getParam(params.create_block_end) ?? "");
+
+  if (
+    !templateId ||
+    !SCHEDULE_TEMPLATE_DAYS.includes(day as TemplateDay) ||
+    !startTime ||
+    !endTime ||
+    startTime >= endTime
+  ) {
+    return null;
+  }
+
+  return {
+    day: day as TemplateDay,
+    endTime,
+    selectedDays: resolveTemplateCreateBlockDays(
+      params.create_block_days,
+      day as TemplateDay,
+    ),
+    startTime,
+    templateId,
+  };
 }
 
 async function getScheduleTemplates(organizationId: string) {
@@ -437,7 +547,9 @@ async function getClassTypes(organizationId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("class_types")
-    .select("id, name, category, required_coaches, status, color")
+    .select(
+      "id, name, category, certification_id, required_coaches, status, color, icon_key",
+    )
     .eq("organization_id", organizationId)
     .order("status", { ascending: true })
     .order("category", { ascending: true })
@@ -482,6 +594,7 @@ async function getScheduleCoachContext(organizationId: string) {
     linkedPersonProfilesResult,
     userPersonProfilesResult,
     membershipsResult,
+    coachCertificationsResult,
   ] = await Promise.all([
     personProfileIds.length > 0
       ? supabase
@@ -504,6 +617,11 @@ async function getScheduleCoachContext(organizationId: string) {
           .eq("organization_id", organizationId)
           .in("user_id", userIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("coach_certifications")
+      .select("coach_profile_id, certification_id, status")
+      .eq("organization_id", organizationId)
+      .eq("status", "active"),
   ]);
 
   if (linkedPersonProfilesResult.error) {
@@ -524,6 +642,12 @@ async function getScheduleCoachContext(organizationId: string) {
     );
   }
 
+  if (coachCertificationsResult.error) {
+    throw new Error(
+      `Could not load coach certifications: ${coachCertificationsResult.error.message}`,
+    );
+  }
+
   const linkedPersonProfiles =
     linkedPersonProfilesResult.data satisfies PersonProfileRow[];
   const userPersonProfiles =
@@ -537,6 +661,8 @@ async function getScheduleCoachContext(organizationId: string) {
 
   return {
     coachProfiles: coachProfiles satisfies CoachProfileRow[],
+    coachCertifications:
+      coachCertificationsResult.data satisfies CoachCertificationRow[],
     memberships: membershipsResult.data satisfies MembershipStatusRow[],
     personProfiles: [...personProfilesById.values()],
   };
@@ -665,23 +791,13 @@ function getAppliedTemplateConflict({
   };
 }
 
-function ColorSwatch({ color }: { color: string | null }) {
-  const safeColor = getSafeColor(color);
-
-  return (
-    <span
-      aria-hidden="true"
-      className="size-3.5 shrink-0 rounded-full border border-border"
-      style={safeColor ? { backgroundColor: safeColor } : undefined}
-    />
-  );
-}
-
 function getCoachDisplay({
+  certificationIds = [],
   coachProfile,
   membership,
   personProfile,
 }: {
+  certificationIds?: string[];
   coachProfile: CoachProfileRow;
   membership?: MembershipStatusRow;
   personProfile?: PersonProfileRow;
@@ -692,41 +808,63 @@ function getCoachDisplay({
     personProfile.visibility_status === "visible"
   ) {
     return {
+      certificationIds,
       detail: membership
         ? `Acceso ${membership.status}`
         : "Persona operativa pendiente de cuenta",
       id: coachProfile.id,
       isFallback: false,
       label: personProfile.display_name,
+      personProfileId: personProfile.id,
     };
   }
 
   if (coachProfile.user_id) {
     return {
+      certificationIds,
       detail: `Cuenta sin persona visible (${shortId(coachProfile.user_id)})`,
       id: coachProfile.id,
       isFallback: true,
       label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
+      personProfileId: personProfile?.id ?? coachProfile.person_profile_id,
     };
   }
 
   return {
     detail: `Perfil técnico incompleto ${shortId(coachProfile.id)}`,
+    certificationIds,
     id: coachProfile.id,
     isFallback: true,
     label: `Entrenador sin perfil visible ${shortId(coachProfile.id)}`,
+    personProfileId: personProfile?.id ?? coachProfile.person_profile_id,
   };
 }
 
 function buildCoachDisplays({
+  coachCertifications,
   coachProfiles,
   memberships,
   personProfiles,
 }: {
+  coachCertifications: CoachCertificationRow[];
   coachProfiles: CoachProfileRow[];
   memberships: MembershipStatusRow[];
   personProfiles: PersonProfileRow[];
 }) {
+  const certificationIdsByCoachProfileId = new Map<string, string[]>();
+
+  for (const coachCertification of coachCertifications) {
+    const certificationIds =
+      certificationIdsByCoachProfileId.get(coachCertification.coach_profile_id) ??
+      [];
+
+    certificationIds.push(coachCertification.certification_id);
+    certificationIdsByCoachProfileId.set(
+      coachCertification.coach_profile_id,
+      certificationIds,
+    );
+  }
+
   const membershipsByUserId = new Map(
     memberships.map((membership) => [membership.user_id, membership]),
   );
@@ -742,6 +880,8 @@ function buildCoachDisplays({
   );
   const displays = coachProfiles.map((coachProfile) =>
     getCoachDisplay({
+      certificationIds:
+        certificationIdsByCoachProfileId.get(coachProfile.id) ?? [],
       coachProfile,
       membership: coachProfile.user_id
         ? membershipsByUserId.get(coachProfile.user_id)
@@ -788,6 +928,8 @@ function buildCoachDisplays({
 
       return [
         getCoachDisplay({
+          certificationIds:
+            certificationIdsByCoachProfileId.get(coachProfile.id) ?? [],
           coachProfile,
           membership,
           personProfile,
@@ -818,13 +960,85 @@ function TemplateStatusBadge({ status }: { status: string }) {
   );
 }
 
+function resolveTemplateCenterFilter({
+  centers,
+  rawCenterId,
+}: {
+  centers: CenterRow[];
+  rawCenterId: string | null;
+}) {
+  if (rawCenterId === TEMPLATE_CENTER_FILTER_ALL) {
+    return {
+      centerId: null,
+      value: TEMPLATE_CENTER_FILTER_ALL,
+    };
+  }
+
+  if (rawCenterId && centers.some((center) => center.id === rawCenterId)) {
+    return {
+      centerId: rawCenterId,
+      value: rawCenterId,
+    };
+  }
+
+  const defaultCenterId = centers[0]?.id ?? null;
+
+  return {
+    centerId: defaultCenterId,
+    value: defaultCenterId ?? TEMPLATE_CENTER_FILTER_ALL,
+  };
+}
+
+function resolveRememberedTemplateCenterFilter({
+  centers,
+  scheduleCenterValue,
+  templateCenterValue,
+}: {
+  centers: CenterRow[];
+  scheduleCenterValue: string | null | undefined;
+  templateCenterValue: string | null | undefined;
+}) {
+  if (templateCenterValue === TEMPLATE_CENTER_FILTER_ALL) {
+    return TEMPLATE_CENTER_FILTER_ALL;
+  }
+
+  if (
+    isScheduleCenterPreferenceValue(templateCenterValue) &&
+    centers.some((center) => center.id === templateCenterValue)
+  ) {
+    return templateCenterValue;
+  }
+
+  if (
+    isScheduleCenterPreferenceValue(scheduleCenterValue) &&
+    centers.some((center) => center.id === scheduleCenterValue)
+  ) {
+    return scheduleCenterValue;
+  }
+
+  return null;
+}
+
+function filterTemplatesByCenter(
+  templates: ScheduleTemplateRow[],
+  centerId: string | null,
+) {
+  if (!centerId) {
+    return templates;
+  }
+
+  return templates.filter((template) => template.center_id === centerId);
+}
+
 function TemplateViewTabs({
+  centerFilterId,
   editBlockId,
   organizationId,
   selectedDay,
   view,
   weekStart,
 }: {
+  centerFilterId: string;
   editBlockId?: string | null;
   organizationId: string;
   selectedDay: TemplateDay;
@@ -847,6 +1061,7 @@ function TemplateViewTabs({
             <Link
               aria-current={active ? "page" : undefined}
               href={getScheduleTemplatesPath({
+                centerId: centerFilterId,
                 day: String(selectedDay),
                 editTemplateBlockId: editBlockId,
                 organizationId,
@@ -1047,12 +1262,14 @@ function DaySelect({ defaultValue }: { defaultValue?: number }) {
 }
 
 function TemplateHiddenInputs({
+  centerFilterId,
   organizationId,
   selectedDay,
   templateId,
   view,
   weekStart,
 }: {
+  centerFilterId: string;
   organizationId: string;
   selectedDay?: TemplateDay;
   templateId?: string;
@@ -1061,6 +1278,7 @@ function TemplateHiddenInputs({
 }) {
   return (
     <>
+      <input name="centerFilterId" type="hidden" value={centerFilterId} />
       <input name="organizationId" type="hidden" value={organizationId} />
       {selectedDay ? (
         <input name="day" type="hidden" value={String(selectedDay)} />
@@ -1076,12 +1294,14 @@ function TemplateHiddenInputs({
 
 function TemplateCreateForm({
   activeCenters,
+  centerFilterId,
   organizationId,
   selectedDay,
   view,
   weekStart,
 }: {
   activeCenters: CenterRow[];
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   view: TemplateView;
@@ -1093,6 +1313,7 @@ function TemplateCreateForm({
       className="grid gap-4 lg:grid-cols-6"
     >
       <TemplateHiddenInputs
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         view={view}
@@ -1137,6 +1358,7 @@ function TemplateCreateForm({
 }
 
 function TemplateMetaForm({
+  centerFilterId,
   centers,
   organizationId,
   selectedDay,
@@ -1144,6 +1366,7 @@ function TemplateMetaForm({
   view,
   weekStart,
 }: {
+  centerFilterId: string;
   centers: CenterRow[];
   organizationId: string;
   selectedDay: TemplateDay;
@@ -1159,6 +1382,7 @@ function TemplateMetaForm({
       className="grid gap-4 lg:grid-cols-6"
     >
       <TemplateHiddenInputs
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         templateId={template.id}
@@ -1344,6 +1568,7 @@ function TemplateBlockFields({
 function TemplateBlockEditForm({
   assignableCoaches,
   block,
+  centerFilterId,
   centers,
   classTypes,
   organizationId,
@@ -1354,6 +1579,7 @@ function TemplateBlockEditForm({
 }: {
   assignableCoaches: CoachDisplay[];
   block: ScheduleTemplateBlockRow;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   organizationId: string;
@@ -1368,6 +1594,7 @@ function TemplateBlockEditForm({
       className="grid gap-4 lg:grid-cols-6"
     >
       <TemplateHiddenInputs
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         templateId={block.template_id}
@@ -1395,6 +1622,7 @@ function TemplateBlockEditForm({
 function TemplateBlockAdminRow({
   assignableCoaches,
   block,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
@@ -1408,6 +1636,7 @@ function TemplateBlockAdminRow({
 }: {
   assignableCoaches: CoachDisplay[];
   block: ScheduleTemplateBlockRow;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
@@ -1439,18 +1668,21 @@ function TemplateBlockAdminRow({
   });
   const isEditing = editBlockId === block.id;
   const cancelEditHref = getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day: String(selectedDay),
     organizationId,
     view,
     week: weekStart,
   });
   const editHref = getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day: String(selectedDay),
     editTemplateBlockId: block.id,
     organizationId,
     view,
     week: weekStart,
   });
+  const classTypeColor = getSafeColor(classType?.color ?? null);
 
   if (templateArchived) {
     return (
@@ -1502,7 +1734,11 @@ function TemplateBlockAdminRow({
         </MetaItem>
         <MetaItem label="Actividad">
           <span className="flex min-w-0 items-center gap-2">
-            <ColorSwatch color={classType?.color ?? null} />
+            <ClassTypeIcon
+              className="size-3.5 shrink-0"
+              iconKey={classType?.icon_key}
+              style={classTypeColor ? { color: classTypeColor } : undefined}
+            />
             <span className="truncate">
               {classType?.name ?? "Tipo no disponible"}
             </span>
@@ -1520,6 +1756,7 @@ function TemplateBlockAdminRow({
           <TemplateBlockEditForm
             assignableCoaches={assignableCoaches}
             block={block}
+            centerFilterId={centerFilterId}
             centers={centers}
             classTypes={classTypes}
             organizationId={organizationId}
@@ -1560,6 +1797,7 @@ function TemplateBlockReadOnlyRow({
     defaultCoachLabel: defaultCoach?.label,
     requiredCoaches: block.required_coaches,
   });
+  const classTypeColor = getSafeColor(classType?.color ?? null);
 
   return (
     <div className="rounded-lg border border-border p-4">
@@ -1592,7 +1830,11 @@ function TemplateBlockReadOnlyRow({
         <div className="min-w-0">
           <dt className="text-muted-foreground">Actividad</dt>
           <dd className="mt-1 flex min-w-0 items-center gap-2 font-medium">
-            <ColorSwatch color={classType?.color ?? null} />
+            <ClassTypeIcon
+              className="size-3.5 shrink-0"
+              iconKey={classType?.icon_key}
+              style={classTypeColor ? { color: classTypeColor } : undefined}
+            />
             <span className="truncate">
               {classType?.name ?? "Tipo no disponible"}
             </span>
@@ -1645,6 +1887,7 @@ function groupTemplateBlocksByDay(blocks: ScheduleTemplateBlockRow[]) {
 function TemplateBlockWeekCard({
   block,
   canManageTemplates,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
@@ -1657,6 +1900,7 @@ function TemplateBlockWeekCard({
 }: {
   block: ScheduleTemplateBlockRow;
   canManageTemplates: boolean;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
@@ -1688,18 +1932,21 @@ function TemplateBlockWeekCard({
   const isEditing = editBlockId === block.id;
   const canEdit = canManageTemplates && !templateArchived;
   const cancelEditHref = getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day: String(selectedDay),
     organizationId,
     view,
     week: weekStart,
   });
   const editHref = getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day: String(selectedDay),
     editTemplateBlockId: block.id,
     organizationId,
     view,
     week: weekStart,
   });
+  const classTypeColor = getSafeColor(classType?.color ?? null);
 
   return (
     <div
@@ -1723,7 +1970,11 @@ function TemplateBlockWeekCard({
       </div>
 
       <h4 className="mt-2 flex min-w-0 items-start gap-1.5 text-xs font-semibold leading-snug tracking-tight">
-        <ColorSwatch color={classType?.color ?? null} />
+        <ClassTypeIcon
+          className="mt-0.5 size-3.5 shrink-0"
+          iconKey={classType?.icon_key}
+          style={classTypeColor ? { color: classTypeColor } : undefined}
+        />
         <span className="min-w-0 break-words">
           {classType?.name ?? "Tipo no disponible"}
         </span>
@@ -1770,12 +2021,14 @@ function TemplateBlockWeekCard({
 
 function TemplateMobileDayPicker({
   blocksByDay,
+  centerFilterId,
   organizationId,
   selectedDay,
   view,
   weekStart,
 }: {
   blocksByDay: Map<number, ScheduleTemplateBlockRow[]>;
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   view: TemplateView;
@@ -1801,6 +2054,7 @@ function TemplateMobileDayPicker({
                   : "border-border bg-card text-foreground hover:bg-muted/45",
               )}
               href={getScheduleTemplatesPath({
+                centerId: centerFilterId,
                 day: String(day),
                 organizationId,
                 view,
@@ -1826,6 +2080,7 @@ function TemplateMobileDayPicker({
 function TemplateMobileDayBlocks({
   blocks,
   canManageTemplates,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
@@ -1838,6 +2093,7 @@ function TemplateMobileDayBlocks({
 }: {
   blocks: ScheduleTemplateBlockRow[];
   canManageTemplates: boolean;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
@@ -1869,6 +2125,7 @@ function TemplateMobileDayBlocks({
             <TemplateBlockWeekCard
               block={block}
               canManageTemplates={canManageTemplates}
+              centerFilterId={centerFilterId}
               centers={centers}
               classTypes={classTypes}
               coachDisplaysById={coachDisplaysById}
@@ -1891,6 +2148,7 @@ function TemplateBlocksWeekView({
   assignableCoaches,
   blocks,
   canManageTemplates,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
@@ -1906,6 +2164,7 @@ function TemplateBlocksWeekView({
   assignableCoaches: CoachDisplay[];
   blocks: ScheduleTemplateBlockRow[];
   canManageTemplates: boolean;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
@@ -1931,6 +2190,7 @@ function TemplateBlocksWeekView({
     <div className="space-y-3">
       <TemplateMobileDayPicker
         blocksByDay={blocksByDay}
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         view={view}
@@ -1954,6 +2214,7 @@ function TemplateBlocksWeekView({
             <Button asChild size="sm" variant="outline">
               <Link
                 href={getScheduleTemplatesPath({
+                  centerId: centerFilterId,
                   organizationId,
                   day: String(selectedDay),
                   view,
@@ -1970,6 +2231,7 @@ function TemplateBlocksWeekView({
             block={editingBlock}
             centers={centers}
             classTypes={classTypes}
+            centerFilterId={centerFilterId}
             organizationId={organizationId}
             selectedDay={selectedDay}
             templateCenterId={templateCenterId}
@@ -1984,6 +2246,7 @@ function TemplateBlocksWeekView({
         canManageTemplates={canManageTemplates}
         centers={centers}
         classTypes={classTypes}
+        centerFilterId={centerFilterId}
         coachDisplaysById={coachDisplaysById}
         editBlockId={editBlockId}
         organizationId={organizationId}
@@ -2027,6 +2290,7 @@ function TemplateBlocksWeekView({
                       <TemplateBlockWeekCard
                         block={block}
                         canManageTemplates={canManageTemplates}
+                        centerFilterId={centerFilterId}
                         centers={centers}
                         classTypes={classTypes}
                         coachDisplaysById={coachDisplaysById}
@@ -2054,6 +2318,7 @@ function TemplateBlocksAgendaView({
   assignableCoaches,
   blocks,
   canManageTemplates,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
@@ -2068,6 +2333,7 @@ function TemplateBlocksAgendaView({
   assignableCoaches: CoachDisplay[];
   blocks: ScheduleTemplateBlockRow[];
   canManageTemplates: boolean;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
@@ -2086,6 +2352,7 @@ function TemplateBlocksAgendaView({
           <TemplateBlockAdminRow
             assignableCoaches={assignableCoaches}
             block={block}
+            centerFilterId={centerFilterId}
             centers={centers}
             classTypes={classTypes}
             coachDisplaysById={coachDisplaysById}
@@ -2120,6 +2387,7 @@ function ApplyTemplateForm({
   appliedTemplateConflict,
   assignedBlockCount,
   blockCount,
+  centerFilterId,
   organizationId,
   selectedDay,
   template,
@@ -2129,6 +2397,7 @@ function ApplyTemplateForm({
   appliedTemplateConflict: AppliedTemplateConflict | null;
   assignedBlockCount: number;
   blockCount: number;
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   template: ScheduleTemplateRow;
@@ -2144,6 +2413,7 @@ function ApplyTemplateForm({
       className="grid gap-3 sm:grid-cols-[minmax(180px,240px)_auto]"
       id={formId}
     >
+      <input name="centerFilterId" type="hidden" value={centerFilterId} />
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="day" type="hidden" value={String(selectedDay)} />
       <input name="templateId" type="hidden" value={template.id} />
@@ -2186,12 +2456,14 @@ function ApplyTemplateForm({
 }
 
 function TemplateArchiveForm({
+  centerFilterId,
   organizationId,
   selectedDay,
   template,
   view,
   weekStart,
 }: {
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   template: ScheduleTemplateRow;
@@ -2203,6 +2475,7 @@ function TemplateArchiveForm({
   return (
     <form action={archiveScheduleTemplate} id={formId}>
       <TemplateHiddenInputs
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         templateId={template.id}
@@ -2215,12 +2488,14 @@ function TemplateArchiveForm({
 }
 
 function TemplateArchiveDangerZone({
+  centerFilterId,
   organizationId,
   selectedDay,
   template,
   view,
   weekStart,
 }: {
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   template: ScheduleTemplateRow;
@@ -2239,6 +2514,7 @@ function TemplateArchiveDangerZone({
         </p>
       </div>
       <TemplateArchiveForm
+        centerFilterId={centerFilterId}
         organizationId={organizationId}
         selectedDay={selectedDay}
         template={template}
@@ -2252,6 +2528,7 @@ function TemplateArchiveDangerZone({
 function ArchivedTemplateCard({
   blockCount,
   canManageTemplates,
+  centerFilterId,
   organizationId,
   selectedDay,
   template,
@@ -2261,6 +2538,7 @@ function ArchivedTemplateCard({
 }: {
   blockCount: number;
   canManageTemplates: boolean;
+  centerFilterId: string;
   organizationId: string;
   selectedDay: TemplateDay;
   template: ScheduleTemplateRow;
@@ -2306,6 +2584,7 @@ function ArchivedTemplateCard({
       {canManageTemplates ? (
         <form action={restoreScheduleTemplate} className="mt-4">
           <TemplateHiddenInputs
+            centerFilterId={centerFilterId}
             organizationId={organizationId}
             selectedDay={selectedDay}
             templateId={template.id}
@@ -2336,9 +2615,12 @@ function TemplateCard({
   assignableCoaches,
   blocks,
   canManageTemplates,
+  centerFilterId,
   centers,
   classTypes,
   coachDisplaysById,
+  coachWorkWindows,
+  createBlockSlot,
   defaultExpanded,
   editBlockId,
   organizationId,
@@ -2354,9 +2636,12 @@ function TemplateCard({
   assignableCoaches: CoachDisplay[];
   blocks: ScheduleTemplateBlockRow[];
   canManageTemplates: boolean;
+  centerFilterId: string;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
   coachDisplaysById: Map<string, CoachDisplay>;
+  coachWorkWindows: ScheduleTemplateCoachWorkWindow[];
+  createBlockSlot?: TemplateCreateBlockSlot | null;
   defaultExpanded: boolean;
   editBlockId?: string | null;
   organizationId: string;
@@ -2464,6 +2749,7 @@ function TemplateCard({
             <InlineEditDetails label="Editar plantilla">
               <div className="grid gap-4">
                 <TemplateMetaForm
+                  centerFilterId={centerFilterId}
                   centers={centers}
                   organizationId={organizationId}
                   selectedDay={selectedDay}
@@ -2473,6 +2759,7 @@ function TemplateCard({
                 />
                 {!templateArchived ? (
                   <TemplateArchiveDangerZone
+                    centerFilterId={centerFilterId}
                     organizationId={organizationId}
                     selectedDay={selectedDay}
                     template={template}
@@ -2487,6 +2774,7 @@ function TemplateCard({
                 appliedTemplateConflict={appliedTemplateConflict}
                 assignedBlockCount={assignedBlockCount}
                 blockCount={blocks.length}
+                centerFilterId={centerFilterId}
                 organizationId={organizationId}
                 selectedDay={selectedDay}
                 template={template}
@@ -2515,7 +2803,9 @@ function TemplateCard({
                   activeCenters={activeCenters}
                   activeClassTypes={activeClassTypes}
                   assignableCoaches={assignableCoaches}
+                  centerFilterId={centerFilterId}
                   centers={centers}
+                  coachWorkWindows={coachWorkWindows}
                   editorSettings={editorSettings}
                   organizationId={organizationId}
                   selectedDay={selectedDay}
@@ -2535,12 +2825,20 @@ function TemplateCard({
               activeClassTypes={activeClassTypes}
               assignableCoaches={assignableCoaches}
               blocks={blocks}
+              centerFilterId={centerFilterId}
               centers={centers}
               classTypes={classTypes}
               coachDisplays={Array.from(coachDisplaysById.values())}
+              coachWorkWindows={coachWorkWindows}
+              createBlockSlot={createBlockSlot}
               editorSettings={editorSettings}
               initialEditBlockId={editBlockId}
               initialSelectedDay={selectedDay}
+              key={
+                createBlockSlot
+                  ? `create-${createBlockSlot.day}-${createBlockSlot.selectedDays.join(",")}-${createBlockSlot.startTime}-${createBlockSlot.endTime}`
+                  : "editor"
+              }
               mode={view}
               organizationId={organizationId}
               templateCenterId={template.center_id}
@@ -2556,11 +2854,12 @@ function TemplateCard({
               </p>
             </div>
           ) : view === "week" ? (
-            <TemplateBlocksWeekView
-              assignableCoaches={assignableCoaches}
-              blocks={blocks}
-              canManageTemplates={canManageTemplates}
-              centers={centers}
+              <TemplateBlocksWeekView
+                assignableCoaches={assignableCoaches}
+                blocks={blocks}
+                canManageTemplates={canManageTemplates}
+                centerFilterId={centerFilterId}
+                centers={centers}
               classTypes={classTypes}
               coachDisplaysById={coachDisplaysById}
               editBlockId={editBlockId}
@@ -2573,11 +2872,12 @@ function TemplateCard({
               weekStart={weekStart}
             />
           ) : (
-            <TemplateBlocksAgendaView
-              assignableCoaches={assignableCoaches}
-              blocks={blocks}
-              canManageTemplates={canManageTemplates}
-              centers={centers}
+              <TemplateBlocksAgendaView
+                assignableCoaches={assignableCoaches}
+                blocks={blocks}
+                canManageTemplates={canManageTemplates}
+                centerFilterId={centerFilterId}
+                centers={centers}
               classTypes={classTypes}
               coachDisplaysById={coachDisplaysById}
               editBlockId={editBlockId}
@@ -2611,6 +2911,8 @@ export default async function TemplatesPage({
   const status = getParam(params.status);
   const error = getParam(params.error);
   const editBlockId = getParam(params.edit_block_id);
+  const explicitCenterFilterId = getParam(params.center_id) ?? null;
+  const createBlockSlot = resolveTemplateCreateBlockSlot(params);
   const templateView = resolveTemplateView(params.view);
   const weekParam = getParam(params.week);
   const memberships = await getActiveMemberships(user.id);
@@ -2679,13 +2981,24 @@ export default async function TemplatesPage({
     windowStart: week.weekStart,
   });
 
-  const [templates, centers, classTypes, coachContext, appliedWeekTemplates] =
-    await Promise.all([
+  const [
+    templates,
+    centers,
+    classTypes,
+    coachContext,
+    appliedWeekTemplates,
+    staffWorkWindowContext,
+  ] = await Promise.all([
     getScheduleTemplates(resolution.organization.id),
     getCenters(resolution.organization.id),
     getClassTypes(resolution.organization.id),
     getScheduleCoachContext(resolution.organization.id),
     getAppliedWeekTemplateSummaries({
+      organizationId: resolution.organization.id,
+      weekEnd: week.weekEnd,
+      weekStart: week.weekStart,
+    }),
+    listStaffWorkWindowsForWeek({
       organizationId: resolution.organization.id,
       weekEnd: week.weekEnd,
       weekStart: week.weekStart,
@@ -2697,6 +3010,14 @@ export default async function TemplatesPage({
   });
   const { assignableCoaches, displaysById: coachDisplaysById } =
     buildCoachDisplays(coachContext);
+  const coachWorkWindows: ScheduleTemplateCoachWorkWindow[] =
+    staffWorkWindowContext.occurrences.map((occurrence) => ({
+      center_id: occurrence.center_id,
+      day_of_week: occurrence.day_of_week,
+      end_time: occurrence.end_time,
+      person_profile_id: occurrence.person_profile_id,
+      start_time: occurrence.start_time,
+    }));
   const blocksByTemplateId = templateBlocks.reduce(
     (groups, block) => {
       const group = groups.get(block.template_id) ?? [];
@@ -2711,13 +3032,41 @@ export default async function TemplatesPage({
   const activeClassTypes = classTypes.filter(
     (classType) => classType.status === "active",
   );
-  const activeTemplates = templates.filter(
+  const centerFilterOptions = activeCenters.length > 0 ? activeCenters : centers;
+  const preferenceCookies = explicitCenterFilterId ? null : await cookies();
+  const rememberedCenterFilterId = explicitCenterFilterId
+    ? null
+    : resolveRememberedTemplateCenterFilter({
+        centers: centerFilterOptions,
+        scheduleCenterValue: preferenceCookies?.get(
+          getScheduleCenterPreferenceCookieName(resolution.organization.id),
+        )?.value,
+        templateCenterValue: preferenceCookies?.get(
+          getTemplateCenterPreferenceCookieName(resolution.organization.id),
+        )?.value,
+      });
+  const templateCenterFilter = resolveTemplateCenterFilter({
+    centers: centerFilterOptions,
+    rawCenterId: explicitCenterFilterId ?? rememberedCenterFilterId,
+  });
+  const allActiveTemplates = templates.filter(
     (template) => template.status !== "archived",
   );
-  const archivedTemplates = templates.filter(
+  const allArchivedTemplates = templates.filter(
     (template) => template.status === "archived",
   );
-
+  const activeTemplates = filterTemplatesByCenter(
+    allActiveTemplates,
+    templateCenterFilter.centerId,
+  );
+  const archivedTemplates = filterTemplatesByCenter(
+    allArchivedTemplates,
+    templateCenterFilter.centerId,
+  );
+  const selectedCenterName = templateCenterFilter.centerId
+    ? centers.find((center) => center.id === templateCenterFilter.centerId)
+        ?.name ?? null
+    : null;
   return (
     <div className="space-y-6">
       <PageHeader
@@ -2741,7 +3090,7 @@ export default async function TemplatesPage({
 
       {status && successMessages[status] ? (
         <TransientFeedbackBanner
-          description="La lista ya muestra las plantillas actuales."
+          description={getSuccessDescription(status)}
           title={successMessages[status]}
           tone="success"
         />
@@ -2764,6 +3113,7 @@ export default async function TemplatesPage({
         >
           <TemplateCreateForm
             activeCenters={activeCenters}
+            centerFilterId={templateCenterFilter.value}
             organizationId={resolution.organization.id}
             selectedDay={selectedDay}
             view={templateView}
@@ -2784,10 +3134,20 @@ export default async function TemplatesPage({
         <SectionHeader
           action={
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <TemplateCenterFocusSwitcher
+                centers={centerFilterOptions}
+                editBlockId={editBlockId}
+                organizationId={resolution.organization.id}
+                selectedCenterValue={templateCenterFilter.value}
+                selectedDay={String(selectedDay)}
+                view={templateView}
+                weekStart={week.weekStart}
+              />
               <TemplateExpansionControls
                 templateCount={activeTemplates.length}
               />
               <TemplateViewTabs
+                centerFilterId={templateCenterFilter.value}
                 editBlockId={editBlockId}
                 organizationId={resolution.organization.id}
                 selectedDay={selectedDay}
@@ -2814,10 +3174,16 @@ export default async function TemplatesPage({
           <EmptyState
             description={
               canManageTemplates
-                ? "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
+                ? selectedCenterName
+                  ? `No hay plantillas activas para ${selectedCenterName}. Usa Todas o crea una plantilla para este centro.`
+                  : "Crea una plantilla semanal para dejar de cargar cada semana desde cero."
                 : "Un rol operativo debe crear plantillas antes de que aparezcan aquí."
             }
-            title="No hay plantillas activas"
+            title={
+              selectedCenterName
+                ? "No hay plantillas para este centro"
+                : "No hay plantillas activas"
+            }
           />
         ) : (
           <div className="grid gap-3">
@@ -2839,9 +3205,16 @@ export default async function TemplatesPage({
                   assignableCoaches={assignableCoaches}
                   blocks={blocks}
                   canManageTemplates={canManageTemplates}
+                  centerFilterId={templateCenterFilter.value}
                   centers={centers}
                   classTypes={classTypes}
                   coachDisplaysById={coachDisplaysById}
+                  coachWorkWindows={coachWorkWindows}
+                  createBlockSlot={
+                    createBlockSlot?.templateId === template.id
+                      ? createBlockSlot
+                      : null
+                  }
                   defaultExpanded={
                     activeTemplates.length === 1 || hasEditingBlock
                   }
@@ -2871,6 +3244,7 @@ export default async function TemplatesPage({
               <ArchivedTemplateCard
                 blockCount={blocksByTemplateId.get(template.id)?.length ?? 0}
                 canManageTemplates={canManageTemplates}
+                centerFilterId={templateCenterFilter.value}
                 key={template.id}
                 organizationId={resolution.organization.id}
                 selectedDay={selectedDay}

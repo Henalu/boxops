@@ -1,6 +1,13 @@
 # Guias de usuario - BoxOps
 
-Guias practicas por rol. Estan incompletas a proposito: el producto ya tiene cobertura basica, plantillas semanales, dashboard admin basico, avatar propio privado y firma propia privada, pero aun no tiene dashboard visual final, cambios, ausencias, fichaje ni documentos firmables.
+Guias practicas por rol.
+
+La carpeta `export/` contiene guias presentables por rol, con PDF y DOCX editable para:
+
+- Propietario
+- Administrador
+- Responsable
+- Entrenador
 
 ## Roles actuales
 

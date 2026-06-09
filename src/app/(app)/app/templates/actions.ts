@@ -16,6 +16,7 @@ import {
 import { resolveWeek } from "@/lib/schedule-blocks";
 import {
   applyScheduleTemplateWeek,
+  ensureScheduleTemplateCurrentWeekApplied,
   ensureScheduleTemplateRangeApplied,
 } from "@/lib/schedule-template-application";
 import {
@@ -46,6 +47,8 @@ type TemplateMetadata = { [key: string]: Json | undefined };
 
 const TEMPLATE_RECOVERY_DAYS = 30;
 const BULK_KEEP_VALUE = "keep";
+const TEMPLATE_CENTER_FILTER_ALL = "all";
+const TEMPLATE_BLOCK_CREATE_KEEP_OPEN_VALUE = "1";
 const TEMPLATE_BLOCK_DELETE_CONFIRMATION_VALUE = "1";
 
 function getRequiredFormString(formData: FormData, key: string) {
@@ -192,14 +195,29 @@ function getTemplateDay(formData: FormData) {
   return Number.isInteger(day) && day >= 1 && day <= 7 ? String(day) : "1";
 }
 
+function getTemplateCenterFilterId(formData: FormData) {
+  const centerFilterId = getRequiredFormString(formData, "centerFilterId");
+
+  return centerFilterId || null;
+}
+
+function shouldKeepTemplateBlockCreateOpen(formData: FormData) {
+  return (
+    getRequiredFormString(formData, "keepTemplateBlockCreateOpen") ===
+    TEMPLATE_BLOCK_CREATE_KEEP_OPEN_VALUE
+  );
+}
+
 function getErrorPath(
   organizationId: string | null,
   week: string | null,
   error: string,
   view?: string | null,
   day?: string | null,
+  centerFilterId?: string | null,
 ) {
   return getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day,
     error,
     organizationId,
@@ -213,7 +231,9 @@ async function getOperationalActionContext(formData: FormData) {
   const rawWeekStart = getRequiredFormString(formData, "weekStart");
   const day = getTemplateDay(formData);
   const view = getTemplateView(formData);
+  const centerFilterId = getTemplateCenterFilterId(formData);
   const redirectPath = getScheduleTemplatesPath({
+    centerId: centerFilterId,
     day,
     organizationId,
     view,
@@ -236,6 +256,7 @@ async function getOperationalActionContext(formData: FormData) {
         resolution.reason,
         view,
         day,
+        centerFilterId,
       ),
     );
   }
@@ -248,6 +269,7 @@ async function getOperationalActionContext(formData: FormData) {
         "forbidden",
         view,
         day,
+        centerFilterId,
       ),
     );
   }
@@ -256,6 +278,7 @@ async function getOperationalActionContext(formData: FormData) {
 
   return {
     day,
+    centerFilterId,
     organization: resolution.organization,
     userId: user.id,
     view,
@@ -273,13 +296,17 @@ function getMutationError(errorCode?: string) {
   }
 
   if (errorCode === "23514") {
-    return "invalid-template-data";
+    return "coach-missing-certification";
   }
 
   return "save-failed";
 }
 
 function getTemplateSyncError(status: string) {
+  if (status === "coach-missing-certification") {
+    return "template-sync-coach-missing-certification";
+  }
+
   if (status === "coach-unavailable") {
     return "template-sync-coach-unavailable";
   }
@@ -453,6 +480,49 @@ async function validateAssignableCoach({
   return null;
 }
 
+async function validateCoachCertificationForClassType({
+  classTypeId,
+  coachProfileId,
+  organizationId,
+  supabase,
+}: {
+  classTypeId: string;
+  coachProfileId: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+}) {
+  const { data: classType, error: classTypeError } = await supabase
+    .from("class_types")
+    .select("certification_id")
+    .eq("id", classTypeId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (classTypeError || !classType) {
+    return "invalid-class-type";
+  }
+
+  if (!classType.certification_id) {
+    return null;
+  }
+
+  const { data: coachCertification, error: certificationError } =
+    await supabase
+      .from("coach_certifications")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("coach_profile_id", coachProfileId)
+      .eq("certification_id", classType.certification_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+  if (certificationError || !coachCertification) {
+    return "coach-missing-certification";
+  }
+
+  return null;
+}
+
 async function validateTemplateBlockReferences({
   centerId,
   classTypeId,
@@ -535,6 +605,20 @@ async function validateTemplateBlockReferences({
       return {
         centerId: null,
         error: coachError,
+      };
+    }
+
+    const certificationError = await validateCoachCertificationForClassType({
+      classTypeId,
+      coachProfileId: defaultCoachProfileId,
+      organizationId,
+      supabase,
+    });
+
+    if (certificationError) {
+      return {
+        centerId: null,
+        error: certificationError,
       };
     }
   }
@@ -666,6 +750,7 @@ export async function createScheduleTemplate(formData: FormData) {
         validation.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -678,6 +763,7 @@ export async function createScheduleTemplate(formData: FormData) {
         "template-archive-confirmation-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -697,6 +783,7 @@ export async function createScheduleTemplate(formData: FormData) {
         centerError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -724,6 +811,7 @@ export async function createScheduleTemplate(formData: FormData) {
         getMutationError(error.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -745,6 +833,7 @@ export async function createScheduleTemplate(formData: FormData) {
           syncError,
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -761,6 +850,7 @@ export async function createScheduleTemplate(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-created",
@@ -783,6 +873,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         "template-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -795,6 +886,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -807,6 +899,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         validation.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -819,6 +912,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         "template-archive-confirmation-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -838,6 +932,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         templateResult.error ?? "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -858,6 +953,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -876,6 +972,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         centerError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -909,6 +1006,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         getMutationError(error.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -933,6 +1031,7 @@ export async function updateScheduleTemplate(formData: FormData) {
           getMutationError(alignedTemplateBlocksError.code),
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -956,6 +1055,7 @@ export async function updateScheduleTemplate(formData: FormData) {
         syncError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1025,6 +1125,7 @@ export async function updateScheduleTemplate(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-updated",
@@ -1046,6 +1147,7 @@ export async function archiveScheduleTemplate(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1065,6 +1167,7 @@ export async function archiveScheduleTemplate(formData: FormData) {
         templateResult.error ?? "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1072,6 +1175,7 @@ export async function archiveScheduleTemplate(formData: FormData) {
   if (templateResult.template.status === "archived") {
     redirect(
       getScheduleTemplatesPath({
+        centerId: context.centerFilterId,
         day: context.day,
         organizationId: context.organization.id,
         status: "template-archived",
@@ -1114,6 +1218,7 @@ export async function archiveScheduleTemplate(formData: FormData) {
         getMutationError(error.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1133,6 +1238,7 @@ export async function archiveScheduleTemplate(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-archived",
@@ -1154,6 +1260,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1173,6 +1280,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
         templateResult.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1185,6 +1293,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1202,6 +1311,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
         "template-recovery-expired",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1238,6 +1348,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
         getMutationError(error.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1260,6 +1371,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-restored",
@@ -1272,6 +1384,7 @@ export async function restoreScheduleTemplate(formData: FormData) {
 export async function createScheduleTemplateBlock(formData: FormData) {
   const context = await getOperationalActionContext(formData);
   const validation = validateScheduleTemplateBlockCreateForm(formData);
+  const keepCreateOpen = shouldKeepTemplateBlockCreateOpen(formData);
 
   if (!validation.ok) {
     redirect(
@@ -1281,6 +1394,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         validation.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1295,6 +1409,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         "missing-fields",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1317,6 +1432,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         referenceResult.error ?? "invalid-center",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1339,6 +1455,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         duplicateError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1362,6 +1479,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
           availabilityError,
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -1397,16 +1515,17 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         getMutationError(error?.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
 
-  const syncStatus = await ensureScheduleTemplateRangeApplied({
+  const syncStatus = await ensureScheduleTemplateCurrentWeekApplied({
     organizationId: context.organization.id,
     supabase,
     templateId: referenceValues.templateId,
-    templateBlockIds: templateBlocks.map((templateBlock) => templateBlock.id),
     timezone: context.organization.timezone,
+    weekStart: context.weekStart,
   });
   const syncError = getTemplateSyncError(syncStatus);
 
@@ -1418,6 +1537,7 @@ export async function createScheduleTemplateBlock(formData: FormData) {
         syncError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1446,9 +1566,26 @@ export async function createScheduleTemplateBlock(formData: FormData) {
     }),
   );
 
+  const createBlockDays = [
+    ...new Set(validation.values.map((values) => values.dayOfWeek)),
+  ].join(",");
+
   redirect(
     getScheduleTemplatesPath({
-      day: context.day,
+      centerId: context.centerFilterId,
+      createTemplateBlock: keepCreateOpen,
+      createTemplateBlockDay: keepCreateOpen
+        ? String(referenceValues.dayOfWeek)
+        : null,
+      createTemplateBlockDays: keepCreateOpen ? createBlockDays : null,
+      createTemplateBlockEnd: keepCreateOpen ? referenceValues.endTime : null,
+      createTemplateBlockStart: keepCreateOpen
+        ? referenceValues.startTime
+        : null,
+      createTemplateBlockTemplateId: keepCreateOpen
+        ? referenceValues.templateId
+        : null,
+      day: keepCreateOpen ? String(referenceValues.dayOfWeek) : context.day,
       organizationId: context.organization.id,
       status:
         templateBlocks.length > 1
@@ -1476,6 +1613,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         "template-block-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1488,6 +1626,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1500,6 +1639,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         validation.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1514,6 +1654,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         "missing-fields",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1538,6 +1679,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1559,6 +1701,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         referenceResult.error ?? "invalid-center",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1581,6 +1724,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         duplicateError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1604,6 +1748,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
           availabilityError,
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -1639,6 +1784,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         getMutationError(error?.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1660,6 +1806,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
         syncError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1695,6 +1842,7 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status:
@@ -1720,6 +1868,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         "template-block-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1732,6 +1881,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1744,6 +1894,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         validation.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1770,6 +1921,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1791,6 +1943,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         referenceResult.error ?? "invalid-center",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1814,6 +1967,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         availabilityError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1843,6 +1997,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         getMutationError(error.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1864,6 +2019,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
         syncError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -1927,6 +2083,7 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-block-updated",
@@ -2050,6 +2207,7 @@ async function deleteTemplateBlocksForContext({
         templateResult.error ?? "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2075,6 +2233,7 @@ async function deleteTemplateBlocksForContext({
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2094,6 +2253,7 @@ async function deleteTemplateBlocksForContext({
         cleanupResult.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2132,12 +2292,14 @@ async function deleteTemplateBlocksForContext({
         getMutationError(deleteError.code),
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: successStatus,
@@ -2160,6 +2322,7 @@ export async function deleteScheduleTemplateBlock(formData: FormData) {
         "template-block-delete-confirmation-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2172,6 +2335,7 @@ export async function deleteScheduleTemplateBlock(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2184,6 +2348,7 @@ export async function deleteScheduleTemplateBlock(formData: FormData) {
         "template-block-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2196,6 +2361,7 @@ export async function deleteScheduleTemplateBlock(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2398,6 +2564,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2413,6 +2580,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2439,6 +2607,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         firstValidationError,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2458,6 +2627,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         templateResult.error ?? "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2477,6 +2647,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         centerUpdate.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2496,6 +2667,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
           coachError,
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -2504,7 +2676,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
   const { data: allBlocks, error: blocksError } = await supabase
     .from("schedule_template_blocks")
     .select(
-      "id, center_id, day_of_week, default_coach_profile_id, end_time, notes, required_coaches, start_time, template_id",
+      "id, center_id, class_type_id, day_of_week, default_coach_profile_id, end_time, notes, required_coaches, start_time, template_id",
     )
     .eq("organization_id", context.organization.id)
     .eq("template_id", templateId);
@@ -2517,6 +2689,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         "save-failed",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2534,6 +2707,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2564,11 +2738,34 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-coach",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
 
   if (coachUpdate.shouldUpdate && normalizedBulkCoachProfileId) {
+    for (const block of selectedBlocks) {
+      const certificationError = await validateCoachCertificationForClassType({
+        classTypeId: block.class_type_id,
+        coachProfileId: normalizedBulkCoachProfileId,
+        organizationId: context.organization.id,
+        supabase,
+      });
+
+      if (certificationError) {
+        redirect(
+          getErrorPath(
+            context.organization.id,
+            context.weekStart,
+            certificationError,
+            context.view,
+            context.day,
+            context.centerFilterId,
+          ),
+        );
+      }
+    }
+
     const targetCoachProfileId = normalizedBulkCoachProfileId;
     const candidateBlocks = allBlocks.map((block) => ({
       ...block,
@@ -2599,6 +2796,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
           "coach-unavailable",
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -2648,6 +2846,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
           getMutationError(error.code),
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -2669,6 +2868,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
           syncError,
           context.view,
           context.day,
+          context.centerFilterId,
         ),
       );
     }
@@ -2725,6 +2925,7 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
 
   redirect(
     getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
       day: context.day,
       organizationId: context.organization.id,
       status: "template-blocks-updated",
@@ -2747,6 +2948,7 @@ export async function deleteScheduleTemplateBlocksBulk(formData: FormData) {
         "template-block-delete-confirmation-required",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2759,6 +2961,7 @@ export async function deleteScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2774,6 +2977,7 @@ export async function deleteScheduleTemplateBlocksBulk(formData: FormData) {
         "invalid-template-block",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2802,6 +3006,7 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
         "invalid-template",
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2822,6 +3027,7 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
         templateResult.error,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2837,6 +3043,7 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
   });
 
   if (
+    result.status === "coach-missing-certification" ||
     result.status === "coach-unavailable" ||
     result.status === "invalid-coach" ||
     result.status === "invalid-template" ||
@@ -2853,6 +3060,7 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
         result.status,
         context.view,
         context.day,
+        context.centerFilterId,
       ),
     );
   }
@@ -2875,6 +3083,10 @@ export async function applyScheduleTemplateToWeek(formData: FormData) {
 
   redirect(
     getSchedulePath({
+      centerId:
+        context.centerFilterId === TEMPLATE_CENTER_FILTER_ALL
+          ? null
+          : context.centerFilterId,
       organizationId: context.organization.id,
       status:
         result.replacedBlockCount > 0

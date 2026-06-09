@@ -506,7 +506,7 @@ Nota futura de Configuracion:
 Decision implementada 2026-05-14:
 
 - Editar un tipo de actividad usa `update_class_type_and_sync_defaults(...)`, no un `UPDATE` suelto desde app.
-- `name`, `slug`, `category`, `color`, `requires_certification` y `status` viven en `class_types` y las pantallas los leen por `class_type_id`; no se duplican como texto en plantillas o bloques.
+- `name`, `slug`, `category`, `color`, `requires_certification` y `status` viven en `class_types` y las pantallas los leen por `class_type_id`; no se duplican como texto en plantillas o bloques. El `slug` es interno: se genera al crear y se conserva estable si cambia el nombre visible.
 - `required_coaches` es un default copiado en `schedule_template_blocks` y `schedule_blocks`. Cuando cambia en el catalogo, se sincroniza a todas las plantillas del tenant y a bloques de horario presentes/futuros accionables.
 - La sincronizacion de horario usa `target_effective_from` calculado con timezone de la organizacion; no reescribe bloques pasados ni bloques `cancelled`/`completed`.
 - `00033_class_type_sync_all_related_blocks.sql` corrige el primer enfoque conservador: todos los bloques relacionados deben alinearse con el nuevo default, no solo los que tenian el valor anterior.
@@ -583,6 +583,8 @@ Decision implementada 2026-05-14:
 - El selector de coach por defecto en Plantillas filtra solapes dentro de la propia plantilla como ayuda UX; el horario real sigue protegido por el guardrail Postgres de asignaciones `assigned`.
 - Los filtros colapsables de Plantillas por asignacion y tipo de actividad no cambian el modelo; solo reducen ruido y ayudan a resolver plantillas grandes.
 - Decision 2026-05-15: `required_coaches = 0` se muestra en Plantillas como "Sin requisito" / "No requiere entrenador"; no cuenta como vacante ni asignado y queda fuera de riesgos de cobertura.
+- Decision 2026-06-08: `/app/templates` enfoca "Plantillas semanales" por centro con opcion global "Todas" (`center_id=all`). Este foco es contexto de UI y no sustituye `schedule_templates.center_id` ni `schedule_template_blocks.center_id`.
+- Decision 2026-06-08: la creacion rapida de bloques desde el grid semanal permite elegir varios dias y puede volver con el modal abierto y banner temporal flotante. Es comportamiento de UI para carga secuencial; no cambia schema ni semantica de `schedule_template_blocks`.
 
 ### `schedule_blocks`
 
@@ -674,11 +676,11 @@ Decision implementada 2026-05-15:
 - `organization_id` es obligatorio y las FKs a `person_profiles` y `centers` son tenant-safe.
 - `day_of_week` usa 1-7, `start_time < end_time` y este corte no abre turnos que cruzan medianoche.
 - No genera ocurrencias semanales persistidas: la app expande las franjas al vuelo para la semana visible.
-- Varias personas pueden coincidir en la misma franja y una persona puede tener varias franjas semanales; esos solapes no son conflicto.
+- Varias personas pueden coincidir en la misma franja. Una misma persona puede tener varias franjas semanales, pero no puede guardar franjas activas que se solapen en dia, fechas y horario; la UI valida antes de guardar y Postgres bloquea nuevas altas/ediciones solapadas.
 - `/app/schedule` lo muestra como resumen compacto, microcopy neutral por celda y contexto en detalle de bloque.
 - El contexto de "asignado fuera de jornada prevista" es aviso suave, no bloqueo de creacion de bloques ni de asignacion de coaches.
 - Todos los miembros activos del tenant ven franjas activas como contexto compartido del dia.
-- `owner`, `admin` y `manager` gestionan todas las franjas del tenant y pueden revisar tambien inactivas.
+- `owner`, `admin` y `manager` gestionan todas las franjas del tenant, pueden revisar tambien inactivas y pueden eliminar franjas creadas por error.
 - `staff`, `center_manager`, `document_admin` y `payroll_manager` no reciben permisos de gestion por herencia.
 - Las notas son cortas y no sensibles. No guardar salario, contrato, payroll, saldos legales, bajas, salud, ubicacion, documentos ni datos bancarios.
 - No toca `schedule_blocks`, `schedule_block_assignments`, plantillas, fichaje real ni cobertura como restriccion dura.
@@ -2853,11 +2855,13 @@ Antes de cualquier migracion futura:
 | Recuperacion segura | Una plantilla archivada puede recuperarse durante 30 dias como `draft`; no vuelve a `active` automaticamente para evitar aplicar rangos sin decision explicita. |
 | Historico independiente | Archivar una plantilla no borra horarios ya generados ni asignaciones. La retencion de `schedule_blocks` se decide separada de la retencion de plantillas. |
 | Permisos B.2 | `owner`, `admin` y `manager` gestionan plantillas; `coach` consulta en modo lectura. |
-| Sincronizacion de rango | Desde 2026-05-14, guardar plantilla/bloque activo sincroniza el rango activo de forma idempotente con `ensureScheduleTemplateRangeApplied(...)`, respetando excepciones. |
+| Sincronizacion de rango | Desde 2026-05-14, guardar plantilla/bloque activo sincroniza el rango activo de forma idempotente con `ensureScheduleTemplateRangeApplied(...)`, respetando excepciones. Desde 2026-06-08, crear bloques nuevos usa `ensureScheduleTemplateCurrentWeekApplied(...)` para sincronizar solo la semana visible y mantener la carga secuencial rapida. |
 | Auditoria de retirada | La retirada de bloques de plantilla usa auditoria operativa corta con accion `removed` sobre `schedule_template_blocks`; no guarda notas completas ni sustituye auditoria legal/payroll. |
 | Edicion multiple acotada | La UI permite seleccionar varios bloques y editar solo entrenador por defecto, notas, entrenadores necesarios y centro si la plantilla cubre todos los centros. |
 | Centro heredado | Si la plantilla esta acotada a un centro, los bloques lo heredan y el campo de centro queda de lectura. |
 | Filtros de trabajo | Los filtros colapsables por asignacion y tipo ayudan a resolver plantillas grandes sin cambiar el modelo ni el historico. |
+| Foco por centro | Desde 2026-06-08, "Plantillas semanales" filtra por centro en URL y ofrece "Todas" como vista global. El foco se conserva en tabs/formularios/actions, pero no cambia el centro real persistido. |
+| Creacion secuencial | La creacion rapida de un slot permite seleccionar varios dias y puede reabrir el modal tras guardar con confirmacion visible para seguir cargando clases sin volver a buscar el hueco. |
 
 ## Decision De Fixture Interno Fase A 2026-05-07
 
@@ -2927,7 +2931,7 @@ Antes de cualquier migracion futura:
 | Decision | Implementacion |
 |---|---|
 | Ruta de catalogo | `/app/class-types` gestiona tipos de clase/actividad del tenant activo. |
-| Migracion de sincronizacion | `class_types` soporta nombre, slug, categoria, coaches necesarios, certificacion, color y estado; desde 2026-05-14 la edicion pasa por `update_class_type_and_sync_defaults(...)` para sincronizar defaults relacionados. |
+| Migracion de sincronizacion | `class_types` soporta nombre, slug interno estable, categoria, coaches necesarios, certificacion, color, icono y estado; desde 2026-05-14 la edicion pasa por `update_class_type_and_sync_defaults(...)` para sincronizar defaults relacionados. |
 | Catalogo por tenant | Todas las queries y mutaciones filtran por `organization_id`. |
 | Color opcional | La app ofrece paleta rapida y acepta color hexadecimal manual `#rrggbb`; no se impone paleta cerrada. |
 | Sin relacion por centro | Los tipos se mantienen a nivel organizacion hasta que horarios/bloques demuestren otra necesidad. |

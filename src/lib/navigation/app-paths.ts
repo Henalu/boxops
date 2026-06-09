@@ -9,6 +9,12 @@ type AppPathOptions = {
   classTypeId?: string | null;
   coachProfileId?: string | null;
   coverageState?: string | null;
+  createTemplateBlock?: boolean | null;
+  createTemplateBlockDay?: string | null;
+  createTemplateBlockDays?: string | null;
+  createTemplateBlockEnd?: string | null;
+  createTemplateBlockStart?: string | null;
+  createTemplateBlockTemplateId?: string | null;
   day?: string | null;
   documentScope?: string | null;
   organizationId?: string | null;
@@ -59,6 +65,30 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
 
   if (options.editTemplateBlockId) {
     params.set("edit_block_id", options.editTemplateBlockId);
+  }
+
+  if (options.createTemplateBlock) {
+    params.set("create_block", "1");
+  }
+
+  if (options.createTemplateBlockTemplateId) {
+    params.set("create_block_template_id", options.createTemplateBlockTemplateId);
+  }
+
+  if (options.createTemplateBlockDay) {
+    params.set("create_block_day", options.createTemplateBlockDay);
+  }
+
+  if (options.createTemplateBlockDays) {
+    params.set("create_block_days", options.createTemplateBlockDays);
+  }
+
+  if (options.createTemplateBlockStart) {
+    params.set("create_block_start", options.createTemplateBlockStart);
+  }
+
+  if (options.createTemplateBlockEnd) {
+    params.set("create_block_end", options.createTemplateBlockEnd);
   }
 
   if (options.week) {
@@ -139,6 +169,10 @@ export function getCoachesPath(options: AppPathOptions = {}) {
 
 export function getClassTypesPath(options: AppPathOptions = {}) {
   return getAppPath("/app/class-types", options);
+}
+
+export function getCertificationsPath(options: AppPathOptions = {}) {
+  return getAppPath("/app/certifications", options);
 }
 
 export function getSchedulePath(options: AppPathOptions = {}) {

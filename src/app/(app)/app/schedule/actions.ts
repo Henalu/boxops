@@ -24,6 +24,7 @@ import {
   type ScheduleBlockFormValues,
 } from "@/lib/schedule-blocks";
 import {
+  findStaffWorkWindowOverlap,
   validateStaffWorkWindowCreateForm,
   validateStaffWorkWindowForm,
   validateStaffWorkWindowReferences,
@@ -59,6 +60,8 @@ const ACTION_RETURN_PATHS = [
   "/app/schedule",
   "/app/work-windows",
 ] as const;
+const STAFF_WORK_WINDOW_DELETE_CONFIRMATION = "delete-staff-work-windows";
+const STAFF_WORK_WINDOW_DELETE_LIMIT = 100;
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -244,10 +247,18 @@ function getAssignmentMutationError(errorCode?: string) {
     return "invalid-assignment-reference";
   }
 
+  if (errorCode === "23514") {
+    return "coach-missing-certification";
+  }
+
   return "save-failed";
 }
 
 function getStaffWorkWindowMutationError(errorCode?: string) {
+  if (errorCode === "23P01") {
+    return "work-window-overlap";
+  }
+
   if (errorCode === "23503") {
     return "invalid-reference";
   }
@@ -257,6 +268,33 @@ function getStaffWorkWindowMutationError(errorCode?: string) {
   }
 
   return "save-failed";
+}
+
+async function getStaffWorkWindowOverlapError({
+  excludeWindowId,
+  organizationId,
+  supabase,
+  values,
+}: {
+  excludeWindowId?: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+  values: StaffWorkWindowFormValues[];
+}) {
+  for (const windowValues of values) {
+    const overlapError = await findStaffWorkWindowOverlap({
+      excludeWindowId,
+      organizationId,
+      supabase,
+      values: windowValues,
+    });
+
+    if (overlapError) {
+      return overlapError;
+    }
+  }
+
+  return null;
 }
 
 async function validateBlockReferences({
@@ -488,6 +526,54 @@ function getStaffWorkWindowChangedAuditFields({
   return changedFields;
 }
 
+function getStaffWorkWindowRemovedAuditFields({
+  bulkSize,
+  window,
+}: {
+  bulkSize: number;
+  window: {
+    center_id: string | null;
+    day_of_week: number;
+    end_time: string;
+    notes: string | null;
+    person_profile_id: string;
+    start_time: string;
+    status: string;
+    valid_from: string;
+    valid_until: string | null;
+  };
+}): OperationalAuditChangedFields {
+  return {
+    bulk_size: auditFieldSet(bulkSize),
+    center_id: auditFieldSet(window.center_id),
+    day_of_week: auditFieldSet(window.day_of_week),
+    end_time: auditFieldSet(normalizeComparableTime(window.end_time)),
+    ...(window.notes ? { notes: auditFieldTouched() } : {}),
+    person_profile_id: auditFieldSet(window.person_profile_id),
+    start_time: auditFieldSet(normalizeComparableTime(window.start_time)),
+    status: auditFieldSet(window.status),
+    valid_from: auditFieldSet(window.valid_from),
+    valid_until: auditFieldSet(window.valid_until),
+  };
+}
+
+function getStaffWorkWindowIds(formData: FormData) {
+  return [
+    ...new Set(
+      [...formData.getAll("staffWorkWindowIds"), formData.get("staffWorkWindowId")]
+        .flatMap((value) => (typeof value === "string" ? [value.trim()] : []))
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function hasStaffWorkWindowDeleteConfirmation(formData: FormData) {
+  return (
+    getRequiredFormString(formData, "deleteConfirmation") ===
+    STAFF_WORK_WINDOW_DELETE_CONFIRMATION
+  );
+}
+
 async function validateAssignableBlock({
   organizationId,
   scheduleBlockId,
@@ -576,6 +662,103 @@ async function validateAssignableCoach({
     if (membershipError || !membership) {
       return "coach-membership-inactive";
     }
+  }
+
+  return null;
+}
+
+async function validateCoachCertificationForScheduleBlock({
+  coachProfileId,
+  organizationId,
+  scheduleBlockId,
+  supabase,
+}: {
+  coachProfileId: string;
+  organizationId: string;
+  scheduleBlockId: string;
+  supabase: SupabaseServerClient;
+}) {
+  const { data: block, error: blockError } = await supabase
+    .from("schedule_blocks")
+    .select("class_type_id")
+    .eq("id", scheduleBlockId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (blockError || !block) {
+    return "block-required";
+  }
+
+  const { data: classType, error: classTypeError } = await supabase
+    .from("class_types")
+    .select("certification_id")
+    .eq("id", block.class_type_id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (classTypeError || !classType) {
+    return "invalid-class-type";
+  }
+
+  if (!classType.certification_id) {
+    return null;
+  }
+
+  const { data: coachCertification, error: certificationError } =
+    await supabase
+      .from("coach_certifications")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("coach_profile_id", coachProfileId)
+      .eq("certification_id", classType.certification_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+  if (certificationError || !coachCertification) {
+    return "coach-missing-certification";
+  }
+
+  return null;
+}
+
+async function validateCoachCertificationForClassType({
+  classTypeId,
+  coachProfileId,
+  organizationId,
+  supabase,
+}: {
+  classTypeId: string;
+  coachProfileId: string;
+  organizationId: string;
+  supabase: SupabaseServerClient;
+}) {
+  const { data: classType, error: classTypeError } = await supabase
+    .from("class_types")
+    .select("certification_id")
+    .eq("id", classTypeId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (classTypeError || !classType) {
+    return "invalid-class-type";
+  }
+
+  if (!classType.certification_id) {
+    return null;
+  }
+
+  const { data: coachCertification, error: certificationError } =
+    await supabase
+      .from("coach_certifications")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("coach_profile_id", coachProfileId)
+      .eq("certification_id", classType.certification_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+  if (certificationError || !coachCertification) {
+    return "coach-missing-certification";
   }
 
   return null;
@@ -699,6 +882,23 @@ export async function assignScheduleBlockCoach(formData: FormData) {
         key: "error",
         returnPath: context.returnPath,
         value: coachError,
+      }),
+    );
+  }
+
+  const certificationError = await validateCoachCertificationForScheduleBlock({
+    coachProfileId: validation.values.coachProfileId,
+    organizationId: context.organization.id,
+    scheduleBlockId: validation.values.scheduleBlockId,
+    supabase,
+  });
+
+  if (certificationError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: certificationError,
       }),
     );
   }
@@ -977,6 +1177,45 @@ export async function updateScheduleBlock(formData: FormData) {
     );
   }
 
+  if (validation.values.classTypeId !== existingBlock.class_type_id) {
+    const { data: activeAssignments, error: activeAssignmentsError } =
+      await supabase
+        .from("schedule_block_assignments")
+        .select("coach_profile_id")
+        .eq("organization_id", context.organization.id)
+        .eq("schedule_block_id", scheduleBlockId)
+        .in("assignment_status", ["assigned", "pending"]);
+
+    if (activeAssignmentsError) {
+      redirect(
+        getActionResultPath({
+          key: "error",
+          returnPath: context.returnPath,
+          value: "save-failed",
+        }),
+      );
+    }
+
+    for (const assignment of activeAssignments ?? []) {
+      const certificationError = await validateCoachCertificationForClassType({
+        classTypeId: validation.values.classTypeId,
+        coachProfileId: assignment.coach_profile_id,
+        organizationId: context.organization.id,
+        supabase,
+      });
+
+      if (certificationError) {
+        redirect(
+          getActionResultPath({
+            key: "error",
+            returnPath: context.returnPath,
+            value: certificationError,
+          }),
+        );
+      }
+    }
+  }
+
   const shouldMarkTemplateException =
     existingBlock.is_template_exception ||
     (isTemplateAppliedBlock(existingBlock) &&
@@ -1157,6 +1396,22 @@ export async function createStaffWorkWindow(formData: FormData) {
     );
   }
 
+  const overlapError = await getStaffWorkWindowOverlapError({
+    organizationId: context.organization.id,
+    supabase,
+    values: validation.values,
+  });
+
+  if (overlapError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: overlapError,
+      }),
+    );
+  }
+
   const { data: windows, error } = await supabase
     .from("staff_work_windows")
     .insert(validation.values.map((values) => ({
@@ -1274,6 +1529,23 @@ export async function updateStaffWorkWindow(formData: FormData) {
         key: "error",
         returnPath: context.returnPath,
         value: referenceError,
+      }),
+    );
+  }
+
+  const overlapError = await getStaffWorkWindowOverlapError({
+    excludeWindowId: existingWindow.id,
+    organizationId: context.organization.id,
+    supabase,
+    values: [validation.values],
+  });
+
+  if (overlapError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: overlapError,
       }),
     );
   }
@@ -1396,6 +1668,124 @@ export async function deactivateStaffWorkWindow(formData: FormData) {
       key: "status",
       returnPath: context.returnPath,
       value: "work-window-deactivated",
+    }),
+  );
+}
+
+export async function deleteStaffWorkWindowsBulk(formData: FormData) {
+  const context = await getOperationalActionContext(
+    formData,
+    "staff-work-windows",
+  );
+  const staffWorkWindowIds = getStaffWorkWindowIds(formData);
+
+  if (!hasStaffWorkWindowDeleteConfirmation(formData)) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-delete-confirmation-required",
+      }),
+    );
+  }
+
+  if (staffWorkWindowIds.length === 0) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-delete-required",
+      }),
+    );
+  }
+
+  if (staffWorkWindowIds.length > STAFF_WORK_WINDOW_DELETE_LIMIT) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-delete-limit",
+      }),
+    );
+  }
+
+  if (staffWorkWindowIds.some((id) => !isScheduleUuid(id))) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-delete-invalid",
+      }),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: windows, error: loadError } = await supabase
+    .from("staff_work_windows")
+    .select(
+      "id, person_profile_id, center_id, day_of_week, start_time, end_time, valid_from, valid_until, status, notes",
+    )
+    .eq("organization_id", context.organization.id)
+    .in("id", staffWorkWindowIds);
+
+  if (loadError) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "save-failed",
+      }),
+    );
+  }
+
+  if (!windows || windows.length !== staffWorkWindowIds.length) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: "work-window-required",
+      }),
+    );
+  }
+
+  await Promise.all(
+    windows.map((window) =>
+      recordOperationalAuditEvent({
+        action: "removed",
+        changedFields: getStaffWorkWindowRemovedAuditFields({
+          bulkSize: windows.length,
+          window,
+        }),
+        entityId: window.id,
+        entityType: "staff_work_windows",
+        organizationId: context.organization.id,
+        supabase,
+      }),
+    ),
+  );
+
+  const { error } = await supabase
+    .from("staff_work_windows")
+    .delete()
+    .eq("organization_id", context.organization.id)
+    .in("id", staffWorkWindowIds);
+
+  if (error) {
+    redirect(
+      getActionResultPath({
+        key: "error",
+        returnPath: context.returnPath,
+        value: getStaffWorkWindowMutationError(error.code),
+      }),
+    );
+  }
+
+  redirect(
+    getActionResultPath({
+      key: "status",
+      returnPath: context.returnPath,
+      value:
+        windows.length > 1 ? "work-windows-deleted" : "work-window-deleted",
     }),
   );
 }

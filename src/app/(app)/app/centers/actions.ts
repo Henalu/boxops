@@ -16,7 +16,10 @@ import {
   auditFieldTouched,
   recordOperationalAuditEvent,
 } from "@/lib/operational-audit";
+import { getAvailableSlug } from "@/lib/slugs";
 import { createClient } from "@/lib/supabase/server";
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -68,6 +71,111 @@ function getMutationError(error?: { code?: string; message?: string }) {
   return "save-failed";
 }
 
+async function getCenterSlug({
+  name,
+  organizationId,
+  supabase,
+  usedSlugs,
+}: {
+  name: string;
+  organizationId: string;
+  supabase: SupabaseClient;
+  usedSlugs: Iterable<string>;
+}) {
+  const { data, error } = await supabase
+    .from("centers")
+    .select("slug")
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return {
+      error,
+      ok: false as const,
+    };
+  }
+
+  return {
+    ok: true as const,
+    slug: getAvailableSlug({
+      fallback: "centro",
+      source: name,
+      usedSlugs: [...(data ?? []).map((center) => center.slug), ...usedSlugs],
+    }),
+  };
+}
+
+async function insertCenterWithUniqueSlug({
+  name,
+  organizationId,
+  status,
+  supabase,
+  timezone,
+}: {
+  name: string;
+  organizationId: string;
+  status: string;
+  supabase: SupabaseClient;
+  timezone: string;
+}) {
+  const attemptedSlugs = new Set<string>();
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const slugResult = await getCenterSlug({
+      name,
+      organizationId,
+      supabase,
+      usedSlugs: attemptedSlugs,
+    });
+
+    if (!slugResult.ok) {
+      return {
+        center: null,
+        error: slugResult.error,
+        slug: null,
+      };
+    }
+
+    attemptedSlugs.add(slugResult.slug);
+
+    const { data: center, error } = await supabase
+      .from("centers")
+      .insert({
+        organization_id: organizationId,
+        name,
+        slug: slugResult.slug,
+        timezone,
+        status,
+      })
+      .select("id")
+      .single();
+
+    if (!error && center) {
+      return {
+        center,
+        error: null,
+        slug: slugResult.slug,
+      };
+    }
+
+    if (error?.code !== "23505") {
+      return {
+        center: null,
+        error,
+        slug: slugResult.slug,
+      };
+    }
+  }
+
+  return {
+    center: null,
+    error: {
+      code: "23505",
+      message: "Could not generate a unique center slug.",
+    },
+    slug: null,
+  };
+}
+
 export async function createCenter(formData: FormData) {
   const context = await getOperationalActionContext(formData);
   const validation = validateCenterForm(formData);
@@ -77,17 +185,13 @@ export async function createCenter(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { data: center, error } = await supabase
-    .from("centers")
-    .insert({
-      organization_id: context.organization.id,
-      name: validation.values.name,
-      slug: validation.values.slug,
-      timezone: validation.values.timezone,
-      status: validation.values.status,
-    })
-    .select("id")
-    .single();
+  const { center, error, slug } = await insertCenterWithUniqueSlug({
+    name: validation.values.name,
+    organizationId: context.organization.id,
+    status: validation.values.status,
+    supabase,
+    timezone: validation.values.timezone,
+  });
 
   if (error || !center) {
     redirect(getErrorPath(context.organization.id, getMutationError(error ?? undefined)));
@@ -97,7 +201,7 @@ export async function createCenter(formData: FormData) {
     action: "created",
     changedFields: {
       name: auditFieldTouched(),
-      slug: auditFieldSet(validation.values.slug),
+      slug: auditFieldSet(slug),
       status: auditFieldSet(validation.values.status),
       timezone: auditFieldSet(validation.values.timezone),
     },
@@ -133,7 +237,6 @@ export async function updateCenter(formData: FormData) {
     .from("centers")
     .update({
       name: validation.values.name,
-      slug: validation.values.slug,
       timezone: validation.values.timezone,
       status: validation.values.status,
     })
@@ -150,7 +253,6 @@ export async function updateCenter(formData: FormData) {
     action: "updated",
     changedFields: {
       name: auditFieldTouched(),
-      slug: auditFieldSet(validation.values.slug),
       status: auditFieldSet(validation.values.status),
       timezone: auditFieldSet(validation.values.timezone),
     },

@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import { ScrollbarActivity } from "@/components/features/scrollbar-activity";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,7 +44,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ScrollbarActivity />
+        {children}
+      </body>
     </html>
   );
 }

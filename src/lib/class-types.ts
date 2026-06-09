@@ -1,3 +1,10 @@
+import { isSlug, toSlug } from "@/lib/slugs";
+import {
+  DEFAULT_CLASS_TYPE_ICON_KEY,
+  isClassTypeIconKey,
+} from "@/lib/class-type-icons";
+import { parseOptionalCertificationId } from "@/lib/certifications";
+
 export const CLASS_TYPE_CATEGORIES = [
   "class",
   "staffing",
@@ -14,11 +21,12 @@ export type ClassTypeStatus = (typeof CLASS_TYPE_STATUSES)[number];
 
 export type ClassTypeFormValues = {
   name: string;
-  slug: string;
   category: ClassTypeCategory;
+  certificationId: string | null;
   requiredCoaches: number;
   requiresCertification: boolean;
   color: string | null;
+  iconKey: string;
   status: ClassTypeStatus;
 };
 
@@ -32,13 +40,14 @@ export type ClassTypeValidationResult =
       error:
         | "missing-fields"
         | "invalid-category"
+        | "invalid-certification"
         | "invalid-color"
+        | "invalid-icon"
         | "invalid-required-coaches"
         | "invalid-slug"
         | "invalid-status";
     };
 
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/;
 
 export function isClassTypeCategory(
@@ -54,7 +63,7 @@ export function isClassTypeStatus(value: string): value is ClassTypeStatus {
 export function getClassTypeCategoryLabel(category: string) {
   const labels: Record<ClassTypeCategory, string> = {
     class: "Clase",
-    competition: "Competicion",
+    competition: "Competición",
     event: "Evento",
     holiday: "Festivo",
     other: "Otra actividad",
@@ -69,12 +78,7 @@ export function getClassTypeStatusLabel(status: string) {
 }
 
 export function toClassTypeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return toSlug(value, "actividad");
 }
 
 function getFormString(formData: FormData, key: string) {
@@ -111,24 +115,26 @@ export function validateClassTypeForm(
   formData: FormData,
 ): ClassTypeValidationResult {
   const name = getFormString(formData, "name");
-  const rawSlug = getFormString(formData, "slug");
   const rawCategory = getFormString(formData, "category") || "class";
   const rawRequiredCoaches = getFormString(formData, "requiredCoaches") || "1";
   const rawStatus = getFormString(formData, "status") || "active";
   const rawColor = getFormString(formData, "color");
-  const requiresCertification = formData.get("requiresCertification") === "on";
-  const slug = rawSlug ? toClassTypeSlug(rawSlug) : toClassTypeSlug(name);
+  const rawIconKey =
+    getFormString(formData, "iconKey") || DEFAULT_CLASS_TYPE_ICON_KEY;
+  const certificationId = parseOptionalCertificationId(
+    formData.get("certificationId"),
+  );
   const requiredCoaches = parseRequiredCoaches(rawRequiredCoaches);
   const color = parseColor(rawColor);
 
-  if (!name || !slug) {
+  if (!name) {
     return {
       ok: false,
       error: "missing-fields",
     };
   }
 
-  if (!SLUG_PATTERN.test(slug)) {
+  if (!isSlug(toClassTypeSlug(name))) {
     return {
       ok: false,
       error: "invalid-slug",
@@ -139,6 +145,13 @@ export function validateClassTypeForm(
     return {
       ok: false,
       error: "invalid-category",
+    };
+  }
+
+  if (certificationId === undefined) {
+    return {
+      ok: false,
+      error: "invalid-certification",
     };
   }
 
@@ -156,6 +169,13 @@ export function validateClassTypeForm(
     };
   }
 
+  if (!isClassTypeIconKey(rawIconKey)) {
+    return {
+      ok: false,
+      error: "invalid-icon",
+    };
+  }
+
   if (!isClassTypeStatus(rawStatus)) {
     return {
       ok: false,
@@ -167,11 +187,12 @@ export function validateClassTypeForm(
     ok: true,
     values: {
       name,
-      slug,
       category: rawCategory,
+      certificationId,
       requiredCoaches,
-      requiresCertification,
+      requiresCertification: certificationId !== null,
       color,
+      iconKey: rawIconKey,
       status: rawStatus,
     },
   };

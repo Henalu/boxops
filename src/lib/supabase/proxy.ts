@@ -7,7 +7,9 @@ import {
 } from "@/lib/auth/required-password-change";
 import { getLoginPath } from "@/lib/auth/redirects";
 import {
+  getTemplateCenterPreferenceCookieName,
   getScheduleCenterPreferenceCookieName,
+  isTemplateCenterPreferenceValue,
   isScheduleCenterPreferenceValue,
   SCHEDULE_CENTER_PREFERENCE_COOKIE_MAX_AGE_SECONDS,
 } from "@/lib/schedule-center-preferences";
@@ -69,6 +71,42 @@ function withScheduleCenterPreference(
   return response;
 }
 
+function withTemplateCenterPreference(
+  request: NextRequest,
+  response: NextResponse,
+) {
+  if (
+    request.nextUrl.pathname !== "/app/templates" ||
+    isNavigationPrefetch(request)
+  ) {
+    return response;
+  }
+
+  const centerId = request.nextUrl.searchParams.get("center_id");
+  const organizationId = request.nextUrl.searchParams.get("organizationId");
+
+  if (
+    !isTemplateCenterPreferenceValue(centerId) ||
+    !isScheduleCenterPreferenceValue(organizationId)
+  ) {
+    return response;
+  }
+
+  response.cookies.set(
+    getTemplateCenterPreferenceCookieName(organizationId),
+    centerId,
+    {
+      httpOnly: true,
+      maxAge: SCHEDULE_CENTER_PREFERENCE_COOKIE_MAX_AGE_SECONDS,
+      path: "/app",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
+  );
+
+  return response;
+}
+
 export async function updateSession(request: NextRequest) {
   const { supabaseUrl, supabaseAnonKey } = getSupabasePublicEnv();
   let response = withPrivateAppCacheHeaders(NextResponse.next({ request }));
@@ -117,8 +155,8 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  return withScheduleCenterPreference(
+  return withTemplateCenterPreference(
     request,
-    withPrivateAppCacheHeaders(response),
+    withScheduleCenterPreference(request, withPrivateAppCacheHeaders(response)),
   );
 }

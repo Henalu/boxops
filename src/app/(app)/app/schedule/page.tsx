@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -23,6 +23,7 @@ import {
   type StaffWorkWindowHourSummaryItem,
 } from "./staff-work-windows-visibility";
 import { ScheduleCenterSwitcher } from "./schedule-center-switcher";
+import { ClassTypeIcon } from "@/components/features/class-type-icon";
 import { TransientFeedbackBanner } from "@/components/features/transient-feedback-banner";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { RouteStateButton } from "@/components/features/route-state-link";
@@ -138,7 +139,14 @@ type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
 
 type ClassTypeRow = Pick<
   Tables<"class_types">,
-  "category" | "color" | "id" | "name" | "required_coaches" | "status"
+  | "category"
+  | "certification_id"
+  | "color"
+  | "icon_key"
+  | "id"
+  | "name"
+  | "required_coaches"
+  | "status"
 >;
 
 type ScheduleBlockAssignmentRow = Pick<
@@ -167,11 +175,18 @@ type MembershipStatusRow = Pick<
 >;
 
 type CoachDisplay = {
+  certificationIds?: string[];
   detail: string;
   id: string;
   isFallback: boolean;
   label: string;
   personProfileId: string | null;
+};
+
+type CoachCertificationRow = {
+  certification_id: string;
+  coach_profile_id: string;
+  status: string;
 };
 
 type ScheduleFilters = {
@@ -230,6 +245,8 @@ const successMessages: Record<string, string> = {
   "work-window-created": "Jornada prevista creada.",
   "work-windows-created": "Jornadas previstas creadas.",
   "work-window-deactivated": "Jornada prevista desactivada.",
+  "work-window-deleted": "Jornada prevista eliminada.",
+  "work-windows-deleted": "Jornadas previstas eliminadas.",
   "work-window-updated": "Jornada prevista actualizada.",
 };
 
@@ -240,6 +257,8 @@ const errorMessages: Record<string, string> = {
   "block-not-assignable":
     "No se puede asignar entrenador a un bloque cancelado o completado.",
   "coach-inactive": "Ese perfil de entrenador no está activo.",
+  "coach-missing-certification":
+    "Ese entrenador no tiene la certificación requerida para esta actividad.",
   "coach-membership-inactive":
     "Ese entrenador tiene cuenta vinculada, pero su acceso no está activo.",
   "coach-required": "Selecciona un entrenador para asignar.",
@@ -299,6 +318,15 @@ const errorMessages: Record<string, string> = {
   "person-profile-without-active-coach":
     "Elige una ficha de entrenador activa para crear jornadas previstas.",
   "save-failed": "No se han podido guardar los cambios.",
+  "work-window-delete-confirmation-required":
+    "Confirma la eliminación antes de borrar jornadas previstas.",
+  "work-window-delete-invalid":
+    "La selección contiene una jornada prevista no válida.",
+  "work-window-delete-limit":
+    "Selecciona menos jornadas para eliminarlas en una sola acción.",
+  "work-window-delete-required": "Selecciona al menos una jornada prevista.",
+  "work-window-overlap":
+    "Ya existe una jornada activa para esa persona que se solapa en ese día, fechas y horario.",
   "template-out-of-range":
     "La semana seleccionada no cruza el rango de validez de esa plantilla.",
   "template-week-has-template":
@@ -319,6 +347,10 @@ const successDescriptions: Partial<Record<keyof typeof successMessages, string>>
     "Las franjas quedan como presencia prevista del personal, sin crear bloques ni fichajes.",
   "work-window-deactivated":
     "La franja deja de mostrarse como activa, sin borrar historial operativo.",
+  "work-window-deleted":
+    "La franja se ha retirado de la planificación prevista.",
+  "work-windows-deleted":
+    "Las franjas se han retirado de la planificación prevista.",
   "work-window-updated":
     "La semana se recalcula al vuelo con la nueva planificación prevista.",
   "operational-event-created":
@@ -695,7 +727,9 @@ async function getClassTypes(organizationId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("class_types")
-    .select("id, name, category, required_coaches, status, color")
+    .select(
+      "id, name, category, certification_id, required_coaches, status, color, icon_key",
+    )
     .eq("organization_id", organizationId)
     .order("status", { ascending: true })
     .order("category", { ascending: true })
@@ -845,6 +879,7 @@ async function getScheduleCoachContext(organizationId: string) {
     linkedPersonProfilesResult,
     userPersonProfilesResult,
     membershipsResult,
+    coachCertificationsResult,
   ] = await Promise.all([
     personProfileIds.length > 0
       ? supabase
@@ -867,6 +902,11 @@ async function getScheduleCoachContext(organizationId: string) {
           .eq("organization_id", organizationId)
           .in("user_id", userIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("coach_certifications")
+      .select("coach_profile_id, certification_id, status")
+      .eq("organization_id", organizationId)
+      .eq("status", "active"),
   ]);
 
   if (linkedPersonProfilesResult.error) {
@@ -887,6 +927,12 @@ async function getScheduleCoachContext(organizationId: string) {
     );
   }
 
+  if (coachCertificationsResult.error) {
+    throw new Error(
+      `Could not load coach certifications: ${coachCertificationsResult.error.message}`,
+    );
+  }
+
   const linkedPersonProfiles =
     linkedPersonProfilesResult.data satisfies PersonProfileRow[];
   const userPersonProfiles =
@@ -900,6 +946,8 @@ async function getScheduleCoachContext(organizationId: string) {
 
   return {
     coachProfiles: coachProfiles satisfies CoachProfileRow[],
+    coachCertifications:
+      coachCertificationsResult.data satisfies CoachCertificationRow[],
     memberships: membershipsResult.data satisfies MembershipStatusRow[],
     personProfiles: [...personProfilesById.values()],
   };
@@ -1196,9 +1244,10 @@ function getHourSlots(
 }
 
 const WEEKLY_TIMELINE_HOUR_HEIGHT = 112;
-const WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT = 76;
-const WEEKLY_TIMELINE_STACKED_BLOCK_GAP = 8;
-const WEEKLY_TIMELINE_HOUR_INSET = 8;
+const WEEKLY_TIMELINE_BLOCK_COLUMN_GAP = 6;
+const WEEKLY_TIMELINE_BLOCK_INSET = 8;
+const WEEKLY_TIMELINE_BLOCK_MIN_HEIGHT = 34;
+const WEEKLY_TIMELINE_COMPACT_BLOCK_HEIGHT = 88;
 
 function minutesToTime(value: number) {
   const bounded = Math.max(0, Math.min(23 * 60 + 59, value));
@@ -1249,19 +1298,15 @@ function sortScheduleBlocksByTime(blocks: ScheduleBlockRow[]) {
       return startDifference;
     }
 
-    return timeToMinutes(first.end_time) - timeToMinutes(second.end_time);
+    const endDifference =
+      timeToMinutes(first.end_time) - timeToMinutes(second.end_time);
+
+    if (endDifference !== 0) {
+      return endDifference;
+    }
+
+    return first.id.localeCompare(second.id);
   });
-}
-
-function groupBlocksByStartHour(blocks: ScheduleBlockRow[]) {
-  return sortScheduleBlocksByTime(blocks).reduce((groups, block) => {
-    const hour = Math.floor(timeToMinutes(block.start_time) / 60);
-    const group = groups.get(hour) ?? [];
-    group.push(block);
-    groups.set(hour, group);
-
-    return groups;
-  }, new Map<number, ScheduleBlockRow[]>());
 }
 
 type WeeklyTimelineHourLayout = {
@@ -1270,36 +1315,12 @@ type WeeklyTimelineHourLayout = {
   top: number;
 };
 
-function getWeeklyTimelineLayout({
-  blocksByDate,
-  days,
-  hourSlots,
-}: {
-  blocksByDate: Map<string, ScheduleBlockRow[]>;
-  days: string[];
-  hourSlots: number[];
-}) {
+function getWeeklyTimelineLayout({ hourSlots }: { hourSlots: number[] }) {
   const layouts: WeeklyTimelineHourLayout[] = [];
   let top = 0;
 
   for (const hour of hourSlots) {
-    const maxStackCount = Math.max(
-      0,
-      ...days.map((day) => {
-        const blocks = blocksByDate.get(day) ?? [];
-
-        return blocks.filter(
-          (block) => Math.floor(timeToMinutes(block.start_time) / 60) === hour,
-        ).length;
-      }),
-    );
-    const stackedHeight =
-      maxStackCount > 1
-        ? WEEKLY_TIMELINE_HOUR_INSET * 2 +
-          maxStackCount * WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT +
-          (maxStackCount - 1) * WEEKLY_TIMELINE_STACKED_BLOCK_GAP
-        : WEEKLY_TIMELINE_HOUR_HEIGHT;
-    const height = Math.max(WEEKLY_TIMELINE_HOUR_HEIGHT, stackedHeight);
+    const height = WEEKLY_TIMELINE_HOUR_HEIGHT;
 
     layouts.push({ height, hour, top });
     top += height;
@@ -1343,6 +1364,125 @@ function getTimelineTopForMinute({
   );
 }
 
+type WeeklyScheduleBlockLayout = {
+  block: ScheduleBlockRow;
+  column: number;
+  columnCount: number;
+  height: number;
+  isCompact: boolean;
+  top: number;
+};
+
+function getWeeklyScheduleDayBlockLayouts({
+  blocks,
+  layoutsByHour,
+}: {
+  blocks: ScheduleBlockRow[];
+  layoutsByHour: Map<number, WeeklyTimelineHourLayout>;
+}) {
+  const timedBlocks = sortScheduleBlocksByTime(blocks)
+    .map((block) => {
+      const startMinute = timeToMinutes(block.start_time);
+      const endMinute = timeToMinutes(block.end_time);
+
+      return {
+        block,
+        endMinute,
+        startMinute,
+      };
+    })
+    .filter(({ endMinute, startMinute }) => endMinute > startMinute);
+
+  const clusters: Array<typeof timedBlocks> = [];
+  let currentCluster: typeof timedBlocks = [];
+  let currentClusterEnd = 0;
+
+  for (const timedBlock of timedBlocks) {
+    if (
+      currentCluster.length > 0 &&
+      timedBlock.startMinute >= currentClusterEnd
+    ) {
+      clusters.push(currentCluster);
+      currentCluster = [];
+    }
+
+    currentCluster.push(timedBlock);
+    currentClusterEnd = Math.max(currentClusterEnd, timedBlock.endMinute);
+  }
+
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  return clusters.flatMap((cluster) => {
+    const columnEnds: number[] = [];
+    const columnByBlockId = new Map<string, number>();
+
+    for (const timedBlock of cluster) {
+      const availableColumn = columnEnds.findIndex(
+        (endMinute) => endMinute <= timedBlock.startMinute,
+      );
+      const column =
+        availableColumn >= 0 ? availableColumn : columnEnds.length;
+
+      columnEnds[column] = timedBlock.endMinute;
+      columnByBlockId.set(timedBlock.block.id, column);
+    }
+
+    const columnCount = Math.max(1, columnEnds.length);
+
+    return cluster.map((timedBlock) => {
+      const durationHeight =
+        getTimelineTopForMinute({
+          layoutsByHour,
+          minute: timedBlock.endMinute,
+        }) -
+        getTimelineTopForMinute({
+          layoutsByHour,
+          minute: timedBlock.startMinute,
+        });
+      const height = Math.max(
+        WEEKLY_TIMELINE_BLOCK_MIN_HEIGHT,
+        durationHeight - WEEKLY_TIMELINE_BLOCK_INSET * 2,
+      );
+
+      return {
+        block: timedBlock.block,
+        column: columnByBlockId.get(timedBlock.block.id) ?? 0,
+        columnCount,
+        height,
+        isCompact: height < WEEKLY_TIMELINE_COMPACT_BLOCK_HEIGHT,
+        top:
+          getTimelineTopForMinute({
+            layoutsByHour,
+            minute: timedBlock.startMinute,
+          }) + WEEKLY_TIMELINE_BLOCK_INSET,
+      } satisfies WeeklyScheduleBlockLayout;
+    });
+  });
+}
+
+function getWeeklyScheduleBlockColumnStyle({
+  column,
+  columnCount,
+}: Pick<WeeklyScheduleBlockLayout, "column" | "columnCount">): CSSProperties {
+  const leftPercent = (column / columnCount) * 100;
+  const rightPercent = ((columnCount - column - 1) / columnCount) * 100;
+  const leftInset =
+    column === 0
+      ? WEEKLY_TIMELINE_BLOCK_INSET
+      : WEEKLY_TIMELINE_BLOCK_COLUMN_GAP / 2;
+  const rightInset =
+    column === columnCount - 1
+      ? WEEKLY_TIMELINE_BLOCK_INSET
+      : WEEKLY_TIMELINE_BLOCK_COLUMN_GAP / 2;
+
+  return {
+    left: `calc(${leftPercent}% + ${leftInset}px)`,
+    right: `calc(${rightPercent}% + ${rightInset}px)`,
+  };
+}
+
 function getBlockCoachSummary({
   assignments,
   coachDisplaysById,
@@ -1355,7 +1495,7 @@ function getBlockCoachSummary({
   );
 
   if (activeAssignments.length === 0) {
-    return "Vacante";
+    return null;
   }
 
   return activeAssignments
@@ -1365,6 +1505,47 @@ function getBlockCoachSummary({
         `Entrenador ${shortId(assignment.coach_profile_id)}`,
     )
     .join(", ");
+}
+
+function getScheduleBlockCoachDisplayLabel({
+  assignments,
+  block,
+  coachDisplaysById,
+}: {
+  assignments: ScheduleBlockAssignmentRow[];
+  block: ScheduleBlockRow;
+  coachDisplaysById: Map<string, CoachDisplay>;
+}) {
+  const coachSummary = getBlockCoachSummary({ assignments, coachDisplaysById });
+
+  if (coachSummary) {
+    return coachSummary;
+  }
+
+  return block.required_coaches > 0 ? "Vacante" : null;
+}
+
+function getTimelineClassTypeLabel({
+  isMinimumDensity,
+  isNarrow,
+  name,
+}: {
+  isMinimumDensity: boolean;
+  isNarrow: boolean;
+  name?: string | null;
+}) {
+  const fallback = "Actividad";
+  const normalizedName = name?.trim() || fallback;
+
+  if (isMinimumDensity) {
+    return normalizedName.slice(0, 3);
+  }
+
+  if (isNarrow) {
+    return normalizedName.split(/\s+/)[0] || fallback;
+  }
+
+  return normalizedName;
 }
 
 function getScheduleBasePath({
@@ -1662,10 +1843,12 @@ function shortId(value: string) {
 }
 
 function getCoachDisplay({
+  certificationIds = [],
   coachProfile,
   membership,
   personProfile,
 }: {
+  certificationIds?: string[];
   coachProfile: CoachProfileRow;
   membership?: MembershipStatusRow;
   personProfile?: PersonProfileRow;
@@ -1676,6 +1859,7 @@ function getCoachDisplay({
     personProfile.visibility_status === "visible"
   ) {
     return {
+      certificationIds,
       detail: membership
         ? `Acceso ${membership.status}`
         : "Persona operativa pendiente de cuenta",
@@ -1688,6 +1872,7 @@ function getCoachDisplay({
 
   if (coachProfile.user_id) {
     return {
+      certificationIds,
       detail: `Cuenta sin persona visible (${shortId(coachProfile.user_id)})`,
       id: coachProfile.id,
       isFallback: true,
@@ -1706,14 +1891,30 @@ function getCoachDisplay({
 }
 
 function buildCoachDisplays({
+  coachCertifications,
   coachProfiles,
   memberships,
   personProfiles,
 }: {
+  coachCertifications: CoachCertificationRow[];
   coachProfiles: CoachProfileRow[];
   memberships: MembershipStatusRow[];
   personProfiles: PersonProfileRow[];
 }) {
+  const certificationIdsByCoachProfileId = new Map<string, string[]>();
+
+  for (const coachCertification of coachCertifications) {
+    const certificationIds =
+      certificationIdsByCoachProfileId.get(coachCertification.coach_profile_id) ??
+      [];
+
+    certificationIds.push(coachCertification.certification_id);
+    certificationIdsByCoachProfileId.set(
+      coachCertification.coach_profile_id,
+      certificationIds,
+    );
+  }
+
   const membershipsByUserId = new Map(
     memberships.map((membership) => [membership.user_id, membership]),
   );
@@ -1729,6 +1930,8 @@ function buildCoachDisplays({
   );
   const displays = coachProfiles.map((coachProfile) =>
     getCoachDisplay({
+      certificationIds:
+        certificationIdsByCoachProfileId.get(coachProfile.id) ?? [],
       coachProfile,
       membership: coachProfile.user_id
         ? membershipsByUserId.get(coachProfile.user_id)
@@ -1778,6 +1981,8 @@ function buildCoachDisplays({
 
       return [
         getCoachDisplay({
+          certificationIds:
+            certificationIdsByCoachProfileId.get(coachProfile.id) ?? [],
           coachProfile,
           membership,
           personProfile,
@@ -1791,18 +1996,6 @@ function buildCoachDisplays({
     assignableCoaches,
     displaysById,
   };
-}
-
-function ColorSwatch({ color }: { color: string | null }) {
-  const safeColor = getSafeColor(color);
-
-  return (
-    <span
-      aria-hidden="true"
-      className="size-3.5 shrink-0 rounded-full border border-border"
-      style={safeColor ? { backgroundColor: safeColor } : undefined}
-    />
-  );
 }
 
 type ScheduleBlockTone =
@@ -1856,21 +2049,17 @@ function getScheduleBlockTone({
 }
 
 function getScheduleBlockToneClasses(tone: ScheduleBlockTone) {
+  const activeClasses =
+    "border-border bg-card text-card-foreground ring-foreground/10 hover:brightness-[0.98]";
   const classes: Record<ScheduleBlockTone, string> = {
-    conflict:
-      "border-red-200 bg-red-50 text-red-950 ring-red-200/70 hover:bg-red-100",
-    covered:
-      "border-emerald-200 bg-emerald-50 text-emerald-950 ring-emerald-200/70 hover:bg-emerald-100",
+    conflict: activeClasses,
+    covered: activeClasses,
     inactive:
       "border-border bg-muted/45 text-muted-foreground ring-border hover:bg-muted",
-    insufficient:
-      "border-amber-200 bg-amber-50 text-amber-950 ring-amber-200/70 hover:bg-amber-100",
-    neutral:
-      "border-border bg-card text-card-foreground ring-foreground/10 hover:bg-muted/45",
-    pending:
-      "border-amber-200 bg-amber-50 text-amber-950 ring-amber-200/70 hover:bg-amber-100",
-    uncovered:
-      "border-red-200 bg-red-50 text-red-950 ring-red-200/70 hover:bg-red-100",
+    insufficient: activeClasses,
+    neutral: activeClasses,
+    pending: activeClasses,
+    uncovered: activeClasses,
   };
 
   return classes[tone];
@@ -1888,6 +2077,21 @@ function getScheduleBlockRailClasses(tone: ScheduleBlockTone) {
   };
 
   return classes[tone];
+}
+
+function getScheduleClassTypeSurfaceStyle(
+  color: string | null,
+): CSSProperties | undefined {
+  const safeColor = getSafeColor(color);
+
+  if (!safeColor) {
+    return undefined;
+  }
+
+  return {
+    backgroundColor: `color-mix(in srgb, ${safeColor} 12%, var(--card))`,
+    borderColor: `color-mix(in srgb, ${safeColor} 42%, var(--border))`,
+  };
 }
 
 function getScheduleAbsenceImpactLabel(coverage: ScheduleBlockCoverage) {
@@ -2822,6 +3026,8 @@ function ScheduleBlockSummaryLink({
   coachDisplaysById,
   compact = false,
   coverage,
+  isMinimumDensity = false,
+  isNarrow = false,
 }: {
   assignments: ScheduleBlockAssignmentRow[];
   basePath: string;
@@ -2832,17 +3038,54 @@ function ScheduleBlockSummaryLink({
   coachDisplaysById: Map<string, CoachDisplay>;
   compact?: boolean;
   coverage: ScheduleBlockCoverage;
+  isMinimumDensity?: boolean;
+  isNarrow?: boolean;
 }) {
   const tone = getScheduleBlockTone({ block, coverage });
-  const coachSummary = getBlockCoachSummary({ assignments, coachDisplaysById });
+  const coachDisplayLabel = getScheduleBlockCoachDisplayLabel({
+    assignments,
+    block,
+    coachDisplaysById,
+  });
   const stateLabel = getScheduleBlockToneLabel({ block, coverage });
   const absenceImpactLabel = getScheduleAbsenceImpactLabel(coverage);
+  const classTypeColor = getSafeColor(classType?.color ?? null);
+  const classTypeSurfaceStyle =
+    tone === "inactive"
+      ? undefined
+      : getScheduleClassTypeSurfaceStyle(classTypeColor);
+  const timeLabel = `${formatTime(block.start_time)}-${formatTime(
+    block.end_time,
+  )}`;
+  const classTypeLabel = getTimelineClassTypeLabel({
+    isMinimumDensity,
+    isNarrow,
+    name: classType?.name,
+  });
+  const hideCoachSummary = isMinimumDensity || !coachDisplayLabel;
+  const showStateBadge =
+    !isMinimumDensity &&
+    coverage.state !== "covered" &&
+    coverage.state !== "uncovered";
+  const showAbsenceImpactBadge =
+    !isMinimumDensity && absenceImpactLabel && absenceImpactLabel !== stateLabel;
+  const accessibleLabel = [
+    timeLabel,
+    stateLabel,
+    classType?.name ?? "Actividad",
+    center?.name ?? "Centro no disponible",
+    coachDisplayLabel,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <RouteStateButton
+      aria-label={accessibleLabel}
       className={cn(
-        "group relative isolate flex min-h-[76px] min-w-0 cursor-pointer flex-col justify-between gap-2 overflow-hidden rounded-xl border p-3 text-left text-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-24 md:rounded-lg",
+        "group relative isolate flex min-h-[76px] w-full min-w-0 cursor-pointer flex-col justify-between gap-2 overflow-hidden rounded-xl border p-3 text-left text-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-24 md:rounded-lg",
         compact ? "md:min-h-0 md:gap-1.5 md:p-2" : "",
+        isMinimumDensity ? "md:items-start md:justify-start md:gap-1" : "",
         getScheduleBlockToneClasses(tone),
         className,
       )}
@@ -2851,6 +3094,7 @@ function ScheduleBlockSummaryLink({
         basePath,
         blockId: block.id,
       })}
+      style={classTypeSurfaceStyle}
     >
       <span
         aria-hidden="true"
@@ -2861,42 +3105,75 @@ function ScheduleBlockSummaryLink({
       />
       <span className="flex min-w-0 flex-col gap-1.5 pl-3">
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="font-mono text-xs font-semibold tabular-nums">
-            {formatTime(block.start_time)}-{formatTime(block.end_time)}
+          <span
+            className={cn(
+              "font-mono text-xs font-semibold tabular-nums",
+              isMinimumDensity ? "sr-only" : "",
+            )}
+          >
+            {timeLabel}
           </span>
-          <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
+          <span
+            className={cn(
+              "max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5",
+              showStateBadge ? "" : "sr-only",
+            )}
+          >
             {stateLabel}
           </span>
-          {absenceImpactLabel && absenceImpactLabel !== stateLabel ? (
-            <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
+          {showAbsenceImpactBadge ? (
+            <span
+              className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5"
+            >
               {absenceImpactLabel}
             </span>
           ) : null}
           {block.is_template_exception ? (
-            <span className="max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5">
+            <span
+              className={cn(
+                "max-w-full truncate rounded-full bg-background px-2 py-0.5 text-[11px] font-medium ring-1 ring-foreground/5",
+                isMinimumDensity ? "sr-only" : "",
+              )}
+            >
               Cambiado
             </span>
           ) : null}
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-semibold leading-5 tracking-tight">
-            {classType?.name ?? "Actividad"}
-          </span>
-          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs opacity-80">
-            <ColorSwatch color={classType?.color ?? null} />
-            <span className="truncate">
-              {center?.name ?? "Centro no disponible"}
+          <span
+            className={cn(
+              "flex min-w-0 text-[13px] font-semibold tracking-tight",
+              isMinimumDensity
+                ? "flex-col items-start gap-0.5 leading-none"
+                : "items-center gap-1.5 leading-5",
+            )}
+            title={classType?.name ?? "Actividad"}
+          >
+            <ClassTypeIcon
+              className={cn("shrink-0", isMinimumDensity ? "size-3" : "size-3.5")}
+              iconKey={classType?.icon_key}
+              style={classTypeColor ? { color: classTypeColor } : undefined}
+            />
+            <span
+              className={cn(
+                "min-w-0 truncate",
+                isMinimumDensity ? "text-[10px] uppercase" : "",
+              )}
+            >
+              {classTypeLabel}
             </span>
           </span>
+          {hideCoachSummary ? null : (
+            <span className="mt-0.5 block truncate text-xs opacity-80">
+              {coachDisplayLabel}
+            </span>
+          )}
         </span>
       </span>
-      <span className="flex min-w-0 items-center justify-between gap-2 pl-3 text-xs leading-4 opacity-80">
-        <span className="truncate">{coachSummary}</span>
-        <PanelRightOpen
-          aria-hidden="true"
-          className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
-        />
-      </span>
+      <PanelRightOpen
+        aria-hidden="true"
+        className="absolute bottom-2 right-2 size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+      />
     </RouteStateButton>
   );
 }
@@ -3416,8 +3693,6 @@ function WeeklyScheduleView({
     }),
   );
   const timelineLayout = getWeeklyTimelineLayout({
-    blocksByDate,
-    days,
     hourSlots,
   });
 
@@ -3642,15 +3917,11 @@ function WeeklyScheduleView({
                     );
                   })}
 
-                  {[...groupBlocksByStartHour(dayBlocks).entries()].flatMap(
-                    ([hour, hourBlocks]) =>
-                      hourBlocks.map((block, stackIndex) => ({
-                        block,
-                        hour,
-                        stackIndex,
-                        stackCount: hourBlocks.length,
-                      })),
-                  ).map(({ block, hour, stackIndex, stackCount }) => {
+                  {getWeeklyScheduleDayBlockLayouts({
+                    blocks: dayBlocks,
+                    layoutsByHour: timelineLayout.layoutsByHour,
+                  }).map((layout) => {
+                    const block = layout.block;
                     const coverage = coverageByBlock.get(block.id);
 
                     if (!coverage) {
@@ -3659,42 +3930,14 @@ function WeeklyScheduleView({
                       );
                     }
 
-                    const startMinute = timeToMinutes(block.start_time);
-                    const endMinute = timeToMinutes(block.end_time);
-                    const layout = timelineLayout.layoutsByHour.get(hour);
-                    const stacked = stackCount > 1 && Boolean(layout);
-                    const top = stacked
-                      ? (layout?.top ?? 0) +
-                        WEEKLY_TIMELINE_HOUR_INSET +
-                        stackIndex *
-                          (WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT +
-                            WEEKLY_TIMELINE_STACKED_BLOCK_GAP)
-                      : getTimelineTopForMinute({
-                          layoutsByHour: timelineLayout.layoutsByHour,
-                          minute: startMinute,
-                        }) + 8;
-                    const height = stacked
-                      ? WEEKLY_TIMELINE_STACKED_BLOCK_HEIGHT
-                      : Math.max(
-                          58,
-                          getTimelineTopForMinute({
-                            layoutsByHour: timelineLayout.layoutsByHour,
-                            minute: endMinute,
-                          }) -
-                            getTimelineTopForMinute({
-                              layoutsByHour: timelineLayout.layoutsByHour,
-                              minute: startMinute,
-                            }) -
-                            12,
-                        );
-
                     return (
                       <div
-                        className="absolute inset-x-2 z-10"
+                        className="absolute z-10"
                         key={block.id}
                         style={{
-                          height,
-                          top,
+                          ...getWeeklyScheduleBlockColumnStyle(layout),
+                          height: layout.height,
+                          top: layout.top,
                         }}
                       >
                         <ScheduleBlockSummaryLink
@@ -3704,12 +3947,18 @@ function WeeklyScheduleView({
                           center={centersById.get(block.center_id)}
                           className={cn(
                             "h-full md:min-h-0",
-                            stacked && "md:gap-1 md:px-2 md:pb-2 md:pt-1.5",
+                            layout.columnCount > 1 &&
+                              "md:gap-1 md:px-2 md:pb-2 md:pt-1.5",
+                            layout.isCompact && "md:px-1.5 md:py-1.5",
                           )}
                           classType={classTypesById.get(block.class_type_id)}
                           coachDisplaysById={coachDisplaysById}
                           compact
                           coverage={coverage}
+                          isMinimumDensity={
+                            layout.columnCount >= 3 || layout.isCompact
+                          }
+                          isNarrow={layout.columnCount > 1 || layout.isCompact}
                         />
                       </div>
                     );

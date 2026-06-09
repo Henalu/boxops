@@ -108,8 +108,9 @@ Visual:
 Copy recomendado:
 
 - "Sin cubrir"
-- "Vacante"
 - "Requiere 1 coach"
+
+En tarjetas compactas de Horario no se repite "Vacante" si ya aparece el badge "Sin cubrir"; solo aporta ruido y puede cambiar la altura visual del bloque.
 
 ### Cobertura Insuficiente
 

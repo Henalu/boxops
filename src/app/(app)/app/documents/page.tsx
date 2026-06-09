@@ -406,7 +406,7 @@ function DocumentCreateForm({
       </div>
 
       <label className="grid gap-2">
-        <span className="text-sm font-medium">Descripcion opcional</span>
+        <span className="text-sm font-medium">Descripción opcional</span>
         <Textarea
           maxLength={500}
           name="description"

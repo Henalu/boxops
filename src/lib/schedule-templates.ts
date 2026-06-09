@@ -72,6 +72,14 @@ export type ScheduleTemplateCoachUnavailableBlock = {
   templateBlockId: string;
 };
 
+export type ScheduleTemplateCoachWorkWindow = {
+  center_id: string | null;
+  day_of_week: number;
+  end_time: string;
+  person_profile_id: string;
+  start_time: string;
+};
+
 export type ScheduleTemplateValidationResult =
   | {
       ok: true;
@@ -232,6 +240,91 @@ function timeRangesOverlap(
     timeToMinutes(firstStart) < timeToMinutes(secondEnd) &&
     timeToMinutes(secondStart) < timeToMinutes(firstEnd)
   );
+}
+
+function timeRangeContains(
+  containerStart: string,
+  containerEnd: string,
+  targetStart: string,
+  targetEnd: string,
+) {
+  return (
+    timeToMinutes(containerStart) <= timeToMinutes(targetStart) &&
+    timeToMinutes(containerEnd) >= timeToMinutes(targetEnd)
+  );
+}
+
+export function getScheduleTemplateCoachWorkWindowMatchedDayCount({
+  centerId,
+  days,
+  endTime,
+  personProfileId,
+  startTime,
+  workWindows,
+}: {
+  centerId: string | null;
+  days: number[];
+  endTime: string;
+  personProfileId: string | null;
+  startTime: string;
+  workWindows: ScheduleTemplateCoachWorkWindow[];
+}) {
+  const targetStartTime = normalizeTime(startTime);
+  const targetEndTime = normalizeTime(endTime);
+  const uniqueDays = [...new Set(days)];
+
+  if (
+    !personProfileId ||
+    !targetStartTime ||
+    !targetEndTime ||
+    uniqueDays.length === 0 ||
+    timeToMinutes(targetStartTime) >= timeToMinutes(targetEndTime)
+  ) {
+    return 0;
+  }
+
+  return uniqueDays.filter((day) =>
+    workWindows.some((workWindow) => {
+      const windowStartTime = normalizeTime(workWindow.start_time);
+      const windowEndTime = normalizeTime(workWindow.end_time);
+
+      return (
+        workWindow.person_profile_id === personProfileId &&
+        workWindow.day_of_week === day &&
+        (!workWindow.center_id || workWindow.center_id === centerId) &&
+        windowStartTime !== null &&
+        windowEndTime !== null &&
+        timeRangeContains(
+          windowStartTime,
+          windowEndTime,
+          targetStartTime,
+          targetEndTime,
+        )
+      );
+    }),
+  ).length;
+}
+
+export function getScheduleTemplateCoachWorkWindowHintLabel({
+  matchedDayCount,
+  totalDayCount,
+}: {
+  matchedDayCount: number;
+  totalDayCount: number;
+}) {
+  if (matchedDayCount <= 0 || totalDayCount <= 0) {
+    return "";
+  }
+
+  if (totalDayCount === 1) {
+    return " - En franja horaria";
+  }
+
+  if (matchedDayCount === totalDayCount) {
+    return " - En franjas seleccionadas";
+  }
+
+  return ` - En ${matchedDayCount}/${totalDayCount} días`;
 }
 
 export function getUnavailableScheduleTemplateCoachBlocks({

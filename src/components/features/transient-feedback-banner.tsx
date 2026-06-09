@@ -66,7 +66,7 @@ export function TransientFeedbackBanner({
   return (
     <div
       aria-live={tone === "error" ? "assertive" : "polite"}
-      className="pointer-events-none fixed inset-x-4 top-4 z-50 flex justify-center md:inset-x-auto md:right-6 md:justify-end"
+      className="pointer-events-none fixed inset-x-4 top-4 z-[90] flex justify-center md:inset-x-auto md:right-6 md:justify-end"
       role={tone === "error" ? "alert" : "status"}
     >
       <div

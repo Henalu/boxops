@@ -20,6 +20,8 @@ import {
   setClassTypeStatus,
   updateClassType,
 } from "./actions";
+import { ClassTypeIcon } from "@/components/features/class-type-icon";
+import { ClassTypeIconSelect } from "@/components/features/class-type-icon-select";
 import { ColorPaletteField } from "@/components/features/color-palette-field";
 import {
   CollapsibleActionPanel,
@@ -56,6 +58,9 @@ import {
   type ClassTypeCategory,
   type ClassTypeStatus,
 } from "@/lib/class-types";
+import {
+  getClassTypeIconLabel,
+} from "@/lib/class-type-icons";
 import { getClassTypesPath } from "@/lib/navigation/app-paths";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -79,7 +84,9 @@ type ClassTypesPageProps = {
 type ClassTypeRow = Pick<
   Tables<"class_types">,
   | "category"
+  | "certification_id"
   | "color"
+  | "icon_key"
   | "id"
   | "name"
   | "required_coaches"
@@ -88,6 +95,12 @@ type ClassTypeRow = Pick<
   | "status"
   | "updated_at"
 >;
+
+type CertificationRow = {
+  id: string;
+  status: string;
+  title: string;
+};
 
 type ClassTypeCertificationFilter = "all" | "not_required" | "required";
 
@@ -109,7 +122,7 @@ const REQUIRED_COACHES_FILTERS: Array<{
   { label: "Sin requisito", value: "0" },
   { label: "1 entrenador", value: "1" },
   { label: "2 entrenadores", value: "2" },
-  { label: "3 o mas", value: "3_plus" },
+  { label: "3 o más", value: "3_plus" },
 ];
 
 const successMessages: Record<string, string> = {
@@ -129,15 +142,19 @@ const successDescriptions: Record<string, string> = {
 
 const errorMessages: Record<string, string> = {
   "class-type-required": "No se ha recibido el tipo a actualizar.",
-  "duplicate-slug": "Ya existe un tipo con ese slug en esta organización.",
+  "duplicate-slug":
+    "No se ha podido crear un identificador interno libre. Prueba con otro nombre.",
   forbidden: "Tu rol no permite gestionar tipos de actividad.",
+  "invalid-certification": "La certificación seleccionada no está disponible.",
   "invalid-category": "La categoría seleccionada no es válida.",
   "invalid-color": "Usa un color hexadecimal, por ejemplo #2563eb.",
+  "invalid-icon": "El icono seleccionado no está disponible.",
   "invalid-required-coaches":
     "Los entrenadores necesarios deben ser un número entero entre 0 y 20.",
-  "invalid-slug": "Usa un slug en minúsculas, números y guiones.",
+  "invalid-slug":
+    "No se ha podido preparar el identificador interno. Prueba con otro nombre.",
   "invalid-status": "El estado seleccionado no es válido.",
-  "missing-fields": "Completa nombre y slug.",
+  "missing-fields": "Completa el nombre.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required:
@@ -154,7 +171,7 @@ async function getClassTypes(organizationId: string) {
   const { data, error } = await supabase
     .from("class_types")
     .select(
-      "id, name, slug, category, required_coaches, requires_certification, status, color, updated_at",
+      "id, name, slug, category, certification_id, required_coaches, requires_certification, status, color, icon_key, updated_at",
     )
     .eq("organization_id", organizationId)
     .order("status", { ascending: true })
@@ -166,6 +183,22 @@ async function getClassTypes(organizationId: string) {
   }
 
   return data satisfies ClassTypeRow[];
+}
+
+async function getCertifications(organizationId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("certifications")
+    .select("id, title, status")
+    .eq("organization_id", organizationId)
+    .order("status", { ascending: true })
+    .order("title", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load certifications: ${error.message}`);
+  }
+
+  return (data ?? []) satisfies CertificationRow[];
 }
 
 function formatUpdatedAt(value: string, timezone: string) {
@@ -392,29 +425,74 @@ function ColorSwatch({ color }: { color: string | null }) {
   );
 }
 
-function CertificationBadge({ required }: { required: boolean }) {
+function getCertificationTitle({
+  certificationId,
+  certifications,
+}: {
+  certificationId: string | null;
+  certifications: CertificationRow[];
+}) {
+  if (!certificationId) {
+    return "Ninguna";
+  }
+
+  return (
+    certifications.find((certification) => certification.id === certificationId)
+      ?.title ?? "Certificación no disponible"
+  );
+}
+
+function ClassTypeCertificationBadge({
+  certificationId,
+  certifications,
+  required,
+}: {
+  certificationId: string | null;
+  certifications: CertificationRow[];
+  required: boolean;
+}) {
   return (
     <StatusBadge tone={required ? "warning" : "neutral"}>
-      {required ? "Requiere" : "No"}
+      {required
+        ? getCertificationTitle({ certificationId, certifications })
+        : "Ninguna"}
     </StatusBadge>
   );
 }
 
-function CertificationCheckbox({
-  defaultChecked,
+function ClassTypeCertificationSelect({
+  certifications,
+  defaultValue,
 }: {
-  defaultChecked?: boolean;
+  certifications: CertificationRow[];
+  defaultValue?: string | null;
 }) {
+  const activeCertifications = certifications.filter(
+    (certification) => certification.status === "active",
+  );
+  const selectedInactiveCertification = certifications.find(
+    (certification) =>
+      certification.id === defaultValue && certification.status !== "active",
+  );
+
   return (
-    <label className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border px-3 text-sm md:min-h-9">
-      <input
-        className="size-4 shrink-0 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-        defaultChecked={defaultChecked}
-        name="requiresCertification"
-        type="checkbox"
-      />
-      <span>Requiere certificación</span>
-    </label>
+    <select
+      className={selectClassName()}
+      defaultValue={defaultValue ?? "none"}
+      name="certificationId"
+    >
+      <option value="none">Ninguna</option>
+      {selectedInactiveCertification ? (
+        <option value={selectedInactiveCertification.id}>
+          {selectedInactiveCertification.title} (inactiva)
+        </option>
+      ) : null}
+      {activeCertifications.map((certification) => (
+        <option key={certification.id} value={certification.id}>
+          {certification.title}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -551,7 +629,7 @@ function ClassTypeFilterControls({
                 className="pl-9"
                 defaultValue={filters.q}
                 name="q"
-                placeholder="Nombre o slug"
+                placeholder="Nombre"
                 type="search"
               />
             </span>
@@ -595,7 +673,7 @@ function ClassTypeFilterControls({
 
           <label className="grid gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">
-              Certificacion
+              Certificación
             </span>
             <select
               className={selectClassName()}
@@ -641,23 +719,24 @@ function ClassTypeFilterControls({
   );
 }
 
-function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
+function ClassTypeCreateForm({
+  certifications,
+  organizationId,
+}: {
+  certifications: CertificationRow[];
+  organizationId: string;
+}) {
   return (
     <form action={createClassType} className="grid gap-4 lg:grid-cols-6">
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="status" type="hidden" value="active" />
 
-      <label className="grid gap-2 lg:col-span-2">
+      <label className="grid gap-2 lg:col-span-3">
         <span className="text-sm font-medium">Nombre</span>
         <Input name="name" placeholder="Open Box" required />
       </label>
 
       <label className="grid gap-2 lg:col-span-2">
-        <span className="text-sm font-medium">Slug interno</span>
-        <Input name="slug" placeholder="open-box" />
-      </label>
-
-      <label className="grid gap-2">
         <span className="text-sm font-medium">Categoría</span>
         <ClassTypeCategorySelect />
       </label>
@@ -678,8 +757,12 @@ function ClassTypeCreateForm({ organizationId }: { organizationId: string }) {
         <ColorPaletteField label="Color" name="color" placeholder="#2563eb" />
       </div>
 
+      <div className="lg:col-span-2">
+        <ClassTypeIconSelect />
+      </div>
+
       <div className="flex items-end lg:col-span-2">
-        <CertificationCheckbox />
+        <ClassTypeCertificationSelect certifications={certifications} />
       </div>
 
       <div className="flex items-end lg:col-span-2">
@@ -698,8 +781,9 @@ function ClassTypeIdentity({ classType }: { classType: ClassTypeRow }) {
       <span
         className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-primary/10 text-primary ring-1 ring-primary/10"
         style={getColorAccentStyle(classType.color)}
+        title={getClassTypeIconLabel(classType.icon_key)}
       >
-        <ListChecks aria-hidden="true" className="size-5" />
+        <ClassTypeIcon className="size-5" iconKey={classType.icon_key} />
       </span>
 
       <div className="min-w-0 space-y-2">
@@ -707,9 +791,6 @@ function ClassTypeIdentity({ classType }: { classType: ClassTypeRow }) {
           <h3 className="truncate text-base font-semibold tracking-tight md:text-lg">
             {classType.name}
           </h3>
-          <p className="mt-1 truncate font-mono text-sm text-muted-foreground">
-            {classType.slug}
-          </p>
         </div>
         <div className="xl:hidden">
           <ClassTypeStatusBadge status={classType.status} />
@@ -749,9 +830,11 @@ function ClassTypeColorPill({ classType }: { classType: ClassTypeRow }) {
 
 function ClassTypeCardSummary({
   classType,
+  certifications,
   timezone,
 }: {
   classType: ClassTypeRow;
+  certifications: CertificationRow[];
   timezone: string;
 }) {
   return (
@@ -764,8 +847,12 @@ function ClassTypeCardSummary({
         <ClassTypeMetaField label="Entrenadores">
           {classType.required_coaches}
         </ClassTypeMetaField>
-        <ClassTypeMetaField label="Certificacion">
-          <CertificationBadge required={classType.requires_certification} />
+        <ClassTypeMetaField label="Certificación">
+          <ClassTypeCertificationBadge
+            certificationId={classType.certification_id}
+            certifications={certifications}
+            required={classType.requires_certification}
+          />
         </ClassTypeMetaField>
         <ClassTypeMetaField label="Color">
           <ClassTypeColorPill classType={classType} />
@@ -787,7 +874,7 @@ function ClassTypeListHeader() {
       <span>Tipo de actividad</span>
       <span>Categoría</span>
       <span>Entrenadores</span>
-      <span>Certificacion</span>
+      <span>Certificación</span>
       <span>Color</span>
       <span>Actualizado</span>
       <span className="text-right">Estado</span>
@@ -797,15 +884,21 @@ function ClassTypeListHeader() {
 
 function ClassTypeReadOnlyCard({
   classType,
+  certifications,
   timezone,
 }: {
   classType: ClassTypeRow;
+  certifications: CertificationRow[];
   timezone: string;
 }) {
   return (
     <Card size="sm">
       <CardContent className="px-5 py-2">
-        <ClassTypeCardSummary classType={classType} timezone={timezone} />
+        <ClassTypeCardSummary
+          certifications={certifications}
+          classType={classType}
+          timezone={timezone}
+        />
       </CardContent>
     </Card>
   );
@@ -813,10 +906,12 @@ function ClassTypeReadOnlyCard({
 
 function ClassTypeAdminCard({
   classType,
+  certifications,
   organizationId,
   timezone,
 }: {
   classType: ClassTypeRow;
+  certifications: CertificationRow[];
   organizationId: string;
   timezone: string;
 }) {
@@ -826,7 +921,11 @@ function ClassTypeAdminCard({
   return (
     <Card size="sm">
       <CardContent className="space-y-4 px-5 py-2">
-        <ClassTypeCardSummary classType={classType} timezone={timezone} />
+        <ClassTypeCardSummary
+          certifications={certifications}
+          classType={classType}
+          timezone={timezone}
+        />
 
         <div className="border-t border-border pt-4">
           <InlineEditDetails label="Gestionar">
@@ -843,17 +942,12 @@ function ClassTypeAdminCard({
                 <input name="classTypeId" type="hidden" value={classType.id} />
 
                 <div className="grid gap-4 lg:grid-cols-6">
-                  <label className="grid gap-2 lg:col-span-2">
+                  <label className="grid gap-2 lg:col-span-3">
                     <span className="text-sm font-medium">Nombre</span>
                     <Input name="name" required defaultValue={classType.name} />
                   </label>
 
                   <label className="grid gap-2 lg:col-span-2">
-                    <span className="text-sm font-medium">Slug interno</span>
-                    <Input name="slug" required defaultValue={classType.slug} />
-                  </label>
-
-                  <label className="grid gap-2">
                     <span className="text-sm font-medium">Categoría</span>
                     <ClassTypeCategorySelect defaultValue={classType.category} />
                   </label>
@@ -871,7 +965,7 @@ function ClassTypeAdminCard({
                   </label>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.42fr)] lg:items-start">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.56fr)] lg:items-start">
                   <ColorPaletteField
                     defaultValue={classType.color}
                     label="Color"
@@ -879,18 +973,21 @@ function ClassTypeAdminCard({
                     placeholder="#2563eb"
                   />
 
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                    <label className="grid gap-2">
-                      <span className="text-sm font-medium">Estado</span>
-                      <ClassTypeStatusSelect defaultValue={classType.status} />
-                    </label>
+                  <ClassTypeIconSelect defaultValue={classType.icon_key} />
+                </div>
 
-                    <div className="grid content-start gap-2">
-                      <span className="text-sm font-medium">Certificación</span>
-                      <CertificationCheckbox
-                        defaultChecked={classType.requires_certification}
-                      />
-                    </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-sm font-medium">Estado</span>
+                    <ClassTypeStatusSelect defaultValue={classType.status} />
+                  </label>
+
+                  <div className="grid content-start gap-2">
+                    <span className="text-sm font-medium">Certificación</span>
+                    <ClassTypeCertificationSelect
+                      certifications={certifications}
+                      defaultValue={classType.certification_id}
+                    />
                   </div>
                 </div>
 
@@ -984,7 +1081,10 @@ export default async function ClassTypesPage({
     );
   }
 
-  const classTypes = await getClassTypes(resolution.organization.id);
+  const [classTypes, certifications] = await Promise.all([
+    getClassTypes(resolution.organization.id),
+    getCertifications(resolution.organization.id),
+  ]);
   const canManageClassTypes = canManageOperationalData(
     resolution.membership.role,
   );
@@ -1039,7 +1139,10 @@ export default async function ClassTypesPage({
           icon={Plus}
           title="Crear tipo de actividad"
         >
-          <ClassTypeCreateForm organizationId={resolution.organization.id} />
+          <ClassTypeCreateForm
+            certifications={certifications}
+            organizationId={resolution.organization.id}
+          />
         </CollapsibleActionPanel>
       ) : (
         <Alert>
@@ -1098,6 +1201,7 @@ export default async function ClassTypesPage({
             {filteredClassTypes.map((classType) =>
               canManageClassTypes ? (
                 <ClassTypeAdminCard
+                  certifications={certifications}
                   classType={classType}
                   key={classType.id}
                   organizationId={resolution.organization.id}
@@ -1105,6 +1209,7 @@ export default async function ClassTypesPage({
                 />
               ) : (
                 <ClassTypeReadOnlyCard
+                  certifications={certifications}
                   classType={classType}
                   key={classType.id}
                   timezone={resolution.organization.timezone}
