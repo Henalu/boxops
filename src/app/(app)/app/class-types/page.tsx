@@ -496,6 +496,40 @@ function ClassTypeCertificationSelect({
   );
 }
 
+function ClassTypeFormField({
+  children,
+  className,
+  label,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  label: string;
+}) {
+  return (
+    <label className={cn("grid min-w-0 gap-2", className)}>
+      <span className="text-sm font-medium">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ClassTypeRequiredCoachesInput({
+  defaultValue = 1,
+}: {
+  defaultValue?: number;
+}) {
+  return (
+    <Input
+      defaultValue={defaultValue}
+      max="20"
+      min="0"
+      name="requiredCoaches"
+      required
+      type="number"
+    />
+  );
+}
+
 function ClassTypeSummaryCard({
   description,
   icon: Icon,
@@ -727,45 +761,40 @@ function ClassTypeCreateForm({
   organizationId: string;
 }) {
   return (
-    <form action={createClassType} className="grid gap-4 lg:grid-cols-6">
+    <form action={createClassType} className="grid gap-4">
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="status" type="hidden" value="active" />
 
-      <label className="grid gap-2 lg:col-span-3">
-        <span className="text-sm font-medium">Nombre</span>
-        <Input name="name" placeholder="Open Box" required />
-      </label>
+      <div className="grid gap-4 lg:grid-cols-[minmax(16rem,1.35fr)_minmax(12rem,0.72fr)_minmax(8rem,0.42fr)]">
+        <ClassTypeFormField label="Nombre">
+          <Input name="name" placeholder="Open Box" required />
+        </ClassTypeFormField>
 
-      <label className="grid gap-2 lg:col-span-2">
-        <span className="text-sm font-medium">Categoría</span>
-        <ClassTypeCategorySelect />
-      </label>
+        <ClassTypeFormField label="Categoría">
+          <ClassTypeCategorySelect />
+        </ClassTypeFormField>
 
-      <label className="grid gap-2">
-        <span className="text-sm font-medium">Entrenadores</span>
-        <Input
-          defaultValue="1"
-          max="20"
-          min="0"
-          name="requiredCoaches"
-          required
-          type="number"
-        />
-      </label>
-
-      <div className="lg:col-span-2">
-        <ColorPaletteField label="Color" name="color" placeholder="#2563eb" />
+        <ClassTypeFormField label="Entrenadores">
+          <ClassTypeRequiredCoachesInput />
+        </ClassTypeFormField>
       </div>
 
-      <div className="lg:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <ClassTypeIconSelect />
+
+        <ClassTypeFormField label="Certificación">
+          <ClassTypeCertificationSelect certifications={certifications} />
+        </ClassTypeFormField>
       </div>
 
-      <div className="flex items-end lg:col-span-2">
-        <ClassTypeCertificationSelect certifications={certifications} />
-      </div>
+      <ColorPaletteField
+        label="Color"
+        layout="compact"
+        name="color"
+        placeholder="#2563eb"
+      />
 
-      <div className="flex items-end lg:col-span-2">
+      <div className="flex flex-wrap gap-2">
         <Button className="w-full sm:w-auto" type="submit">
           <Plus aria-hidden="true" />
           Crear tipo
@@ -930,10 +959,7 @@ function ClassTypeAdminCard({
         <div className="border-t border-border pt-4">
           <InlineEditDetails label="Gestionar">
             <div className="space-y-4">
-              <form
-                action={updateClassType}
-                className="space-y-4"
-              >
+              <form action={updateClassType} className="grid gap-4">
                 <input
                   name="organizationId"
                   type="hidden"
@@ -941,55 +967,44 @@ function ClassTypeAdminCard({
                 />
                 <input name="classTypeId" type="hidden" value={classType.id} />
 
-                <div className="grid gap-4 lg:grid-cols-6">
-                  <label className="grid gap-2 lg:col-span-3">
-                    <span className="text-sm font-medium">Nombre</span>
+                <div className="grid gap-4 lg:grid-cols-[minmax(16rem,1.35fr)_minmax(12rem,0.72fr)_minmax(8rem,0.42fr)]">
+                  <ClassTypeFormField label="Nombre">
                     <Input name="name" required defaultValue={classType.name} />
-                  </label>
+                  </ClassTypeFormField>
 
-                  <label className="grid gap-2 lg:col-span-2">
-                    <span className="text-sm font-medium">Categoría</span>
+                  <ClassTypeFormField label="Categoría">
                     <ClassTypeCategorySelect defaultValue={classType.category} />
-                  </label>
+                  </ClassTypeFormField>
 
-                  <label className="grid gap-2">
-                    <span className="text-sm font-medium">Entrenadores</span>
-                    <Input
+                  <ClassTypeFormField label="Entrenadores">
+                    <ClassTypeRequiredCoachesInput
                       defaultValue={classType.required_coaches}
-                      max="20"
-                      min="0"
-                      name="requiredCoaches"
-                      required
-                      type="number"
                     />
-                  </label>
+                  </ClassTypeFormField>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.56fr)] lg:items-start">
-                  <ColorPaletteField
-                    defaultValue={classType.color}
-                    label="Color"
-                    name="color"
-                    placeholder="#2563eb"
-                  />
-
+                <div className="grid gap-4 lg:grid-cols-3">
                   <ClassTypeIconSelect defaultValue={classType.icon_key} />
-                </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="grid gap-2">
-                    <span className="text-sm font-medium">Estado</span>
-                    <ClassTypeStatusSelect defaultValue={classType.status} />
-                  </label>
-
-                  <div className="grid content-start gap-2">
-                    <span className="text-sm font-medium">Certificación</span>
+                  <ClassTypeFormField label="Certificación">
                     <ClassTypeCertificationSelect
                       certifications={certifications}
                       defaultValue={classType.certification_id}
                     />
-                  </div>
+                  </ClassTypeFormField>
+
+                  <ClassTypeFormField label="Estado">
+                    <ClassTypeStatusSelect defaultValue={classType.status} />
+                  </ClassTypeFormField>
                 </div>
+
+                <ColorPaletteField
+                  defaultValue={classType.color}
+                  label="Color"
+                  layout="compact"
+                  name="color"
+                  placeholder="#2563eb"
+                />
 
                 <div className="flex flex-wrap gap-2">
                   <Button type="submit">

@@ -19,6 +19,7 @@ import {
 } from "@/lib/documents";
 import { getDocumentsPath } from "@/lib/navigation/app-paths";
 import { createClient } from "@/lib/supabase/server";
+import { isPostgresUuid } from "@/lib/uuid";
 
 function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -26,12 +27,22 @@ function getFormString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getFormStringArray(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function getErrorPath(
+  folderId: string | null,
   organizationId: string | null,
   error: string,
   scope?: string | null,
 ) {
   return getDocumentsPath({
+    documentFolderId: folderId,
     documentScope: scope,
     error,
     organizationId,
@@ -39,11 +50,13 @@ function getErrorPath(
 }
 
 function getStatusPath(
+  folderId: string | null,
   organizationId: string,
   status: string,
   scope: string,
 ) {
   return getDocumentsPath({
+    documentFolderId: folderId,
     documentScope: scope,
     organizationId,
     status,
@@ -71,13 +84,17 @@ async function getDocumentUploadActionContext(formData: FormData) {
   const resolution = resolveActiveOrganization(memberships, organizationId);
 
   if (!resolution.ok) {
-    redirect(getErrorPath(organizationId, resolution.reason));
+    redirect(getErrorPath(null, organizationId, resolution.reason));
   }
 
   return {
     organization: resolution.organization,
     user,
   };
+}
+
+function getCleanFolderName(value: string) {
+  return value.trim().replace(/\s+/g, " ").slice(0, 120);
 }
 
 async function markDocumentDeleted({
@@ -125,20 +142,26 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
   const title = getFormString(formData, "title");
   const description = getCleanDescription(getFormString(formData, "description"));
   const scope = normalizeDocumentUploadScope(getFormString(formData, "scope"));
+  const rawFolderId = getFormString(formData, "folderId");
+  const folderId = rawFolderId || null;
 
   if (!scope) {
-    redirect(getErrorPath(context.organization.id, "invalid-scope"));
+    redirect(getErrorPath(folderId, context.organization.id, "invalid-scope"));
   }
 
   if (!title || title.length > 160) {
-    redirect(getErrorPath(context.organization.id, "invalid-title", scope));
+    redirect(getErrorPath(folderId, context.organization.id, "invalid-title", scope));
+  }
+
+  if (folderId && !isPostgresUuid(folderId)) {
+    redirect(getErrorPath(null, context.organization.id, "invalid-folder", scope));
   }
 
   const rawFile = formData.get("documentFile");
   const file = rawFile instanceof File ? rawFile : null;
 
   if (!file) {
-    redirect(getErrorPath(context.organization.id, "file-empty", scope));
+    redirect(getErrorPath(folderId, context.organization.id, "file-empty", scope));
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -146,7 +169,7 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
   const validation = validateMinimalDocumentUploadFile(file, bytes);
 
   if (!validation.ok) {
-    redirect(getErrorPath(context.organization.id, validation.error, scope));
+    redirect(getErrorPath(folderId, context.organization.id, validation.error, scope));
   }
 
   const supabase = await createClient();
@@ -160,7 +183,19 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
   );
 
   if (permissionError || !canManageMetadata) {
-    redirect(getErrorPath(context.organization.id, "forbidden", scope));
+    redirect(getErrorPath(folderId, context.organization.id, "forbidden", scope));
+  }
+
+  if (folderId) {
+    const { data: canManageFolder, error: folderPermissionError } =
+      await supabase.rpc("can_manage_document_folder_by_id", {
+        target_folder_id: folderId,
+        target_organization_id: context.organization.id,
+      });
+
+    if (folderPermissionError || !canManageFolder) {
+      redirect(getErrorPath(null, context.organization.id, "invalid-folder", scope));
+    }
   }
 
   const documentId = randomUUID();
@@ -172,6 +207,7 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
       description,
       document_scope: scope,
       document_type: getDocumentUploadDocumentType(scope),
+      folder_id: folderId,
       metadata: {
         source: "app_documents_minimal_upload",
       },
@@ -183,7 +219,9 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
     });
 
   if (documentError) {
-    redirect(getErrorPath(context.organization.id, "metadata-save-failed", scope));
+    redirect(
+      getErrorPath(folderId, context.organization.id, "metadata-save-failed", scope),
+    );
   }
 
   const fileBuffer = Buffer.from(arrayBuffer);
@@ -210,7 +248,9 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
       organizationId: context.organization.id,
     });
 
-    redirect(getErrorPath(context.organization.id, "upload-start-failed", scope));
+    redirect(
+      getErrorPath(folderId, context.organization.id, "upload-start-failed", scope),
+    );
   }
 
   const { error: uploadError } = await supabase.storage
@@ -228,7 +268,7 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
       organizationId: context.organization.id,
     });
 
-    redirect(getErrorPath(context.organization.id, "upload-failed", scope));
+    redirect(getErrorPath(folderId, context.organization.id, "upload-failed", scope));
   }
 
   const { error: activateError } = await supabase.rpc(
@@ -245,7 +285,9 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
       organizationId: context.organization.id,
     });
 
-    redirect(getErrorPath(context.organization.id, "activation-failed", scope));
+    redirect(
+      getErrorPath(folderId, context.organization.id, "activation-failed", scope),
+    );
   }
 
   const { error: publishError } = await supabase
@@ -261,10 +303,163 @@ export async function createDocumentWithInitialFileUpload(formData: FormData) {
       organizationId: context.organization.id,
     });
 
-    redirect(getErrorPath(context.organization.id, "metadata-save-failed", scope));
+    redirect(
+      getErrorPath(folderId, context.organization.id, "metadata-save-failed", scope),
+    );
   }
 
   revalidatePath("/app/documents");
 
-  redirect(getStatusPath(context.organization.id, "document-uploaded", scope));
+  redirect(
+    getStatusPath(folderId, context.organization.id, "document-uploaded", scope),
+  );
+}
+
+async function createDocumentFolderRedirectPath(formData: FormData) {
+  const context = await getDocumentUploadActionContext(formData);
+  const name = getCleanFolderName(getFormString(formData, "folderName"));
+  const description = getCleanDescription(
+    getFormString(formData, "folderDescription"),
+  );
+  const visibility = getFormString(formData, "folderVisibility");
+  const selectedPersonIds = Array.from(
+    new Set(
+      getFormStringArray(formData, "personProfileIds").filter(isPostgresUuid),
+    ),
+  );
+  const scope = normalizeDocumentUploadScope(getFormString(formData, "scope"));
+
+  if (!name) {
+    return getErrorPath(null, context.organization.id, "invalid-folder-name", scope);
+  }
+
+  if (!["management", "all", "people"].includes(visibility)) {
+    return getErrorPath(
+      null,
+      context.organization.id,
+      "invalid-folder-permission",
+      scope,
+    );
+  }
+
+  if (visibility === "people" && selectedPersonIds.length === 0) {
+    return getErrorPath(
+      null,
+      context.organization.id,
+      "invalid-folder-people",
+      scope,
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: canManageFolders, error: permissionError } = await supabase.rpc(
+    "can_manage_document_folder_metadata",
+    {
+      target_organization_id: context.organization.id,
+    },
+  );
+
+  if (permissionError || !canManageFolders) {
+    return getErrorPath(null, context.organization.id, "forbidden", scope);
+  }
+
+  const { data: folder, error: folderError } = await supabase
+    .from("document_folders")
+    .insert({
+      created_by_user_id: context.user.id,
+      description,
+      metadata: {
+        source: "app_documents_folder_create",
+        visibility,
+      },
+      name,
+      organization_id: context.organization.id,
+      status: "active",
+    })
+    .select("id")
+    .single();
+
+  if (folderError || !folder) {
+    return getErrorPath(
+      null,
+      context.organization.id,
+      "folder-create-failed",
+      scope,
+    );
+  }
+
+  const grantRows =
+    visibility === "all"
+      ? [
+          {
+            access_level: "download",
+            folder_id: folder.id,
+            grant_status: "active",
+            granted_by_user_id: context.user.id,
+            metadata: { source: "app_documents_folder_create" },
+            organization_id: context.organization.id,
+            target_type: "all_members",
+          },
+        ]
+      : visibility === "management"
+        ? ["owner", "admin", "manager", "center_manager", "document_admin"].map(
+            (role) => ({
+              access_level: "download",
+              folder_id: folder.id,
+              grant_status: "active",
+              granted_by_user_id: context.user.id,
+              metadata: { source: "app_documents_folder_create" },
+              organization_id: context.organization.id,
+              role,
+              target_type: "role",
+            }),
+          )
+        : selectedPersonIds.map((personProfileId) => ({
+            access_level: "download",
+            folder_id: folder.id,
+            grant_status: "active",
+            granted_by_user_id: context.user.id,
+            metadata: { source: "app_documents_folder_create" },
+            organization_id: context.organization.id,
+            person_profile_id: personProfileId,
+            target_type: "person",
+          }));
+
+  const { error: grantsError } = await supabase
+    .from("document_folder_access_grants")
+    .insert(grantRows);
+
+  if (grantsError) {
+    await supabase
+      .from("document_folders")
+      .update({ status: "archived" })
+      .eq("id", folder.id)
+      .eq("organization_id", context.organization.id);
+
+    return getErrorPath(
+      null,
+      context.organization.id,
+      "folder-grants-failed",
+      scope,
+    );
+  }
+
+  revalidatePath("/app/documents");
+
+  return getStatusPath(
+    folder.id,
+    context.organization.id,
+    "folder-created",
+    scope ?? "company",
+  );
+}
+
+export async function createDocumentFolder(formData: FormData) {
+  redirect(await createDocumentFolderRedirectPath(formData));
+}
+
+export async function createDocumentFolderFromClient(formData: FormData) {
+  return {
+    path: await createDocumentFolderRedirectPath(formData),
+  };
 }

@@ -1353,6 +1353,147 @@ export type Database = {
           },
         ]
       }
+      document_folder_access_grants: {
+        Row: {
+          access_level: string
+          created_at: string
+          expires_at: string | null
+          folder_id: string
+          grant_status: string
+          granted_by_user_id: string
+          id: string
+          metadata: Json
+          organization_id: string
+          person_profile_id: string | null
+          revoked_at: string | null
+          role: string | null
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          access_level?: string
+          created_at?: string
+          expires_at?: string | null
+          folder_id: string
+          grant_status?: string
+          granted_by_user_id: string
+          id?: string
+          metadata?: Json
+          organization_id: string
+          person_profile_id?: string | null
+          revoked_at?: string | null
+          role?: string | null
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          created_at?: string
+          expires_at?: string | null
+          folder_id?: string
+          grant_status?: string
+          granted_by_user_id?: string
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          person_profile_id?: string | null
+          revoked_at?: string | null
+          role?: string | null
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folder_access_grants_folder_id_organization_id_fkey"
+            columns: ["folder_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "document_folder_access_grants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_folder_access_grants_organization_id_granted_by_u_fkey"
+            columns: ["organization_id", "granted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "document_folder_access_grants_person_profile_id_organizati_fkey"
+            columns: ["person_profile_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "person_profiles"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      document_folders: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          id: string
+          metadata: Json
+          name: string
+          organization_id: string
+          parent_folder_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          organization_id: string
+          parent_folder_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          organization_id?: string
+          parent_folder_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folders_organization_id_created_by_user_id_fkey"
+            columns: ["organization_id", "created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "document_folders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_folders_parent_folder_id_organization_id_fkey"
+            columns: ["parent_folder_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       document_programming_links: {
         Row: {
           center_id: string | null
@@ -1649,6 +1790,7 @@ export type Database = {
           description: string | null
           document_scope: string
           document_type: string
+          folder_id: string | null
           id: string
           metadata: Json
           organization_id: string
@@ -1665,6 +1807,7 @@ export type Database = {
           description?: string | null
           document_scope: string
           document_type?: string
+          folder_id?: string | null
           id?: string
           metadata?: Json
           organization_id: string
@@ -1681,6 +1824,7 @@ export type Database = {
           description?: string | null
           document_scope?: string
           document_type?: string
+          folder_id?: string | null
           id?: string
           metadata?: Json
           organization_id?: string
@@ -1697,6 +1841,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "document_versions"
             referencedColumns: ["id", "document_id", "organization_id"]
+          },
+          {
+            foreignKeyName: "documents_folder_fk"
+            columns: ["folder_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id", "organization_id"]
           },
           {
             foreignKeyName: "documents_organization_id_created_by_user_id_fkey"
@@ -4619,6 +4770,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_access_document_folder: {
+        Args: {
+          target_access_level?: string
+          target_folder_id: string
+          target_organization_id: string
+        }
+        Returns: boolean
+      }
       can_activate_time_location_settings: {
         Args: { target_organization_id: string }
         Returns: boolean
@@ -4638,6 +4797,14 @@ export type Database = {
       }
       can_manage_document_by_id: {
         Args: { target_document_id: string; target_organization_id: string }
+        Returns: boolean
+      }
+      can_manage_document_folder_by_id: {
+        Args: { target_folder_id: string; target_organization_id: string }
+        Returns: boolean
+      }
+      can_manage_document_folder_metadata: {
+        Args: { target_organization_id: string }
         Returns: boolean
       }
       can_manage_document_metadata: {
@@ -5524,9 +5691,25 @@ export type Database = {
           subject_coach_profile_id: string
         }[]
       }
+      list_accessible_document_folders: {
+        Args: { target_organization_id: string }
+        Returns: {
+          can_manage: boolean
+          created_at: string
+          description: string
+          document_count: number
+          folder_id: string
+          name: string
+          organization_id: string
+          parent_folder_id: string
+          status: string
+          updated_at: string
+        }[]
+      }
       list_accessible_document_versions: {
         Args: {
           target_document_scope?: string
+          target_folder_id?: string
           target_limit?: number
           target_organization_id: string
         }
@@ -5542,6 +5725,8 @@ export type Database = {
           document_type: string
           document_updated_at: string
           document_version_id: string
+          folder_id: string
+          folder_name: string
           mime_type: string
           organization_id: string
           original_filename: string

@@ -20,6 +20,7 @@ import {
   ensureScheduleTemplateRangeApplied,
 } from "@/lib/schedule-template-application";
 import {
+  SCHEDULE_TEMPLATE_DAYS,
   SCHEDULE_TEMPLATE_EDITOR_DEFAULT_DURATION_MINUTES,
   SCHEDULE_TEMPLATE_EDITOR_SLOT_MINUTES,
   getScheduleTemplateEditorSettings,
@@ -44,6 +45,18 @@ import type { Json } from "@/types/supabase";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type TemplateMetadata = { [key: string]: Json | undefined };
+type TemplateBlockBulkCopyValue = {
+  centerId: string;
+  classTypeId: string;
+  dayOfWeek: number;
+  defaultCoachProfileId: string | null;
+  endTime: string;
+  notes: string | null;
+  requiredCoaches: number;
+  sourceBlockId: string;
+  startTime: string;
+  templateId: string;
+};
 
 const TEMPLATE_RECOVERY_DAYS = 30;
 const BULK_KEEP_VALUE = "keep";
@@ -736,6 +749,43 @@ async function validateTemplateBlockExactDuplicates({
   );
 
   return hasDuplicate ? "template-block-duplicate" : null;
+}
+
+function getTemplateBlockIds(formData: FormData) {
+  return [
+    ...new Set(
+      formData
+        .getAll("templateBlockIds")
+        .flatMap((value) => (typeof value === "string" ? [value.trim()] : []))
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function getTargetTemplateDay(formData: FormData) {
+  const day = Number(getRequiredFormString(formData, "targetDayOfWeek"));
+
+  return SCHEDULE_TEMPLATE_DAYS.includes(
+    day as (typeof SCHEDULE_TEMPLATE_DAYS)[number],
+  )
+    ? day
+    : null;
+}
+
+function getTemplateBlockCopyKey(values: {
+  center_id: string;
+  class_type_id: string;
+  day_of_week: number;
+  end_time: string;
+  start_time: string;
+}) {
+  return [
+    values.center_id,
+    values.class_type_id,
+    values.day_of_week,
+    normalizeTimeForComparison(values.start_time),
+    normalizeTimeForComparison(values.end_time),
+  ].join(":");
 }
 
 export async function createScheduleTemplate(formData: FormData) {
@@ -1844,6 +1894,397 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
     getScheduleTemplatesPath({
       centerId: context.centerFilterId,
       day: context.day,
+      organizationId: context.organization.id,
+      status:
+        copiedBlocks.length > 1
+          ? "template-blocks-copied"
+          : "template-block-copied",
+      view: context.view,
+      week: context.weekStart,
+    }),
+  );
+}
+
+export async function copyScheduleTemplateBlocksBulk(formData: FormData) {
+  const context = await getOperationalActionContext(formData);
+  const templateId = getRequiredFormString(formData, "templateId");
+  const templateBlockIds = getTemplateBlockIds(formData);
+  const targetDayOfWeek = getTargetTemplateDay(formData);
+
+  if (templateBlockIds.length === 0) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "template-block-required",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  if (!templateId) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "missing-fields",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  if (!isScheduleTemplateUuid(templateId)) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  if (templateBlockIds.some((blockId) => !isScheduleTemplateUuid(blockId))) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  if (!targetDayOfWeek) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-day",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  const templateResult = await validateTemplateReference({
+    organizationId: context.organization.id,
+    supabase,
+    templateId,
+  });
+
+  if (templateResult.error || !templateResult.template) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        templateResult.error ?? "invalid-template",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const { data: sourceBlocks, error: sourceBlocksError } = await supabase
+    .from("schedule_template_blocks")
+    .select(
+      "id, template_id, center_id, class_type_id, day_of_week, default_coach_profile_id, end_time, notes, required_coaches, start_time",
+    )
+    .eq("organization_id", context.organization.id)
+    .eq("template_id", templateId)
+    .in("id", templateBlockIds);
+
+  const sourceBlocksById = new Map(
+    (sourceBlocks ?? []).map((block) => [block.id, block]),
+  );
+  const orderedSourceBlocks = templateBlockIds.flatMap((blockId) => {
+    const block = sourceBlocksById.get(blockId);
+
+    return block ? [block] : [];
+  });
+
+  if (
+    sourceBlocksError ||
+    !sourceBlocks ||
+    orderedSourceBlocks.length !== templateBlockIds.length
+  ) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "invalid-template-block",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const copyValues: TemplateBlockBulkCopyValue[] = [];
+
+  for (const sourceBlock of orderedSourceBlocks) {
+    const defaultCoachProfileId = scheduleTemplateBlockRequiresCoach(
+      sourceBlock.required_coaches,
+    )
+      ? sourceBlock.default_coach_profile_id
+      : null;
+    const referenceResult = await validateTemplateBlockReferences({
+      centerId: sourceBlock.center_id,
+      classTypeId: sourceBlock.class_type_id,
+      defaultCoachProfileId,
+      organizationId: context.organization.id,
+      supabase,
+      templateId,
+    });
+
+    if (referenceResult.error || !referenceResult.centerId) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          referenceResult.error ?? "invalid-center",
+          context.view,
+          context.day,
+          context.centerFilterId,
+        ),
+      );
+    }
+
+    copyValues.push({
+      centerId: referenceResult.centerId,
+      classTypeId: sourceBlock.class_type_id,
+      dayOfWeek: targetDayOfWeek,
+      defaultCoachProfileId,
+      endTime: normalizeTimeForComparison(sourceBlock.end_time),
+      notes: sourceBlock.notes,
+      requiredCoaches: sourceBlock.required_coaches,
+      sourceBlockId: sourceBlock.id,
+      startTime: normalizeTimeForComparison(sourceBlock.start_time),
+      templateId,
+    });
+  }
+
+  const { data: existingTargetBlocks, error: existingTargetBlocksError } =
+    await supabase
+      .from("schedule_template_blocks")
+      .select(
+        "id, center_id, class_type_id, day_of_week, default_coach_profile_id, end_time, start_time",
+      )
+      .eq("organization_id", context.organization.id)
+      .eq("template_id", templateId)
+      .eq("day_of_week", targetDayOfWeek);
+
+  if (existingTargetBlocksError) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        "save-failed",
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const existingDuplicateKeys = new Set(
+    (existingTargetBlocks ?? []).map((block) =>
+      getTemplateBlockCopyKey(block),
+    ),
+  );
+  const newDuplicateKeys = new Set<string>();
+
+  for (const values of copyValues) {
+    const copyKey = getTemplateBlockCopyKey({
+      center_id: values.centerId,
+      class_type_id: values.classTypeId,
+      day_of_week: values.dayOfWeek,
+      end_time: values.endTime,
+      start_time: values.startTime,
+    });
+
+    if (existingDuplicateKeys.has(copyKey) || newDuplicateKeys.has(copyKey)) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          "template-block-duplicate",
+          context.view,
+          context.day,
+          context.centerFilterId,
+        ),
+      );
+    }
+
+    newDuplicateKeys.add(copyKey);
+  }
+
+  const availabilityBlocks = [
+    ...(existingTargetBlocks ?? []).map((block) => ({
+      default_coach_profile_id: block.default_coach_profile_id,
+      day_of_week: block.day_of_week,
+      end_time: block.end_time,
+      id: block.id,
+      start_time: block.start_time,
+    })),
+    ...copyValues.map((values) => ({
+      default_coach_profile_id: values.defaultCoachProfileId,
+      day_of_week: values.dayOfWeek,
+      end_time: values.endTime,
+      id: `copy:${values.sourceBlockId}`,
+      start_time: values.startTime,
+    })),
+  ];
+
+  for (const values of copyValues) {
+    if (!values.defaultCoachProfileId) {
+      continue;
+    }
+
+    const unavailableBlocks = getUnavailableScheduleTemplateCoachBlocks({
+      blocks: availabilityBlocks,
+      targetBlock: {
+        day_of_week: values.dayOfWeek,
+        end_time: values.endTime,
+        id: `copy:${values.sourceBlockId}`,
+        start_time: values.startTime,
+      },
+    });
+
+    if (
+      unavailableBlocks.some(
+        (block) => block.coachProfileId === values.defaultCoachProfileId,
+      )
+    ) {
+      redirect(
+        getErrorPath(
+          context.organization.id,
+          context.weekStart,
+          "coach-unavailable",
+          context.view,
+          context.day,
+          context.centerFilterId,
+        ),
+      );
+    }
+  }
+
+  const { data: copiedBlocks, error } = await supabase
+    .from("schedule_template_blocks")
+    .insert(
+      copyValues.map((values) => ({
+        center_id: values.centerId,
+        class_type_id: values.classTypeId,
+        day_of_week: values.dayOfWeek,
+        default_coach_profile_id: values.defaultCoachProfileId,
+        end_time: values.endTime,
+        notes: values.notes,
+        organization_id: context.organization.id,
+        required_coaches: values.requiredCoaches,
+        start_time: values.startTime,
+        template_id: values.templateId,
+      })),
+    )
+    .select("id, center_id, class_type_id, day_of_week, end_time, start_time");
+
+  if (
+    error ||
+    !copiedBlocks ||
+    copiedBlocks.length !== copyValues.length
+  ) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        getMutationError(error?.code),
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const syncStatus = await ensureScheduleTemplateRangeApplied({
+    organizationId: context.organization.id,
+    supabase,
+    templateId,
+    templateBlockIds: copiedBlocks.map((templateBlock) => templateBlock.id),
+    timezone: context.organization.timezone,
+  });
+  const syncError = getTemplateSyncError(syncStatus);
+
+  if (syncError) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        syncError,
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const valuesByCopyKey = new Map(
+    copyValues.map((values) => [
+      getTemplateBlockCopyKey({
+        center_id: values.centerId,
+        class_type_id: values.classTypeId,
+        day_of_week: values.dayOfWeek,
+        end_time: values.endTime,
+        start_time: values.startTime,
+      }),
+      values,
+    ]),
+  );
+
+  await Promise.all(
+    copiedBlocks.map((templateBlock) => {
+      const values = valuesByCopyKey.get(getTemplateBlockCopyKey(templateBlock));
+
+      return recordOperationalAuditEvent({
+        action: "created",
+        changedFields: values
+          ? {
+              ...getScheduleTemplateBlockCreatedAuditFields({
+                centerId: values.centerId,
+                classTypeId: values.classTypeId,
+                dayOfWeek: values.dayOfWeek,
+                defaultCoachProfileId: values.defaultCoachProfileId,
+                endTime: values.endTime,
+                notes: values.notes,
+                requiredCoaches: values.requiredCoaches,
+                startTime: values.startTime,
+              }),
+              copied_from_template_block_id: auditFieldSet(
+                values.sourceBlockId,
+              ),
+            }
+          : {},
+        entityId: templateBlock.id,
+        entityType: "schedule_template_blocks",
+        organizationId: context.organization.id,
+        supabase,
+      });
+    }),
+  );
+
+  redirect(
+    getScheduleTemplatesPath({
+      centerId: context.centerFilterId,
+      day: String(targetDayOfWeek),
       organizationId: context.organization.id,
       status:
         copiedBlocks.length > 1

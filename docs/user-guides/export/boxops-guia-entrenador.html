@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>BoxOps - Guía de Entrenador</title>
+  <style>
+    @page { size: Letter; margin: 0.72in; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #0F172A;
+      background: white;
+      font-size: 10.5pt;
+      line-height: 1.45;
+    }
+    .cover {
+      min-height: 9.2in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid #D7DEE8;
+      border-radius: 18px;
+      padding: 42px;
+      background:
+        linear-gradient(145deg, rgba(0,109,114,.10), rgba(255,216,77,.16) 45%, rgba(255,255,255,1) 76%),
+        #fff;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: #006D72; color: white;
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 20px;
+    }
+    .eyebrow {
+      color: #064E52; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; font-size: 10px;
+    }
+    h1 { font-size: 38px; line-height: 1.06; margin: 72px 0 12px; letter-spacing: 0; }
+    .subtitle { font-size: 17px; color: #334155; max-width: 620px; }
+    .meta-strip {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-top: 36px;
+    }
+    .meta-card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 16px;
+      background: rgba(255,255,255,.76);
+    }
+    .meta-card b { display: block; font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: .06em; }
+    .meta-card span { display: block; margin-top: 4px; font-weight: 700; }
+    .notice {
+      margin-top: 26px; border: 1px solid #F2D56B; border-radius: 14px;
+      background: #FFF7D6; padding: 15px 18px; color: #3B3A22;
+    }
+    .page { break-before: page; }
+    h2 { font-size: 23px; margin: 0 0 12px; color: #064E52; }
+    h3 { font-size: 15px; margin: 18px 0 8px; color: #0F172A; }
+    p { margin: 0 0 9px; }
+    .lead { color: #475569; font-size: 12pt; margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 15px 16px;
+      background: #FFFFFF; break-inside: avoid;
+    }
+    .card h3 { margin-top: 0; }
+    ul, ol { margin: 8px 0 0 21px; padding: 0; }
+    li { margin: 0 0 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; break-inside: avoid; }
+    th { text-align: left; background: #064E52; color: white; padding: 9px 10px; font-size: 9.6pt; }
+    td { border: 1px solid #D7DEE8; padding: 9px 10px; vertical-align: top; }
+    code { color: #064E52; font-weight: 700; }
+    .workflow {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 18px;
+      background: #FAFCFE; margin: 0 0 12px; break-inside: avoid;
+    }
+    .workflow h3 { margin-top: 0; }
+    figure {
+      margin: 18px 0 24px; break-inside: avoid;
+      border: 1px solid #D7DEE8; border-radius: 16px;
+      overflow: hidden; background: white;
+    }
+    figure img { display: block; width: 100%; max-height: 6.8in; object-fit: contain; background: #F5F8FB; }
+    figcaption {
+      padding: 9px 12px; color: #64748B; font-size: 9.3pt;
+      border-top: 1px solid #D7DEE8; background: #F8FAFC;
+    }
+    .limits {
+      border-left: 5px solid #006D72; background: #F5FBFB;
+      padding: 14px 18px; border-radius: 12px; margin-top: 10px;
+    }
+    .footer-note { color: #64748B; font-size: 9pt; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">
+        <div class="mark">B</div>
+        <div>
+          <div class="eyebrow">BoxOps</div>
+          <div>Guía de usuario</div>
+        </div>
+      </div>
+      <h1>Guía de Entrenador</h1>
+      <p class="subtitle">Consulta de horario, equipo, cuenta propia, fichaje, solicitudes y documentos permitidos.</p>
+      <div class="meta-strip">
+        <div class="meta-card"><b>Versión</b><span>v1</span></div>
+        <div class="meta-card"><b>Fecha</b><span>01/06/2026</span></div>
+        <div class="meta-card"><b>Rol</b><span>Entrenador</span></div>
+      </div>
+    </div>
+    <p class="footer-note">Guía rápida para trabajar con BoxOps sin perder contexto.</p>
+  </section>
+
+  <section class="page">
+    <h2>Para quién es esta guía</h2>
+    <p class="lead">Para quien necesita saber cuándo trabaja, registrar jornada y pedir cambios sin tocar la gestión del box.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Qué puedes hacer</h3>
+        <ul><li>Entrar y consultar su contexto de trabajo.</li><li>Ver horario semanal y usar Mi horario si tiene ficha vinculada.</li><li>Consultar equipo, centros, tipos de actividad y plantillas en lectura.</li><li>Registrar entrada/salida manual y revisar la semana de fichaje.</li><li>Gestionar su perfil, avatar y firma interna propia.</li></ul>
+      </div>
+      <div class="card">
+        <h3>Uso recomendado</h3>
+        <ul>
+          <li>Empieza por las pantallas principales de tu rol.</li>
+          <li>Si una acción no aparece, puede depender de tus permisos.</li>
+          <li>No des por hecho que un botón “debería estar”: si no aparece, puede ser por rol.</li>
+          <li>Reporta página, acción, resultado esperado y resultado real.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px">Mapa rápido</h2>
+    <table>
+      <thead><tr><th>Pantalla</th><th>Ruta</th><th>Sirve para</th></tr></thead>
+      <tbody><tr><td>Inicio</td><td><code>/app</code></td><td>Avisos propios y accesos rápidos.</td></tr>
+<tr><td>Horario</td><td><code>/app/schedule</code></td><td>Semana visible y filtro Mi horario.</td></tr>
+<tr><td>Equipo</td><td><code>/app/coaches</code></td><td>Consulta del equipo visible.</td></tr>
+<tr><td>Mi fichaje</td><td><code>/app/time</code></td><td>Entrada, salida, semana y correcciones.</td></tr>
+<tr><td>Ausencias</td><td><code>/app/absences</code></td><td>Peticiones propias si están activas.</td></tr>
+<tr><td>Solicitudes</td><td><code>/app/requests</code></td><td>Cambios o cobertura cuando aplique.</td></tr>
+<tr><td>Documentos</td><td><code>/app/documents</code></td><td>Documentos permitidos por acceso.</td></tr>
+<tr><td>Mi cuenta</td><td><code>/app/account</code></td><td>Perfil, avatar y firma propia.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Flujos principales</h2>
+    <p class="lead">Empieza por estos recorridos. Son los que más valor dan en el uso diario.</p>
+
+            <section class="workflow">
+              <h3>Entrar y orientarte</h3>
+              <ol><li>Abre la URL de BoxOps y entra con tu email y contraseña.</li><li>Si te piden cambiar contraseña, hazlo antes de seguir.</li><li>Empieza en Inicio para ver avisos y accesos directos.</li><li>En móvil, usa la navegación inferior: Inicio, Horario, Equipo y Más.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Consultar tu horario</h3>
+              <ol><li>Entra en Horario.</li><li>Elige la semana con Anterior, Hoy o Siguiente.</li><li>Activa Mi horario si aparece disponible.</li><li>Abre un bloque para ver centro, hora, actividad, notas y asignaciones.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Fichar manualmente</h3>
+              <ol><li>Entra en Mi fichaje.</li><li>Revisa fecha, hora y centro si aplica.</li><li>Pulsa Fichar entrada al empezar y Fichar salida al terminar.</li><li>Si te equivocas, usa correcciones con motivo claro.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Mantener tu cuenta</h3>
+              <ol><li>En Mi cuenta, revisa tu perfil visible.</li><li>Actualiza nombre visible, alias o email público si está permitido.</li><li>Sube tu avatar propio si se usa en el piloto.</li><li>Guarda tu firma interna solo como confirmación propia; aún no firma documentos.</li></ol>
+            </section>
+
+  </section>
+
+  <section class="page">
+    <h2>Otras funciones útiles</h2>
+    <p class="lead">Estas zonas no siempre son la primera parada, pero ayudan a entender la operación completa.</p>
+    <table>
+      <thead><tr><th>Función</th><th>Dónde está</th><th>Para qué sirve</th></tr></thead>
+      <tbody><tr><td>Cobertura</td><td><code>/app/schedule</code></td><td>En Horario puedes ver si un bloque está cubierto, sin cubrir, insuficiente o en conflicto.</td></tr>
+<tr><td>Solicitudes</td><td><code>/app/requests</code></td><td>Sirve para pedir o revisar cambios/coberturas propias cuando el flujo esté disponible para tu rol.</td></tr>
+<tr><td>Ausencias</td><td><code>/app/absences</code></td><td>Permite consultar o crear peticiones propias de ausencia si la organización lo usa.</td></tr>
+<tr><td>Mi fichaje</td><td><code>/app/time</code></td><td>Registra entrada/salida manual, revisa la semana y pide correcciones si algo no cuadra.</td></tr>
+<tr><td>Mi cuenta y firma</td><td><code>/app/account</code></td><td>Permite actualizar tu perfil visible, avatar y firma interna propia.</td></tr>
+<tr><td>Documentos</td><td><code>/app/documents</code></td><td>Muestra documentos disponibles para ti según permisos.</td></tr>
+<tr><td>Equipo, centros y tipos</td><td><code>/app/more</code></td><td>Permiten consultar información operativa básica en modo lectura.</td></tr>
+<tr><td>Plantillas</td><td><code>/app/templates</code></td><td>Ayudan a entender la estructura semanal base, aunque no puedas editarlas.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Capturas de referencia</h2>
+    <p class="lead">Las imágenes ayudan a reconocer la pantalla y los elementos principales.</p>
+
+        <figure>
+          <img src="assets/guide-images/login.png" alt="Login: punto de entrada a BoxOps.">
+          <figcaption>Login: punto de entrada a BoxOps.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-mobile-home.png" alt="Vista móvil: navegación pensada para uso rápido.">
+          <figcaption>Vista móvil: navegación pensada para uso rápido.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-schedule.png" alt="Horario: semana, filtros y contexto de bloques.">
+          <figcaption>Horario: semana, filtros y contexto de bloques.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-time.png" alt="Mi fichaje: entrada/salida y balance semanal.">
+          <figcaption>Mi fichaje: entrada/salida y balance semanal.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/account.png" alt="Mi cuenta: perfil propio, avatar y firma interna.">
+          <figcaption>Mi cuenta: perfil propio, avatar y firma interna.</figcaption>
+        </figure>
+
+  </section>
+
+  <section class="page">
+    <h2>Límites actuales</h2>
+    <div class="limits">
+      <ul><li>No crea ni edita centros, tipos, usuarios, plantillas ni bloques.</li><li>No ve datos laborales sensibles por defecto.</li><li>No hay geolocalización real ni tracking de ubicación.</li><li>No hay reservas de clientes en BoxOps; eso será BoxWOD si se construye.</li></ul>
+    </div>
+    <h2 style="margin-top:26px">Si necesitas reportar algo</h2>
+    <ol>
+      <li>Di qué estabas intentando hacer.</li>
+      <li>Indica la pantalla: por ejemplo, Horario, Equipo o Mi fichaje.</li>
+      <li>Explica qué esperabas que pasara.</li>
+      <li>Explica qué pasó realmente.</li>
+      <li>Añade captura si el problema es visual o de comprensión.</li>
+    </ol>
+    <p class="footer-note">Evita enviar contraseñas, datos sensibles o información laboral real por canales no acordados.</p>
+  </section>
+</body>
+</html>

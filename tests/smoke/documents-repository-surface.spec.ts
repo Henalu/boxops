@@ -1618,6 +1618,66 @@ test.describe("documents minimal repository guardrails", () => {
     );
   });
 
+  test("keeps document folders tenant-scoped, inherited and server-gated", () => {
+    const page = readProjectFile("src/app/(app)/app/documents/page.tsx");
+    const actions = readProjectFile("src/app/(app)/app/documents/actions.ts");
+    const folderCreateForm = readProjectFile(
+      "src/app/(app)/app/documents/document-folder-create-form.tsx",
+    );
+    const helper = readProjectFile("src/lib/documents.ts");
+    const appPaths = readProjectFile("src/lib/navigation/app-paths.ts");
+    const migration = readProjectFile(
+      "supabase/migrations/20260609075635_document_folders.sql",
+    );
+
+    expect(migration).toContain("CREATE TABLE public.document_folders");
+    expect(migration).toContain(
+      "CREATE TABLE public.document_folder_access_grants",
+    );
+    expect(migration).toContain("ALTER TABLE public.documents");
+    expect(migration).toContain("ADD COLUMN folder_id uuid");
+    expect(migration).toContain("can_access_document_folder");
+    expect(migration).toContain("can_manage_document_folder_metadata");
+    expect(migration).toContain("can_manage_document_folder_by_id");
+    expect(migration).toContain("list_accessible_document_folders");
+    expect(migration).toContain("target_folder_id uuid DEFAULT NULL");
+    expect(migration).toMatch(
+      /can_access_document[\s\S]+target_document\.folder_id IS NOT NULL[\s\S]+public\.can_access_document_folder/,
+    );
+    expect(migration).toMatch(
+      /CREATE POLICY "Users can view accessible document folders"[\s\S]+public\.can_access_document_folder/,
+    );
+    expect(migration).toMatch(
+      /CREATE POLICY "Document managers can create folders"[\s\S]+can_manage_document_folder_metadata/,
+    );
+    expect(migration).toContain(
+      "GRANT SELECT, INSERT, UPDATE ON public.document_folders TO authenticated",
+    );
+    expect(migration).not.toMatch(
+      /GRANT\s+[^;]*DELETE[^;]*ON\s+public\.document_folders\s+TO\s+authenticated/i,
+    );
+
+    expect(helper).toContain("listAccessibleDocumentFolders");
+    expect(helper).toContain("folder_id");
+    expect(helper).toContain("target_folder_id");
+    expect(page).toContain("DocumentFolderCreateForm");
+    expect(page).toContain('name="folderId"');
+    expect(page).toContain("Todas las carpetas");
+    expect(page).toContain("Carpeta si se elige");
+    expect(actions).toContain("can_manage_document_folder_by_id");
+    expect(actions).toContain("document_folder_access_grants");
+    expect(actions).toContain("createDocumentFolder");
+    expect(actions).toContain("createDocumentFolderFromClient");
+    expect(folderCreateForm).toContain("\"use client\"");
+    expect(folderCreateForm).toContain("event.preventDefault()");
+    expect(folderCreateForm).toContain("createDocumentFolderFromClient");
+    expect(folderCreateForm).toContain('name="folderVisibility"');
+    expect(folderCreateForm).toContain('name="personProfileIds"');
+    expect(folderCreateForm).toContain("router.push(result.path)");
+    expect(folderCreateForm).toContain("Crear carpeta");
+    expect(appPaths).toContain("folder_id");
+  });
+
   test("keeps E.12 controlled QA rollback-only and evidence-focused", () => {
     const tasks = readProjectFile("TASKS.md");
     const runbook = readProjectFile(

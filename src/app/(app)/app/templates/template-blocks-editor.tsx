@@ -24,6 +24,7 @@ import {
 
 import {
   copyScheduleTemplateBlock,
+  copyScheduleTemplateBlocksBulk,
   createScheduleTemplateBlock,
   deleteScheduleTemplateBlock,
   deleteScheduleTemplateBlocksBulk,
@@ -544,6 +545,58 @@ function groupTemplateBlocksByDay(blocks: ScheduleTemplateBlockRow[]) {
   return groups;
 }
 
+function DaySelectionCheckbox({
+  className,
+  day,
+  dayBlocks,
+  onToggleDay,
+  selectedBlockIds,
+}: {
+  className?: string;
+  day: TemplateDay;
+  dayBlocks: ScheduleTemplateBlockRow[];
+  onToggleDay: (day: TemplateDay) => void;
+  selectedBlockIds: Set<string>;
+}) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const selectedCount = dayBlocks.filter((block) =>
+    selectedBlockIds.has(block.id),
+  ).length;
+  const checked = dayBlocks.length > 0 && selectedCount === dayBlocks.length;
+  const indeterminate = selectedCount > 0 && selectedCount < dayBlocks.length;
+  const dayLabel = getScheduleTemplateDayLabel(day);
+  const selectionAction = checked ? "Deseleccionar" : "Seleccionar";
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={`${selectionAction} todos los bloques de ${dayLabel}`}
+      checked={checked}
+      className={cn(
+        "size-4 shrink-0 rounded border-border accent-primary disabled:cursor-not-allowed disabled:opacity-35",
+        className,
+      )}
+      disabled={dayBlocks.length === 0}
+      onChange={() => onToggleDay(day)}
+      ref={checkboxRef}
+      title={
+        dayBlocks.length === 0
+          ? "Sin bloques para seleccionar"
+          : `${selectionAction} ${dayBlocks.length} bloque${
+              dayBlocks.length === 1 ? "" : "s"
+            }`
+      }
+      type="checkbox"
+    />
+  );
+}
+
 function filterTemplateBlocks({
   assignmentFilter,
   blocks,
@@ -757,10 +810,12 @@ function CoachSelect({
 
 function DaySelect({
   defaultValue,
+  name = "dayOfWeek",
   onChange,
   value,
 }: {
   defaultValue?: number;
+  name?: string;
   onChange?: (value: TemplateDay) => void;
   value?: TemplateDay;
 }) {
@@ -774,7 +829,7 @@ function DaySelect({
         onChange?.(Number(event.currentTarget.value) as TemplateDay)
       }
       {...valueProps}
-      name="dayOfWeek"
+      name={name}
       required
     >
       {SCHEDULE_TEMPLATE_DAYS.map((day) => (
@@ -1474,6 +1529,20 @@ function getUnavailableCoachIdsForCopiedBlock({
   return unavailable;
 }
 
+function getNextTemplateDay(day: TemplateDay) {
+  return (day === 7 ? 1 : day + 1) as TemplateDay;
+}
+
+function getBulkCopyDefaultTargetDay(
+  selectedBlocks: ScheduleTemplateBlockRow[],
+) {
+  const firstSourceDay = selectedBlocks[0]?.day_of_week as
+    | TemplateDay
+    | undefined;
+
+  return firstSourceDay ? getNextTemplateDay(firstSourceDay) : 1;
+}
+
 function TemplateBlockCopyForm({
   assignableCoaches,
   block,
@@ -1647,6 +1716,90 @@ function TemplateBlockCopyForm({
         <Button disabled={selectedDays.size === 0} type="submit">
           <Copy aria-hidden="true" />
           Copiar bloque
+        </Button>
+        <Button onClick={onCancel} type="button" variant="outline">
+          <X aria-hidden="true" />
+          Cerrar
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TemplateBlocksBulkCopyForm({
+  centerFilterId,
+  onCancel,
+  organizationId,
+  selectedBlocks,
+  selectedDay,
+  view,
+  weekStart,
+}: {
+  centerFilterId: string;
+  onCancel: () => void;
+  organizationId: string;
+  selectedBlocks: ScheduleTemplateBlockRow[];
+  selectedDay: TemplateDay;
+  view: TemplateView;
+  weekStart: string;
+}) {
+  const templateId = selectedBlocks[0]?.template_id ?? "";
+  const [targetDay, setTargetDay] = useState<TemplateDay>(() =>
+    getBulkCopyDefaultTargetDay(selectedBlocks),
+  );
+  const selectedSourceDays = useMemo(
+    () =>
+      [...new Set(selectedBlocks.map((block) => block.day_of_week))]
+        .sort((first, second) => first - second)
+        .map((day) => getScheduleTemplateDayLabel(day)),
+    [selectedBlocks],
+  );
+  const sourceDaysLabel =
+    selectedSourceDays.length === 1
+      ? selectedSourceDays[0]
+      : `${selectedSourceDays.length} días`;
+
+  return (
+    <form
+      action={copyScheduleTemplateBlocksBulk}
+      className="grid gap-4 sm:grid-cols-[minmax(14rem,0.5fr)_minmax(0,1fr)]"
+    >
+      <input name="centerFilterId" type="hidden" value={centerFilterId} />
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="day" type="hidden" value={String(selectedDay)} />
+      <input name="templateId" type="hidden" value={templateId} />
+      <input name="view" type="hidden" value={view} />
+      <input name="weekStart" type="hidden" value={weekStart} />
+      {selectedBlocks.map((block) => (
+        <input
+          key={block.id}
+          name="templateBlockIds"
+          type="hidden"
+          value={block.id}
+        />
+      ))}
+
+      <label className="grid min-w-0 gap-2">
+        <span className="text-sm font-medium">Día destino</span>
+        <DaySelect
+          name="targetDayOfWeek"
+          onChange={setTargetDay}
+          value={targetDay}
+        />
+      </label>
+
+      <div className="rounded-md border border-border bg-muted/25 px-3 py-2 text-sm leading-6 text-muted-foreground">
+        Se copiarán {selectedBlocks.length} bloque
+        {selectedBlocks.length === 1 ? "" : "s"} de {sourceDaysLabel} a{" "}
+        {getScheduleTemplateDayLabel(targetDay)}. Solo se cambia el día:
+        horarios, tipo, centro, entrenador, requisitos y notas se mantienen.
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+        <Button type="submit">
+          <Copy aria-hidden="true" />
+          Copiar {selectedBlocks.length} bloque
+          {selectedBlocks.length === 1 ? "" : "s"}
         </Button>
         <Button onClick={onCancel} type="button" variant="outline">
           <X aria-hidden="true" />
@@ -2677,6 +2830,7 @@ function TemplateBlocksTimelineGrid({
   getEditorHref,
   onEdit,
   onSlotCreate,
+  onToggleDaySelected,
   onToggleSelected,
   rangeBlocks,
   selectedBlockId,
@@ -2693,6 +2847,7 @@ function TemplateBlocksTimelineGrid({
   getEditorHref: (block: ScheduleTemplateBlockRow) => string;
   onEdit: (block: ScheduleTemplateBlockRow) => void;
   onSlotCreate: (slot: TemplateCreateSlot) => void;
+  onToggleDaySelected: (day: TemplateDay) => void;
   onToggleSelected: (blockId: string) => void;
   rangeBlocks: ScheduleTemplateBlockRow[];
   selectedBlockId: string | null;
@@ -2909,7 +3064,15 @@ function TemplateBlocksTimelineGrid({
                     <h4 className="text-sm font-semibold tracking-tight">
                       {getScheduleTemplateDayLabel(day)}
                     </h4>
-                    <Badge variant="outline">{dayBlocks.length}</Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <DaySelectionCheckbox
+                        day={day}
+                        dayBlocks={dayBlocks}
+                        onToggleDay={onToggleDaySelected}
+                        selectedBlockIds={selectedBlockIds}
+                      />
+                      <Badge variant="outline">{dayBlocks.length}</Badge>
+                    </div>
                   </div>
                 </div>
               );
@@ -3336,6 +3499,36 @@ export function TemplateBlocksEditor({
     }
   }
 
+  function toggleSelectedDay(day: TemplateDay) {
+    const dayBlocks = blocksByDay.get(day) ?? [];
+
+    if (dayBlocks.length === 0) {
+      return;
+    }
+
+    const shouldSelectAll = dayBlocks.some(
+      (block) => !selectedBlockIds.has(block.id),
+    );
+    const next = new Set(selectedBlockIds);
+
+    for (const block of dayBlocks) {
+      if (shouldSelectAll) {
+        next.add(block.id);
+      } else {
+        next.delete(block.id);
+      }
+    }
+
+    setSelectedBlockIds(next);
+
+    if (next.size === 0) {
+      setBulkEditorOpen(false);
+      setCopyEditorOpen(false);
+      return;
+    }
+
+  }
+
   function clearSelection() {
     setSelectedBlockIds(new Set());
     setBulkEditorOpen(false);
@@ -3449,6 +3642,7 @@ export function TemplateBlocksEditor({
             <p className="mt-1 text-sm text-muted-foreground">
               Edición masiva limitada a entrenador, notas
               {templateCenterId ? "" : ", centro"} y entrenadores necesarios.
+              La copia múltiple solo cambia el día destino.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -3464,20 +3658,18 @@ export function TemplateBlocksEditor({
               <Pencil aria-hidden="true" />
               {bulkEditorOpen ? "Ocultar edición" : "Editar selección"}
             </Button>
-            {selectedBlockForCopy ? (
-              <Button
-                onClick={() => {
-                  closeEditor();
-                  setBulkEditorOpen(false);
-                  setCopyEditorOpen((current) => !current);
-                }}
-                type="button"
-                variant={copyEditorOpen ? "secondary" : "outline"}
-              >
-                <Copy aria-hidden="true" />
-                {copyEditorOpen ? "Ocultar copia" : "Copiar"}
-              </Button>
-            ) : null}
+            <Button
+              onClick={() => {
+                closeEditor();
+                setBulkEditorOpen(false);
+                setCopyEditorOpen((current) => !current);
+              }}
+              type="button"
+              variant={copyEditorOpen ? "secondary" : "outline"}
+            >
+              <Copy aria-hidden="true" />
+              {copyEditorOpen ? "Ocultar copia" : "Copiar"}
+            </Button>
             <Button onClick={clearSelection} type="button" variant="outline">
               Limpiar
             </Button>
@@ -3501,23 +3693,35 @@ export function TemplateBlocksEditor({
             />
           </div>
         ) : null}
-        {copyEditorOpen && selectedBlockForCopy ? (
+        {copyEditorOpen && selectedBlocks.length > 0 ? (
           <div className="border-t border-border pt-3">
-            <TemplateBlockCopyForm
-              assignableCoaches={assignableCoaches}
-              block={selectedBlockForCopy}
-              blocks={blocks}
-              centerFilterId={centerFilterId}
-              centers={centers}
-              classTypes={classTypes}
-              coachWorkWindows={coachWorkWindows}
-              onCancel={() => setCopyEditorOpen(false)}
-              organizationId={organizationId}
-              selectedDay={displayedDay}
-              templateCenterId={templateCenterId}
-              view={view}
-              weekStart={weekStart}
-            />
+            {selectedBlockForCopy ? (
+              <TemplateBlockCopyForm
+                assignableCoaches={assignableCoaches}
+                block={selectedBlockForCopy}
+                blocks={blocks}
+                centerFilterId={centerFilterId}
+                centers={centers}
+                classTypes={classTypes}
+                coachWorkWindows={coachWorkWindows}
+                onCancel={() => setCopyEditorOpen(false)}
+                organizationId={organizationId}
+                selectedDay={displayedDay}
+                templateCenterId={templateCenterId}
+                view={view}
+                weekStart={weekStart}
+              />
+            ) : (
+              <TemplateBlocksBulkCopyForm
+                centerFilterId={centerFilterId}
+                onCancel={() => setCopyEditorOpen(false)}
+                organizationId={organizationId}
+                selectedBlocks={selectedBlocks}
+                selectedDay={displayedDay}
+                view={view}
+                weekStart={weekStart}
+              />
+            )}
           </div>
         ) : null}
       </div>
@@ -3636,31 +3840,42 @@ export function TemplateBlocksEditor({
             const active = displayedDay === day;
 
             return (
-              <button
-                aria-current={active ? "date" : undefined}
-                aria-label={`${getScheduleTemplateDayLabel(day)}. ${
-                  dayBlocks.length
-                } bloque${dayBlocks.length === 1 ? "" : "s"}`}
+              <div
                 className={cn(
-                  "flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border text-center outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "relative h-14 min-w-0 rounded-xl border text-center transition-colors",
                   active
                     ? "border-primary/60 bg-primary/15 text-primary shadow-sm ring-1 ring-primary/20"
                     : "border-border bg-card text-foreground hover:bg-muted/45",
                 )}
                 key={day}
-                onClick={() => {
-                  setActiveDay(day);
-                  closeEditorForDay(day);
-                }}
-                type="button"
               >
-                <span className="text-sm font-semibold">
-                  {templateDayShortLabels[day]}
-                </span>
-                <span className="font-mono text-xs font-medium leading-none text-muted-foreground">
-                  {dayBlocks.length}
-                </span>
-              </button>
+                <button
+                  aria-current={active ? "date" : undefined}
+                  aria-label={`${getScheduleTemplateDayLabel(day)}. ${
+                    dayBlocks.length
+                  } bloque${dayBlocks.length === 1 ? "" : "s"}`}
+                  className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  onClick={() => {
+                    setActiveDay(day);
+                    closeEditorForDay(day);
+                  }}
+                  type="button"
+                >
+                  <span className="text-sm font-semibold">
+                    {templateDayShortLabels[day]}
+                  </span>
+                  <span className="font-mono text-xs font-medium leading-none text-muted-foreground">
+                    {dayBlocks.length}
+                  </span>
+                </button>
+                <DaySelectionCheckbox
+                  className="absolute right-1 top-1 z-10 size-3.5 bg-background"
+                  day={day}
+                  dayBlocks={dayBlocks}
+                  onToggleDay={toggleSelectedDay}
+                  selectedBlockIds={selectedBlockIds}
+                />
+              </div>
             );
           })}
         </div>
@@ -3668,9 +3883,17 @@ export function TemplateBlocksEditor({
 
       <section className="space-y-3 md:hidden">
         <div className="flex items-center justify-between gap-3">
-          <h4 className="text-base font-semibold tracking-tight">
-            {getScheduleTemplateDayLabel(displayedDay)}
-          </h4>
+          <div className="flex min-w-0 items-center gap-2">
+            <DaySelectionCheckbox
+              day={displayedDay}
+              dayBlocks={activeDayBlocks}
+              onToggleDay={toggleSelectedDay}
+              selectedBlockIds={selectedBlockIds}
+            />
+            <h4 className="truncate text-base font-semibold tracking-tight">
+              {getScheduleTemplateDayLabel(displayedDay)}
+            </h4>
+          </div>
           <Badge variant="outline">
             {activeDayBlocks.length} bloque
             {activeDayBlocks.length === 1 ? "" : "s"}
@@ -3745,6 +3968,7 @@ export function TemplateBlocksEditor({
           setActiveDay(slot.day);
           setQuickCreateSlot(slot);
         }}
+        onToggleDaySelected={toggleSelectedDay}
         onToggleSelected={toggleSelectedBlock}
         rangeBlocks={blocks}
         selectedBlockId={selectedBlockId}

@@ -6,14 +6,18 @@ import {
   Download,
   Eye,
   FileText,
+  Folder,
   FolderOpen,
   Info,
   LockKeyhole,
   Plus,
+  ShieldCheck,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
 import { createDocumentWithInitialFileUpload } from "./actions";
+import { DocumentFolderCreateForm } from "./document-folder-create-form";
 import { DocumentUploadSubmitButton } from "./document-upload-submit-button";
 import { OrganizationResolutionState } from "@/components/features/organization-resolution-state";
 import { PageHeader } from "@/components/features/operations-ui";
@@ -43,14 +47,19 @@ import {
   DOCUMENT_UPLOAD_SCOPES,
   canCreateMinimalDocumentUpload,
   isDocumentUploadScope,
+  listAccessibleDocumentFolders,
   listAccessibleDocumentVersions,
+  type DocumentFolderEntry,
   normalizeDocumentRepositoryScope,
   type DocumentRepositoryEntry,
   type DocumentRepositoryScope,
   type DocumentUploadScope,
 } from "@/lib/documents";
 import { getDocumentsPath, getSchedulePath } from "@/lib/navigation/app-paths";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import type { Tables } from "@/types/supabase";
+import { isPostgresUuid } from "@/lib/uuid";
 
 export const dynamic = "force-dynamic";
 
@@ -58,53 +67,77 @@ type DocumentsPageProps = {
   searchParams: Promise<{
     organizationId?: string | string[];
     scope?: string | string[];
+    folder_id?: string | string[];
     error?: string | string[];
     status?: string | string[];
   }>;
 };
 
+type PersonProfileRow = Pick<
+  Tables<"person_profiles">,
+  "display_name" | "id" | "status" | "visibility_status"
+>;
+
 const scopeLabels: Record<DocumentRepositoryScope, string> = {
   certification: "Certificaciones",
   company: "Empresa",
-  management_private: "Gestion",
+  management_private: "Gestión",
   person_private: "Persona",
-  programming: "Programacion",
+  programming: "Programación",
 };
 
 const scopeDescriptions: Record<DocumentRepositoryScope, string> = {
-  certification: "Cursos, titulos y adjuntos autorizados.",
+  certification: "Cursos, títulos y adjuntos autorizados.",
   company: "Documentos internos de empresa visibles por rol o permiso.",
   management_private: "Documentos de gestión con permiso explícito.",
   person_private: "Documentos asociados a tu persona o autorizados para tu rol.",
-  programming: "Programacion y material asociado al horario.",
+  programming: "Programación y material asociado al horario.",
 };
 
 const successMessages: Record<string, string> = {
   "document-uploaded": "Documento creado y archivo adjuntado.",
+  "folder-created": "Carpeta creada.",
+};
+
+const successDescriptions: Record<string, string> = {
+  "document-uploaded": "La versión activa ya usa el almacenamiento privado.",
+  "folder-created": "Ya puedes subir documentos dentro de esta carpeta.",
 };
 
 const errorMessages: Record<string, string> = {
-  "activation-failed": "El archivo se recibio, pero no se pudo activar la version.",
+  "activation-failed": "El archivo se recibió, pero no se pudo activar la versión.",
   "file-content-mismatch": "El contenido no coincide con el tipo de archivo declarado.",
   "file-empty": "Adjunta un archivo antes de crear el documento.",
-  "file-extension-mismatch": "La extension no coincide con el tipo de archivo.",
+  "file-extension-mismatch": "La extensión no coincide con el tipo de archivo.",
   "file-name-invalid": "Usa un nombre de archivo simple, sin rutas ni barras.",
   "file-read-failed": "No se pudo leer el archivo completo.",
   "file-too-large": "El archivo supera el tamaño máximo permitido.",
   "file-type-not-allowed": "Ese tipo de archivo no está permitido en este corte.",
+  "folder-create-failed": "No se pudo crear la carpeta.",
+  "folder-grants-failed": "La carpeta se creó, pero no se pudieron guardar sus permisos.",
   forbidden: "Tu rol no permite crear documentos desde esta pantalla.",
+  "invalid-folder": "La carpeta seleccionada no está disponible para tu rol.",
+  "invalid-folder-name": "Usa un nombre de carpeta entre 1 y 120 caracteres.",
+  "invalid-folder-people": "Elige al menos una persona para esa visibilidad.",
+  "invalid-folder-permission": "El tipo de visibilidad de la carpeta no es válido.",
   "invalid-scope": "El ámbito documental no está disponible para subida.",
-  "invalid-title": "Usa un titulo entre 1 y 160 caracteres.",
+  "invalid-title": "Usa un título entre 1 y 160 caracteres.",
   "metadata-save-failed": "No se pudo guardar la metadata documental.",
   no_active_memberships: "No hay accesos activos para este usuario.",
   organization_not_found: "La organización solicitada no está disponible.",
   organization_required: "Elige una organización antes de gestionar documentos.",
   "upload-failed": "No se pudo subir el archivo al almacenamiento privado.",
-  "upload-start-failed": "No se pudo preparar la version documental.",
+  "upload-start-failed": "No se pudo preparar la versión documental.",
 };
 
 function getParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeDocumentFolderParam(value: string | string[] | undefined) {
+  const folderId = getParam(value);
+
+  return folderId && isPostgresUuid(folderId) ? folderId : null;
 }
 
 function formatDate(value: string | null) {
@@ -125,7 +158,7 @@ function formatDate(value: string | null) {
 
 function formatFileSize(value: number) {
   if (!Number.isFinite(value) || value <= 0) {
-    return "Tamano no disponible";
+    return "Tamaño no disponible";
   }
 
   if (value < 1024) {
@@ -167,6 +200,13 @@ function getAccessLabel(entry: DocumentRepositoryEntry) {
   return "Solo metadata";
 }
 
+function selectClassName(className = "") {
+  return cn(
+    "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:h-9",
+    className,
+  );
+}
+
 function formatUploadLimit() {
   return `${DOCUMENT_UPLOAD_MAX_SIZE_BYTES / (1024 * 1024)} MB`;
 }
@@ -177,6 +217,23 @@ function getDefaultUploadScope(
   return selectedScope && isDocumentUploadScope(selectedScope)
     ? selectedScope
     : "company";
+}
+
+async function getFolderPermissionPeople(organizationId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("person_profiles")
+    .select("id, display_name, status, visibility_status")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .neq("visibility_status", "hidden")
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load document folder people: ${error.message}`);
+  }
+
+  return data satisfies PersonProfileRow[];
 }
 
 type DocumentSummaryTone = "download" | "preview" | "visible";
@@ -271,11 +328,66 @@ function DocumentUploadPanel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DocumentFolderPanel({
+  organizationId,
+  people,
+  selectedScope,
+}: {
+  organizationId: string;
+  people: PersonProfileRow[];
+  selectedScope: DocumentRepositoryScope | null;
+}) {
+  const defaultScope = getDefaultUploadScope(selectedScope);
+
+  return (
+    <section className="scroll-mt-24" id="document-folder-create">
+      <Card>
+        <CardContent className="grid gap-5 py-2 lg:grid-cols-[minmax(0,0.75fr)_minmax(340px,1fr)] lg:items-start">
+          <div className="flex min-w-0 gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+              <Folder aria-hidden="true" className="size-6" />
+            </span>
+            <div className="min-w-0 space-y-3">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Crear carpeta
+                </h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                  Agrupa documentos y decide quién puede ver lo que guardes
+                  dentro.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  <ShieldCheck aria-hidden="true" className="mr-1 size-3.5" />
+                  Permisos heredados
+                </Badge>
+                <Badge variant="outline">
+                  <Users aria-hidden="true" className="mr-1 size-3.5" />
+                  Roles o personas
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <DocumentFolderCreateForm
+            defaultScope={defaultScope}
+            organizationId={organizationId}
+            people={people}
+          />
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 function DocumentRepositoryHeader({
   metadataOnlyCount,
+  selectedFolder,
   selectedScope,
 }: {
   metadataOnlyCount: number;
+  selectedFolder: DocumentFolderEntry | null;
   selectedScope: DocumentRepositoryScope | null;
 }) {
   return (
@@ -283,9 +395,11 @@ function DocumentRepositoryHeader({
       <div className="min-w-0 space-y-1">
         <h2 className="text-xl font-semibold tracking-tight">Repositorio</h2>
         <p className="text-sm leading-6 text-muted-foreground">
-          {selectedScope
-            ? scopeDescriptions[selectedScope]
-            : "Todos los archivos visibles para tu rol."}
+          {selectedFolder
+            ? `Documentos dentro de ${selectedFolder.name}.`
+            : selectedScope
+              ? scopeDescriptions[selectedScope]
+              : "Todos los archivos visibles para tu rol."}
         </p>
       </div>
       <Badge className="w-fit" variant="outline">
@@ -355,18 +469,22 @@ function DocumentsHelpNote() {
       <Info aria-hidden="true" className="size-4 text-blue-700" />
       <AlertTitle>¿Sabías que?</AlertTitle>
       <AlertDescription className="leading-6 text-blue-900/85">
-        La visibilidad depende de tu rol y del ámbito de cada versión. Preview
-        y descarga pasan siempre por rutas backend controladas.
+        La visibilidad depende de tu rol, de la carpeta y del ámbito de cada
+        versión. Preview y descarga pasan siempre por rutas backend controladas.
       </AlertDescription>
     </Alert>
   );
 }
 
 function DocumentCreateForm({
+  folders,
   organizationId,
+  selectedFolderId,
   selectedScope,
 }: {
+  folders: DocumentFolderEntry[];
   organizationId: string;
+  selectedFolderId: string | null;
   selectedScope: DocumentRepositoryScope | null;
 }) {
   const defaultScope = getDefaultUploadScope(selectedScope);
@@ -384,24 +502,45 @@ function DocumentCreateForm({
           <Input
             maxLength={160}
             name="title"
-            placeholder="Programacion semana 1"
+            placeholder="Programación semana 1"
             required
           />
         </label>
 
         <label className="grid gap-2">
-          <span className="text-sm font-medium">Ambito</span>
+          <span className="text-sm font-medium">Carpeta</span>
           <select
-            className="h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:h-8"
-            defaultValue={defaultScope}
-            name="scope"
+            className={selectClassName()}
+            defaultValue={selectedFolderId ?? ""}
+            name="folderId"
           >
+            <option value="">Sin carpeta</option>
+            {folders.map((folder) => (
+              <option key={folder.folder_id} value={folder.folder_id}>
+                {folder.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <label className="grid gap-2">
+          <span className="text-sm font-medium">Ámbito</span>
+          <select className={selectClassName()} defaultValue={defaultScope} name="scope">
             {DOCUMENT_UPLOAD_SCOPES.map((scope) => (
               <option key={scope} value={scope}>
                 {scopeLabels[scope]}
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="grid gap-2">
+          <span className="text-sm font-medium">Permisos</span>
+          <span className="flex h-11 items-center rounded-lg border border-border bg-muted/40 px-3 text-sm text-muted-foreground md:h-9">
+            Carpeta si se elige
+          </span>
         </label>
       </div>
 
@@ -423,7 +562,7 @@ function DocumentCreateForm({
           type="file"
         />
         <span className="text-xs leading-5 text-muted-foreground">
-          PDF, PNG, JPG, TXT o CSV. Maximo {formatUploadLimit()}.
+          PDF, PNG, JPG, TXT o CSV. Máximo {formatUploadLimit()}.
         </span>
       </label>
 
@@ -438,9 +577,11 @@ function DocumentCreateForm({
 }
 
 function DocumentsScopeFilters({
+  selectedFolderId,
   organizationId,
   selectedScope,
 }: {
+  selectedFolderId: string | null;
   organizationId: string;
   selectedScope: DocumentRepositoryScope | null;
 }) {
@@ -474,11 +615,78 @@ function DocumentsScopeFilters({
             <Link
               aria-current={active ? "page" : undefined}
               href={getDocumentsPath({
+                documentFolderId: selectedFolderId,
                 documentScope: item.scope,
                 organizationId,
               })}
             >
               {item.label}
+            </Link>
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DocumentsFolderFilters({
+  folders,
+  organizationId,
+  selectedFolderId,
+  selectedScope,
+}: {
+  folders: DocumentFolderEntry[];
+  organizationId: string;
+  selectedFolderId: string | null;
+  selectedScope: DocumentRepositoryScope | null;
+}) {
+  if (folders.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1" role="list">
+      <Button
+        asChild
+        className="shrink-0"
+        size="sm"
+        variant={selectedFolderId ? "outline" : "default"}
+      >
+        <Link
+          aria-current={!selectedFolderId ? "page" : undefined}
+          href={getDocumentsPath({
+            documentScope: selectedScope,
+            organizationId,
+          })}
+        >
+          Todas las carpetas
+        </Link>
+      </Button>
+
+      {folders.map((folder) => {
+        const active = folder.folder_id === selectedFolderId;
+
+        return (
+          <Button
+            asChild
+            className="shrink-0"
+            key={folder.folder_id}
+            size="sm"
+            variant={active ? "default" : "outline"}
+          >
+            <Link
+              aria-current={active ? "page" : undefined}
+              href={getDocumentsPath({
+                documentFolderId: folder.folder_id,
+                documentScope: selectedScope,
+                organizationId,
+              })}
+            >
+              <Folder aria-hidden="true" />
+              <span className="max-w-40 truncate">{folder.name}</span>
+              <Badge className="-mr-1 ml-1" variant="outline">
+                {folder.document_count}
+              </Badge>
             </Link>
           </Button>
         );
@@ -513,6 +721,12 @@ function DocumentRepositoryCard({
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{scopeLabels[entry.document_scope]}</Badge>
+            {entry.folder_name ? (
+              <Badge variant="outline">
+                <Folder aria-hidden="true" className="mr-1 size-3.5" />
+                {entry.folder_name}
+              </Badge>
+            ) : null}
             <Badge variant="outline">{getAccessLabel(entry)}</Badge>
             {entry.document_status === "archived" ||
             entry.version_status === "archived" ? (
@@ -588,6 +802,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
   const params = await searchParams;
   const organizationId = getParam(params.organizationId);
   const selectedScope = normalizeDocumentRepositoryScope(getParam(params.scope));
+  const selectedFolderId = normalizeDocumentFolderParam(params.folder_id);
   const status = getParam(params.status);
   const error = getParam(params.error);
   const memberships = await getActiveMemberships(user.id);
@@ -605,7 +820,14 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
     );
   }
 
+  const foldersResult = await listAccessibleDocumentFolders({
+    organizationId: resolution.organization.id,
+  });
+  const folders = foldersResult.ok ? foldersResult.data : [];
+  const selectedFolder =
+    folders.find((folder) => folder.folder_id === selectedFolderId) ?? null;
   const repositoryResult = await listAccessibleDocumentVersions({
+    folderId: selectedFolderId,
     limit: 100,
     organizationId: resolution.organization.id,
     scope: selectedScope,
@@ -620,6 +842,9 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
   const canCreateDocuments = canCreateMinimalDocumentUpload(
     resolution.membership.role,
   );
+  const folderPermissionPeople = canCreateDocuments
+    ? await getFolderPermissionPeople(resolution.organization.id)
+    : [];
 
   return (
     <div
@@ -631,7 +856,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
           <Button asChild variant="outline">
             <Link href="#document-help">
               <FileText aria-hidden="true" />
-              Guia de documentos
+              Guía de documentos
             </Link>
           </Button>
         }
@@ -648,7 +873,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
 
       {status && successMessages[status] ? (
         <TransientFeedbackBanner
-          description="La version activa ya usa el almacenamiento privado."
+          description={successDescriptions[status] ?? ""}
           title={successMessages[status]}
           tone="success"
         />
@@ -687,20 +912,46 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
       </section>
 
       {canCreateDocuments ? (
-        <DocumentUploadPanel>
-          <DocumentCreateForm
+        <>
+          <DocumentFolderPanel
             organizationId={resolution.organization.id}
+            people={folderPermissionPeople}
             selectedScope={selectedScope}
           />
-        </DocumentUploadPanel>
+          <DocumentUploadPanel>
+            <DocumentCreateForm
+              folders={folders}
+              organizationId={resolution.organization.id}
+              selectedFolderId={selectedFolder?.folder_id ?? null}
+              selectedScope={selectedScope}
+            />
+          </DocumentUploadPanel>
+        </>
       ) : null}
 
       <section className="space-y-3">
         <DocumentRepositoryHeader
           metadataOnlyCount={metadataOnlyCount}
+          selectedFolder={selectedFolder}
+          selectedScope={selectedScope}
+        />
+        {!foldersResult.ok ? (
+          <Alert variant="destructive">
+            <LockKeyhole aria-hidden="true" className="size-4" />
+            <AlertTitle>No se pudieron cargar las carpetas</AlertTitle>
+            <AlertDescription>
+              La lista de carpetas quedó bloqueada por tenant o permisos.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        <DocumentsFolderFilters
+          folders={folders}
+          organizationId={resolution.organization.id}
+          selectedFolderId={selectedFolder?.folder_id ?? null}
           selectedScope={selectedScope}
         />
         <DocumentsScopeFilters
+          selectedFolderId={selectedFolder?.folder_id ?? null}
           organizationId={resolution.organization.id}
           selectedScope={selectedScope}
         />
@@ -710,7 +961,7 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
             <LockKeyhole aria-hidden="true" className="size-4" />
             <AlertTitle>No se pudo cargar el repositorio</AlertTitle>
             <AlertDescription>
-              La consulta documental quedo bloqueada por entorno, tenant o
+              La consulta documental quedó bloqueada por entorno, tenant o
               permisos. Revisa los accesos y datos reales antes de beta.
             </AlertDescription>
           </Alert>

@@ -62,6 +62,8 @@ export type DocumentRepositoryEntry = {
   document_type: string;
   document_updated_at: string;
   document_version_id: string;
+  folder_id: string | null;
+  folder_name: string | null;
   mime_type: string;
   organization_id: string;
   original_filename: string;
@@ -73,9 +75,23 @@ export type DocumentRepositoryEntry = {
   version_updated_at: string;
 };
 
+export type DocumentFolderEntry = {
+  can_manage: boolean;
+  created_at: string;
+  description: string | null;
+  document_count: number;
+  folder_id: string;
+  name: string;
+  organization_id: string;
+  parent_folder_id: string | null;
+  status: string;
+  updated_at: string;
+};
+
 export type DocumentRepositoryErrorCode =
   | "authentication-required"
   | "forbidden"
+  | "invalid-folder"
   | "invalid-input"
   | "invalid-limit"
   | "invalid-organization"
@@ -400,6 +416,20 @@ function validateScope(value: unknown): ValidationResult<DocumentRepositoryScope
     : invalid("invalid-scope");
 }
 
+function validateOptionalFolderId(
+  value: unknown,
+): ValidationResult<string | null> {
+  if (value === undefined || value === null || value === "") {
+    return valid(null);
+  }
+
+  if (typeof value !== "string" || !isPostgresUuid(value.trim())) {
+    return invalid("invalid-folder");
+  }
+
+  return valid(value.trim());
+}
+
 function validateLimit(value: unknown): ValidationResult<number> {
   if (value === undefined || value === null) {
     return valid(DEFAULT_LIST_LIMIT);
@@ -418,10 +448,12 @@ function validateLimit(value: unknown): ValidationResult<number> {
 }
 
 function validateListInput(input: {
+  folderId?: string | null;
   limit?: number | null;
   organizationId: string;
   scope?: string | null;
 }): ValidationResult<{
+  folderId: string | null;
   limit: number;
   organizationId: string;
   scope: DocumentRepositoryScope | null;
@@ -442,6 +474,12 @@ function validateListInput(input: {
     return scope;
   }
 
+  const folderId = validateOptionalFolderId(input.folderId);
+
+  if (!folderId.ok) {
+    return folderId;
+  }
+
   const limit = validateLimit(input.limit);
 
   if (!limit.ok) {
@@ -449,6 +487,7 @@ function validateListInput(input: {
   }
 
   return valid({
+    folderId: folderId.value,
     limit: limit.value,
     organizationId: organizationId.value,
     scope: scope.value,
@@ -472,6 +511,10 @@ function mapDatabaseError(message: string | undefined): DocumentRepositoryErrorC
 
   if (normalized.includes("scope")) {
     return "invalid-scope";
+  }
+
+  if (normalized.includes("folder")) {
+    return "invalid-folder";
   }
 
   return "load-failed";
@@ -504,6 +547,7 @@ async function resolveDocumentRepositoryContext(
 }
 
 export async function listAccessibleDocumentVersions(input: {
+  folderId?: string | null;
   limit?: number | null;
   organizationId: string;
   scope?: string | null;
@@ -526,8 +570,43 @@ export async function listAccessibleDocumentVersions(input: {
   const { data, error } = await db.rpc<DocumentRepositoryEntry[]>(
     "list_accessible_document_versions",
     {
+      target_folder_id: validation.value.folderId,
       target_document_scope: validation.value.scope,
       target_limit: validation.value.limit,
+      target_organization_id: context.data.organization.id,
+    },
+  );
+
+  if (error) {
+    return failure(mapDatabaseError(error.message));
+  }
+
+  return success(data ?? []);
+}
+
+export async function listAccessibleDocumentFolders(input: {
+  organizationId: string;
+}): Promise<DocumentRepositoryResult<DocumentFolderEntry[]>> {
+  if (!isRecord(input)) {
+    return failure("invalid-input");
+  }
+
+  const organizationId = normalizeOrganizationId(input.organizationId);
+
+  if (!organizationId.ok) {
+    return failure(organizationId.error);
+  }
+
+  const context = await resolveDocumentRepositoryContext(organizationId.value);
+
+  if (!context.ok) {
+    return context;
+  }
+
+  const db = getDocumentRepositoryClient(context.data.supabase);
+  const { data, error } = await db.rpc<DocumentFolderEntry[]>(
+    "list_accessible_document_folders",
+    {
       target_organization_id: context.data.organization.id,
     },
   );

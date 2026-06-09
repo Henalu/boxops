@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>BoxOps - Guía de Propietario</title>
+  <style>
+    @page { size: Letter; margin: 0.72in; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #0F172A;
+      background: white;
+      font-size: 10.5pt;
+      line-height: 1.45;
+    }
+    .cover {
+      min-height: 9.2in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid #D7DEE8;
+      border-radius: 18px;
+      padding: 42px;
+      background:
+        linear-gradient(145deg, rgba(0,109,114,.10), rgba(255,216,77,.16) 45%, rgba(255,255,255,1) 76%),
+        #fff;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: #006D72; color: white;
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 20px;
+    }
+    .eyebrow {
+      color: #064E52; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; font-size: 10px;
+    }
+    h1 { font-size: 38px; line-height: 1.06; margin: 72px 0 12px; letter-spacing: 0; }
+    .subtitle { font-size: 17px; color: #334155; max-width: 620px; }
+    .meta-strip {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-top: 36px;
+    }
+    .meta-card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 16px;
+      background: rgba(255,255,255,.76);
+    }
+    .meta-card b { display: block; font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: .06em; }
+    .meta-card span { display: block; margin-top: 4px; font-weight: 700; }
+    .notice {
+      margin-top: 26px; border: 1px solid #F2D56B; border-radius: 14px;
+      background: #FFF7D6; padding: 15px 18px; color: #3B3A22;
+    }
+    .page { break-before: page; }
+    h2 { font-size: 23px; margin: 0 0 12px; color: #064E52; }
+    h3 { font-size: 15px; margin: 18px 0 8px; color: #0F172A; }
+    p { margin: 0 0 9px; }
+    .lead { color: #475569; font-size: 12pt; margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 15px 16px;
+      background: #FFFFFF; break-inside: avoid;
+    }
+    .card h3 { margin-top: 0; }
+    ul, ol { margin: 8px 0 0 21px; padding: 0; }
+    li { margin: 0 0 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; break-inside: avoid; }
+    th { text-align: left; background: #064E52; color: white; padding: 9px 10px; font-size: 9.6pt; }
+    td { border: 1px solid #D7DEE8; padding: 9px 10px; vertical-align: top; }
+    code { color: #064E52; font-weight: 700; }
+    .workflow {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 18px;
+      background: #FAFCFE; margin: 0 0 12px; break-inside: avoid;
+    }
+    .workflow h3 { margin-top: 0; }
+    figure {
+      margin: 18px 0 24px; break-inside: avoid;
+      border: 1px solid #D7DEE8; border-radius: 16px;
+      overflow: hidden; background: white;
+    }
+    figure img { display: block; width: 100%; max-height: 6.8in; object-fit: contain; background: #F5F8FB; }
+    figcaption {
+      padding: 9px 12px; color: #64748B; font-size: 9.3pt;
+      border-top: 1px solid #D7DEE8; background: #F8FAFC;
+    }
+    .limits {
+      border-left: 5px solid #006D72; background: #F5FBFB;
+      padding: 14px 18px; border-radius: 12px; margin-top: 10px;
+    }
+    .footer-note { color: #64748B; font-size: 9pt; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">
+        <div class="mark">B</div>
+        <div>
+          <div class="eyebrow">BoxOps</div>
+          <div>Guía de usuario</div>
+        </div>
+      </div>
+      <h1>Guía de Propietario</h1>
+      <p class="subtitle">Control general del box, accesos, configuración y supervisión operativa.</p>
+      <div class="meta-strip">
+        <div class="meta-card"><b>Versión</b><span>v1</span></div>
+        <div class="meta-card"><b>Fecha</b><span>01/06/2026</span></div>
+        <div class="meta-card"><b>Rol</b><span>Propietario</span></div>
+      </div>
+    </div>
+    <p class="footer-note">Guía rápida para trabajar con BoxOps sin perder contexto.</p>
+  </section>
+
+  <section class="page">
+    <h2>Para quién es esta guía</h2>
+    <p class="lead">Para quien toma decisiones sobre el box y necesita ver si la semana está bajo control.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Qué puedes hacer</h3>
+        <ul><li>Entrar en Inicio para ver estado semanal, cobertura, avisos y acciones rápidas.</li><li>Crear y revisar centros, tipos de actividad, equipo, plantillas y horario.</li><li>Gestionar altas de usuario, invitaciones, roles y estado de acceso.</li><li>Supervisar solicitudes, ausencias, fichaje, documentos y plan/facturación.</li><li>Cambiar ajustes de organización que afectan a la forma de trabajar.</li></ul>
+      </div>
+      <div class="card">
+        <h3>Uso recomendado</h3>
+        <ul>
+          <li>Empieza por las pantallas principales de tu rol.</li>
+          <li>Si una acción no aparece, puede depender de tus permisos.</li>
+          <li>No des por hecho que un botón “debería estar”: si no aparece, puede ser por rol.</li>
+          <li>Reporta página, acción, resultado esperado y resultado real.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px">Mapa rápido</h2>
+    <table>
+      <thead><tr><th>Pantalla</th><th>Ruta</th><th>Sirve para</th></tr></thead>
+      <tbody><tr><td>Inicio</td><td><code>/app</code></td><td>Estado semanal, avisos y accesos rápidos.</td></tr>
+<tr><td>Equipo</td><td><code>/app/coaches</code></td><td>Usuarios, roles, invitaciones y fichas operativas.</td></tr>
+<tr><td>Centros</td><td><code>/app/centers</code></td><td>Sedes disponibles para planificar.</td></tr>
+<tr><td>Tipos</td><td><code>/app/class-types</code></td><td>Catálogo de actividades y requisitos.</td></tr>
+<tr><td>Plantillas</td><td><code>/app/templates</code></td><td>Semana base reutilizable.</td></tr>
+<tr><td>Horario</td><td><code>/app/schedule</code></td><td>Bloques reales de la semana y asignaciones.</td></tr>
+<tr><td>Cobertura</td><td><code>/app/coverage</code></td><td>Riesgos de clases sin cubrir o insuficientes.</td></tr>
+<tr><td>Configuración</td><td><code>/app/settings</code></td><td>Nombre, color y reglas operativas.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Flujos principales</h2>
+    <p class="lead">Empieza por estos recorridos. Son los que más valor dan en el uso diario.</p>
+
+            <section class="workflow">
+              <h3>Preparar la base del box</h3>
+              <ol><li>Crea o revisa los centros en Centros.</li><li>Define tipos de actividad: WOD, Open Box, recepción, competición o lo que use el box.</li><li>En Equipo, crea cuentas o envía invitaciones y confirma que cada persona tiene rol correcto.</li><li>Completa ficha operativa: centro principal, horas semanales y estado operativo.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Crear una semana normal</h3>
+              <ol><li>En Plantillas, crea una plantilla semanal con los bloques habituales.</li><li>Añade bloques por día y hora, con entrenadores necesarios y entrenador por defecto si lo sabes.</li><li>Aplica la plantilla a la semana que quieres preparar.</li><li>En Horario, revisa excepciones: clases canceladas, cambios de hora o entrenadores distintos.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Cerrar cobertura</h3>
+              <ol><li>Abre Inicio o Cobertura y localiza riesgos: sin cubrir, insuficientes o conflictos.</li><li>Entra al bloque real desde el enlace de la cola.</li><li>Añade o retira entrenadores en Asignaciones actuales.</li><li>Vuelve a Cobertura y confirma que el riesgo desaparece.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Cuando revises BoxOps</h3>
+              <ol><li>Anota qué querías hacer, en qué pantalla estabas y qué resultado esperabas.</li><li>Si algo no se entiende, no lo des por sabido: ese punto es feedback valioso.</li><li>No uses datos laborales sensibles reales todavía.</li></ol>
+            </section>
+
+  </section>
+
+  <section class="page">
+    <h2>Otras funciones útiles</h2>
+    <p class="lead">Estas zonas no siempre son la primera parada, pero ayudan a entender la operación completa.</p>
+    <table>
+      <thead><tr><th>Función</th><th>Dónde está</th><th>Para qué sirve</th></tr></thead>
+      <tbody><tr><td>Cobertura</td><td><code>/app/coverage</code></td><td>Reúne clases sin cubrir, cobertura insuficiente y conflictos de asignación para resolverlos desde el bloque real.</td></tr>
+<tr><td>Solicitudes</td><td><code>/app/requests</code></td><td>Centraliza peticiones de cambio o cobertura para revisar qué persona pide ayuda y qué bloque se ve afectado.</td></tr>
+<tr><td>Ausencias</td><td><code>/app/absences</code></td><td>Permite revisar peticiones y estados de ausencia, y entender su impacto operativo sin mostrar motivos sensibles innecesarios.</td></tr>
+<tr><td>Jornadas previstas</td><td><code>/app/work-windows</code></td><td>Define cuándo se espera que una persona esté disponible o presente, separado del horario de clases.</td></tr>
+<tr><td>Mi fichaje</td><td><code>/app/time</code></td><td>Registra jornada propia y permite revisar cierres, correcciones y posibles excesos como apoyo interno.</td></tr>
+<tr><td>Mi cuenta y firma</td><td><code>/app/account</code></td><td>Guarda perfil propio, avatar privado y firma interna propia. La firma no permite firmar por otra persona.</td></tr>
+<tr><td>Documentos</td><td><code>/app/documents</code></td><td>Muestra documentos autorizados y archivos vinculados a programación o contexto interno permitido.</td></tr>
+<tr><td>Estadísticas</td><td><code>/app/stats</code></td><td>Resume carga por coach, clases por tipo, actividad por centro y avisos operativos.</td></tr>
+<tr><td>Plan y facturación</td><td><code>/app/settings/billing</code></td><td>Muestra plan, límites y uso disponible para la organización.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Capturas de referencia</h2>
+    <p class="lead">Las imágenes ayudan a reconocer la pantalla y los elementos principales.</p>
+
+        <figure>
+          <img src="assets/guide-images/coach-dashboard.png" alt="Inicio muestra la salud de la semana y accesos rápidos.">
+          <figcaption>Inicio muestra la salud de la semana y accesos rápidos.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-team.png" alt="Equipo concentra accesos, roles y datos operativos.">
+          <figcaption>Equipo concentra accesos, roles y datos operativos.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-templates.png" alt="Plantillas permite construir una semana base reutilizable.">
+          <figcaption>Plantillas permite construir una semana base reutilizable.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/placeholders/placeholder-coverage.png" alt="Cobertura: vista para revisar riesgos, huecos y conflictos.">
+          <figcaption>Cobertura: vista para revisar riesgos, huecos y conflictos.</figcaption>
+        </figure>
+
+  </section>
+
+  <section class="page">
+    <h2>Límites actuales</h2>
+    <div class="limits">
+      <ul><li>No hay reservas de clientes ni BoxWOD todavía.</li><li>No hay geolocalización real, payroll ni nómina.</li><li>No se deben cargar documentos sensibles reales sin entorno validado.</li><li>El acceso de clientes finales y reservas no forma parte de BoxOps.</li></ul>
+    </div>
+    <h2 style="margin-top:26px">Si necesitas reportar algo</h2>
+    <ol>
+      <li>Di qué estabas intentando hacer.</li>
+      <li>Indica la pantalla: por ejemplo, Horario, Equipo o Mi fichaje.</li>
+      <li>Explica qué esperabas que pasara.</li>
+      <li>Explica qué pasó realmente.</li>
+      <li>Añade captura si el problema es visual o de comprensión.</li>
+    </ol>
+    <p class="footer-note">Evita enviar contraseñas, datos sensibles o información laboral real por canales no acordados.</p>
+  </section>
+</body>
+</html>

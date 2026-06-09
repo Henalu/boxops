@@ -1,0 +1,8 @@
+docs\user-guides\export\boxops-guia-propietario.html
+docs\user-guides\export\boxops-guia-propietario.docx
+docs\user-guides\export\boxops-guia-administrador.html
+docs\user-guides\export\boxops-guia-administrador.docx
+docs\user-guides\export\boxops-guia-responsable.html
+docs\user-guides\export\boxops-guia-responsable.docx
+docs\user-guides\export\boxops-guia-entrenador.html
+docs\user-guides\export\boxops-guia-entrenador.docx

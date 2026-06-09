@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>BoxOps - Guía de Responsable</title>
+  <style>
+    @page { size: Letter; margin: 0.72in; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #0F172A;
+      background: white;
+      font-size: 10.5pt;
+      line-height: 1.45;
+    }
+    .cover {
+      min-height: 9.2in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid #D7DEE8;
+      border-radius: 18px;
+      padding: 42px;
+      background:
+        linear-gradient(145deg, rgba(0,109,114,.10), rgba(255,216,77,.16) 45%, rgba(255,255,255,1) 76%),
+        #fff;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark {
+      width: 46px; height: 46px; border-radius: 14px;
+      background: #006D72; color: white;
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 20px;
+    }
+    .eyebrow {
+      color: #064E52; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; font-size: 10px;
+    }
+    h1 { font-size: 38px; line-height: 1.06; margin: 72px 0 12px; letter-spacing: 0; }
+    .subtitle { font-size: 17px; color: #334155; max-width: 620px; }
+    .meta-strip {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-top: 36px;
+    }
+    .meta-card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 16px;
+      background: rgba(255,255,255,.76);
+    }
+    .meta-card b { display: block; font-size: 9px; color: #64748B; text-transform: uppercase; letter-spacing: .06em; }
+    .meta-card span { display: block; margin-top: 4px; font-weight: 700; }
+    .notice {
+      margin-top: 26px; border: 1px solid #F2D56B; border-radius: 14px;
+      background: #FFF7D6; padding: 15px 18px; color: #3B3A22;
+    }
+    .page { break-before: page; }
+    h2 { font-size: 23px; margin: 0 0 12px; color: #064E52; }
+    h3 { font-size: 15px; margin: 18px 0 8px; color: #0F172A; }
+    p { margin: 0 0 9px; }
+    .lead { color: #475569; font-size: 12pt; margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 15px 16px;
+      background: #FFFFFF; break-inside: avoid;
+    }
+    .card h3 { margin-top: 0; }
+    ul, ol { margin: 8px 0 0 21px; padding: 0; }
+    li { margin: 0 0 5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; break-inside: avoid; }
+    th { text-align: left; background: #064E52; color: white; padding: 9px 10px; font-size: 9.6pt; }
+    td { border: 1px solid #D7DEE8; padding: 9px 10px; vertical-align: top; }
+    code { color: #064E52; font-weight: 700; }
+    .workflow {
+      border: 1px solid #D7DEE8; border-radius: 14px; padding: 14px 18px;
+      background: #FAFCFE; margin: 0 0 12px; break-inside: avoid;
+    }
+    .workflow h3 { margin-top: 0; }
+    figure {
+      margin: 18px 0 24px; break-inside: avoid;
+      border: 1px solid #D7DEE8; border-radius: 16px;
+      overflow: hidden; background: white;
+    }
+    figure img { display: block; width: 100%; max-height: 6.8in; object-fit: contain; background: #F5F8FB; }
+    figcaption {
+      padding: 9px 12px; color: #64748B; font-size: 9.3pt;
+      border-top: 1px solid #D7DEE8; background: #F8FAFC;
+    }
+    .limits {
+      border-left: 5px solid #006D72; background: #F5FBFB;
+      padding: 14px 18px; border-radius: 12px; margin-top: 10px;
+    }
+    .footer-note { color: #64748B; font-size: 9pt; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div>
+      <div class="brand">
+        <div class="mark">B</div>
+        <div>
+          <div class="eyebrow">BoxOps</div>
+          <div>Guía de usuario</div>
+        </div>
+      </div>
+      <h1>Guía de Responsable</h1>
+      <p class="subtitle">Supervisión diaria: horario, cobertura, solicitudes, ausencias, jornadas y fichaje.</p>
+      <div class="meta-strip">
+        <div class="meta-card"><b>Versión</b><span>v1</span></div>
+        <div class="meta-card"><b>Fecha</b><span>01/06/2026</span></div>
+        <div class="meta-card"><b>Rol</b><span>Responsable</span></div>
+      </div>
+    </div>
+    <p class="footer-note">Guía rápida para trabajar con BoxOps sin perder contexto.</p>
+  </section>
+
+  <section class="page">
+    <h2>Para quién es esta guía</h2>
+    <p class="lead">Para quien resuelve el día a día sin tocar la configuración global del negocio.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Qué puedes hacer</h3>
+        <ul><li>Ver Inicio y detectar qué necesita atención.</li><li>Gestionar bloques, asignaciones y cobertura operativa.</li><li>Revisar solicitudes de cambio o cobertura cuando existan.</li><li>Revisar ausencias y su impacto operativo.</li><li>Consultar fichaje y posibles excesos como apoyo interno, sin payroll.</li></ul>
+      </div>
+      <div class="card">
+        <h3>Uso recomendado</h3>
+        <ul>
+          <li>Empieza por las pantallas principales de tu rol.</li>
+          <li>Si una acción no aparece, puede depender de tus permisos.</li>
+          <li>No des por hecho que un botón “debería estar”: si no aparece, puede ser por rol.</li>
+          <li>Reporta página, acción, resultado esperado y resultado real.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px">Mapa rápido</h2>
+    <table>
+      <thead><tr><th>Pantalla</th><th>Ruta</th><th>Sirve para</th></tr></thead>
+      <tbody><tr><td>Inicio</td><td><code>/app</code></td><td>Vista rápida de semana y pendientes.</td></tr>
+<tr><td>Horario</td><td><code>/app/schedule</code></td><td>Bloques, asignaciones y contexto.</td></tr>
+<tr><td>Cobertura</td><td><code>/app/coverage</code></td><td>Lista de riesgos accionables.</td></tr>
+<tr><td>Solicitudes</td><td><code>/app/requests</code></td><td>Cambios o cobertura pendiente.</td></tr>
+<tr><td>Ausencias</td><td><code>/app/absences</code></td><td>Peticiones y estados de ausencia.</td></tr>
+<tr><td>Jornadas</td><td><code>/app/work-windows</code></td><td>Presencia prevista.</td></tr>
+<tr><td>Mi fichaje</td><td><code>/app/time</code></td><td>Registro propio y revisión si aplica.</td></tr>
+<tr><td>Estadísticas</td><td><code>/app/stats</code></td><td>Lectura operativa de carga y avisos.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Flujos principales</h2>
+    <p class="lead">Empieza por estos recorridos. Son los que más valor dan en el uso diario.</p>
+
+            <section class="workflow">
+              <h3>Revisar la semana</h3>
+              <ol><li>Empieza en Inicio.</li><li>Mira cobertura semanal, avisos y accesos rápidos.</li><li>Abre Horario para entender el contexto por día y centro.</li><li>Abre Cobertura si hay riesgos que resolver.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Resolver una clase sin cubrir</h3>
+              <ol><li>En Cobertura, abre el riesgo concreto.</li><li>Comprueba centro, hora, tipo de actividad y entrenadores necesarios.</li><li>Asigna un entrenador disponible o ajusta el requisito si el bloque está mal configurado.</li><li>Revisa que no aparezcan conflictos de solape.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Usar solicitudes y ausencias</h3>
+              <ol><li>En Solicitudes, revisa qué pide la persona y qué bloque afecta.</li><li>En Ausencias, revisa fechas y estado sin exponer motivos sensibles innecesarios.</li><li>Vuelve a Horario o Cobertura para comprobar impacto.</li></ol>
+            </section>
+
+            <section class="workflow">
+              <h3>Fichaje y excesos</h3>
+              <ol><li>En Mi fichaje, revisa registros propios y, si tu rol lo permite, correcciones del equipo.</li><li>Usa posibles excesos como alerta operativa, no como aprobación legal ni nómina.</li><li>Documenta cualquier caso raro para revisarlo antes de beta real.</li></ol>
+            </section>
+
+  </section>
+
+  <section class="page">
+    <h2>Otras funciones útiles</h2>
+    <p class="lead">Estas zonas no siempre son la primera parada, pero ayudan a entender la operación completa.</p>
+    <table>
+      <thead><tr><th>Función</th><th>Dónde está</th><th>Para qué sirve</th></tr></thead>
+      <tbody><tr><td>Cobertura</td><td><code>/app/coverage</code></td><td>Prioriza clases sin cubrir, insuficientes o con conflicto para resolver la semana con menos vueltas.</td></tr>
+<tr><td>Solicitudes</td><td><code>/app/requests</code></td><td>Muestra peticiones de cambio o cobertura y ayuda a decidir qué hacer con cada caso.</td></tr>
+<tr><td>Ausencias</td><td><code>/app/absences</code></td><td>Ayuda a revisar ausencias y comprobar si afectan a bloques o cobertura.</td></tr>
+<tr><td>Jornadas previstas</td><td><code>/app/work-windows</code></td><td>Da contexto de disponibilidad/presencia prevista para organizar mejor el día.</td></tr>
+<tr><td>Mi fichaje</td><td><code>/app/time</code></td><td>Registra jornada propia y, si el rol lo permite, revisa correcciones o cierres del equipo.</td></tr>
+<tr><td>Mi cuenta y firma</td><td><code>/app/account</code></td><td>Gestiona perfil propio, avatar y firma interna privada.</td></tr>
+<tr><td>Documentos</td><td><code>/app/documents</code></td><td>Permite consultar documentos o programación autorizada sin abrir información sensible por defecto.</td></tr>
+<tr><td>Estadísticas</td><td><code>/app/stats</code></td><td>Resume actividad, carga y avisos para entender la operación sin entrar a cada pantalla.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="page">
+    <h2>Capturas de referencia</h2>
+    <p class="lead">Las imágenes ayudan a reconocer la pantalla y los elementos principales.</p>
+
+        <figure>
+          <img src="assets/guide-images/coach-dashboard.png" alt="Inicio ayuda a priorizar la semana.">
+          <figcaption>Inicio ayuda a priorizar la semana.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/placeholders/placeholder-coverage.png" alt="Cobertura: vista para priorizar riesgos de la semana.">
+          <figcaption>Cobertura: vista para priorizar riesgos de la semana.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/guide-images/coach-time.png" alt="Mi fichaje muestra registro, balance semanal y revisión operativa.">
+          <figcaption>Mi fichaje muestra registro, balance semanal y revisión operativa.</figcaption>
+        </figure>
+
+
+        <figure>
+          <img src="assets/placeholders/placeholder-requests-absences.png" alt="Solicitudes y ausencias: seguimiento de peticiones y estados.">
+          <figcaption>Solicitudes y ausencias: seguimiento de peticiones y estados.</figcaption>
+        </figure>
+
+  </section>
+
+  <section class="page">
+    <h2>Límites actuales</h2>
+    <div class="limits">
+      <ul><li>No cambia planes, facturación ni configuración global.</li><li>No debe gestionar roles o cuentas si la acción no aparece en Equipo.</li><li>No hay payroll ni aprobación legal definitiva de horas extra.</li><li>No hay resolución automática de cobertura: la decisión sigue siendo humana.</li></ul>
+    </div>
+    <h2 style="margin-top:26px">Si necesitas reportar algo</h2>
+    <ol>
+      <li>Di qué estabas intentando hacer.</li>
+      <li>Indica la pantalla: por ejemplo, Horario, Equipo o Mi fichaje.</li>
+      <li>Explica qué esperabas que pasara.</li>
+      <li>Explica qué pasó realmente.</li>
+      <li>Añade captura si el problema es visual o de comprensión.</li>
+    </ol>
+    <p class="footer-note">Evita enviar contraseñas, datos sensibles o información laboral real por canales no acordados.</p>
+  </section>
+</body>
+</html>

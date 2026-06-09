@@ -17,6 +17,7 @@ type AppPathOptions = {
   createTemplateBlockTemplateId?: string | null;
   day?: string | null;
   documentScope?: string | null;
+  documentFolderId?: string | null;
   organizationId?: string | null;
   error?: string | null;
   editTemplateBlockId?: string | null;
@@ -101,6 +102,10 @@ export function getAppPath(path = DEFAULT_APP_PATH, options: AppPathOptions = {}
 
   if (options.documentScope) {
     params.set("scope", options.documentScope);
+  }
+
+  if (options.documentFolderId) {
+    params.set("folder_id", options.documentFolderId);
   }
 
   if (options.view) {
