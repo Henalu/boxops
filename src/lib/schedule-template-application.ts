@@ -732,12 +732,14 @@ async function syncTemplateAssignmentsForScheduleBlocks({
 }
 
 async function syncExistingTemplateBlocksForRange({
+  minimumWeekStart,
   organizationId,
   supabase,
   template,
   templateBlockIds,
   timezone,
 }: {
+  minimumWeekStart?: string;
   organizationId: string;
   supabase: SupabaseServerClient;
   template: ScheduleTemplateForApplication;
@@ -789,8 +791,23 @@ async function syncExistingTemplateBlocksForRange({
     };
   }
 
-  const startWeek = resolveWeek(template.valid_from ?? "", timezone).weekStart;
+  const templateStartWeek = resolveWeek(
+    template.valid_from ?? "",
+    timezone,
+  ).weekStart;
+  const startWeek =
+    minimumWeekStart && templateStartWeek < minimumWeekStart
+      ? minimumWeekStart
+      : templateStartWeek;
   const endWeek = resolveWeek(template.valid_until ?? "", timezone).weekEnd;
+
+  if (startWeek > endWeek) {
+    return {
+      status: "applied" as const,
+      syncedAssignmentCount: 0,
+      syncedBlockCount: 0,
+    };
+  }
   const templateBlocksById = new Map(
     templateBlocks.map((block) => [block.id, block]),
   );
@@ -1141,6 +1158,11 @@ export async function ensureScheduleTemplateCurrentWeekApplied({
   }
 
   const week = resolveWeek(weekStart, timezone);
+  const currentWeek = resolveWeek(undefined, timezone);
+
+  if (week.weekStart < currentWeek.weekStart) {
+    return "already-applied";
+  }
 
   if (
     templateResult.template.valid_from > week.weekEnd ||
@@ -1159,13 +1181,17 @@ export async function ensureScheduleTemplateCurrentWeekApplied({
 }
 
 export async function ensureScheduleTemplateRangeApplied({
+  minimumWeekStart,
   organizationId,
+  replaceExisting = false,
   supabase,
   templateId,
   templateBlockIds,
   timezone,
 }: {
+  minimumWeekStart?: string;
   organizationId: string;
+  replaceExisting?: boolean;
   supabase: SupabaseServerClient;
   templateId: string;
   templateBlockIds?: string[];
@@ -1189,38 +1215,56 @@ export async function ensureScheduleTemplateRangeApplied({
     templateResult.template.valid_from,
     timezone,
   ).weekStart;
+  const effectiveStartWeek =
+    minimumWeekStart && startWeek < minimumWeekStart
+      ? minimumWeekStart
+      : startWeek;
   const endWeek = resolveWeek(
     templateResult.template.valid_until,
     timezone,
   ).weekStart;
-  const syncResult = await syncExistingTemplateBlocksForRange({
-    organizationId,
-    supabase,
-    template: templateResult.template,
-    templateBlockIds,
-    timezone,
-  });
+  if (!replaceExisting) {
+    const syncResult = await syncExistingTemplateBlocksForRange({
+      minimumWeekStart,
+      organizationId,
+      supabase,
+      template: templateResult.template,
+      templateBlockIds,
+      timezone,
+    });
 
-  if (
-    syncResult.status === "coach-missing-certification" ||
-    syncResult.status === "coach-unavailable" ||
-    syncResult.status === "invalid-coach" ||
-    syncResult.status === "save-failed"
-  ) {
-    return syncResult.status;
+    if (
+      syncResult.status === "coach-missing-certification" ||
+      syncResult.status === "coach-unavailable" ||
+      syncResult.status === "invalid-coach" ||
+      syncResult.status === "save-failed"
+    ) {
+      return syncResult.status;
+    }
   }
 
-  let currentWeek = startWeek;
+  let currentWeek = effectiveStartWeek;
   let weekCount = 0;
 
   while (currentWeek <= endWeek && weekCount < MAX_AUTOMATIC_TEMPLATE_WEEKS) {
-    const ensureStatus = await ensureScheduleTemplateWeek({
-      organizationId,
-      supabase,
-      templateId,
-      timezone,
-      weekStart: currentWeek,
-    });
+    const ensureStatus = replaceExisting
+      ? (
+          await applyScheduleTemplateWeek({
+            organizationId,
+            replaceExisting: true,
+            supabase,
+            templateId,
+            timezone,
+            weekStart: currentWeek,
+          })
+        ).status
+      : await ensureScheduleTemplateWeek({
+          organizationId,
+          supabase,
+          templateId,
+          timezone,
+          weekStart: currentWeek,
+        });
 
     if (
       ensureStatus === "coach-missing-certification" ||
@@ -1233,6 +1277,26 @@ export async function ensureScheduleTemplateRangeApplied({
 
     currentWeek = getAdjacentWeekStart(currentWeek, 1);
     weekCount += 1;
+  }
+
+  if (replaceExisting) {
+    const syncResult = await syncExistingTemplateBlocksForRange({
+      minimumWeekStart,
+      organizationId,
+      supabase,
+      template: templateResult.template,
+      templateBlockIds,
+      timezone,
+    });
+
+    if (
+      syncResult.status === "coach-missing-certification" ||
+      syncResult.status === "coach-unavailable" ||
+      syncResult.status === "invalid-coach" ||
+      syncResult.status === "save-failed"
+    ) {
+      return syncResult.status;
+    }
   }
 
   return "applied";
@@ -1267,7 +1331,10 @@ export async function ensureActiveScheduleTemplatesForWindow({
     return;
   }
 
-  let currentWeek = resolveWeek(windowStart, timezone).weekStart;
+  const currentResolvedWeek = resolveWeek(undefined, timezone).weekStart;
+  const windowStartWeek = resolveWeek(windowStart, timezone).weekStart;
+  let currentWeek =
+    windowStartWeek < currentResolvedWeek ? currentResolvedWeek : windowStartWeek;
   const endWeek = resolveWeek(windowEnd, timezone).weekStart;
   let weekCount = 0;
 

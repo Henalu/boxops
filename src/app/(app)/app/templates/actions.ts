@@ -31,6 +31,7 @@ import {
   validateScheduleTemplateBlockForm,
   validateScheduleTemplateForm,
   type ScheduleTemplateCoachAvailabilityBlockInput,
+  type ScheduleTemplateFormValues,
 } from "@/lib/schedule-templates";
 import {
   addAuditFieldChange,
@@ -63,6 +64,9 @@ const BULK_KEEP_VALUE = "keep";
 const TEMPLATE_CENTER_FILTER_ALL = "all";
 const TEMPLATE_BLOCK_CREATE_KEEP_OPEN_VALUE = "1";
 const TEMPLATE_BLOCK_DELETE_CONFIRMATION_VALUE = "1";
+const TEMPLATE_APPLICATION_MODES = ["range", "week"] as const;
+
+type TemplateApplicationMode = (typeof TEMPLATE_APPLICATION_MODES)[number];
 
 function getRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -74,6 +78,107 @@ function getOptionalFormString(formData: FormData, key: string) {
   const value = formData.get(key);
 
   return typeof value === "string" ? value.trim() : null;
+}
+
+function getTemplateApplicationMode(formData: FormData): TemplateApplicationMode {
+  const value = getRequiredFormString(formData, "applicationMode");
+
+  return TEMPLATE_APPLICATION_MODES.includes(value as TemplateApplicationMode)
+    ? (value as TemplateApplicationMode)
+    : "range";
+}
+
+function shouldReplaceExistingAppliedTemplates(formData: FormData) {
+  return getRequiredFormString(formData, "replaceExisting") === "1";
+}
+
+function hasConfirmedYearEndApplication(formData: FormData) {
+  return getRequiredFormString(formData, "confirmYearEnd") === "1";
+}
+
+function getYearEndDateString(dateString: string) {
+  return `${dateString.slice(0, 4)}-12-31`;
+}
+
+function normalizeScheduleTemplateValuesForApplication({
+  formData,
+  timezone,
+  values,
+}: {
+  formData: FormData;
+  timezone: string;
+  values: ScheduleTemplateFormValues;
+}):
+  | {
+      ok: true;
+      values: ScheduleTemplateFormValues;
+    }
+  | {
+      error: "invalid-date" | "invalid-date-range" | "template-valid-until-confirmation-required";
+      ok: false;
+    } {
+  const applicationMode = getTemplateApplicationMode(formData);
+
+  if (applicationMode === "week") {
+    const targetWeekStart = getRequiredFormString(formData, "targetWeekStart");
+    const week = resolveWeek(targetWeekStart, timezone);
+
+    if (!targetWeekStart || week.invalidWeekParam) {
+      return {
+        error: "invalid-date",
+        ok: false,
+      };
+    }
+
+    return {
+      ok: true,
+      values: {
+        ...values,
+        validFrom: week.weekStart,
+        validUntil: week.weekEnd,
+      },
+    };
+  }
+
+  if (
+    values.status === "active" &&
+    values.validFrom &&
+    !values.validUntil
+  ) {
+    if (!hasConfirmedYearEndApplication(formData)) {
+      return {
+        error: "template-valid-until-confirmation-required",
+        ok: false,
+      };
+    }
+
+    const currentWeek = resolveWeek(undefined, timezone);
+    const effectiveStartDate =
+      values.validFrom < currentWeek.weekStart
+        ? currentWeek.weekStart
+        : values.validFrom;
+    const validUntil = getYearEndDateString(effectiveStartDate);
+
+    if (validUntil < values.validFrom) {
+      return {
+        error: "invalid-date-range",
+        ok: false,
+      };
+    }
+
+    return {
+      ok: true,
+      values: {
+        ...values,
+        validUntil,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    values,
+  };
 }
 
 function getTemplateMetadataObject(value: unknown): TemplateMetadata {
@@ -805,7 +910,28 @@ export async function createScheduleTemplate(formData: FormData) {
     );
   }
 
-  if (validation.values.status === "archived") {
+  const normalizedValidation = normalizeScheduleTemplateValuesForApplication({
+    formData,
+    timezone: context.organization.timezone,
+    values: validation.values,
+  });
+
+  if (!normalizedValidation.ok) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        normalizedValidation.error,
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const templateValues = normalizedValidation.values;
+
+  if (templateValues.status === "archived") {
     redirect(
       getErrorPath(
         context.organization.id,
@@ -820,7 +946,7 @@ export async function createScheduleTemplate(formData: FormData) {
 
   const supabase = await createClient();
   const centerError = await validateOptionalCenterReference({
-    centerId: validation.values.centerId,
+    centerId: templateValues.centerId,
     organizationId: context.organization.id,
     supabase,
   });
@@ -841,14 +967,14 @@ export async function createScheduleTemplate(formData: FormData) {
   const { data: template, error } = await supabase
     .from("schedule_templates")
     .insert({
-      center_id: validation.values.centerId,
-      metadata: mergeTemplateEditorMetadata(null, validation.values),
-      name: validation.values.name,
+      center_id: templateValues.centerId,
+      metadata: mergeTemplateEditorMetadata(null, templateValues),
+      name: templateValues.name,
       organization_id: context.organization.id,
-      status: validation.values.status,
+      status: templateValues.status,
       template_type: "weekly",
-      valid_from: validation.values.validFrom,
-      valid_until: validation.values.validUntil,
+      valid_from: templateValues.validFrom,
+      valid_until: templateValues.validUntil,
     })
     .select("id")
     .single();
@@ -868,7 +994,10 @@ export async function createScheduleTemplate(formData: FormData) {
 
   if (template) {
     const syncStatus = await ensureScheduleTemplateRangeApplied({
+      minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+        .weekStart,
       organizationId: context.organization.id,
+      replaceExisting: shouldReplaceExistingAppliedTemplates(formData),
       supabase,
       templateId: template.id,
       timezone: context.organization.timezone,
@@ -890,7 +1019,7 @@ export async function createScheduleTemplate(formData: FormData) {
 
     await recordOperationalAuditEvent({
       action: "created",
-      changedFields: getScheduleTemplateCreatedAuditFields(validation.values),
+      changedFields: getScheduleTemplateCreatedAuditFields(templateValues),
       entityId: template.id,
       entityType: "schedule_templates",
       organizationId: context.organization.id,
@@ -954,7 +1083,28 @@ export async function updateScheduleTemplate(formData: FormData) {
     );
   }
 
-  if (validation.values.status === "archived") {
+  const normalizedValidation = normalizeScheduleTemplateValuesForApplication({
+    formData,
+    timezone: context.organization.timezone,
+    values: validation.values,
+  });
+
+  if (!normalizedValidation.ok) {
+    redirect(
+      getErrorPath(
+        context.organization.id,
+        context.weekStart,
+        normalizedValidation.error,
+        context.view,
+        context.day,
+        context.centerFilterId,
+      ),
+    );
+  }
+
+  const templateValues = normalizedValidation.values;
+
+  if (templateValues.status === "archived") {
     redirect(
       getErrorPath(
         context.organization.id,
@@ -1009,7 +1159,7 @@ export async function updateScheduleTemplate(formData: FormData) {
   }
 
   const centerError = await validateOptionalCenterReference({
-    centerId: validation.values.centerId,
+    centerId: templateValues.centerId,
     organizationId: context.organization.id,
     supabase,
   });
@@ -1029,18 +1179,18 @@ export async function updateScheduleTemplate(formData: FormData) {
 
   const nextMetadata = mergeTemplateEditorMetadata(
     existingTemplate.metadata,
-    validation.values,
+    templateValues,
   );
 
   const { error } = await supabase
     .from("schedule_templates")
     .update({
-      center_id: validation.values.centerId,
+      center_id: templateValues.centerId,
       metadata: nextMetadata,
-      name: validation.values.name,
-      status: validation.values.status,
-      valid_from: validation.values.validFrom,
-      valid_until: validation.values.validUntil,
+      name: templateValues.name,
+      status: templateValues.status,
+      valid_from: templateValues.validFrom,
+      valid_until: templateValues.validUntil,
     })
     .eq("id", templateId)
     .eq("organization_id", context.organization.id)
@@ -1063,14 +1213,14 @@ export async function updateScheduleTemplate(formData: FormData) {
 
   let alignedTemplateBlockCount = 0;
 
-  if (validation.values.centerId) {
+  if (templateValues.centerId) {
     const { data: alignedTemplateBlocks, error: alignedTemplateBlocksError } =
       await supabase
         .from("schedule_template_blocks")
-        .update({ center_id: validation.values.centerId })
+        .update({ center_id: templateValues.centerId })
         .eq("organization_id", context.organization.id)
         .eq("template_id", templateId)
-        .neq("center_id", validation.values.centerId)
+        .neq("center_id", templateValues.centerId)
         .select("id");
 
     if (alignedTemplateBlocksError) {
@@ -1090,7 +1240,10 @@ export async function updateScheduleTemplate(formData: FormData) {
   }
 
   const syncStatus = await ensureScheduleTemplateRangeApplied({
+    minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+      .weekStart,
     organizationId: context.organization.id,
+    replaceExisting: shouldReplaceExistingAppliedTemplates(formData),
     supabase,
     templateId,
     timezone: context.organization.timezone,
@@ -1115,25 +1268,25 @@ export async function updateScheduleTemplate(formData: FormData) {
     changedFields,
     "center_id",
     existingTemplate.center_id,
-    validation.values.centerId,
+    templateValues.centerId,
   );
   addAuditFieldChange(
     changedFields,
     "status",
     existingTemplate.status,
-    validation.values.status,
+    templateValues.status,
   );
   addAuditFieldChange(
     changedFields,
     "valid_from",
     existingTemplate.valid_from,
-    validation.values.validFrom,
+    templateValues.validFrom,
   );
   addAuditFieldChange(
     changedFields,
     "valid_until",
     existingTemplate.valid_until,
-    validation.values.validUntil,
+    templateValues.validUntil,
   );
   const existingEditorSettings = getScheduleTemplateEditorSettings(
     existingTemplate.metadata,
@@ -1142,22 +1295,22 @@ export async function updateScheduleTemplate(formData: FormData) {
     changedFields,
     "editor_start_time",
     existingEditorSettings.startTime,
-    validation.values.editorStartTime,
+    templateValues.editorStartTime,
   );
   addAuditFieldChange(
     changedFields,
     "editor_end_time",
     existingEditorSettings.endTime,
-    validation.values.editorEndTime,
+    templateValues.editorEndTime,
   );
 
-  if (existingTemplate.name !== validation.values.name) {
+  if (existingTemplate.name !== templateValues.name) {
     changedFields.name = auditFieldTouched();
   }
 
-  if (alignedTemplateBlockCount > 0 && validation.values.centerId) {
+  if (alignedTemplateBlockCount > 0 && templateValues.centerId) {
     changedFields.template_blocks_center_id = auditFieldSet(
-      validation.values.centerId,
+      templateValues.centerId,
     );
     changedFields.template_blocks_aligned = auditFieldSet(
       alignedTemplateBlockCount,
@@ -1840,6 +1993,8 @@ export async function copyScheduleTemplateBlock(formData: FormData) {
   }
 
   const syncStatus = await ensureScheduleTemplateRangeApplied({
+    minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+      .weekStart,
     organizationId: context.organization.id,
     supabase,
     templateId: referenceValues.templateId,
@@ -2216,6 +2371,8 @@ export async function copyScheduleTemplateBlocksBulk(formData: FormData) {
   }
 
   const syncStatus = await ensureScheduleTemplateRangeApplied({
+    minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+      .weekStart,
     organizationId: context.organization.id,
     supabase,
     templateId,
@@ -2444,6 +2601,8 @@ export async function updateScheduleTemplateBlock(formData: FormData) {
   }
 
   const syncStatus = await ensureScheduleTemplateRangeApplied({
+    minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+      .weekStart,
     organizationId: context.organization.id,
     supabase,
     templateId: validation.values.templateId,
@@ -3293,6 +3452,8 @@ export async function updateScheduleTemplateBlocksBulk(formData: FormData) {
     }
 
     const syncStatus = await ensureScheduleTemplateRangeApplied({
+      minimumWeekStart: resolveWeek(undefined, context.organization.timezone)
+        .weekStart,
       organizationId: context.organization.id,
       supabase,
       templateId,
