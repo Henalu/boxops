@@ -4,6 +4,8 @@ BoxOps es un SaaS operativo para boxes de CrossFit: horarios semanales, coaches,
 
 La primera implementacion real sera para STL, pero el producto nace multi-tenant desde el primer dia. STL no es el nombre del producto ni debe aparecer hardcodeado en la arquitectura.
 
+Decision 2026-06-29: BoxOps comparte hub/Supabase con BoxWod para Auth, organizaciones, centros, perfiles base y acceso tenant. BoxWod es una app separada; BoxOps no debe absorber reservas/WOD ni convertir sus roles operativos en permisos BoxWod.
+
 ## Estado
 
 Task 017 implementada: scaffold tecnico minimo con Next.js App Router, TypeScript, Tailwind CSS 4, shadcn/ui, Supabase SSR Auth, resolucion multi-tenant por membership, superficies protegidas de MVP 1 para centros, equipo/coaches, catalogo basico de tipos de actividad, gestion semanal de bloques operativos, `person_profiles`, asignaciones coach-bloque con `schedule_block_assignments`, cobertura basica calculada, filtros operativos compartibles, filtro `mine=1` para "Mi horario", plantillas semanales basicas en `/app/templates`, dashboard operativo en `/app`, cola de cobertura en `/app/coverage`, gestion/ayuda en `/app/more`, navegacion mobile-first, onboarding local y smoke/audit real de UI. Todavia no hay cambios de turno ni invitaciones.
@@ -42,14 +44,15 @@ Leer en este orden:
 13. `docs/product/ui-references.md`: referencias de diseño y producto.
 14. `docs/architecture/domain-model.md`: entidades candidatas.
 15. `docs/architecture/tenancy-and-billing.md`: tenancy, infraestructura y modelo de cobro.
-16. `docs/guides/README.md`: guias personales para entender y tocar el proyecto.
-17. `docs/user-guides/README.md`: guias de uso por rol.
-18. `docs/product/open-questions.md`: dudas pendientes.
-19. `docs/operations/legal-and-privacy-notes.md`: fichaje, geolocalizacion, horas extra y documentos.
-20. `docs/operations/smoke-checklist.md`: alcance del smoke automatizado y manual pendiente.
-21. `docs/tenants/stl/README.md`: primer tenant real, separado del producto generico.
-22. `docs/tenants/stl/design-notes.md`: notas visuales del tenant STL.
-23. `AGENTS.md`: adaptador para Codex.
+16. `docs/architecture/hub-and-boxwod-integration.md`: hub compartido con BoxWod y fronteras de producto.
+17. `docs/guides/README.md`: guias personales para entender y tocar el proyecto.
+18. `docs/user-guides/README.md`: guias de uso por rol.
+19. `docs/product/open-questions.md`: dudas pendientes.
+20. `docs/operations/legal-and-privacy-notes.md`: fichaje, geolocalizacion, horas extra y documentos.
+21. `docs/operations/smoke-checklist.md`: alcance del smoke automatizado y manual pendiente.
+22. `docs/tenants/stl/README.md`: primer tenant real, separado del producto generico.
+23. `docs/tenants/stl/design-notes.md`: notas visuales del tenant STL.
+24. `AGENTS.md`: adaptador para Codex.
 
 `CLAUDE.md` existe solo como puente para las convenciones del workspace DEV y apunta a `PROJECT_BRIEF.md`.
 
@@ -86,6 +89,7 @@ BoxOps/
   docs/
     architecture/
       domain-model.md
+      hub-and-boxwod-integration.md
       tenancy-and-billing.md
     guides/
       README.md

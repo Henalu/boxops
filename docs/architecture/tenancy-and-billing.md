@@ -13,6 +13,29 @@ Cada cliente/box sera una `organization` dentro de la misma aplicacion y base de
 
 STL es el primer tenant, no un proyecto Supabase separado por defecto.
 
+## Decision 2026-06-29 - Hub Compartido Con BoxWod
+
+BoxOps y BoxWod deben compartir el Supabase del hub para evitar duplicar cuentas, perfiles, organizaciones y centros.
+
+Compartido por hub:
+
+- Supabase Auth (`auth.users`);
+- `organizations`;
+- `centers`;
+- `person_profiles`;
+- pertenencia/acceso base al tenant;
+- Console/plataforma y billing cuando el plan active productos.
+
+Separado por producto:
+
+- BoxOps conserva horarios, cobertura, fichaje, documentos, staff, plantillas, eventos y operativa.
+- BoxWod conserva reservas, waitlist, WOD, resultados, perfil deportivo, progreso y comunidad.
+- Los permisos BoxOps y BoxWod se resuelven con helpers/capacidades separadas.
+
+Implicacion tecnica aplicada 2026-06-29: `organization_memberships.role` incluye los roles BoxOps y `athlete`. `is_hub_member` representa membership activa del hub; `is_org_member` queda como helper operativo BoxOps y excluye usuarios solo `athlete`. BoxWod usa helpers `boxwod_*` para sus capacidades.
+
+Implicacion comercial MVP: un tenant que contrata BoxOps tiene BoxWod incluido. La Console/billing podra reflejar productos activos, planes o venta standalone en una fase futura sin reabrir el modelo de identidad.
+
 ## Resolucion Tenant En Auth
 
 Task 003 implementa la base de auth sin cambiar el schema.

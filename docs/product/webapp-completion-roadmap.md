@@ -4,11 +4,13 @@ Este documento traduce el roadmap largo de BoxOps a un mapa de cierre: que falta
 
 `docs/product/roadmap.md` sigue siendo la vista principal de fases A-I y `TASKS.md` sigue siendo el backlog ejecutable. Este archivo no abre codigo, migraciones ni UI; solo ordena prioridades y dependencias para no confundir "todo BoxOps" con "webapp lista".
 
-## Decision Principal 2026-05-17
+## Decision Principal 2026-05-17, Revisada 2026-06-28
 
-La IA va al final. Es un extra futuro que puede ayudar a vender BoxOps mas adelante, pero no es relevante para cerrar la webapp operativa.
+La IA propia dentro de BoxOps sigue al final. Resumenes, RAG, embeddings, modelos internos o respuestas sobre documentos quedan como extra futuro sobre una base documental madura.
 
-Antes de cualquier IA funcional deben estar resueltos como minimo:
+Se abre una excepcion acotada: un conector ChatGPT operativo puede empezar antes como capa externa y vendible si se limita a herramientas seguras de BoxOps. El usuario usaria su cuenta de ChatGPT para pedir informacion o acciones, pero ChatGPT no tendria acceso directo a Supabase ni decidiria por su cuenta.
+
+Antes de cualquier IA documental/interna deben estar resueltos como minimo:
 
 - documentos y versiones como fuentes canonicas;
 - permisos reales por `document_access_grants`;
@@ -18,15 +20,15 @@ Antes de cualquier IA funcional deben estar resueltos como minimo:
 - aislamiento estricto de tenant;
 - una webapp ya vendible sin depender de IA.
 
-IA no forma parte de beta ni de v1 inicial. Tampoco debe tomar decisiones automaticas sobre cobertura, cambios, ausencias, fichaje, horas extra, payroll ni datos sensibles.
+El conector ChatGPT operativo puede entrar como fase diferenciadora posterior al MVP siempre que empiece por informacion rapida y borradores confirmables: consultar quien imparte una clase en una fecha/hora, listar el horario de un dia, preparar un borrador de plantilla y aplicar una plantilla solo tras confirmacion. Tampoco debe tomar decisiones automaticas sobre cobertura, cambios, ausencias, fichaje, horas extra, payroll ni datos sensibles.
 
 ## Definiciones De Cierre
 
 Beta operativa interna: BoxOps puede usarse con un tenant real controlado para validar el trabajo diario, con datos revisados, entorno real configurado, permisos seguros, smokes suficientes y runbooks claros. Puede tener modulos incompletos si estan bloqueados visualmente o marcados como futuros.
 
-Webapp v1 vendible: BoxOps puede venderse como SaaS web a un box con una o varias sedes, cubriendo operativa diaria, configuracion basica, usuarios, horario, cobertura, cambios, ausencias, eventos, fichaje web, documentos/firma inicial cuando aplique, exportes necesarios, onboarding y soporte operativo. No exige app nativa, geofencing avanzado, payroll completo, CRM de alumnos ni IA.
+Webapp v1 vendible: BoxOps puede venderse como SaaS web a un box con una o varias sedes, cubriendo operativa diaria, configuracion basica, usuarios, horario, cobertura, cambios, ausencias, eventos, fichaje web, documentos/firma inicial cuando aplique, exportes necesarios, onboarding y soporte operativo. No exige app nativa, geofencing avanzado, payroll completo, CRM de alumnos ni IA propia. Puede diferenciarse con un conector ChatGPT operativo si este queda acotado y auditado.
 
-Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues de v1, como app nativa, push nativo, geofencing real, integraciones avanzadas, billing sofisticado, validacion automatica de certificaciones o IA sobre programacion.
+Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues de v1, como app nativa, push nativo, geofencing real, integraciones avanzadas, billing sofisticado, validacion automatica de certificaciones o IA documental sobre programacion.
 
 ## Estado Actual Resumido
 
@@ -44,8 +46,9 @@ Futuro opcional: capacidades que pueden mejorar venta o diferenciacion despues d
 | Operativa diaria beta | Documentada en OD.1/I.32 | Validacion real/staging por rol, evidencia y cierre de deuda bloqueante antes de beta interna real. |
 | Documentos | Primer repositorio visible minimo abierto en E.11, QA/staging controlado preparado en E.12, evidencia local/bloqueo staging cerrado en E.13, reintento E.14 bloqueado por falta de acceso real/archivo Storage controlado, E.15 actualizado con relectura de entorno redacted y E.16 cerrado como handoff operativo controlado | Ejecutar validacion real/staging con operador autorizado, datos controlados y archivo Storage controlado; despues subida controlada, gestion de grants desde UI, auditoria visible, documentos firmables y certificaciones. |
 | Produccion SaaS | Parcial | Console de plataforma, soporte auditado, catalogo founder versionado, billing owner manual y enforcement inicial de centros ya existen; faltan ASVS, headers/CSP, secretos, backups, observabilidad, purgas, onboarding y Stripe real. |
+| Conector ChatGPT operativo | Fase diferenciadora temprana | Contrato de herramientas, auth/OAuth, permisos por rol, auditoria, confirmacion humana e idempotencia antes de cualquier mutacion. |
 | App nativa/geofencing/push | Futuro | Decision comercial y legal especifica; no bloquea webapp v1. |
-| IA | Ultimo extra futuro | Solo despues de documentos/programacion/permisos/auditoria/legal y webapp vendible. |
+| IA documental propia | Ultimo extra futuro | Solo despues de documentos/programacion/permisos/auditoria/legal y webapp vendible. |
 
 ## Revision 2026-05-25 Para Publicacion Online
 
@@ -219,7 +222,41 @@ Primeros cortes recomendados:
 3. Ya abierto: planes founder versionados, `/console/plans`, snapshots en suscripcion, `/app/settings/billing`, cambio manual y enforcement inicial de `center_limit`; todavia sin almacenar datos bancarios ni cobrar.
 4. Siguiente corte recomendado: Stripe real con Checkout/Customer Portal, webhooks idempotentes, sincronizacion de suscripcion y facturas, manteniendo datos bancarios fuera de BoxOps.
 
-### 7. Nativo, Push Y Geofencing Si El Negocio Lo Exige
+### 7. Conector ChatGPT Operativo
+
+Objetivo: permitir que un usuario autorizado use ChatGPT como interfaz natural para consultar y preparar acciones de BoxOps, sin construir una IA propia dentro de la app.
+
+Contrato base: `docs/architecture/chatgpt-connector-contract.md`.
+
+Incluye:
+
+- contrato de herramientas externo, preferiblemente compatible con Apps SDK/MCP cuando el producto este listo para una integracion presentable;
+- autenticacion del usuario y organizacion activa sin exponer `SUPABASE_SERVICE_ROLE_KEY`, claves internas ni acceso directo a base de datos;
+- herramientas de lectura rapida: centros, tipos de actividad, horario por dia, horario por fecha/hora y "quien da la clase del martes de 9:00 a 11:15";
+- herramientas de borrador: previsualizar plantilla por rango, centro, dias, horas y tipo de actividad antes de crear nada definitivo;
+- herramientas de mutacion confirmada: crear borrador de plantilla y aplicar plantilla solo tras resumen, confirmacion explicita e idempotencia;
+- auditoria `source = chatgpt_connector`, actor real, tenant real, herramienta llamada, resultado y referencias a entidades afectadas;
+- mensajes de error claros cuando falte permiso, haya centro ambiguo, rango invalido, solape o datos insuficientes.
+
+Faseado recomendado:
+
+1. CG.0 contrato documental: completado en `docs/architecture/chatgpt-connector-contract.md` con superficie, herramientas, permisos, payloads, errores, auditoria y limites.
+2. CG.1 lectura operativa: `list_centers`, `list_class_types`, `get_schedule_for_day`, `get_schedule_at_time` y `get_my_schedule`.
+3. CG.2 plantillas en borrador: `preview_schedule_template` y `create_schedule_template_draft`, sin aplicar al horario real.
+4. CG.3 aplicacion confirmada: `apply_schedule_template` con confirmacion humana, idempotencia y trazabilidad.
+5. CG.4 packaging ChatGPT: CG.4A ya deja MCP/JSON-RPC interno sobre herramientas existentes; CG.4B debe cerrar OAuth/conexion real de cuenta, prueba ChatGPT/dev mode y guia comercial final.
+
+No incluye:
+
+- acceso directo de ChatGPT a Supabase;
+- SQL libre, service role, secrets o claves de proveedor expuestas al modelo;
+- lectura de documentos sensibles, fichaje, payroll, firmas, ubicacion o RRHH sensible;
+- aprobaciones automaticas de cobertura, cambios, ausencias, fichaje, horas extra o nomina;
+- entrenamiento/fine-tuning con datos privados del tenant.
+
+Mapea a: futura fase CG, `docs/architecture/domain-model.md`, `docs/architecture/chatgpt-connector-contract.md` y backlog ejecutable en `TASKS.md`.
+
+### 8. Nativo, Push Y Geofencing Si El Negocio Lo Exige
 
 Objetivo: abrir capacidades moviles solo si aportan valor comercial claro y pueden hacerse con privacidad adecuada.
 
@@ -234,7 +271,7 @@ Mapea a: Fase G y Fase H.
 
 No bloquea: webapp v1.
 
-### 8. IA Como Ultimo Extra Futuro
+### 9. IA Documental Como Ultimo Extra Futuro
 
 Objetivo: anadir valor sobre programacion/documentos cuando el producto base ya sea solido.
 
@@ -269,5 +306,6 @@ Fuera de alcance incluso en IA futura:
 5. Cerrar fichaje web con F.15: ejecutar `docs/operations/time-tracking-beta-readiness-runbook.md` en local/staging/real segun corresponda, sin geofencing, payroll, app nativa, documentos firmables ni IA.
 6. Cerrar E.16 y ampliar modulo documental de forma gradual solo cuando haya evidencia local/staging redacted, datos/grants controlados y preview/descarga por E.5 con archivo seguro; despues subida controlada, grants UI, auditoria y firma documental.
 7. Ejecutar hardening beta/produccion y onboarding SaaS.
-8. Evaluar nativo/geofencing/push si hay razon comercial.
-9. Evaluar IA al final, solo como extra sobre una base documental y operativa ya madura.
+8. Abrir CG.1 si se quiere usar ChatGPT como diferenciador comercial: lectura operativa sin mutaciones sobre el contrato CG.0 ya fijado.
+9. Evaluar nativo/geofencing/push si hay razon comercial.
+10. Evaluar IA documental al final, solo como extra sobre una base documental y operativa ya madura.

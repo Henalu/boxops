@@ -2,7 +2,7 @@ project_id = "boxops"
 
 [api]
 enabled = true
-port = 54321
+port = 55321
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
@@ -11,8 +11,8 @@ max_rows = 1000
 enabled = false
 
 [db]
-port = 54322
-shadow_port = 54320
+port = 55322
+shadow_port = 55320
 major_version = 15
 
 [db.seed]
@@ -21,7 +21,7 @@ sql_paths = ["./seeds/01_demo_data.sql", "./seeds/02_stl_tenant.sql"]
 
 [db.pooler]
 enabled = false
-port = 54329
+port = 55329
 pool_mode = "transaction"
 default_pool_size = 20
 max_client_conn = 100
@@ -31,14 +31,14 @@ enabled = true
 
 [studio]
 enabled = true
-port = 54323
-api_url = "http://127.0.0.1:54321"
+port = 55323
+api_url = "http://127.0.0.1:55321"
 
 [inbucket]
 enabled = true
-port = 54324
-smtp_port = 54325
-pop3_port = 54326
+port = 55324
+smtp_port = 55325
+pop3_port = 55326
 
 [storage]
 enabled = true
@@ -60,6 +60,12 @@ secure_password_change = false
 max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600
+
+[analytics]
+enabled = true
+port = 55327
+vector_port = 55328
+backend = "postgres"
 
 [edge_runtime]
 enabled = true

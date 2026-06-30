@@ -48,6 +48,10 @@ Relevant defaults for this project:
 
 ## Project Guardrails
 
+- Decision 2026-06-29: BoxOps and BoxWod are separate apps inside the same hub and share the hub Supabase project for Auth, organizations, centers, base person/profile identity and tenant access.
+- Do not create a second user/profile system for BoxWod users who already exist in BoxOps/hub. A coach, owner or admin should reuse the same hub identity across both apps.
+- Sharing Supabase does not mean sharing operational permissions blindly. BoxWod is included for BoxOps tenants in MVP, but BoxWod capabilities must go through `boxwod_*` helpers and BoxOps operational access must keep excluding athlete-only users.
+- Keep BoxOps product tables and workflows operational. BoxWod owns reservations, WOD, athlete results, athlete profile/progress and athlete community surfaces.
 - Do not hardcode STL in product names, routes, components, permissions or database rules.
 - Treat STL as tenant data/configuration only.
 - Keep the tenant hierarchy explicit: `Organization/Tenant -> Centers -> Users/Coaches -> Schedules -> Classes/Blocks -> Events`.

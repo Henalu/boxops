@@ -8,6 +8,7 @@ Leer en este orden si vienes frio:
 2. `stack-guide.md`: como esta montado el stack y por que.
 3. `code-editing-guide.md`: donde tocar cada cosa sin abrir medio repo.
 4. `stack-pitch.md`: como defender el stack sin sonar a catalogo de conferencias.
+5. `chatgpt-connector-cg4a.md`: como probar el packaging MCP interno sin confundirlo con la conexion ChatGPT final.
 
 Guias de uso por rol:
 
@@ -23,5 +24,7 @@ La jerarquia mental sigue siendo:
 ```text
 Organization/Tenant -> Centers -> Users/Coaches -> Schedules -> Classes/Blocks -> Events
 ```
+
+Decision 2026-06-29: BoxOps comparte hub/Supabase con BoxWod para Auth, organizaciones, centros, perfiles base y acceso tenant. BoxWod es app separada; no meter reservas/WOD en la operativa BoxOps ni asumir que roles BoxOps equivalen a permisos BoxWod.
 
 Ahora mismo el producto llega de verdad hasta auth, organizacion activa, shell protegido, centros, equipo/coaches, tipos de actividad, horario semanal, asignaciones, cobertura, filtros, "Mi horario", plantillas semanales, proxima clase propia, solicitudes/ofertas minimas de cobertura/cambio, area personal, avatar/firma privada, fichaje propio con correcciones, cierre semanal y exporte interno revisable. Ausencias, vacaciones, swap entre dos bloques, payroll, documentos visibles/firmables, geolocalizacion web, push real, service worker/offline privado, app nativa e IA siguen fuera de la base actual.

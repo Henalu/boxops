@@ -8,6 +8,9 @@ Este bloque manda para los siguientes cortes. Las secciones historicas de Task 0
 
 Reglas para las fases nuevas:
 
+- [x] Decision 2026-06-29: BoxOps y BoxWod seran apps separadas dentro del mismo hub y compartiran Supabase para Auth, organizaciones, centros, perfiles base/personas y acceso tenant.
+- [x] Documentar que compartir Supabase no mezcla permisos: BoxOps mantiene operativa; BoxWod mantiene reservas, WOD, resultados y experiencia atleta.
+- [ ] Definir tabla/contrato de acceso por producto para activar BoxOps, BoxWod o ambos por tenant.
 - [ ] No tocar codigo de app, migraciones ni seeds hasta abrir una task tecnica concreta.
 - [ ] No hardcodear STL; STL sigue siendo tenant piloto, no producto.
 - [ ] Mantener `Organization/Tenant -> Centers -> Users/Coaches -> Schedules -> Classes/Blocks -> Events`.
@@ -20,6 +23,79 @@ Reglas para las fases nuevas:
 - [ ] En formularios densos mobile-first, no volver a campos colapsados: UUIDs/nombres largos a ancho completo cuando haga falta, selects con padding suficiente para la flecha y truncado legible.
 
 La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cierre hacia beta/webapp v1 vive en `docs/product/webapp-completion-roadmap.md`.
+
+### Corte 2026-06-28 - Roadmap Conector ChatGPT Operativo
+
+Estado: `CG.0` completado como contrato documental; `CG.1` implementado como capa interna server-side read-only; `CG.2A` implementa `preview_schedule_template` sin persistencia; `CG.2B` implementa `create_schedule_template_draft` como mutacion interna acotada a borradores de plantilla; `CG.3A` implementa `prepare_schedule_template_application` como preparacion confirmable sin mutar horario real y persistiendo una confirmacion minima; `CG.3B` implementa `apply_schedule_template` con RPC transaccional, idempotencia, token verificable y auditoria; `CG.4A` implementa packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`; `CG.4B` implementa account linking OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion, pero la prueba real en ChatGPT/dev mode queda pendiente hasta disponer de URL publica HTTPS/configuracion ChatGPT controlada. CG.1/CG.2A/CG.2B/CG.3A/CG.3B/CG.4A/CG.4B anaden codigo en `src/lib`, rutas MCP/OAuth acotadas, migraciones acotadas y smokes especificos, pero no crean seeds, GPT Action ni UI grande. CG.2B puede crear borradores reales en `schedule_templates` y `schedule_template_blocks` si se invoca server-side; CG.3B puede aplicar al horario real solo tras confirmacion valida. Separa la IA propia/documental futura del conector ChatGPT operativo que puede ayudar a vender BoxOps antes.
+
+Decision:
+
+- [x] Tratar el conector ChatGPT como capa externa de herramientas, no como IA propia embebida en BoxOps.
+- [x] Permitir que ChatGPT responda informacion operativa rapida desde fuentes canonicas: centros, tipos, horario, bloques, asignaciones y personas visibles del tenant.
+- [x] Incluir el caso comercial "quien da la clase del martes de 9:00 a 11:15" como primer ejemplo de lectura.
+- [x] Incluir creacion de plantillas como primer caso de accion: primero previsualizacion, luego borrador y finalmente aplicacion confirmada.
+- [x] Mantener BoxOps como autoridad: cada herramienta revalida sesion, tenant, membership, rol, permisos, IDs y estado antes de leer o mutar.
+- [x] Prohibir acceso directo de ChatGPT a Supabase, SQL libre, `SUPABASE_SERVICE_ROLE_KEY`, Storage privado, secrets o bypass de RLS/permisos.
+- [x] Separar IA documental/RAG/resumen de documentos como fase posterior, no mezclada con el conector operativo inicial.
+- [x] Implementar CG.1 como libreria interna reutilizable: transporte futuro llama herramientas server-side, no tablas ni SQL directo.
+- [x] Mantener `get_my_schedule` solo cuando la identidad propia se resuelve como persona visible activa y ficha coach activa unica.
+- [x] Devolver `default_duration_minutes = null` en `list_class_types` porque el modelo actual no guarda duracion por defecto en `class_types`.
+- [x] Implementar CG.2A como preview interna read-only/no-mutation: `preview_schedule_template` genera bloques en memoria, devuelve `preview_id` deterministico no persistido, muestra muestra limitada y warnings, y revalida sesion, tenant, permiso de gestion, centro, tipo, coaches, fechas, horas e IDs.
+- [x] Implementar CG.2B como borrador interno: `create_schedule_template_draft` revalida el payload completo, recalcula el `preview_id`, aplica idempotencia por metadata minimizada y crea solo `schedule_templates`/`schedule_template_blocks` en estado `draft`.
+- [x] Implementar CG.3A como preparacion interna de aplicacion: `prepare_schedule_template_application` revalida sesion, tenant, permiso, plantilla, centro, rango, bloques, tipos activos y coaches por defecto; calcula candidatos, duplicados, conflictos, totales y warnings; persiste una confirmacion minima con snapshot de plan, expiracion, hash de token e idempotencia; no muta `schedule_blocks` ni `schedule_block_assignments`.
+- [x] Implementar CG.3B como aplicacion confirmada: `apply_schedule_template` revalida sesion, tenant, permiso, plantilla, centro, rango, bloques, tipos activos, coaches por defecto, token, plan hash, idempotencia y conflictos; aplica mediante RPC transaccional; crea solo bloques/asignaciones previstas, salta duplicados y audita `source = chatgpt_connector`.
+- [x] Implementar CG.4A como packaging MCP interno: `/api/chatgpt/mcp` expone discovery, `initialize`, `ping`, `tools/list` y `tools/call`; requiere sesion BoxOps para listar/llamar herramientas; no usa Supabase directo, Storage, `service_role`, SDK nuevo, GPT Action ni OAuth ficticio.
+- [x] Implementar CG.4B como account linking OAuth 2.1 scoped: metadata `.well-known`, authorization code + PKCE, access tokens opacos hasheados, credencial interna cifrada de vida corta para respetar RLS, scopes por herramienta, expiracion, revocacion y bearer auth en `/api/chatgpt/mcp`.
+- [ ] Probar CG.4B en ChatGPT/dev mode con URL publica HTTPS, tenant QA y configuracion real del conector; desde este entorno local no queda validado comercialmente.
+
+Fases CG:
+
+- [x] CG.0 - Contrato documental de herramientas: definir transporte candidato (Apps SDK/MCP o GPT Action), auth/OAuth, herramientas, payloads, errores, permisos, auditoria, idempotencia, limites y copy de confirmacion.
+- [x] CG.1 - Lectura operativa: implementar/probar solo herramientas read-only como `list_centers`, `list_class_types`, `get_schedule_for_day`, `get_schedule_at_time` y `get_my_schedule`.
+- [x] CG.2 - Plantillas en borrador: `CG.2A` implementa y prueba `preview_schedule_template`; `CG.2B` implementa y prueba `create_schedule_template_draft`, sin aplicar al horario real.
+- [x] CG.3 - Aplicacion confirmada: `CG.3A` prepara resumen/token persistiendo una confirmacion minima; `CG.3B` implementa/proba `apply_schedule_template` con revalidacion del token, confirmacion humana, idempotencia, auditoria `source = chatgpt_connector` y proteccion anti-duplicados.
+- [ ] CG.4 - Packaging ChatGPT completo: conectar la cuenta del usuario, preparar Apps SDK/MCP con account linking real, pruebas reales controladas, guia de uso y demo comercial.
+  - [x] CG.4A - Packaging MCP interno: ruta `/api/chatgpt/mcp`, schemas de herramientas, JSON-RPC MCP basico, auth por sesion BoxOps existente y smokes/guardrails.
+  - [x] CG.4B - Account linking real en codigo: OAuth 2.1 + PKCE, token scoped opaco, expiracion/revocacion, metadata de autorizacion y smoke especifico.
+  - [ ] CG.4C - Prueba ChatGPT/dev mode y demo final: registrar/configurar conector en entorno ChatGPT controlado, validar account linking real end-to-end y guardar evidencia redacted.
+
+Fuera de alcance:
+
+- [x] No implementar SDKs, endpoints, MCP server, GPT Action, rutas de IA ni UI en este corte documental.
+- [x] No leer documentos sensibles, fichaje, payroll, firmas, ubicacion, RRHH sensible ni auditorias sensibles desde ChatGPT.
+- [x] No decidir cobertura, asignar coaches automaticamente, aprobar cambios, aprobar ausencias, cerrar fichajes, validar horas extra ni generar nominas.
+- [x] No entrenar, fine-tunear ni evaluar modelos con datos privados del tenant.
+- [x] No sustituir las acciones humanas ni las validaciones existentes de BoxOps.
+- [x] CG.2B no implementa `apply_schedule_template`, confirmaciones CG.3, aplicacion al horario real, transporte publico ni nuevas tablas. La idempotencia vive en metadata controlada de `schedule_templates`; sin indice unico, no garantiza concurrencia perfecta.
+- [x] CG.3A/CG.3B no crean transporte publico ni UI. CG.3A persiste solo confirmaciones internas minimizadas en `chatgpt_connector_confirmations`; CG.3B aplica mediante `apply_chatgpt_schedule_template_application` y solo muta confirmaciones internas, `schedule_blocks`, `schedule_block_assignments` y auditoria operativa esperada.
+- [x] CG.4B no implementa GPT Action ni UI grande; no abre Storage ni acceso directo a Supabase desde el transporte. `tools/list` y `tools/call` aceptan Bearer scoped o sesion BoxOps interna, y CG.4 sigue abierto hasta la prueba real en ChatGPT/dev mode.
+
+Verificacion:
+
+- [x] `docs/architecture/chatgpt-connector-contract.md` creado como contrato CG.0 con superficie candidata, herramientas, payloads, errores, permisos, auditoria, privacidad, confirmacion e idempotencia.
+- [x] `docs/product/webapp-completion-roadmap.md` actualizado para mover el conector ChatGPT a fase diferenciadora temprana y dejar IA documental como ultimo extra.
+- [x] `docs/product/roadmap.md` actualizado con decision CG.0.
+- [x] `docs/architecture/domain-model.md` actualizado con fuentes canonicas, herramientas candidatas y reglas de seguridad del conector.
+- [x] `PROJECT_BRIEF.md` actualizado como fuente de verdad.
+- [x] Hasta CG.3B no se habia implementado SDK, endpoint, MCP server, GPT Action, ruta de IA ni UI. CG.4A anade solo una ruta MCP/JSON-RPC server-side acotada, sin UI, SDK nuevo, GPT Action ni OAuth real.
+- [x] `src/lib/chatgpt-connector-core.ts` creado con helpers puros de errores, validacion, minimizacion, resolucion de centro/tipo, filtrado horario y resolucion propia persona/coach.
+- [x] `src/lib/chatgpt-connector-tools.ts` creado con herramientas server-side `list_centers`, `list_class_types`, `get_schedule_for_day`, `get_schedule_at_time`, `get_my_schedule`, `preview_schedule_template`, `create_schedule_template_draft`, `prepare_schedule_template_application` y `apply_schedule_template`.
+- [x] `prepare_schedule_template_application` anadido como herramienta interna CG.3A: prepara resumen/token de aplicacion sin mutar horario real, con plan hash, expiracion, duplicados/conflictos/warnings, snapshot minimizado y guardrail de no escribir en `schedule_blocks` ni `schedule_block_assignments`.
+- [x] `apply_schedule_template` anadido como herramienta interna CG.3B: valida token persistido, recalcula plan, rechaza mismatch/expirado/conflictos/idempotencia conflictiva, llama RPC transaccional, crea bloques/asignaciones y devuelve `audit_event_id`.
+- [x] `src/lib/chatgpt-connector-mcp.ts` anadido como adaptador MCP/JSON-RPC CG.4A sobre `chatGptConnectorTools`, con schemas, metadata, `initialize`, `ping`, `tools/list`, `tools/call`, resultados estructurados y auth por sesion BoxOps existente.
+- [x] `src/app/api/chatgpt/mcp/route.ts` anadido como endpoint no cacheable para discovery y POST MCP, sin leer/mutar Supabase directamente.
+- [x] `supabase/migrations/20260630083015_chatgpt_connector_apply_schedule_template.sql` anadida para `chatgpt_connector_confirmations`, RLS propia, idempotencia por hash, snapshot de plan y RPC `apply_chatgpt_schedule_template_application` con locks, insercion atomica y auditoria operativa.
+- [x] `src/lib/chatgpt-connector-auth.ts` anadido para metadata OAuth, scopes, PKCE, hash de credenciales, cifrado de credencial interna corta, validacion Bearer y contexto de conector por request.
+- [x] Rutas CG.4B anadidas: `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`, `/api/chatgpt/oauth/authorize`, `/api/chatgpt/oauth/token` y `/api/chatgpt/oauth/revoke`.
+- [x] `supabase/migrations/20260630092854_chatgpt_connector_account_linking.sql` anadida para `chatgpt_connector_oauth_codes`, `chatgpt_connector_access_tokens`, exchange, validacion y revocacion por RPC con token hash y revalidacion de membership/organizacion.
+- [x] `tests/smoke/chatgpt-connector-tools.spec.ts` anadido para lectura de dia, consulta por hora, denegaciones tenant/permiso, centro ambiguo/inexistente, tipo inexistente, fecha/hora/rango invalidos, scope sensible, resolucion segura de horario propio, preview CG.2A valida/invalidaciones/no mutacion, CG.2B con expansion a bloques de borrador, preview mismatch e idempotencia por metadata, CG.3A con resumen desde draft, plantilla/centro/rango invalido, permiso insuficiente, token persistible, snapshot minimizado, CG.3B con guardrails de RPC/idempotencia/auditoria y no mutaciones fuera de scope.
+- [x] `tests/smoke/chatgpt-connector-mcp.spec.ts` anadido para CG.4A: ruta MCP, herramientas expuestas, auth requerida, resultados estructurados, OAuth no fingido y guardrails sin `service_role`, Storage ni mutaciones directas.
+- [x] `tests/smoke/chatgpt-connector-cg4b.spec.ts` anadido para metadata OAuth, PKCE/scopes, token ausente/invalido/expirado/revocado/scope insuficiente, tools/list, tools/call y guardrails del transporte.
+- [x] `npm run typecheck -- --pretty false` pasa.
+- [x] `npm run lint` pasa con el warning preexistente de `scripts/setup-local-e2e-auth.mjs:86`.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/chatgpt-connector-tools.spec.ts` pasa 20 tests.
+- [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/chatgpt-connector-mcp.spec.ts` pasa 6 tests.
+- [x] `git diff --check` pasa sin errores; mantiene avisos LF/CRLF del worktree.
 
 ### Corte 2026-05-26 - Decision Console SaaS Y Billing Por Fases
 
@@ -227,15 +303,15 @@ Fuera de alcance:
 
 ### Corte 2026-05-17 - Mapa De Cierre Webapp Completa / Beta / V1
 
-Estado: completado como fase documental. No cambia `src`, migraciones, seeds, rutas, UI ni permisos. Ordena el roadmap para distinguir beta operativa, webapp v1 vendible, futuro opcional e IA como ultimo extra.
+Estado: completado como fase documental. No cambia `src`, migraciones, seeds, rutas, UI ni permisos. Ordena el roadmap para distinguir beta operativa, webapp v1 vendible, futuro opcional e IA documental como ultimo extra.
 
 Decision:
 
 - [x] Crear un mapa canonico de cierre que responda que falta para considerar la webapp completa.
 - [x] Mantener `docs/product/roadmap.md` como vista principal de fases A-I y `TASKS.md` como backlog ejecutable.
 - [x] Documentar que beta operativa no equivale a "todo BoxOps": permite usar un tenant real controlado con entorno real, permisos, datos validados, smokes y runbooks.
-- [x] Documentar que webapp v1 vendible no exige app nativa, geofencing avanzado, payroll completo, CRM de alumnos ni IA.
-- [x] Colocar IA al final como extra futuro, posterior a documentos/versiones canonicos, grants, auditoria, privacidad/legal, aislamiento de tenant, programacion documental util y webapp vendible.
+- [x] Documentar que webapp v1 vendible no exige app nativa, geofencing avanzado, payroll completo, CRM de alumnos ni IA propia.
+- [x] Colocar IA documental al final como extra futuro, posterior a documentos/versiones canonicos, grants, auditoria, privacidad/legal, aislamiento de tenant, programacion documental util y webapp vendible.
 - [x] Mapear las areas pendientes: realidad operativa, tenant/permisos, operativa diaria, fichaje, documentos/firma/certificaciones, hardening produccion, comercializacion SaaS, nativo opcional e IA futura.
 
 Fuera de alcance:
@@ -250,7 +326,7 @@ Verificacion:
 
 - [x] `docs/product/webapp-completion-roadmap.md` creado.
 - [x] `docs/product/roadmap.md` enlaza y resume el mapa de cierre.
-- [x] `PROJECT_BRIEF.md` actualizado para referenciar el mapa y mantener IA como ultimo extra.
+- [x] `PROJECT_BRIEF.md` actualizado para referenciar el mapa y mantener IA documental como ultimo extra.
 - [ ] Reejecutar typecheck/lint solo si un corte posterior toca codigo.
 
 ### Corte 2026-05-15 - Jornada Prevista Del Personal
@@ -575,7 +651,7 @@ Decision:
 - [x] Ejecutar el primer bloque del mapa de cierre: realidad operativa antes de beta interna.
 - [x] Revisar S.2-S.7 y mantener como bloqueos activos el acceso real/staging, Auth/email, remitente permitido, email interno controlado, credenciales E2E por rol y job/fallback de purga.
 - [x] Crear `docs/operations/beta-operational-readiness-runbook.md` como checklist operativo interno de S.8/A.1.
-- [x] Mantener IA como ultimo extra futuro y fuera de beta/v1 inicial.
+- [x] Mantener IA documental propia como ultimo extra futuro y fuera de beta/v1 inicial.
 - [x] Confirmar que el corte no requiere codigo, migraciones, seeds, rutas ni UI.
 
 Checklist operativo documentado:
@@ -5360,7 +5436,7 @@ Decision:
 - [x] Distinguir obligatorio para beta interna frente a v1 comercial.
 - [x] Mantener `owner`/`admin` como configuracion/accesos, `manager` como operativa diaria tenant-wide y `coach` como uso operativo/personal.
 - [x] Mantener `staff`, `document_admin`, `payroll_manager` y `center_manager` reconocidos pero sin permisos especializados por herencia.
-- [x] Mantener IA como ultimo extra futuro.
+- [x] Mantener IA documental propia como ultimo extra futuro.
 
 Checklist documentado:
 
@@ -9827,7 +9903,7 @@ Decision OD.1/I.32:
 - [x] Separar minimo obligatorio para beta interna frente a v1 comercial.
 - [x] Mantener `owner`, `admin`, `manager` y `coach` con diferencias operativas explicitas.
 - [x] Mantener cobertura, ausencias, eventos y jornada prevista como contexto operativo, no como decisiones automaticas.
-- [x] Mantener IA como ultimo extra futuro.
+- [x] Mantener IA documental propia como ultimo extra futuro.
 
 Checklist documentado:
 

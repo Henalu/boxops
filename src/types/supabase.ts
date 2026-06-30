@@ -646,6 +646,113 @@ export type Database = {
           },
         ]
       }
+      chatgpt_connector_confirmations: {
+        Row: {
+          actor_user_id: string
+          applied_at: string | null
+          apply_request_id: string | null
+          audit_event_id: string | null
+          center_id: string
+          created_assignment_count: number
+          created_at: string
+          created_block_count: number
+          date_from: string
+          date_to: string
+          expires_at: string
+          id: string
+          idempotency_key_hash: string
+          organization_id: string
+          plan_hash: string
+          plan_snapshot: Json
+          prepare_request_id: string
+          skipped_duplicate_count: number
+          status: string
+          template_id: string
+          token_hash: string
+          tool: string
+          updated_at: string
+        }
+        Insert: {
+          actor_user_id: string
+          applied_at?: string | null
+          apply_request_id?: string | null
+          audit_event_id?: string | null
+          center_id: string
+          created_assignment_count?: number
+          created_at?: string
+          created_block_count?: number
+          date_from: string
+          date_to: string
+          expires_at: string
+          id?: string
+          idempotency_key_hash: string
+          organization_id: string
+          plan_hash: string
+          plan_snapshot: Json
+          prepare_request_id: string
+          skipped_duplicate_count?: number
+          status?: string
+          template_id: string
+          token_hash: string
+          tool: string
+          updated_at?: string
+        }
+        Update: {
+          actor_user_id?: string
+          applied_at?: string | null
+          apply_request_id?: string | null
+          audit_event_id?: string | null
+          center_id?: string
+          created_assignment_count?: number
+          created_at?: string
+          created_block_count?: number
+          date_from?: string
+          date_to?: string
+          expires_at?: string
+          id?: string
+          idempotency_key_hash?: string
+          organization_id?: string
+          plan_hash?: string
+          plan_snapshot?: Json
+          prepare_request_id?: string
+          skipped_duplicate_count?: number
+          status?: string
+          template_id?: string
+          token_hash?: string
+          tool?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatgpt_connector_confirmations_center_id_organization_id_fkey"
+            columns: ["center_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "centers"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "chatgpt_connector_confirmations_organization_id_actor_user_id_fkey"
+            columns: ["organization_id", "actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "organization_memberships"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+          {
+            foreignKeyName: "chatgpt_connector_confirmations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chatgpt_connector_confirmations_template_id_organization_id_fkey"
+            columns: ["template_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_templates"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
       change_request_events: {
         Row: {
           actor_coach_profile_id: string | null
@@ -4460,6 +4567,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      apply_chatgpt_schedule_template_application: {
+        Args: {
+          target_center_id: string
+          target_confirmation_id: string
+          target_date_from: string
+          target_date_to: string
+          target_idempotency_key_hash: string
+          target_organization_id: string
+          target_plan_hash: string
+          target_request_id: string
+          target_template_id: string
+          target_token_hash: string
+        }
+        Returns: Json
+      }
       apply_approved_change_request: {
         Args: {
           target_change_request_id: string
@@ -7265,4 +7387,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

@@ -8,6 +8,10 @@ Schema MVP 1 implementado en `supabase/migrations/00001_mvp1_multi_tenant_schema
 
 Toda entidad operativa debe poder aislarse por organizacion. STL sera una organizacion concreta; no debe existir ninguna entidad o tabla especial para STL.
 
+Decision 2026-06-29: BoxOps comparte la capa de hub con BoxWod en el mismo Supabase. Auth, organizaciones, centros, perfiles base/personas y acceso tenant son conceptos compartidos. Horarios, cobertura, fichaje, documentos y staff siguen siendo dominio BoxOps; reservas, WOD, resultados y progreso atleta siguen siendo dominio BoxWod.
+
+Regla de modelado aplicada: `organization_memberships.role` incluye roles BoxOps y `athlete`, pero BoxOps no debe tratar `athlete` como usuario operativo. Para eso `is_org_member` queda como helper operativo BoxOps, mientras `is_hub_member` representa membership activa del hub.
+
 ```text
 Organization
   Center
@@ -36,6 +40,8 @@ Reglas base:
 ### `organizations`
 
 Tenant/cliente. Frontera principal de datos, billing y permisos.
+
+En el hub compartido, una `organization` puede tener BoxOps, BoxWod o ambos productos activos. No crear organizaciones paralelas por producto.
 
 Campos candidatos:
 
@@ -107,6 +113,8 @@ Fase C implementa el primer polish de seguridad de cuenta sin crear tablas nueva
 
 Relacion usuario-organizacion con rol.
 
+En BoxOps esta tabla sigue siendo fuente de acceso operativo. En el hub compartido no debe asumirse que su `role` basta para BoxWod: la activacion y permisos de BoxWod deben resolverse mediante contrato explicito de app access o permisos app-scoped.
+
 Campos candidatos:
 
 - `id`
@@ -143,6 +151,8 @@ Decision de rol operativo tras validacion STL 2026-04-30:
 Implementado en Task 009 en `supabase/migrations/00002_person_profiles.sql`.
 
 Resuelve el problema de mostrar UUIDs de Auth en horarios, coaches y asignaciones futuras. Es tenant-scoped, no global, para evitar exponer datos personales entre organizaciones. La identidad autenticada sigue viviendo en Supabase Auth y el acceso sigue viviendo en `organization_memberships`.
+
+En el hub compartido, `person_profiles` tambien debe servir como perfil base reutilizable por BoxWod. BoxWod puede crear `athlete_profiles` o extensiones deportivas, pero no debe duplicar la persona base si ya existe.
 
 Campos implementados:
 
@@ -2323,6 +2333,56 @@ Reglas implementadas:
 - E.9/I.30 verifica con usuarios internos que un grant de descarga devuelve `can_preview`/`can_download`, un grant `read_metadata` devuelve solo metadata, un coach asignado sin grant recibe estado vacio, y otro tenant no lista ni enlaza contexto ajeno.
 - E.10/I.31 no anade entidades nuevas: documenta como preparar o seleccionar un caso local/QA y como confirmar en Horario los resultados esperados por permiso, con rollback o limpieza clara.
 
+### Conector ChatGPT Operativo
+
+CG.0 no crea schema. Modela una capa externa de herramientas para que ChatGPT pueda consultar o preparar acciones de BoxOps usando la cuenta del usuario, sin meter una IA propia dentro de la app y sin dar acceso directo a Supabase.
+
+CG.1 implementa la primera capa tecnica interna en `src/lib/chatgpt-connector-tools.ts` y `src/lib/chatgpt-connector-core.ts`: herramientas read-only server-side reutilizables por un transporte futuro. No crea ruta publica, Apps SDK/MCP server, GPT Action, migraciones, seeds ni UI.
+
+Contrato detallado: `docs/architecture/chatgpt-connector-contract.md`.
+
+Fuentes canonicas iniciales:
+
+- `centers` para resolver nombres de centro y zona horaria.
+- `class_types` para tipos de actividad, duracion esperada si existe y requisitos de coaches.
+- `schedule_blocks` para fecha, hora, centro, tipo, estado y rango operativo.
+- `schedule_block_assignments` para saber que coach esta asignado a cada bloque.
+- `coach_profiles`, `person_profiles` y `organization_memberships` para devolver nombres visibles y confirmar que una persona/coach pertenece al tenant activo.
+- `schedule_templates` y `schedule_template_blocks` para crear o previsualizar plantillas, nunca como texto libre fuera del modelo.
+- `operational_audit_events` o auditoria equivalente para registrar acciones hechas desde el conector con `source = chatgpt_connector`.
+
+Herramientas candidatas de lectura:
+
+- `list_centers`: centros accesibles de la organizacion activa.
+- `list_class_types`: tipos de actividad activos.
+- `get_schedule_for_day`: bloques de un dia por centro opcional.
+- `get_schedule_at_time`: respuesta directa a preguntas como "quien da la clase del martes de 9:00 a 11:15".
+- `get_my_schedule`: horario propio del usuario autenticado cuando exista coach/persona vinculada.
+
+Decision CG.1:
+
+- `list_class_types` devuelve `default_duration_minutes = null` porque `class_types` todavia no guarda duracion por defecto; no se inventan 60 minutos.
+- `get_schedule_for_day`, `get_schedule_at_time` y `get_my_schedule` devuelven `coverage_status` calculado desde `schedule_blocks` y `schedule_block_assignments`.
+- `get_my_schedule` no acepta `person_id` externo; deriva usuario -> `person_profiles` -> `coach_profiles` y solo responde si hay una persona visible activa y una ficha coach activa unica.
+- Las lecturas quedan limitadas a datos operativos minimos: centro, tipo, fecha/hora, estado, cobertura y nombre visible del coach si existe.
+- Rango inicial de horario propio: maximo 31 dias para evitar lecturas masivas accidentales.
+
+Herramientas candidatas de plantillas:
+
+- `preview_schedule_template`: genera una previsualizacion tenant-safe por rango, centro, dias, hora, tipo y asignaciones opcionales, sin escribir en tablas definitivas.
+- `create_schedule_template_draft`: crea una plantilla en borrador si el usuario tiene permiso de gestion.
+- `apply_schedule_template`: fase posterior; aplica una plantilla solo despues de confirmacion humana, resumen claro e idempotencia contra duplicados.
+
+Reglas:
+
+- Cada herramienta revalida sesion, tenant, membership, rol/capacidad y IDs recibidos; no se confia en el texto interpretado por ChatGPT.
+- Las respuestas deben ser minimizadas: nombres visibles, centro, tipo, fecha/hora y estado operativo suficiente; nada de datos sensibles.
+- Las mutaciones deben tener confirmacion explicita, idempotency key o equivalente, auditoria y rollback/errores claros cuando proceda.
+- ChatGPT no recibe `SUPABASE_SERVICE_ROLE_KEY`, no ejecuta SQL libre, no accede a Storage privado y no escribe directamente en tablas.
+- El conector no decide cobertura, no asigna coaches automaticamente, no aprueba cambios, ausencias, fichajes, cierres semanales ni horas extra.
+- Documentos, payroll, firmas, ubicacion, RRHH sensible e inferencias personales quedan fuera del primer conector.
+- Si el producto usa Apps SDK/MCP o GPT Actions, esa capa debe ser solo transporte/orquestacion; la autoridad sigue en BoxOps server-side.
+
 ### IA Futura Sobre Documentos Y Programacion
 
 I.26 no crea schema. E.6/I.27 documenta primero la base util de programacion/documentos asociada a horario, sin IA. Solo despues podria encajar una capacidad asistida futura si el producto ya tiene documentos/programacion utiles.
@@ -2363,7 +2423,7 @@ Antes de cualquier migracion futura:
 - Para MVP 1, `coverage_issues` se calculara al vuelo; persistirlo queda pendiente si hace falta auditoria, notificaciones, rendimiento o workflow historico.
 - Si plantillas mensuales son entidad separada o variacion de `schedule_templates`.
 - E.2 implementa `document_subjects` y `document_access_grants` como primer corte; queda pendiente decidir si alguna relacion futura necesita tablas puente especificas por entidad.
-- E.6/I.27 bloquea cualquier tabla de IA hasta que programacion documental tenga uso real: fecha/tipo/centro/bloque modelados, permisos/grants probados, auditoria minimizada y politica de privacidad/legal definida.
+- E.6/I.27 bloquea cualquier tabla de IA documental/interna hasta que programacion documental tenga uso real: fecha/tipo/centro/bloque modelados, permisos/grants probados, auditoria minimizada y politica de privacidad/legal definida. CG.0 permite modelar antes un conector ChatGPT operativo sin tablas de IA si se limita a herramientas server-side acotadas sobre horario/plantillas.
 - Alcance legal exacto de firma documental: confirmacion interna, firma electronica simple o integracion futura con proveedor especializado.
 - La firma de perfil D.5 usa PNG privado; queda pendiente el formato final de snapshot de evidencia y, si procede, version firmada del documento.
 - I.18 decide que eventos, festivos y competiciones comparten `operational_events` con `event_type` cerrado.
