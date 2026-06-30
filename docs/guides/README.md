@@ -9,6 +9,7 @@ Leer en este orden si vienes frio:
 3. `code-editing-guide.md`: donde tocar cada cosa sin abrir medio repo.
 4. `stack-pitch.md`: como defender el stack sin sonar a catalogo de conferencias.
 5. `chatgpt-connector-cg4a.md`: como probar el packaging MCP interno sin confundirlo con la conexion ChatGPT final.
+6. `chatgpt-connector-cg4c.md`: como validar refresh tokens rotados tras conectar BoxOps en ChatGPT.
 
 Guias de uso por rol:
 

@@ -273,6 +273,15 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (!session.refresh_token) {
+    return redirectWithOAuthError({
+      description: "Refresh your BoxOps session before connecting ChatGPT.",
+      error: "temporarily_unavailable",
+      redirectUri,
+      state,
+    });
+  }
+
   const supabaseExpiresAt = new Date(session.expires_at * 1000);
   const connectorExpiresAt = new Date(
     Math.min(
@@ -291,10 +300,14 @@ export async function GET(request: NextRequest) {
   }
 
   let encryptedSupabaseAccessToken: string;
+  let encryptedSupabaseRefreshToken: string;
 
   try {
     encryptedSupabaseAccessToken = encryptChatGptConnectorValue(
       session.access_token,
+    );
+    encryptedSupabaseRefreshToken = encryptChatGptConnectorValue(
+      session.refresh_token,
     );
   } catch {
     return redirectWithOAuthError({
@@ -319,6 +332,7 @@ export async function GET(request: NextRequest) {
     code_challenge_method: "S256",
     code_hash: codeHash,
     encrypted_supabase_access_token: encryptedSupabaseAccessToken,
+    encrypted_supabase_refresh_token: encryptedSupabaseRefreshToken,
     expires_at: new Date(
       Date.now() + CHATGPT_CONNECTOR_AUTH_CODE_TTL_SECONDS * 1000,
     ).toISOString(),

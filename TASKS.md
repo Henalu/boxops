@@ -26,7 +26,7 @@ La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cier
 
 ### Corte 2026-06-28 - Roadmap Conector ChatGPT Operativo
 
-Estado: `CG.0` completado como contrato documental; `CG.1` implementado como capa interna server-side read-only; `CG.2A` implementa `preview_schedule_template` sin persistencia; `CG.2B` implementa `create_schedule_template_draft` como mutacion interna acotada a borradores de plantilla; `CG.3A` implementa `prepare_schedule_template_application` como preparacion confirmable sin mutar horario real y persistiendo una confirmacion minima; `CG.3B` implementa `apply_schedule_template` con RPC transaccional, idempotencia, token verificable y auditoria; `CG.4A` implementa packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`; `CG.4B` implementa account linking OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion, pero la prueba real en ChatGPT/dev mode queda pendiente hasta disponer de URL publica HTTPS/configuracion ChatGPT controlada. CG.1/CG.2A/CG.2B/CG.3A/CG.3B/CG.4A/CG.4B anaden codigo en `src/lib`, rutas MCP/OAuth acotadas, migraciones acotadas y smokes especificos, pero no crean seeds, GPT Action ni UI grande. CG.2B puede crear borradores reales en `schedule_templates` y `schedule_template_blocks` si se invoca server-side; CG.3B puede aplicar al horario real solo tras confirmacion valida. Separa la IA propia/documental futura del conector ChatGPT operativo que puede ayudar a vender BoxOps antes.
+Estado: `CG.0` completado como contrato documental; `CG.1` implementado como capa interna server-side read-only; `CG.2A` implementa `preview_schedule_template` sin persistencia; `CG.2B` implementa `create_schedule_template_draft` como mutacion interna acotada a borradores de plantilla; `CG.3A` implementa `prepare_schedule_template_application` como preparacion confirmable sin mutar horario real y persistiendo una confirmacion minima; `CG.3B` implementa `apply_schedule_template` con RPC transaccional, idempotencia, token verificable y auditoria; `CG.4A` implementa packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`; `CG.4B` implementa account linking OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion, y queda probado en ChatGPT/dev mode contra `BoxOps QA`; `CG.4C` anade refresh tokens opacos rotados para evitar reconexion cada 45 minutos. CG.1/CG.2A/CG.2B/CG.3A/CG.3B/CG.4A/CG.4B/CG.4C anaden codigo en `src/lib`, rutas MCP/OAuth acotadas, migraciones acotadas y smokes especificos, pero no crean seeds, GPT Action ni UI grande. CG.2B puede crear borradores reales en `schedule_templates` y `schedule_template_blocks` si se invoca server-side; CG.3B puede aplicar al horario real solo tras confirmacion valida. Separa la IA propia/documental futura del conector ChatGPT operativo que puede ayudar a vender BoxOps antes.
 
 Decision:
 
@@ -46,7 +46,8 @@ Decision:
 - [x] Implementar CG.3B como aplicacion confirmada: `apply_schedule_template` revalida sesion, tenant, permiso, plantilla, centro, rango, bloques, tipos activos, coaches por defecto, token, plan hash, idempotencia y conflictos; aplica mediante RPC transaccional; crea solo bloques/asignaciones previstas, salta duplicados y audita `source = chatgpt_connector`.
 - [x] Implementar CG.4A como packaging MCP interno: `/api/chatgpt/mcp` expone discovery, `initialize`, `ping`, `tools/list` y `tools/call`; requiere sesion BoxOps para listar/llamar herramientas; no usa Supabase directo, Storage, `service_role`, SDK nuevo, GPT Action ni OAuth ficticio.
 - [x] Implementar CG.4B como account linking OAuth 2.1 scoped: metadata `.well-known`, authorization code + PKCE, access tokens opacos hasheados, credencial interna cifrada de vida corta para respetar RLS, scopes por herramienta, expiracion, revocacion y bearer auth en `/api/chatgpt/mcp`.
-- [ ] Probar CG.4B en ChatGPT/dev mode con URL publica HTTPS, tenant QA y configuracion real del conector; desde este entorno local no queda validado comercialmente.
+- [x] Probar CG.4B en ChatGPT/dev mode con URL publica HTTPS, tenant QA y configuracion real del conector: el 2026-06-30 ChatGPT conecta OAuth con `henaludebarros@hotmail.com` en `BoxOps QA`, emite token, llama MCP y `list_centers` devuelve centros reales.
+- [x] Implementar CG.4C como refresh token rotado: `grant_type=refresh_token`, refresh token hasheado, credencial Supabase renovable cifrada, access tokens previos revocados por cadena, revocacion de access o refresh token y smoke especifico.
 
 Fases CG:
 
@@ -57,7 +58,8 @@ Fases CG:
 - [ ] CG.4 - Packaging ChatGPT completo: conectar la cuenta del usuario, preparar Apps SDK/MCP con account linking real, pruebas reales controladas, guia de uso y demo comercial.
   - [x] CG.4A - Packaging MCP interno: ruta `/api/chatgpt/mcp`, schemas de herramientas, JSON-RPC MCP basico, auth por sesion BoxOps existente y smokes/guardrails.
   - [x] CG.4B - Account linking real en codigo: OAuth 2.1 + PKCE, token scoped opaco, expiracion/revocacion, metadata de autorizacion y smoke especifico.
-  - [ ] CG.4C - Prueba ChatGPT/dev mode y demo final: registrar/configurar conector en entorno ChatGPT controlado, validar account linking real end-to-end y guardar evidencia redacted.
+  - [x] CG.4C - Refresh tokens seguros: rotacion, expiracion, revocacion y smoke especifico.
+  - [ ] CG.4D - Demo final: validar en ChatGPT/dev mode lecturas, borrador, preparacion, aplicacion confirmada controlada y refresh automatico con evidencia redacted.
 
 Fuera de alcance:
 
@@ -91,6 +93,7 @@ Verificacion:
 - [x] `tests/smoke/chatgpt-connector-tools.spec.ts` anadido para lectura de dia, consulta por hora, denegaciones tenant/permiso, centro ambiguo/inexistente, tipo inexistente, fecha/hora/rango invalidos, scope sensible, resolucion segura de horario propio, preview CG.2A valida/invalidaciones/no mutacion, CG.2B con expansion a bloques de borrador, preview mismatch e idempotencia por metadata, CG.3A con resumen desde draft, plantilla/centro/rango invalido, permiso insuficiente, token persistible, snapshot minimizado, CG.3B con guardrails de RPC/idempotencia/auditoria y no mutaciones fuera de scope.
 - [x] `tests/smoke/chatgpt-connector-mcp.spec.ts` anadido para CG.4A: ruta MCP, herramientas expuestas, auth requerida, resultados estructurados, OAuth no fingido y guardrails sin `service_role`, Storage ni mutaciones directas.
 - [x] `tests/smoke/chatgpt-connector-cg4b.spec.ts` anadido para metadata OAuth, PKCE/scopes, token ausente/invalido/expirado/revocado/scope insuficiente, tools/list, tools/call y guardrails del transporte.
+- [x] `tests/smoke/chatgpt-connector-cg4c.spec.ts` anadido para refresh token grant, tabla/RPC de refresh, rotacion, revocacion de cadena y guardrails.
 - [x] `npm run typecheck -- --pretty false` pasa.
 - [x] `npm run lint` pasa con el warning preexistente de `scripts/setup-local-e2e-auth.mjs:86`.
 - [x] `npx playwright test --config=playwright.smoke.config.ts tests/smoke/chatgpt-connector-tools.spec.ts` pasa 20 tests.

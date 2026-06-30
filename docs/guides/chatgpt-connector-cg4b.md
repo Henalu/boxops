@@ -1,6 +1,6 @@
 # Guia CG.4B - Account Linking ChatGPT MCP
 
-Estado: implementacion tecnica local. Pendiente prueba real en ChatGPT/dev mode con URL publica HTTPS.
+Estado: implementacion tecnica probada en ChatGPT/dev mode el 2026-06-30 con `BoxOps QA`. CG.4C anade refresh tokens rotados; ver `chatgpt-connector-cg4c.md`.
 
 ## Que Existe
 
@@ -23,7 +23,7 @@ Decision: OAuth 2.1 authorization code + PKCE. El token scoped del conector es e
 - El access token crudo solo se devuelve a ChatGPT en `/token`.
 - BoxOps guarda `token_hash`, nunca el token crudo.
 - Los authorization codes tambien se guardan por hash y son de un solo uso.
-- Los tokens expiran como maximo a los 45 minutos.
+- Los access tokens expiran como maximo a los 45 minutos. Desde CG.4C, ChatGPT puede recibir refresh token rotado para renovar sin pedir login cada vez.
 - La revocacion marca el token como `revoked`.
 - Cada llamada MCP revalida token, recurso, scopes, usuario, organizacion, membership activa, rol operativo y permisos de la herramienta.
 - El transporte MCP no lee ni muta datos operativos directamente; llama `chatGptConnectorTools`.
@@ -58,7 +58,12 @@ Resultado esperado: `401`, `authentication_required` y `WWW-Authenticate` con `r
 
 ## Prueba ChatGPT/dev Mode
 
-Bloqueo actual desde este entorno: no hay evidencia real porque hace falta una URL publica HTTPS accesible por ChatGPT y configurar el conector en ChatGPT/dev mode.
+Evidencia 2026-06-30:
+
+- URL: `https://boxops-pi.vercel.app/api/chatgpt/mcp`
+- Usuario: `henaludebarros@hotmail.com`
+- Organizacion: `BoxOps QA`
+- Resultado: ChatGPT conecto via OAuth, llamo MCP y `list_centers` devolvio centros reales del tenant.
 
 Checklist exacto:
 
@@ -81,4 +86,4 @@ Checklist exacto:
 9. Revocar desde `/api/chatgpt/oauth/revoke` y comprobar que el Bearer anterior devuelve `invalid_token`.
 10. Guardar evidencia redacted de requests/responses y errores esperados.
 
-No marcar `CG.4` completo hasta cerrar esa prueba o documentar bloqueo real con fecha, URL/entorno y motivo.
+No marcar la demo comercial final completa hasta cerrar tambien CG.4C/CG.4D con refresh y un flujo representativo de plantillas.

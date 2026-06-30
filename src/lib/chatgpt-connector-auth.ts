@@ -15,6 +15,7 @@ import type { Database } from "@/types/supabase";
 export const CHATGPT_CONNECTOR_AUTH_CODE_TTL_SECONDS = 10 * 60;
 export const CHATGPT_CONNECTOR_ACCESS_TOKEN_MAX_TTL_SECONDS = 45 * 60;
 export const CHATGPT_CONNECTOR_MIN_LINKED_SESSION_SECONDS = 5 * 60;
+export const CHATGPT_CONNECTOR_REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export const CHATGPT_CONNECTOR_OAUTH_SCOPES = [
   "boxops.schedule.read",
@@ -113,7 +114,7 @@ export function getChatGptConnectorAuthorizationServerMetadata(origin: string) {
       issuer,
     ).toString(),
     code_challenge_methods_supported: ["S256"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
     issuer,
     response_types_supported: ["code"],
     revocation_endpoint: new URL(
@@ -176,7 +177,7 @@ export function hashChatGptConnectorCredential({
   kind,
   value,
 }: {
-  kind: "access_token" | "authorization_code";
+  kind: "access_token" | "authorization_code" | "refresh_token";
   value: string;
 }) {
   return createHash("sha256")
@@ -249,6 +250,52 @@ export function createChatGptConnectorSupabaseClient(accessToken: string) {
   });
 }
 
+export async function refreshChatGptConnectorSupabaseSession(
+  encryptedSupabaseRefreshToken: string,
+) {
+  let refreshToken: string;
+
+  try {
+    refreshToken = decryptChatGptConnectorValue(encryptedSupabaseRefreshToken);
+  } catch {
+    return {
+      ok: false as const,
+      reason: "credential_decrypt_failed",
+    };
+  }
+
+  const { supabaseAnonKey, supabaseUrl } = getSupabasePublicEnv();
+  const supabase = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  const { data, error } = await supabase.auth.refreshSession({
+    refresh_token: refreshToken,
+  });
+  const session = data.session;
+
+  if (
+    error ||
+    !session?.access_token ||
+    !session.refresh_token ||
+    !session.expires_at
+  ) {
+    return {
+      ok: false as const,
+      reason: "supabase_refresh_failed",
+    };
+  }
+
+  return {
+    accessToken: session.access_token,
+    expiresAt: new Date(session.expires_at * 1000).toISOString(),
+    ok: true as const,
+    refreshToken: session.refresh_token,
+  };
+}
+
 export function runWithChatGptConnectorBearerContext<T>(
   context: ChatGptConnectorBearerContext,
   callback: () => T,
@@ -266,6 +313,8 @@ export async function exchangeChatGptConnectorOAuthCode(input: {
   codeChallenge: string;
   codeHash: string;
   expiresAt: string;
+  refreshExpiresAt: string;
+  refreshTokenHash: string;
   redirectUri: string;
   requestId: string;
   resource: string;
@@ -275,13 +324,83 @@ export async function exchangeChatGptConnectorOAuthCode(input: {
     "exchange_chatgpt_connector_oauth_code",
     {
       target_access_token_hash: input.accessTokenHash,
+      target_access_expires_at: input.expiresAt,
       target_client_id: input.clientId,
       target_code_challenge: input.codeChallenge,
       target_code_hash: input.codeHash,
-      target_expires_at: input.expiresAt,
+      target_refresh_expires_at: input.refreshExpiresAt,
+      target_refresh_token_hash: input.refreshTokenHash,
       target_redirect_uri: input.redirectUri,
       target_request_id: input.requestId,
       target_resource: input.resource,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false as const,
+      reason: "rpc_error",
+    };
+  }
+
+  return assertJsonRecord(data);
+}
+
+export async function prepareChatGptConnectorRefreshToken(input: {
+  clientId: string;
+  refreshToken: string;
+  resource: string;
+}) {
+  const supabase = (await createClient()) as unknown as RpcClient;
+  const { data, error } = await supabase.rpc<JsonRecord>(
+    "prepare_chatgpt_connector_refresh_token",
+    {
+      target_client_id: input.clientId,
+      target_refresh_token_hash: hashChatGptConnectorCredential({
+        kind: "refresh_token",
+        value: input.refreshToken,
+      }),
+      target_resource: input.resource,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false as const,
+      reason: "rpc_error",
+    };
+  }
+
+  return assertJsonRecord(data);
+}
+
+export async function rotateChatGptConnectorRefreshToken(input: {
+  accessTokenHash: string;
+  encryptedSupabaseAccessToken: string;
+  encryptedSupabaseRefreshToken: string;
+  expiresAt: string;
+  refreshExpiresAt: string;
+  refreshToken: string;
+  requestId: string;
+  rotatedRefreshTokenHash: string;
+  supabaseAccessTokenExpiresAt: string;
+}) {
+  const supabase = (await createClient()) as unknown as RpcClient;
+  const { data, error } = await supabase.rpc<JsonRecord>(
+    "rotate_chatgpt_connector_refresh_token",
+    {
+      target_access_expires_at: input.expiresAt,
+      target_access_token_hash: input.accessTokenHash,
+      target_encrypted_supabase_access_token: input.encryptedSupabaseAccessToken,
+      target_encrypted_supabase_refresh_token: input.encryptedSupabaseRefreshToken,
+      target_new_refresh_token_hash: input.rotatedRefreshTokenHash,
+      target_refresh_expires_at: input.refreshExpiresAt,
+      target_refresh_token_hash: hashChatGptConnectorCredential({
+        kind: "refresh_token",
+        value: input.refreshToken,
+      }),
+      target_request_id: input.requestId,
+      target_supabase_access_token_expires_at: input.supabaseAccessTokenExpiresAt,
     },
   );
 
@@ -401,12 +520,17 @@ export async function validateChatGptConnectorBearerToken(input: {
 
 export async function revokeChatGptConnectorBearerToken(token: string) {
   const supabase = (await createClient()) as unknown as RpcClient;
-  const tokenHash = hashChatGptConnectorCredential({
+  const accessTokenHash = hashChatGptConnectorCredential({
     kind: "access_token",
     value: token,
   });
+  const refreshTokenHash = hashChatGptConnectorCredential({
+    kind: "refresh_token",
+    value: token,
+  });
 
-  await supabase.rpc<JsonRecord>("revoke_chatgpt_connector_access_token", {
-    target_token_hash: tokenHash,
+  await supabase.rpc<JsonRecord>("revoke_chatgpt_connector_oauth_token", {
+    target_access_token_hash: accessTokenHash,
+    target_refresh_token_hash: refreshTokenHash,
   });
 }

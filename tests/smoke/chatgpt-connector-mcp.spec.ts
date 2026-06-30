@@ -82,7 +82,8 @@ test.describe("ChatGPT connector CG.4A MCP packaging", () => {
     expect(source).toContain("protected_resource_metadata");
     expect(source).toContain("revocation_endpoint");
     expect(source).toContain("token_type: \"opaque_bearer_scoped\"");
-    expect(source).not.toMatch(/client_secret|refresh_token/i);
+    expect(source).toContain("refresh_token_rotation: true");
+    expect(source).not.toMatch(/client_secret/i);
   });
 
   test("guardrails: no service role, Storage, or sensitive mutations in transport", () => {

@@ -1,6 +1,6 @@
 # Contrato Conector ChatGPT Operativo
 
-Estado: `CG.4B` tecnico. `CG.0` contrato documental y `CG.1` lectura operativa ya estan implementados; `CG.2A` anade preview de plantillas sin persistencia, `CG.2B` crea borradores reales de plantilla desde una preview revalidada, `CG.3A` prepara la aplicacion confirmada con resumen verificable y confirmacion interna, `CG.3B` aplica plantillas al horario real solo con `confirmation_token` valido, plan revalidado, idempotencia y auditoria, `CG.4A` anade packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`, y `CG.4B` anade OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion. `CG.4` completo sigue abierto hasta prueba real controlada en ChatGPT/dev mode o bloqueo verificable.
+Estado: `CG.4C` tecnico. `CG.0` contrato documental y `CG.1` lectura operativa ya estan implementados; `CG.2A` anade preview de plantillas sin persistencia, `CG.2B` crea borradores reales de plantilla desde una preview revalidada, `CG.3A` prepara la aplicacion confirmada con resumen verificable y confirmacion interna, `CG.3B` aplica plantillas al horario real solo con `confirmation_token` valido, plan revalidado, idempotencia y auditoria, `CG.4A` anade packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`, `CG.4B` anade OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion, y `CG.4C` anade refresh tokens rotados. `CG.4` comercial/demo final sigue abierto hasta probar un flujo completo con lectura, borrador, preparacion y aplicacion confirmada o documentar bloqueo verificable.
 
 Fecha: 2026-06-30.
 
@@ -86,14 +86,16 @@ Estado `CG.4B`:
   - `POST /api/chatgpt/oauth/token`
   - `POST /api/chatgpt/oauth/revoke`
 - El access token del conector se devuelve una sola vez a ChatGPT; BoxOps persiste solo `token_hash`, usuario, organizacion, membership, scopes, expiracion, estado y metadata minimizada.
-- Para mantener RLS sin `service_role`, durante account linking BoxOps cifra una credencial Supabase de usuario real de vida corta. El token del conector expira como maximo a los 45 minutos y nunca mas tarde que esa credencial interna. No hay refresh token del conector en este corte.
-- La revocacion marca el token como `revoked`; las validaciones posteriores devuelven `invalid_token`.
+- Para mantener RLS sin `service_role`, durante account linking BoxOps cifra credenciales Supabase de usuario real. El access token del conector expira como maximo a los 45 minutos y nunca mas tarde que la credencial interna de acceso.
+- `CG.4C` emite ademas refresh tokens opacos scoped con TTL maximo de 30 dias. El refresh token se guarda solo por hash; la credencial interna Supabase renovable se guarda cifrada con `CHATGPT_CONNECTOR_CREDENTIAL_SECRET`.
+- Cada refresh rota credenciales: el refresh token anterior pasa a `rotated`, los access tokens asociados se revocan, y BoxOps emite un access token nuevo y un refresh token nuevo.
+- La revocacion acepta access token o refresh token y revoca la cadena asociada cuando corresponde; las validaciones posteriores devuelven `invalid_token` o `invalid_grant`.
 - Scopes:
   - `boxops.schedule.read`: lecturas operativas minimizadas.
   - `boxops.templates.write`: preview, borradores y preparacion de aplicacion.
   - `boxops.templates.apply`: aplicacion confirmada con `confirmation_token`.
 - El transporte no lee ni escribe datos operativos de Supabase directamente; solo valida auth/scopes y ejecuta `chatGptConnectorTools`, que revalidan usuario, tenant, membership, permisos, IDs y estado en cada llamada.
-- Prueba real ChatGPT/dev mode: pendiente desde este entorno hasta tener URL publica HTTPS, configuracion del conector en ChatGPT y tenant QA controlado. No se inventa evidencia de conexion real.
+- Prueba real ChatGPT/dev mode CG.4B: validada el 2026-06-30 contra `https://boxops-pi.vercel.app/api/chatgpt/mcp` con usuario `henaludebarros@hotmail.com` y organizacion `BoxOps QA`. Evidencia redacted: ChatGPT conecto via OAuth, `/api/chatgpt/oauth/token` devolvio 200, `/api/chatgpt/mcp` devolvio 200 y `list_centers` devolvio centros reales del tenant. CG.4C requiere reconexion tras deploy para que ChatGPT reciba refresh token.
 
 Herramienta auxiliar candidata para futuro:
 
@@ -671,6 +673,8 @@ Estado implementacion interna 2026-06-30: `CG.4A` queda implementado como packag
 
 Actualizacion `CG.4B` 2026-06-30: se anade account linking OAuth 2.1 + PKCE sobre el mismo MCP. Se crea migracion acotada para authorization codes y access tokens opacos, metadata `.well-known`, endpoints de authorize/token/revoke, validacion Bearer por RPC y scopes por herramienta. No se crea GPT Action, no se abre SQL libre, no se usa `service_role` en runtime del conector y no se accede a Storage.
 
+Actualizacion `CG.4C` 2026-06-30: se anaden refresh tokens opacos con rotacion. `/api/chatgpt/oauth/token` soporta `grant_type = refresh_token`; cada uso crea un access token nuevo, rota el refresh token, revoca access tokens previos de esa cadena y mantiene persistencia solo por hashes. La credencial Supabase renovable se cifra server-side para seguir ejecutando herramientas con RLS de usuario real.
+
 Endpoint:
 
 - `GET /api/chatgpt/mcp`: discovery no cacheable para pruebas internas, demo tecnica y metadatos OAuth.
@@ -704,6 +708,7 @@ Decisiones CG.4B:
 - Los tokens del conector se guardan solo como hash SHA-256 con prefijo de dominio. El valor crudo no se persiste.
 - Los authorization codes son de un solo uso, expiran en 10 minutos y tambien se guardan por hash.
 - Los access tokens expiran como maximo a los 45 minutos y nunca despues de la credencial interna cifrada que permite ejecutar con RLS de usuario.
+- Los refresh tokens expiran como maximo a los 30 dias, se rotan en cada uso y revocan los access tokens previos de la misma cadena.
 - La credencial interna cifrada exige `CHATGPT_CONNECTOR_CREDENTIAL_SECRET` server-side de alta entropia. Si falta, authorize falla con error controlado.
 - La revalidacion de Bearer comprueba token activo, no expirado, no revocado, recurso correcto, scopes suficientes, membership activa, organizacion activa y rol operativo no atleta.
 - Si hay Bearer valido, `chatGptConnectorTools` crea un cliente Supabase autenticado como el usuario real y vuelve a validar membership/rol/organizacion antes de cada herramienta.
@@ -711,8 +716,8 @@ Decisiones CG.4B:
 
 Pendiente para cerrar `CG.4`:
 
-- Probar en ChatGPT/dev mode o entorno equivalente con URL publica HTTPS y tenant QA controlado.
-- Guardar evidencia redacted de `initialize`, `tools/list`, lecturas, borrador, preparacion y aplicacion confirmada.
+- Probar en ChatGPT/dev mode o entorno equivalente con URL publica HTTPS y tenant QA controlado tras CG.4C para confirmar refresh automatico.
+- Guardar evidencia redacted de `initialize`, `tools/list`, lecturas, borrador, preparacion, aplicacion confirmada y refresh.
 - Preparar guia comercial final con prompts seguros, limites y criterios de demo.
 
 ## Taxonomia De Errores
@@ -842,12 +847,12 @@ Resolucion esperada:
 - No se toca codigo de app, migraciones, seeds, rutas, UI, permisos ni datos reales.
 - Se verifica el diff documental con `git diff --check`.
 
-## Siguiente Corte Recomendado CG.4C
+## Siguiente Corte Recomendado CG.4D
 
-Cerrar prueba real controlada de conexion ChatGPT:
+Cerrar demo final controlada de ChatGPT:
 
-- probar `initialize`, `tools/list`, lecturas, borrador, preparacion y aplicacion confirmada en ChatGPT/dev mode o equivalente;
-- validar authorize/token/revoke contra URL publica HTTPS del entorno QA;
+- probar `initialize`, `tools/list`, lecturas, borrador, preparacion, aplicacion confirmada y refresh en ChatGPT/dev mode o equivalente;
+- validar authorize/token/refresh/revoke contra URL publica HTTPS del entorno QA;
 - confirmar que ChatGPT envia Bearer al MCP y que los scopes bloquean herramientas no autorizadas;
 - mantener prohibidos Supabase directo, SQL libre, `service_role`, Storage y datos sensibles;
-- no marcar `CG.4` como completo hasta tener prueba real controlada de conexion de cuenta.
+- no marcar `CG.4` comercial como completo hasta tener evidencia redacted de lectura, mutacion confirmada y refresh.
