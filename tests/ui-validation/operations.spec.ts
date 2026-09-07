@@ -127,6 +127,11 @@ test("support opens a temporary session, stays outside documents and closes acce
   await expect(page.locator('input[name="documentFile"]')).toHaveCount(0);
   await page.goto(path("/app/schedule"));
   await page.getByRole("button", { name: "Cerrar soporte", exact: true }).click();
+  await expect(page).toHaveURL(url =>
+    url.pathname === `/console/organizations/${f.organizationId}` &&
+    url.searchParams.get("status") === "support-session-ended",
+  );
+  expect(db(`SELECT count(*) FROM platform_support_sessions WHERE organization_id='${f.organizationId}' AND actor_user_id='${f.roles.support.id}' AND status='active'`)).toBe("0");
   await page.goto(path("/app/schedule", { block_id: f.blockId }));
   await expect(page.getByText("Acceso pendiente", { exact: true })).toBeVisible();
   await expect(page.getByText("Modo soporte BoxOps activo", { exact: true })).toHaveCount(0);

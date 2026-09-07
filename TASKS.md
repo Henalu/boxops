@@ -31,6 +31,7 @@ La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cier
 - [x] Probar rollback tras solape, reemplazo fallido, idempotencia, roles operativos, certificaciones, soporte y fronteras tenant/BoxWod en Postgres local con fixtures reversibles.
 - [x] Preparar rama y PR #2 con fixtures locales separados y recorridos UI por siete perfiles, dos organizaciones y escritorio/movil.
 - [x] Corregir accesos documentales registrados por precarga y mostrar restriccion explicita para soporte; probar permisos y apertura/descarga real con archivos sinteticos.
+- [x] Corregir los 22 fallos anteriores y ampliar a 208 comprobaciones; actualizar guardas segun roles/migraciones vigentes, sin omitir casos. Evidencia: `docs/operations/2026-09-07-guardrail-recheck.md`.
 - [ ] Aplicar la migracion al entorno destino antes de desplegar el codigo y verificar el flujo autenticado en ese entorno.
 - [ ] Siguiente corte: carga documental agrupada y paginacion de Horario, con medicion y prueba de calendario grande.
 

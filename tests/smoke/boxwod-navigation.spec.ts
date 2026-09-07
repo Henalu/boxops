@@ -18,8 +18,10 @@ function readProjectFile(relativePath: string) {
 
 test.describe("BoxWod programming navigation", () => {
   test("builds the configured programming URL with only shared context", () => {
+    const appUrl = new URL("https://wod.example.com/base");
+    appUrl.searchParams.set("token", "must-not-survive");
     const href = buildBoxWodProgrammingUrl({
-      appUrl: "https://wod.example.com/base?token=must-not-survive",
+      appUrl: appUrl.toString(),
       centerId: "center-123",
       classTypeId: "class-type-456",
       date: "2026-07-22",

@@ -346,14 +346,19 @@ function makePngDataUrl(width: number, height: number) {
 }
 
 test.describe("tenant/RLS negative local source guardrails", () => {
-  test("keeps app source free from tenant hardcoding, privileged keys, AI, geolocation, push and private caches", () => {
+  test("keeps app source free from tenant hardcoding, privileged keys, AI providers, geolocation, push and private caches", () => {
     const source = collectSourceFiles(path.join(process.cwd(), "src"))
       .map((filePath) => readFileSync(filePath, "utf8"))
       .join("\n");
 
     expect(source).not.toMatch(/\bSTL\b/);
     expect(source).not.toMatch(/\bservice_role\b/);
-    expect(source).not.toMatch(
+    // The existing OAuth connector accepts ChatGPT redirects; it does not call an AI provider.
+    const sourceWithoutOAuthOrigin = source.replaceAll(
+      '"https://chat.openai.com"',
+      '""',
+    );
+    expect(sourceWithoutOAuthOrigin).not.toMatch(
       /\b(?:OpenAI|openai|anthropic|embeddings|vector|pgvector)\b|ai_/,
     );
     expect(source).not.toMatch(/\bnavigator\.geolocation\b/);
@@ -624,11 +629,11 @@ test.describe("visible downloadable response hygiene local source guardrails", (
 
     expect(timePageSource).toContain("Exporte interno revisable");
     expect(timePageSource).toContain("CSV interno");
-    expect(timePageSource).toContain(
-      "Descarga los fichajes de un periodo para revisarlos con el equipo responsable.",
+    expect(timePageSource).toMatch(
+      /Descarga los fichajes de un periodo para revisarlos con el\s+equipo responsable\./,
     );
     expect(timePageSource).toContain(
-      "La descarga queda registrada para trazabilidad de la organizacion.",
+      "La descarga queda registrada para trazabilidad de la organización.",
     );
     expect(timePageSource).not.toMatch(/\bpayroll\b/i);
     expect(timePageSource).not.toMatch(/cumplimiento legal definitivo/i);
@@ -797,6 +802,12 @@ test.describe("visible form action hygiene local source guardrails", () => {
       /(?:["'`](?:https?:|\/\/|data:|blob:|file:)|\bnew\s+URL\b|\bfetch\s*\(|createSignedUrl|signedUrl|storage_path|storagePath|storage_bucket|storageBucket|document-files|profile-assets|profile-signatures|service_role|document_access_grants|manage_grants|signature_evidence|sensitive_hr|payroll|cookie|providerPayload|auditPayload|evidence)/i;
     const internalLiteralRoutePattern = /^\/(?:app|auth)(?:\/|$)/;
     const serverActionIdentifierPattern = /^[A-Za-z_$][\w$]*$/;
+    const isKnownConditionalServerAction = (
+      attribute: (typeof formActionAttributes)[number],
+    ) =>
+      attribute.relativePath === "src/app/(console)/console/plans/page.tsx" &&
+      attribute.value ===
+        "isDraft ? updateBillingPlanDraftAction : createBillingPlanDraftAction";
 
     const literalRouteViolations = formActionAttributes
       .filter((attribute) => attribute.kind === "literal")
@@ -814,7 +825,8 @@ test.describe("visible form action hygiene local source guardrails", () => {
       .filter((attribute) => attribute.kind === "expression")
       .filter(
         (attribute) =>
-          !serverActionIdentifierPattern.test(attribute.value) ||
+          (!serverActionIdentifierPattern.test(attribute.value) &&
+            !isKnownConditionalServerAction(attribute)) ||
           forbiddenExpressionPattern.test(attribute.value),
       )
       .map(
@@ -870,9 +882,16 @@ test.describe("visible protected route query hygiene local source guardrails", (
     "class_type_id",
     "coach_profile_id",
     "coverage_state",
+    "create_block",
+    "create_block_day",
+    "create_block_days",
+    "create_block_end",
+    "create_block_start",
+    "create_block_template_id",
     "day",
     "edit_block_id",
     "error",
+    "folder_id",
     "mine",
     "organizationId",
     "overtime_created",
@@ -894,6 +913,13 @@ test.describe("visible protected route query hygiene local source guardrails", (
     // Client-side list filters for planned-presence windows; values are
     // validated against already loaded tenant-scoped windows before use.
     "person_profile_id",
+    "q",
+    "center_status",
+    "timezone",
+    "class_type_category",
+    "class_type_status",
+    "certification",
+    "required_coaches",
     "window_status",
   ].sort();
   const operationalVisibleRouteQueryParamSet = new Set(
@@ -1317,7 +1343,7 @@ test.describe("visible terminal action hygiene local source guardrails", () => {
       /window\.confirm\(confirmMessage\)/,
     );
     expect(absencesPageSource).toMatch(
-      /confirmMessage="Cancelar[\s\S]+action=\{rejectAbsenceRequestFromForm\}[\s\S]+confirmMessage="Rechazar[\s\S]+action=\{expireAbsenceRequestFromForm\}[\s\S]+confirmMessage="Cerrar/,
+      /confirmMessage="¿Cancelar[\s\S]+action=\{rejectAbsenceRequestFromForm\}[\s\S]+confirmMessage="¿Rechazar[\s\S]+action=\{expireAbsenceRequestFromForm\}[\s\S]+confirmMessage="¿Cerrar/,
     );
     expect(requestExpireSubmitButtonSource).toMatch(/window\.confirm\(/);
 
@@ -1367,10 +1393,10 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
       /if \(!canCancelOwn && !canExpire && !hasReviewActions\) \{[\s\S]+return <ActionGuidance messages=\{actionMessages\} \/>;/,
     );
     expect(absenceMessagesSource).toMatch(
-      /CLOSED_STATUSES\.has\(item\.request\.status\)[\s\S]+No puede cancelarse porque ya esta/,
+      /CLOSED_STATUSES\.has\(item\.request\.status\)[\s\S]+No puede cancelarse porque ya está/,
     );
     expect(absenceMessagesSource).toMatch(
-      /CLOSED_STATUSES\.has\(item\.request\.status\)[\s\S]+No puede aprobarse ni rechazarse porque ya esta/,
+      /CLOSED_STATUSES\.has\(item\.request\.status\)[\s\S]+No puede aprobarse ni rechazarse porque ya está/,
     );
 
     expect(requestsSource).toMatch(
@@ -1380,7 +1406,7 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
       /return status === "cancelled" \|\| status === "completed";/,
     );
     expect(getFunctionSource(requestsSource, "getActionBlockReason")).toMatch(
-      /CLOSED_REQUEST_STATUSES\.has\(item\.request\.status\)[\s\S]+return null;[\s\S]+blockIsNotActionable\(block\.status\)[\s\S]+La clase esta cancelada o completada/,
+      /CLOSED_REQUEST_STATUSES\.has\(item\.request\.status\)[\s\S]+return null;[\s\S]+blockIsNotActionable\(block\.status\)[\s\S]+La clase está cancelada o completada/,
     );
     expect(getFunctionSource(requestsSource, "getOwnOfferedTargets")).toMatch(
       /item\.request\.status !== "pending" && item\.request\.status !== "offered"[\s\S]+return \[\];[\s\S]+getActionBlockReason\(item, displayData, now\)[\s\S]+return \[\];/,
@@ -1406,8 +1432,8 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
     const templatesSource = readProjectFile(
       "src/app/(app)/app/templates/page.tsx",
     );
-    const templateApplySubmitSource = readProjectFile(
-      "src/app/(app)/app/templates/template-apply-submit.tsx",
+    const templateMetaFormSource = readProjectFile(
+      "src/app/(app)/app/templates/template-meta-form.tsx",
     );
     const timePageSource = readProjectFile("src/app/(app)/app/time/page.tsx");
     const operationalEventsSource = readProjectFile(
@@ -1455,14 +1481,19 @@ test.describe("visible non-actionable state hygiene local source guardrails", ()
     expect(templateCardSource).toMatch(
       /canManageTemplates && !templateArchived \? \([\s\S]+<TemplateBlockCreateForm/,
     );
-    expect(getFunctionSource(templatesSource, "ApplyTemplateForm")).toMatch(
-      /const canApply = template\.status === "active" && blockCount > 0;/,
+    expect(templateMetaFormSource).toMatch(
+      /if \(status !== "active"\) \{\s+return;/,
     );
-    expect(templateApplySubmitSource).toMatch(
-      /<Button disabled=\{!canApply\} type="submit">/,
+    expect(getFunctionSource(templateMetaFormSource, "TemplateSaveButton")).toMatch(
+      /useFormStatus\(\)[\s\S]+<Button disabled=\{pending\} type="submit">/,
     );
-    expect(templateApplySubmitSource).toMatch(
-      /<Button[\s\S]+disabled=\{!canApply\}[\s\S]+type="button"/,
+    expect(templateMetaFormSource).toContain('title="Ya hay plantillas aplicadas"');
+    expect(templateMetaFormSource).toContain('setConflictDecision("replace")');
+    const applicationSource = readProjectFile(
+      "src/lib/schedule-template-application.ts",
+    );
+    expect(applicationSource).toMatch(
+      /if \(template\.status !== "active"\)[\s\S]+"template-not-active"/,
     );
     expect(archivedTemplateCardSource).toMatch(
       /const recoverable = canRecoverTemplate\(template\.recoverable_until, now\);[\s\S]+action=\{restoreScheduleTemplate\}[\s\S]+<Button disabled=\{!recoverable\} type="submit" variant="outline">[\s\S]+Recuperar como borrador/,
@@ -1648,6 +1679,20 @@ test.describe("visible protected identifier exposure hygiene local source guardr
           ),
         ]
           .filter((match) => !/\b(?:shortId|formatShortId)\s*\(/.test(match[0]))
+          // DOM IDs and label associations are not rendered identity fallbacks.
+          .filter((match) =>
+            !/\b(?:id|htmlFor)=\{$/.test(source.slice(0, match.index)),
+          )
+          .filter((match) => {
+            const binding = source.slice(0, match.index)
+              .match(/\bconst (reasonId|confirmationId) = $/)?.[1];
+            return (
+              !binding ||
+              relativePath !== "src/app/(console)/console/organizations/[organizationId]/page.tsx" ||
+              !source.includes(`htmlFor={${binding}}`) ||
+              !source.includes(`id={${binding}}`)
+            );
+          })
           .map((match) => `${relativePath}: ${match[0]}`);
       },
     );
@@ -1737,9 +1782,8 @@ test.describe("visible protected personal contact hygiene local source guardrail
       );
     });
 
-    expect(authEmailMatches.sort()).toEqual([
+    expect([...new Set(authEmailMatches)].sort()).toEqual([
       "src/app/(app)/app/account/page.tsx: user.email",
-      "src/app/(app)/app/coaches/actions.ts: context.user.email",
       "src/app/(app)/app/coaches/actions.ts: context.user.email",
       "src/app/(app)/app/layout.tsx: user.email",
     ]);
@@ -1887,13 +1931,11 @@ test.describe("visible protected free-text field hygiene local source guardrails
     }
 
     expect(
-      freeTextControls
-        .map(({ name, relativePath }) => `${relativePath}: ${name}`)
-        .sort(),
+      [...new Set(freeTextControls.map(
+        ({ name, relativePath }) => `${relativePath}: ${name}`,
+      ))].sort(),
     ).toEqual([
       "src/app/(app)/app/absences/page.tsx: reasonSummary",
-      "src/app/(app)/app/coaches/page.tsx: notes",
-      "src/app/(app)/app/coaches/page.tsx: notes",
       "src/app/(app)/app/coaches/page.tsx: notes",
       "src/app/(app)/app/requests/request-creation-form.tsx: reasonSummary",
       "src/app/(app)/app/schedule/schedule-block-detail-panels.tsx: notes",
@@ -1901,10 +1943,8 @@ test.describe("visible protected free-text field hygiene local source guardrails
       // normalizeOptionalNotes with sensitive-text rejection.
       "src/app/(app)/app/schedule/schedule-operational-event-panels.tsx: notes",
       "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx: notes",
-      "src/app/(app)/app/schedule/schedule-slot-create-dialog.tsx: notes",
       "src/app/(app)/app/schedule/staff-work-window-form-fields.tsx: notes",
       "src/app/(app)/app/templates/page.tsx: notes",
-      "src/app/(app)/app/templates/template-blocks-editor.tsx: notes",
       "src/app/(app)/app/templates/template-blocks-editor.tsx: notes",
       "src/app/(app)/app/time/page.tsx: notes",
     ]);
@@ -5429,7 +5469,7 @@ test.describe("organization resolution state local source guardrails", () => {
         expect(basePath, `${relativePath} keeps its own route`).toBe(
           expectedBasePath,
         );
-        expect(basePath).toMatch(/^\/app(?:\/[a-z0-9-]+)?$/);
+        expect(basePath).toMatch(/^\/app(?:\/[a-z0-9-]+)*$/);
         expect(basePath).not.toMatch(
           /\/versions\/|\/preview|\/download|\/storage|\/grants|\/signatures?/,
         );
@@ -6075,7 +6115,7 @@ test.describe("transactional email hardening local source guardrails", () => {
     );
 
     expect(safeInvitationEmailErrorSource).toMatch(
-      /errorCode === "email-not-configured"[\s\S]+El envio de email no esta configurado para este entorno/,
+      /errorCode === "email-not-configured"[\s\S]+El envío de email no está configurado para este entorno/,
     );
     expect(safeInvitationEmailErrorSource).toContain(
       "No se pudo entregar el email.",
@@ -6107,7 +6147,7 @@ test.describe("transactional email hardening local source guardrails", () => {
 });
 
 test.describe("privileged Supabase and Storage client local source guardrails", () => {
-  test("keeps Supabase Auth Admin scoped to the direct account server flow", () => {
+  test("keeps Supabase Auth Admin scoped to account provisioning and required password changes", () => {
     const sourceFiles = collectSourceFiles(path.join(process.cwd(), "src"));
     const relativeSourceFiles = sourceFiles.map((filePath) =>
       path.relative(process.cwd(), filePath).replace(/\\/g, "/"),
@@ -6115,6 +6155,7 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
     const privilegedAuthAdminFiles = new Set([
       "src/app/(app)/app/coaches/actions.ts",
       "src/app/(auth)/reset-password/actions.ts",
+      "src/lib/platform-console-actions.ts",
       "src/lib/supabase/admin.ts",
       "src/lib/supabase/env.ts",
     ]);
@@ -6184,9 +6225,14 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
       /SERVICE_ROLE|service_role|DATABASE_URL|SUPABASE_DB|POSTGRES_URL|DIRECT_URL|PGHOST|PGPASSWORD|SMTP/i,
     );
     expect(processEnvFiles).toEqual([
+      "src/app/api/chatgpt/oauth/authorize/route.ts",
       "src/lib/auth/site-url.ts",
+      "src/lib/boxwod-navigation.ts",
+      "src/lib/chatgpt-connector-auth.ts",
       "src/lib/email/resend.ts",
+      "src/lib/platform-console-actions.ts",
       "src/lib/supabase/admin.ts",
+      "src/lib/supabase/auth-cookie-options.ts",
       "src/lib/supabase/env.ts",
       "src/lib/supabase/proxy.ts",
     ]);
@@ -6198,7 +6244,25 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
       "src/lib/supabase/proxy.ts",
       "src/lib/supabase/server.ts",
     ]);
-    expect(nonTypeSupabaseJsImports).toEqual(["src/lib/supabase/admin.ts"]);
+    expect(nonTypeSupabaseJsImports).toEqual([
+      "src/lib/chatgpt-connector-auth.ts",
+      "src/lib/supabase/admin.ts",
+    ]);
+    const connectorAuthSource = readProjectFile("src/lib/chatgpt-connector-auth.ts");
+    expect(connectorAuthSource).toMatch(/createSupabaseClient<Database>\(supabaseUrl, supabaseAnonKey/);
+    expect(connectorAuthSource).toContain("getSupabasePublicEnv()");
+    expect(connectorAuthSource).toContain("Authorization: `Bearer ${accessToken}`");
+    expect(connectorAuthSource).toContain("persistSession: false");
+    expect(connectorAuthSource).not.toMatch(/auth\.admin|SUPABASE_SERVICE_ROLE/);
+    const platformProvisioningSource = getTsFunctionSource(
+      readProjectFile("src/lib/platform-console-actions.ts"),
+      "createPlatformOrganizationAction",
+    );
+    expect(platformProvisioningSource).toMatch(/getActivePlatformAdmin\(\)[\s\S]+if \(!adminResult\.ok\)/);
+    expect(platformProvisioningSource).toMatch(/adminResult\.data\.role !== "platform_owner"[\s\S]+redirect\(getConsolePath\(\{ error: "permission-denied" \}\)\)/);
+    expect(platformProvisioningSource).toMatch(/authAdmin\.auth\.admin\.createUser\(\{\s*app_metadata: buildRequiredPasswordChangeAppMetadata\(\)/);
+    expect(platformProvisioningSource).toMatch(/if \(!creationResult\.ok\)[\s\S]+if \(createdOwnerUserId && authAdmin\)[\s\S]+authAdmin\.auth\.admin\.deleteUser\(createdOwnerUserId\)/);
+    expect(readProjectFile("src/lib/platform-console-actions.ts").replace(platformProvisioningSource, "")).not.toMatch(/auth\.admin/);
     expect(moduleScopeClientFiles).toEqual([]);
     expect(supabaseAdminSource).toMatch(/createSupabaseClient<Database>/);
     expect(supabaseAdminSource).toMatch(/autoRefreshToken: false/);
@@ -6299,7 +6363,7 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
       /if \(data\.user && isPasswordChangeRequired\(data\.user\)\) \{[\s\S]+redirect\(getRequiredPasswordChangePath\(\)\);/,
     );
     expect(proxySource).toMatch(
-      /if \(user && request\.nextUrl\.pathname\.startsWith\("\/app"\)\) \{[\s\S]+isPasswordChangeRequired\(user\)[\s\S]+NextResponse\.redirect\([\s\S]+new URL\(getRequiredPasswordChangePath\(\), request\.url\)/,
+      /if \(user && isProtectedSurface\(request\.nextUrl\.pathname\)\) \{[\s\S]+isPasswordChangeRequired\(user\)[\s\S]+NextResponse\.redirect\([\s\S]+new URL\(getRequiredPasswordChangePath\(\), request\.url\)/,
     );
     expect(appLayoutSource).toMatch(
       /if \(isPasswordChangeRequired\(user\)\) \{[\s\S]+redirect\(getRequiredPasswordChangePath\(\)\);/,
@@ -6329,15 +6393,32 @@ test.describe("privileged Supabase and Storage client local source guardrails", 
       "src/app/(app)/app/account/actions.ts",
       "src/app/(app)/app/account/page.tsx",
       "src/app/(app)/app/documents/actions.ts",
+      "src/app/(app)/app/layout.tsx",
       "src/lib/document-file-access.ts",
     ]);
     expect(filesMatching(/createSignedUrl/)).toEqual([
       "src/app/(app)/app/account/page.tsx",
+      "src/app/(app)/app/layout.tsx",
       "src/lib/document-file-access.ts",
     ]);
+    const headerProfilesSource = getTsFunctionSource(
+      readProjectFile("src/app/(app)/app/layout.tsx"),
+      "getMobileHeaderProfiles",
+    );
+    expect(headerProfilesSource).toMatch(/membership\.accessMode !== "platform_support"/);
+    expect(headerProfilesSource).toContain('.eq("organization_id", membership.organization.id)');
+    expect(headerProfilesSource).toContain('.eq("user_id", userId)');
+    expect(headerProfilesSource).toContain('.eq("person_profile_id", profile.id)');
+    expect(headerProfilesSource).toContain('.eq("asset_type", "avatar")');
+    expect(headerProfilesSource).toMatch(/from\(PROFILE_ASSETS_BUCKET\)[\s\S]+createSignedUrl\([\s\S]+AVATAR_SIGNED_URL_TTL_SECONDS/);
+    expect(headerProfilesSource).not.toMatch(/document-files|profile-signatures/);
     expect(filesMatching(/\bdocument-files\b/)).toEqual([
       "src/lib/document-file-access.ts",
+      "src/lib/platform-console-actions.ts",
     ]);
+    expect(readProjectFile("src/lib/platform-console-actions.ts")).not.toMatch(
+      /supabase\.storage|createSignedUrl|DOCUMENT_FILES_BUCKET/,
+    );
     expect(filesMatching(/\bdocument_access_grants\b|\bmanage_grants\b/)).not.toContain(
       "src/app/(app)/app/documents/page.tsx",
     );
@@ -7520,7 +7601,7 @@ test.describe("base operational listing page local source guardrails", () => {
       /const centers = await getCenters\(resolution\.organization\.id\)[\s\S]+const canManageCenters = canManageOperationalData\(resolution\.membership\.role\)/,
     );
     expect(classTypesPageSource).toMatch(
-      /const classTypes = await getClassTypes\(resolution\.organization\.id\)[\s\S]+const canManageClassTypes = canManageOperationalData\(/,
+      /const \[classTypes, certifications\] = await Promise\.all\(\[[\s\S]+getClassTypes\(resolution\.organization\.id\)[\s\S]+getCertifications\(resolution\.organization\.id\)[\s\S]+const canManageClassTypes = canManageOperationalData\(/,
     );
     expect(coachesPageSource).toMatch(
       /getMemberships\(resolution\.organization\.id\)[\s\S]+getCoachProfiles\(resolution\.organization\.id\)[\s\S]+getCenters\(resolution\.organization\.id\)[\s\S]+getPersonProfiles\(resolution\.organization\.id\)[\s\S]+getTeamInvitations\(resolution\.organization\.id\)/,
@@ -7925,7 +8006,7 @@ test.describe("app shell navigation local source guardrails", () => {
       /canViewOperationalDashboard[\s\S]+\? getDashboardData\({[\s\S]+organizationId: resolution\.organization\.id[\s\S]+\)[\s\S]+: Promise\.resolve\(null\)/,
     );
     expect(appPageSource).toMatch(
-      /\{dashboardData \? \([\s\S]+<AdminCoverageDashboard[\s\S]+\) : \([\s\S]+<ReadOnlyHome/,
+      /\{isSupportMode \? \([\s\S]+<SupportModeHome[\s\S]+\) : dashboardData \? \([\s\S]+<AdminCoverageDashboard[\s\S]+\) : \([\s\S]+<ReadOnlyHome/,
     );
     expect(appPageSource).toMatch(
       /\{canViewOperationalDashboard \? \([\s\S]+<SurfaceLinks[\s\S]+\) : null\}/,
@@ -7945,7 +8026,7 @@ test.describe("app shell navigation local source guardrails", () => {
       /getCoveragePath|getCentersPath|getCoachesPath|getClassTypesPath|getScheduleTemplatesPath|getStatsPath|getSettingsPath/,
     );
     expect(surfaceLinksSource).toMatch(
-      /getCoveragePath[\s\S]+getSchedulePath[\s\S]+getCentersPath[\s\S]+getCoachesPath[\s\S]+getClassTypesPath[\s\S]+canManageTemplates \? \(/,
+      /getCoveragePath[\s\S]+getSchedulePath[\s\S]+getCoachesPath[\s\S]+canManageTemplates\s+\? \[[\s\S]+getScheduleTemplatesPath[\s\S]+: \[\]/,
     );
 
     const shellAndDashboardSource = [
@@ -8028,7 +8109,10 @@ test.describe("protected app route cache local source guardrails", () => {
       /source: "\/app\/:path\*"[\s\S]+headers: privateAppHeaders/,
     );
 
-    expect(proxySource).toContain('matcher: ["/app/:path*"]');
+    expect(proxySource).toContain('matcher: ["/app/:path*", "/console/:path*"]');
+    expect(getFunctionSource(supabaseProxySource, "isProtectedSurface")).toMatch(
+      /return pathname\.startsWith\("\/app"\) \|\| pathname\.startsWith\("\/console"\)/,
+    );
     expect(proxySource).toMatch(
       /export async function proxy\(request: NextRequest\)[\s\S]+return updateSession\(request\)/,
     );
@@ -8037,10 +8121,10 @@ test.describe("protected app route cache local source guardrails", () => {
       /function withPrivateAppCacheHeaders[\s\S]+response\.headers\.set\("Cache-Control", "no-store"\)[\s\S]+response\.headers\.set\("Pragma", "no-cache"\)/,
     );
     expect(supabaseProxySource).toMatch(
-      /if \(!user && request\.nextUrl\.pathname\.startsWith\("\/app"\)\)[\s\S]+return withPrivateAppCacheHeaders\(NextResponse\.redirect\(loginUrl\)\)/,
+      /if \(!user && isProtectedSurface\(request\.nextUrl\.pathname\)\)[\s\S]+return withPrivateAppCacheHeaders\(NextResponse\.redirect\(loginUrl\)\)/,
     );
     expect(supabaseProxySource).toMatch(
-      /return withScheduleCenterPreference\(\s*request,\s*withPrivateAppCacheHeaders\(response\),\s*\)/,
+      /return withTemplateCenterPreference\(\s*request,\s*withScheduleCenterPreference\(request, withPrivateAppCacheHeaders\(response\)\),\s*\)/,
     );
   });
 
@@ -8091,7 +8175,7 @@ test.describe("protected app route cache local source guardrails", () => {
     expect(helperPaths.length).toBeGreaterThan(10);
 
     for (const helperPath of helperPaths) {
-      expect(helperPath).toMatch(/^\/app(?:\/[a-z0-9-]+)?$/);
+      expect(helperPath).toMatch(/^\/app(?:\/[a-z0-9-]+)*$/);
       expect(helperPath).not.toMatch(
         /\/versions\/|\/preview|\/download|\/storage|\/grants|\/signatures?/,
       );

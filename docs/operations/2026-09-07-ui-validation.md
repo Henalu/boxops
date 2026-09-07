@@ -13,7 +13,9 @@ Las credenciales, capturas y trazas permanecen en `.local-evidence/ui-validation
 
 Resultado: 20/20 recorridos de perfiles y operativa, 11/11 casos documentales y 3/3 paneles operativos, sin casos omitidos. Tras ajustar el aviso de plantillas, se repiten los tres casos de aplicacion/reemplazo con resultado 3/3. Son 34 casos distintos; las repeticiones no se suman al total.
 
-Compilacion de produccion y tipos correctos. ESLint: cero errores y un warning previo en `scripts/setup-local-e2e-auth.mjs`. Auditoria npm de produccion: cero vulnerabilidades. Las 35 aserciones de la migracion atomica pasan en Postgres con rollback.
+Repeticion posterior del mismo dia: los 20 recorridos pasan en una ejecucion completa en serie y los 14 casos documentales/paneles pasan por separado. Se corrige una carrera de la prueba al cerrar soporte, esperando la respuesta antes de volver al horario; ese caso pasa tambien tres repeticiones adicionales. Las ejecuciones autenticadas comparten cuentas y deben ejecutarse en serie: el logout documental puede invalidar las otras sesiones. Detalle en `2026-09-07-guardrail-recheck.md`.
+
+Compilacion de produccion del corte inicial y tipos correctos. Este segundo corte cambia pruebas/documentacion y elimina un helper sin uso; no cambia el codigo de la aplicacion compilada. ESLint queda sin errores ni warnings tras eliminar ese helper. Auditoria npm de produccion: cero vulnerabilidades. Las 35 aserciones de la migracion atomica vuelven a pasar en Postgres con rollback.
 
 Se conservan 37 capturas y su manifiesto SHA-256 en `.local-evidence/ui-validation/`; el informe HTML documental se conserva en `documents-report/`. Al cerrar, el fixture no tiene sesiones de soporte activas ni bloques generados de las plantillas de prueba.
 
@@ -67,5 +69,5 @@ El runner documental utiliza `http://localhost:3107`: Playwright permite las coo
 
 - Esta evidencia valida los recorridos descritos en local; no certifica toda la aplicacion, otros navegadores, concurrencia masiva, email real ni produccion.
 - BoxWod no esta configurado como destino en este entorno. El contrato del enlace y las cookies compartidas tienen pruebas separadas; el recorrido HTTPS entre ambas aplicaciones con sesion compartida sigue pendiente en su entorno destino.
-- La suite general conserva los 22 fallos anteriores de comprobaciones de codigo fuente documentados en el corte de seguridad. No se han omitido para declarar verde una ejecucion global.
+- Los 22 fallos anteriores de comprobaciones de codigo fuente quedan corregidos. La ampliacion pasa 208 casos sin omisiones; alcance y ajustes en `2026-09-07-guardrail-recheck.md`. No equivale a ejecutar todas las suites runtime historicas del repositorio.
 - Antes de integrar en `main`, aplicar y comprobar la migracion en Supabase destino. `main` activa automaticamente el despliegue de Vercel. Las previews no se han utilizado para modificar datos.

@@ -25,7 +25,7 @@ Casos comprobados: aplicacion con entrenador, repeticion sin duplicados, solape 
 - 23 smokes de Auth publica y redireccion anonima: correctos contra el servidor local de produccion en puerto 3107. Login verificado tambien en navegador, sin errores reportados.
 - Ampliacion a `tenant-rls-negative-local.spec.ts` y `templates-day-selection.spec.ts`: 97 passed / 22 failed. Una copia aislada de HEAD `ae4691d`, con los cambios previos del usuario restaurados y sin este corte, reproduce los mismos 22 casos fallidos. Son deuda anterior de las comprobaciones de codigo fuente; no se han omitido ni relajado para declarar verde la suite global.
 
-La suite global sigue pendiente de saneamiento; estos resultados solo cierran las comprobaciones indicadas.
+Actualizacion posterior del mismo dia: los 22 fallos anteriores quedan corregidos y la ampliacion pasa 208 comprobaciones sin omisiones. Detalle y alcance en `2026-09-07-guardrail-recheck.md`; la ejecucion inicial se conserva arriba como evidencia historica.
 
 ## Orden de despliegue
 
