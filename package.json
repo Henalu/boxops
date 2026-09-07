@@ -16,6 +16,7 @@
     "test:smoke:e2e-local": "npm run test:smoke:e2e-auth && npm run test:smoke:protected:roles",
     "typecheck": "tsc --noEmit",
     "test:db:template-atomic": "node scripts/verify-atomic-schedule-template.mjs",
+    "test:ui:local": "node scripts/run-local-ui-validation.mjs",
     "supabase": "supabase",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",

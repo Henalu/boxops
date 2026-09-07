@@ -2885,7 +2885,11 @@ export default async function TemplatesPage({
       {error && errorMessages[error] ? (
         <TransientFeedbackBanner
           description={errorMessages[error]}
-          title="No se han guardado los cambios"
+          title={
+            error.startsWith("template-sync-")
+              ? "Plantilla guardada, horario sin actualizar"
+              : "No se han guardado los cambios"
+          }
           tone="error"
         />
       ) : null}

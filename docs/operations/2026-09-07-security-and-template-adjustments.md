@@ -38,6 +38,8 @@ En este corte la migracion solo se prueba dentro de transacciones locales con ro
 
 ## Limites
 
+Actualizacion posterior del mismo dia: el corte de UI activa la funcion solo en la base local y ejecuta recorridos autenticados con fixtures separados. Resultados y limites actualizados en `2026-09-07-ui-validation.md`; el entorno remoto sigue pendiente.
+
 - La unidad atomica es una semana. Un rango de varias semanas conserva su recorrido actual; no se promete rollback global del rango.
 - La sincronizacion de ediciones sobre bloques ya generados mantiene su implementacion actual y queda para un corte separado.
 - No cambia la politica de reemplazo ni fuerza la eliminacion de bloques con referencias protegidas, incluidas sesiones BoxWod.

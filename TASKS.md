@@ -29,6 +29,8 @@ La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cier
 - [x] Actualizar dependencias afectadas, alinear Next.js/eslint-config-next y separar shadcn de runtime.
 - [x] Sustituir escrituras separadas al aplicar una semana por RPC transaccional con permisos de invocador/RLS.
 - [x] Probar rollback tras solape, reemplazo fallido, idempotencia, roles operativos, certificaciones, soporte y fronteras tenant/BoxWod en Postgres local con fixtures reversibles.
+- [x] Preparar rama y PR #2 con fixtures locales separados y recorridos UI por siete perfiles, dos organizaciones y escritorio/movil.
+- [x] Corregir accesos documentales registrados por precarga y mostrar restriccion explicita para soporte; probar permisos y apertura/descarga real con archivos sinteticos.
 - [ ] Aplicar la migracion al entorno destino antes de desplegar el codigo y verificar el flujo autenticado en ese entorno.
 - [ ] Siguiente corte: carga documental agrupada y paginacion de Horario, con medicion y prueba de calendario grande.
 

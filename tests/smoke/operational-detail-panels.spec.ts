@@ -26,6 +26,10 @@ async function expectRouteStatePanel({
   await page.waitForLoadState("networkidle");
   await expectNoFrameworkError(page);
 
+  if (queryParam === "edit_block_id") {
+    await page.getByRole("button", { name: "Expandir todas", exact: true }).click();
+  }
+
   const triggers = page.locator(triggerSelector).filter({ visible: true });
 
   if ((await triggers.count()) === 0) {
