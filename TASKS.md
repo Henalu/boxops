@@ -24,6 +24,16 @@ Reglas para las fases nuevas:
 
 La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cierre hacia beta/webapp v1 vive en `docs/product/webapp-completion-roadmap.md`.
 
+### Corte 2026-09-07 - Seguridad Y Aplicacion Atomica De Plantillas
+
+- [x] Actualizar dependencias afectadas, alinear Next.js/eslint-config-next y separar shadcn de runtime.
+- [x] Sustituir escrituras separadas al aplicar una semana por RPC transaccional con permisos de invocador/RLS.
+- [x] Probar rollback tras solape, reemplazo fallido, idempotencia, roles operativos, certificaciones, soporte y fronteras tenant/BoxWod en Postgres local con fixtures reversibles.
+- [ ] Aplicar la migracion al entorno destino antes de desplegar el codigo y verificar el flujo autenticado en ese entorno.
+- [ ] Siguiente corte: carga documental agrupada y paginacion de Horario, con medicion y prueba de calendario grande.
+
+La evidencia y los limites de este corte viven en `docs/operations/2026-09-07-security-and-template-adjustments.md`.
+
 ### Corte 2026-06-28 - Roadmap Conector ChatGPT Operativo
 
 Estado: `CG.0` completado como contrato documental; `CG.1` implementado como capa interna server-side read-only; `CG.2A` implementa `preview_schedule_template` sin persistencia; `CG.2B` implementa `create_schedule_template_draft` como mutacion interna acotada a borradores de plantilla; `CG.3A` implementa `prepare_schedule_template_application` como preparacion confirmable sin mutar horario real y persistiendo una confirmacion minima; `CG.3B` implementa `apply_schedule_template` con RPC transaccional, idempotencia, token verificable y auditoria; `CG.4A` implementa packaging MCP/JSON-RPC interno en `/api/chatgpt/mcp`; `CG.4B` implementa account linking OAuth 2.1 con PKCE, metadata, bearer scoped, expiracion y revocacion, y queda probado en ChatGPT/dev mode contra `BoxOps QA`; `CG.4C` anade refresh tokens opacos rotados para evitar reconexion cada 45 minutos. CG.1/CG.2A/CG.2B/CG.3A/CG.3B/CG.4A/CG.4B/CG.4C anaden codigo en `src/lib`, rutas MCP/OAuth acotadas, migraciones acotadas y smokes especificos, pero no crean seeds, GPT Action ni UI grande. CG.2B puede crear borradores reales en `schedule_templates` y `schedule_template_blocks` si se invoca server-side; CG.3B puede aplicar al horario real solo tras confirmacion valida. Separa la IA propia/documental futura del conector ChatGPT operativo que puede ayudar a vender BoxOps antes.

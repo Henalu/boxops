@@ -4614,6 +4614,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      apply_schedule_template_week: {
+        Args: {
+          target_organization_id: string
+          target_replace_existing?: boolean
+          target_template_id: string
+          target_week_start: string
+        }
+        Returns: Json
+      }
       apply_time_record_correction: {
         Args: { target_correction_id: string; target_organization_id: string }
         Returns: {
