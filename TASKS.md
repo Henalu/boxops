@@ -32,6 +32,7 @@ La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cier
 - [x] Preparar rama y PR #2 con fixtures locales separados y recorridos UI por siete perfiles, dos organizaciones y escritorio/movil.
 - [x] Corregir accesos documentales registrados por precarga y mostrar restriccion explicita para soporte; probar permisos y apertura/descarga real con archivos sinteticos.
 - [x] Corregir los 22 fallos anteriores y ampliar a 208 comprobaciones; actualizar guardas segun roles/migraciones vigentes, sin omitir casos. Evidencia: `docs/operations/2026-09-07-guardrail-recheck.md`.
+- [ ] Configurar Supabase en Vercel Preview: build correcto pero login 500 por variables ausentes. Requiere sesion Vercel para editar la configuracion y redesplegar; produccion responde 200 en login.
 - [ ] Aplicar la migracion al entorno destino antes de desplegar el codigo y verificar el flujo autenticado en ese entorno.
 - [ ] Siguiente corte: carga documental agrupada y paginacion de Horario, con medicion y prueba de calendario grande.
 

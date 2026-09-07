@@ -44,6 +44,10 @@ Los comandos de los recorridos autenticados estan en [el informe de UI](2026-09-
 
 ## Entrega y BoxWod
 
+Tras subir `c9d9887`, Vercel termina correctamente el build de `dpl_2tBvhUqv95YZBwrFJaHLJeHBF1WQ`, pero un GET anonimo a `/login` en la preview devuelve **500**. El registro de la funcion identifica `Missing Supabase environment variables.`: falta al menos una de `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` en el entorno Preview. El mismo control contra el dominio de produccion devuelve **200** y el formulario de login.
+
+La preview **no queda validada**, aunque su check de build sea verde. Para resolverlo hay que configurar ambas variables en Preview con el Supabase destino adecuado y redesplegar; despues repetir GET `/login`, redirecciones protegidas y los recorridos autenticados autorizados. El conector conectado permite leer proyecto/deployment/logs, pero no ofrece edicion de variables; la CLI no tiene credenciales y el navegador muestra el login de Vercel. La configuracion queda pendiente de acceso de sesion. No se han copiado claves al repositorio ni conectado la preview a produccion sin revisar su destino.
+
 El usuario confirma que BoxWod todavia no esta publicado ni tiene dominio. En el equipo Vercel conectado aparece BoxOps con preview READY; no aparece un proyecto BoxWod. La prueba HTTPS de sesion entre ambas apps queda pendiente de publicar BoxWod y concretar sus dominios.
 
 La estrategia actual de cookie compartida necesita subdominios de un dominio propio controlado por el hub. Los dominios independientes `*.vercel.app` no permiten compartir una cookie con Domain=`vercel.app`, segun [Vercel](https://vercel.com/kb/guide/can-i-set-a-cookie-from-my-vercel-project-subdomain-to-vercel-app). Esto no impide publicar y verificar BoxOps por separado.

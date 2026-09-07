@@ -67,6 +67,7 @@ El runner documental utiliza `http://localhost:3107`: Playwright permite las coo
 
 ## Limites de entrega
 
+- La preview de Vercel compila, pero su login devuelve 500 por variables de Supabase ausentes; produccion devuelve 200 en el mismo control. Falta configurar Preview con acceso autenticado a Vercel y repetir la verificacion remota. Detalle en `2026-09-07-guardrail-recheck.md`.
 - Esta evidencia valida los recorridos descritos en local; no certifica toda la aplicacion, otros navegadores, concurrencia masiva, email real ni produccion.
 - BoxWod no esta configurado como destino en este entorno. El contrato del enlace y las cookies compartidas tienen pruebas separadas; el recorrido HTTPS entre ambas aplicaciones con sesion compartida sigue pendiente en su entorno destino.
 - Los 22 fallos anteriores de comprobaciones de codigo fuente quedan corregidos. La ampliacion pasa 208 casos sin omisiones; alcance y ajustes en `2026-09-07-guardrail-recheck.md`. No equivale a ejecutar todas las suites runtime historicas del repositorio.
