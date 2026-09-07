@@ -13,6 +13,7 @@ import {
   isScheduleCenterPreferenceValue,
   SCHEDULE_CENTER_PREFERENCE_COOKIE_MAX_AGE_SECONDS,
 } from "@/lib/schedule-center-preferences";
+import { getSupabaseAuthCookieOptions } from "@/lib/supabase/auth-cookie-options";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import type { Database } from "@/types/supabase";
 
@@ -112,6 +113,7 @@ export async function updateSession(request: NextRequest) {
   let response = withPrivateAppCacheHeaders(NextResponse.next({ request }));
 
   const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: getSupabaseAuthCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

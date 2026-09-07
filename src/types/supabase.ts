@@ -4858,6 +4858,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      boxwod_can_program: {
+        Args: { target_organization_id: string }
+        Returns: boolean
+      }
       billing_plan_features_are_safe: {
         Args: { target_features: Json }
         Returns: boolean
