@@ -44,12 +44,26 @@ Los comandos de los recorridos autenticados estan en [el informe de UI](2026-09-
 
 ## Entrega y BoxWod
 
-Tras subir `c9d9887`, Vercel termina correctamente el build de `dpl_2tBvhUqv95YZBwrFJaHLJeHBF1WQ`, pero un GET anonimo a `/login` en la preview devuelve **500**. El registro de la funcion identifica `Missing Supabase environment variables.`: falta al menos una de `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` en el entorno Preview. El mismo control contra el dominio de produccion devuelve **200** y el formulario de login.
+El build inicial terminaba correctamente, pero `/login` devolvia **500** por `Missing Supabase environment variables.`. Tras iniciar el usuario sesion en Vercel, se confirma en la UI que las dos variables publicas estaban limitadas a Produccion. Se habilitan `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` tambien en Preview, conservando sus valores y el Supabase del hub `ccniekhbzvmsyhktprpx`. Las claves privilegiadas y las conexiones Postgres siguen solo en Produccion. No se guardan valores de claves en Git.
 
-La preview **no queda validada**, aunque su check de build sea verde. Para resolverlo hay que configurar ambas variables en Preview con el Supabase destino adecuado y redesplegar; despues repetir GET `/login`, redirecciones protegidas y los recorridos autenticados autorizados. El conector conectado permite leer proyecto/deployment/logs, pero no ofrece edicion de variables; la CLI no tiene credenciales y el navegador muestra el login de Vercel. La configuracion queda pendiente de acceso de sesion. No se han copiado claves al repositorio ni conectado la preview a produccion sin revisar su destino.
+Se redespliega exclusivamente el commit `2c7d923` de `codex/ajustes-validacion-ui`, sin cache de build: deployment `dpl_AoucztbJdyWcqcyipr6LWPXWRRpF`, estado READY. Preview comprobada: [BoxOps](https://boxops-5jodcoqvi-henalus-projects.vercel.app/login).
+
+Comprobacion real en navegador, con sesion Vercel para superar su proteccion de previews y sin sesion BoxOps, el 2026-09-07 entre las 11:25 y las 11:28 UTC:
+
+| Recorrido | Resultado |
+| --- | --- |
+| `/login` | Formulario visible; GET 200 en logs de Vercel |
+| Credenciales ficticias | Redireccion con `error=invalid-credentials`; mensaje de rechazo visible |
+| `/app` sin sesion | 307 a `/login?redirectTo=%2Fapp` |
+| `/console` sin sesion | 307 a `/login?redirectTo=%2Fconsole` |
+| Enlace de recuperacion | Formulario `/forgot-password` visible; GET 200, sin enviar correo |
+
+Los logs del nuevo deployment no registran errores/fatales durante el recorrido. El login de produccion mantiene 200. La peticion del conector a la nueva preview devuelve un 302 de autenticacion de Vercel: no se cuenta como redireccion de BoxOps. La evidencia de la aplicacion procede del navegador y los logs de sus funciones.
+
+El bloqueo de configuracion queda resuelto. La validacion remota cubre este acceso publico y sus rechazos; no sustituye los 34 casos por perfiles ejecutados en local ni verifica operaciones sobre datos reales.
 
 El usuario confirma que BoxWod todavia no esta publicado ni tiene dominio. En el equipo Vercel conectado aparece BoxOps con preview READY; no aparece un proyecto BoxWod. La prueba HTTPS de sesion entre ambas apps queda pendiente de publicar BoxWod y concretar sus dominios.
 
 La estrategia actual de cookie compartida necesita subdominios de un dominio propio controlado por el hub. Los dominios independientes `*.vercel.app` no permiten compartir una cookie con Domain=`vercel.app`, segun [Vercel](https://vercel.com/kb/guide/can-i-set-a-cookie-from-my-vercel-project-subdomain-to-vercel-app). Esto no impide publicar y verificar BoxOps por separado.
 
-Antes de integrar en `main`, sigue siendo necesario aplicar y comprobar la migracion atomica en Supabase destino. Este corte no aplica migraciones remotas ni integra en `main`.
+Antes de integrar en `main`, sigue siendo necesario aplicar y comprobar la migracion atomica en Supabase destino. El complemento confirma 72 migraciones remotas frente a 73 del repositorio; falta solamente `20260907081226_atomic_schedule_template_week`, y una consulta de `pg_proc` confirma que `apply_schedule_template_week` aun no existe. Solo hay rama Supabase `main`, sin base QA separada. Este corte no aplica migraciones remotas, no modifica datos operativos ni integra en `main`.
