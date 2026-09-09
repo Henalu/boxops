@@ -33,7 +33,8 @@ La vista resumida de producto vive en `docs/product/roadmap.md`. El mapa de cier
 - [x] Corregir accesos documentales registrados por precarga y mostrar restriccion explicita para soporte; probar permisos y apertura/descarga real con archivos sinteticos.
 - [x] Corregir los 22 fallos anteriores y ampliar a 208 comprobaciones; actualizar guardas segun roles/migraciones vigentes, sin omitir casos. Evidencia: `docs/operations/2026-09-07-guardrail-recheck.md`.
 - [x] Configurar las dos variables publicas de Supabase en Vercel Preview y redesplegar la PR #2. Login y recuperacion 200, acceso anonimo a `/app` y `/console` 307 al login, credenciales ficticias rechazadas y sin errores de funcion en el recorrido; produccion mantiene login 200.
-- [ ] Aplicar la migracion al entorno destino antes de desplegar el codigo y verificar el flujo autenticado en ese entorno.
+- [x] Aplicar la migracion al entorno destino y verificar el flujo autenticado en Vercel Preview: 73/73 migraciones, 35 aserciones SQL remotas y seis perfiles UI. Evidencia y limpieza: `docs/operations/2026-09-09-remote-ui-validation.md`.
+- [ ] Integrar PR #2 en main y comprobar el despliegue automatico de produccion.
 - [ ] Siguiente corte: carga documental agrupada y paginacion de Horario, con medicion y prueba de calendario grande.
 
 La evidencia y los limites de este corte viven en `docs/operations/2026-09-07-security-and-template-adjustments.md`.
