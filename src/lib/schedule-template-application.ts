@@ -109,24 +109,6 @@ function isDateWithinTemplateValidity({
   return true;
 }
 
-function shouldReplaceExistingTemplateBlock({
-  block,
-  template,
-}: {
-  block: ExistingTemplateBlock;
-  template: ScheduleTemplateForApplication;
-}) {
-  if (block.template_id === template.id) {
-    return false;
-  }
-
-  if (!template.center_id) {
-    return true;
-  }
-
-  return block.center_id === template.center_id;
-}
-
 function shouldBlockAutomaticApplication({
   block,
   template,
@@ -389,162 +371,6 @@ async function validateAssignableCoachForApplication({
   }
 
   return null;
-}
-
-function getTemplateBlocksForWeek({
-  template,
-  templateBlocks,
-  timezone,
-  weekStart,
-}: {
-  template: ScheduleTemplateForApplication;
-  templateBlocks: ScheduleTemplateBlockForApplication[];
-  timezone: string;
-  weekStart: string;
-}) {
-  const week = resolveWeek(weekStart, timezone);
-
-  return templateBlocks.flatMap((block) => {
-    const serviceDate = week.days[block.day_of_week - 1] ?? week.weekStart;
-
-    if (
-      !serviceDate ||
-      !isDateWithinTemplateValidity({ serviceDate, template })
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        block,
-        serviceDate,
-      },
-    ];
-  });
-}
-
-async function insertTemplateBlocksForWeek({
-  existingBlocks,
-  organizationId,
-  supabase,
-  template,
-  templateBlocks,
-  timezone,
-  weekStart,
-}: {
-  existingBlocks: ExistingTemplateBlock[];
-  organizationId: string;
-  supabase: SupabaseServerClient;
-  template: ScheduleTemplateForApplication;
-  templateBlocks: ScheduleTemplateBlockForApplication[];
-  timezone: string;
-  weekStart: string;
-}) {
-  const weeklyTemplateBlocks = getTemplateBlocksForWeek({
-    template,
-    templateBlocks,
-    timezone,
-    weekStart,
-  });
-  const existingKeys = new Set(
-    existingBlocks
-      .filter((block) => block.template_id === template.id)
-      .map(
-        (block) => `${block.template_block_id ?? ""}:${block.service_date}`,
-      ),
-  );
-  const blocksToInsert = weeklyTemplateBlocks.flatMap(
-    ({ block, serviceDate }) => {
-      if (existingKeys.has(`${block.id}:${serviceDate}`)) {
-        return [];
-      }
-
-      return [
-        {
-          center_id: block.center_id,
-          class_type_id: block.class_type_id,
-          end_time: block.end_time,
-          is_template_exception: false,
-          notes: block.notes,
-          organization_id: organizationId,
-          required_coaches: block.required_coaches,
-          service_date: serviceDate,
-          start_time: block.start_time,
-          status: "scheduled",
-          template_block_id: block.id,
-          template_id: template.id,
-        },
-      ];
-    },
-  );
-
-  if (blocksToInsert.length === 0) {
-    return {
-      insertedBlockCount: 0,
-      status: weeklyTemplateBlocks.length === 0
-        ? "template-out-of-range"
-        : "already-applied",
-    } as const;
-  }
-
-  const { data: insertedBlocks, error: insertError } = await supabase
-    .from("schedule_blocks")
-    .insert(blocksToInsert)
-    .select("id, template_block_id");
-
-  if (insertError) {
-    return {
-      insertedBlockCount: 0,
-      status: getMutationStatus(insertError.code),
-    } as const;
-  }
-
-  const defaultCoachByTemplateBlockId = new Map(
-    templateBlocks.flatMap((block) =>
-      scheduleTemplateBlockRequiresCoach(block.required_coaches) &&
-      block.default_coach_profile_id
-        ? [[block.id, block.default_coach_profile_id] as const]
-        : [],
-    ),
-  );
-  const assignmentsToInsert = insertedBlocks.flatMap((block) => {
-    const templateBlockId = block.template_block_id;
-    const coachProfileId = templateBlockId
-      ? defaultCoachByTemplateBlockId.get(templateBlockId)
-      : null;
-
-    if (!coachProfileId) {
-      return [];
-    }
-
-    return [
-      {
-        assignment_status: "assigned",
-        coach_profile_id: coachProfileId,
-        organization_id: organizationId,
-        schedule_block_id: block.id,
-        source: "template",
-      },
-    ];
-  });
-
-  if (assignmentsToInsert.length > 0) {
-    const { error: assignmentsError } = await supabase
-      .from("schedule_block_assignments")
-      .insert(assignmentsToInsert);
-
-    if (assignmentsError) {
-      return {
-        insertedBlockCount: insertedBlocks.length,
-        status: getMutationStatus(assignmentsError.code),
-      } as const;
-    }
-  }
-
-  return {
-    insertedBlockCount: insertedBlocks.length,
-    status: "applied",
-  } as const;
 }
 
 async function syncTemplateAssignmentsForScheduleBlocks({
@@ -922,7 +748,7 @@ async function syncExistingTemplateBlocksForRange({
 
 export async function applyScheduleTemplateWeek({
   organizationId,
-  replaceExisting,
+  replaceExisting = false,
   supabase,
   templateId,
   timezone,
@@ -935,140 +761,56 @@ export async function applyScheduleTemplateWeek({
   timezone: string;
   weekStart: string;
 }): Promise<ScheduleTemplateApplicationResult> {
-  const templateResult = await loadTemplateForApplication({
-    organizationId,
-    supabase,
-    templateId,
-  });
-
-  if (templateResult.error) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: templateResult.error,
-    };
-  }
-
-  const blocksResult = await loadTemplateBlocksForApplication({
-    organizationId,
-    supabase,
-    templateId,
-  });
-
-  if (blocksResult.error) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: blocksResult.error,
-    };
-  }
-
-  if (blocksResult.templateBlocks.length === 0) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: "template-empty",
-    };
-  }
-
-  const coachError = await validateDefaultCoachesForTemplateBlocks({
-    organizationId,
-    supabase,
-    templateBlocks: blocksResult.templateBlocks,
-  });
-
-  if (coachError) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: coachError,
-    };
-  }
-
   const week = resolveWeek(weekStart, timezone);
-  const weeklyTemplateBlocks = getTemplateBlocksForWeek({
-    template: templateResult.template,
-    templateBlocks: blocksResult.templateBlocks,
-    timezone,
-    weekStart: week.weekStart,
+  const { data, error } = await supabase.rpc("apply_schedule_template_week", {
+    target_organization_id: organizationId,
+    target_replace_existing: replaceExisting,
+    target_template_id: templateId,
+    target_week_start: week.weekStart,
   });
 
-  if (weeklyTemplateBlocks.length === 0) {
+  if (error) {
     return {
       insertedBlockCount: 0,
       replacedBlockCount: 0,
-      status: "template-out-of-range",
+      status: getMutationStatus(error.code),
     };
   }
 
-  const existingResult = await loadExistingTemplateBlocksForWeek({
-    organizationId,
-    supabase,
-    weekEnd: week.weekEnd,
-    weekStart: week.weekStart,
-  });
+  const validStatuses: ScheduleTemplateApplicationStatus[] = [
+    "applied",
+    "already-applied",
+    "coach-missing-certification",
+    "coach-unavailable",
+    "invalid-coach",
+    "invalid-template",
+    "save-failed",
+    "template-empty",
+    "template-not-active",
+    "template-out-of-range",
+    "template-week-has-template",
+  ];
 
-  if (existingResult.error) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: existingResult.error,
-    };
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data) ||
+    typeof data.status !== "string" ||
+    !validStatuses.includes(data.status as ScheduleTemplateApplicationStatus) ||
+    typeof data.insertedBlockCount !== "number" ||
+    !Number.isSafeInteger(data.insertedBlockCount) ||
+    data.insertedBlockCount < 0 ||
+    typeof data.replacedBlockCount !== "number" ||
+    !Number.isSafeInteger(data.replacedBlockCount) ||
+    data.replacedBlockCount < 0
+  ) {
+    return { insertedBlockCount: 0, replacedBlockCount: 0, status: "save-failed" };
   }
-
-  const blocksToReplace = existingResult.existingBlocks.filter((block) =>
-    shouldReplaceExistingTemplateBlock({
-      block,
-      template: templateResult.template,
-    }),
-  );
-
-  if (blocksToReplace.length > 0 && !replaceExisting) {
-    return {
-      insertedBlockCount: 0,
-      replacedBlockCount: 0,
-      status: "template-week-has-template",
-    };
-  }
-
-  if (blocksToReplace.length > 0) {
-    const { error: deleteError } = await supabase
-      .from("schedule_blocks")
-      .delete()
-      .eq("organization_id", organizationId)
-      .in(
-        "id",
-        blocksToReplace.map((block) => block.id),
-      );
-
-    if (deleteError) {
-      return {
-        insertedBlockCount: 0,
-        replacedBlockCount: 0,
-        status: getMutationStatus(deleteError.code),
-      };
-    }
-  }
-
-  const insertResult = await insertTemplateBlocksForWeek({
-    existingBlocks: existingResult.existingBlocks.filter(
-      (block) => !blocksToReplace.some((replaced) => replaced.id === block.id),
-    ),
-    organizationId,
-    supabase,
-    template: templateResult.template,
-    templateBlocks: blocksResult.templateBlocks,
-    timezone,
-    weekStart: week.weekStart,
-  });
 
   return {
-    insertedBlockCount: insertResult.insertedBlockCount,
-    replacedBlockCount: blocksToReplace.length,
-    status:
-      insertResult.status === "applied" && blocksToReplace.length > 0
-        ? "applied"
-        : insertResult.status,
+    insertedBlockCount: data.insertedBlockCount,
+    replacedBlockCount: data.replacedBlockCount,
+    status: data.status as ScheduleTemplateApplicationStatus,
   };
 }
 

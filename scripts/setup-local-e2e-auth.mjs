@@ -83,10 +83,6 @@ function redactError(text) {
     .replace(/eyJ[A-Za-z0-9._-]+/g, "<jwt_redacted>");
 }
 
-function commandName(base) {
-  return process.platform === "win32" ? `${base}.cmd` : base;
-}
-
 function ensureLocalTarget() {
   const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
 

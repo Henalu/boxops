@@ -51,7 +51,7 @@ test.describe("coverage absence impact I.16 source guardrails", () => {
     expect(coverageSurfaces).toContain("listOperationalAbsenceScheduleImpacts");
     expect(coverageSurfaces).toContain("isScheduleCoverageRisk");
     expect(coverageSurfaces).toContain("Impacto de ausencia");
-    expect(coverageSurfaces).toContain("Ausencia en revision");
+    expect(coverageSurfaces).toContain("Ausencia en revisión");
     expect(coverageSurfaces).not.toMatch(/\breason_summary\b/);
 
     expect(source).not.toMatch(/\.from\(["']absence_schedule_impacts["']\)/);

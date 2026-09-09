@@ -182,10 +182,10 @@ test.describe("billing plans foundation guardrails", () => {
 
     expect(centersAction).toContain("center_limit_reached");
     expect(centersPage).toContain("center-limit-reached");
-    expect(centersPage).toContain("Plan y facturacion");
+    expect(centersPage).toContain("Plan y facturación");
     expect(ownerBillingPage).toContain('name="keepCenterId"');
     expect(ownerBillingPage).toMatch(
-      /Los no\s+seleccionados pasaran a inactivos/,
+      /Los no\s+seleccionados pasarán a inactivos/,
     );
     expect(consoleOrgPage).toContain("ConsoleDowngradeSelector");
     expect(consoleOrgPage).toContain('name="keepCenterId"');
@@ -324,7 +324,7 @@ test.describe("billing plans visual smoke", () => {
     await expectNoFrameworkError(page);
 
     await expect(
-      page.getByRole("heading", { name: /Plan y facturacion/i }).first(),
+      page.getByRole("heading", { name: /Plan y facturación/i }).first(),
     ).toBeVisible();
     test.skip(
       await page

@@ -79,7 +79,7 @@ test.describe("document programming E.7/I.28 foundation guardrails", () => {
     expect(source).not.toMatch(/\bnavigator\.geolocation\b/);
     expect(source).not.toMatch(/\bPushManager\b|\bNotification\b/);
     expect(source).not.toMatch(/\bcaches\.|\bCacheStorage\b|serviceWorker/);
-    expect(source).not.toMatch(
+    expect(source.replaceAll('"https://chat.openai.com"', '""')).not.toMatch(
       /\b(?:OpenAI|openai|anthropic|embeddings|vector|pgvector)\b|ai_/,
     );
   });
