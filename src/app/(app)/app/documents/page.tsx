@@ -767,18 +767,18 @@ function DocumentRepositoryCard({
         <div className="flex flex-wrap gap-2 md:justify-end">
           {entry.can_preview ? (
             <Button asChild className="flex-1 md:flex-none" size="sm" variant="outline">
-              <Link href={previewHref} target="_blank" rel="noopener noreferrer">
+              <a href={previewHref} target="_blank" rel="noopener noreferrer">
                 <Eye aria-hidden="true" />
                 Preview
-              </Link>
+              </a>
             </Button>
           ) : null}
           {entry.can_download ? (
             <Button asChild className="flex-1 md:flex-none" size="sm" variant="outline">
-              <Link href={downloadHref}>
+              <a href={downloadHref}>
                 <Download aria-hidden="true" />
                 Descargar
-              </Link>
+              </a>
             </Button>
           ) : null}
           {!entry.can_preview && !entry.can_download ? (
@@ -816,6 +816,27 @@ export default async function DocumentsPage({ searchParams }: DocumentsPageProps
           basePath="/app/documents"
           resolution={resolution}
         />
+      </div>
+    );
+  }
+
+  if (resolution.membership.accessMode === "platform_support") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Documentos" />
+        <Alert>
+          <LockKeyhole aria-hidden="true" />
+          <AlertTitle>Documentos no disponibles en modo soporte</AlertTitle>
+          <AlertDescription>
+            La sesión de soporte temporal no permite consultar, subir ni
+            descargar documentos de la organización.
+          </AlertDescription>
+        </Alert>
+        <Button asChild variant="outline">
+          <Link href={getSchedulePath({ organizationId: resolution.organization.id })}>
+            Volver al horario
+          </Link>
+        </Button>
       </div>
     );
   }

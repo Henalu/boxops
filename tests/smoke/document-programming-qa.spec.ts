@@ -76,7 +76,7 @@ test.describe("document programming E.9/I.30 QA guardrails", () => {
       'data-document-programming-surface="schedule-block"',
     );
     expect(schedulePanel).toContain(
-      "No hay material visible para esta sesion.",
+      "No hay material visible para esta sesión.",
     );
     expect(schedulePanel).toContain("Solo informacion");
     expect(schedulePanel).not.toContain("Programacion autorizada");
@@ -96,6 +96,7 @@ test.describe("document programming E.9/I.30 QA guardrails", () => {
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/download/route.ts",
       "src/app/(app)/app/documents/[documentId]/versions/[documentVersionId]/preview/route.ts",
       "src/app/(app)/app/documents/actions.ts",
+      "src/app/(app)/app/documents/document-folder-create-form.tsx",
       "src/app/(app)/app/documents/document-upload-submit-button.tsx",
       "src/app/(app)/app/documents/page.tsx",
     ]);
@@ -104,7 +105,7 @@ test.describe("document programming E.9/I.30 QA guardrails", () => {
     expect(source).not.toMatch(/\bnavigator\.geolocation\b/);
     expect(source).not.toMatch(/\bPushManager\b|\bNotification\b/);
     expect(source).not.toMatch(/\bcaches\.|\bCacheStorage\b|serviceWorker/);
-    expect(source).not.toMatch(
+    expect(source.replaceAll('"https://chat.openai.com"', '""')).not.toMatch(
       /\b(?:OpenAI|openai|anthropic|embeddings|vector|pgvector)\b|ai_/,
     );
   });

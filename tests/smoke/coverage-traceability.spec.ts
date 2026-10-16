@@ -63,7 +63,7 @@ test.describe("coverage traceability I.25 source guardrails", () => {
     expect(helper).toContain('.from("change_requests")');
     expect(helper).toContain('.from("change_request_events")');
     expect(helper).toContain('"list_coverage_trace_audit_events"');
-    expect(helper).toContain("Motivo y datos sensibles no se muestran aqui");
+    expect(helper).toContain("Motivo y datos sensibles no se muestran aquí");
     expect(helper).not.toMatch(/\breason_summary\b/);
 
     expect(permissions).toContain(

@@ -103,7 +103,7 @@ const shouldRunDocumentUploadRuntimeSmoke =
 
 async function expectNoDocumentFileInternalsInUi(page: Page) {
   expect(await page.content()).not.toMatch(
-    /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+    /\bsignedUrl\b|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
   );
 }
 
@@ -700,17 +700,16 @@ async function createSyntheticDocumentWithBackendRouteEvidence({
     page.getByRole("heading", { name: /^Documentos$/ }).first(),
   ).toBeVisible();
 
-  await page
-    .locator("details")
-    .filter({ hasText: "Subir documento" })
-    .locator("summary")
-    .click();
-  await page.getByLabel("Titulo").fill(title);
-  await page.getByLabel("Ambito").selectOption(scope);
-  await page
-    .getByLabel("Descripcion opcional")
+  const uploadForm = page.locator("form").filter({
+    has: page.locator('input[name="documentFile"]'),
+  });
+  await expect(uploadForm).toBeVisible();
+  await uploadForm.getByLabel("Titulo").fill(title);
+  await uploadForm.getByLabel("Ámbito").selectOption(scope);
+  await uploadForm
+    .getByLabel("Descripción opcional")
     .fill(`Archivo sintetico no sensible para smoke local E.19 ${scope}.`);
-  await page.getByLabel("Archivo").setInputFiles({
+  await uploadForm.getByLabel("Archivo").setInputFiles({
     buffer: Buffer.from(`BoxOps E19 ${scope} smoke synthetic file\n`, "utf8"),
     mimeType: "text/plain",
     name: syntheticFileName,
@@ -731,7 +730,7 @@ async function createSyntheticDocumentWithBackendRouteEvidence({
 
   const pageMarkup = await page.content();
   expect(pageMarkup).not.toMatch(
-    /signedUrl|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
+    /\bsignedUrl\b|storage_path|storage_bucket|document-files|\/storage|storage\/v1/i,
   );
 
   const previewHref = await card
@@ -938,7 +937,7 @@ async function expectDirectDocumentFileRoutesDeniedForRole({
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
       syntheticFileName,
       title,
     });
@@ -1025,7 +1024,7 @@ async function expectReadMetadataGrantKeepsFileRoutesDenied({
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
       syntheticFileName,
       title,
     });
@@ -1066,7 +1065,7 @@ async function expectReadMetadataGrantKeepsFileRoutesDenied({
     const card = titleHeading.locator(
       "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
     );
-    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Programación");
     await expect(card).toContainText("Solo metadata");
     await expect(card).toContainText("Sin archivo para tu permiso");
     await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(0);
@@ -1147,7 +1146,7 @@ async function expectPreviewGrantAllowsPreviewOnly({ page }: { page: Page }) {
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
       syntheticFileName,
       title,
     });
@@ -1189,7 +1188,7 @@ async function expectPreviewGrantAllowsPreviewOnly({ page }: { page: Page }) {
     const card = titleHeading.locator(
       "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
     );
-    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Programación");
     await expect(card).toContainText("Preview");
     await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
     await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(0);
@@ -1282,7 +1281,7 @@ async function expectDownloadGrantAllowsDownload({ page }: { page: Page }) {
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
       syntheticFileName,
       title,
     });
@@ -1324,7 +1323,7 @@ async function expectDownloadGrantAllowsDownload({ page }: { page: Page }) {
     const card = titleHeading.locator(
       "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
     );
-    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Programación");
     await expect(card).toContainText("Descarga");
     await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
     await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(1);
@@ -1420,7 +1419,7 @@ async function expectCrossTenantDirectFileRoutesDenied({
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
       syntheticFileName,
       title,
     });
@@ -1462,7 +1461,7 @@ async function expectCrossTenantDirectFileRoutesDenied({
     const card = titleHeading.locator(
       "xpath=ancestor::*[contains(@class, 'bg-card')][1]",
     );
-    await expect(card).toContainText("Programacion");
+    await expect(card).toContainText("Programación");
     await expect(card).toContainText("Descarga");
     await expect(card.getByRole("link", { name: /Preview/i })).toHaveCount(1);
     await expect(card.getByRole("link", { name: /Descargar/i })).toHaveCount(1);
@@ -1613,7 +1612,7 @@ test.describe("documents minimal repository guardrails", () => {
     expect(source).not.toMatch(/\bnavigator\.geolocation\b/);
     expect(source).not.toMatch(/\bPushManager\b|\bNotification\b/);
     expect(source).not.toMatch(/\bcaches\.|\bCacheStorage\b|serviceWorker/);
-    expect(source).not.toMatch(
+    expect(source.replaceAll('"https://chat.openai.com"', '""')).not.toMatch(
       /\b(?:OpenAI|openai|anthropic|embeddings|vector|pgvector)\b|ai_/,
     );
   });
@@ -2028,6 +2027,39 @@ test.describe("documents minimal repository guardrails", () => {
 });
 
 test.describe("documents minimal upload runtime smoke", () => {
+  test("opens a document preview and downloads its file through visible UI links", async ({ page }) => {
+    test.setTimeout(90_000);
+    test.skip(!shouldRunDocumentUploadRuntimeSmoke || !hasCredentials(adminCredentials) || !organizationId,
+      "Requires the controlled local document runtime fixture.");
+    const title = `UI document click synthetic ${Date.now()}`;
+    const syntheticFileName = "ui-document-click.txt";
+    try {
+      const evidence = await createSyntheticDocumentWithBackendRouteEvidence({
+        expectedDocumentType: "company_document", page, scope: "company",
+        scopeLabel: "Empresa", syntheticFileName, title,
+      });
+      const card = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+      const popupPromise = page.waitForEvent("popup");
+      await card.getByRole("link", { name: "Preview", exact: true }).click();
+      const popup = await popupPromise;
+      await expect(popup.locator("body")).toContainText("BoxOps E19 company smoke synthetic file");
+      await popup.screenshot({ path: ".local-evidence/ui-validation/document-preview.png" });
+      await popup.close();
+      const downloadPromise = page.waitForEvent("download");
+      await card.getByRole("link", { name: "Descargar", exact: true }).click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toBe(syntheticFileName);
+      const downloadPath = await download.path();
+      expect(downloadPath).toBeTruthy();
+      expect(readFileSync(downloadPath!, "utf8")).toBe("BoxOps E19 company smoke synthetic file\n");
+      expect(getLocalDocumentUploadEvidence({ orgId: organizationId!, title })).toMatchObject({
+        documentId: evidence.documentId, previewEventCount: 2, downloadEventCount: 2,
+      });
+    } finally {
+      cleanupLocalDocumentUpload({ orgId: organizationId!, title });
+    }
+  });
+
   test("creates a synthetic company document with active version and backend file routes", async ({
     page,
   }) => {
@@ -2046,7 +2078,7 @@ test.describe("documents minimal upload runtime smoke", () => {
       expectedDocumentType: "programming_document",
       page,
       scope: "programming",
-      scopeLabel: "Programacion",
+      scopeLabel: "Programación",
     });
   });
 

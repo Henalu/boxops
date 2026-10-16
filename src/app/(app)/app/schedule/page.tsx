@@ -52,6 +52,12 @@ import {
 } from "@/lib/auth/tenant";
 import { listOperationalAbsenceScheduleImpacts } from "@/lib/absence-requests";
 import {
+  buildBoxWodProgrammingUrl,
+  getConfiguredBoxWodAppUrl,
+  resolveBoxWodActionMode,
+} from "@/lib/boxwod-navigation";
+import { canProgramBoxWod } from "@/lib/boxwod-permissions";
+import {
   listCoverageTraceItems,
   type CoverageTraceItem,
 } from "@/lib/coverage-traceability";
@@ -4221,6 +4227,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     coachContext,
     staffWorkWindowResult,
     operationalEventsResult,
+    boxWodCanProgram,
   ] = await Promise.all([
     getScheduleBlocks({
       organizationId: resolution.organization.id,
@@ -4258,7 +4265,31 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
       rangeStart: eventWindow.rangeStart,
       statuses: ["active"],
     }).catch(() => ({ error: "load-failed", ok: false as const })),
+    isSupportMode
+      ? Promise.resolve(false)
+      : canProgramBoxWod(resolution.organization.id),
   ]);
+  const boxWodAppUrl = getConfiguredBoxWodAppUrl();
+  const boxWodActionMode = resolveBoxWodActionMode({
+    canProgram: boxWodCanProgram,
+    hasConfiguredAppUrl: Boolean(boxWodAppUrl),
+  });
+  const boxWodProgrammingHrefs =
+    boxWodActionMode === "enabled" && boxWodAppUrl
+      ? blocks.flatMap((block) => {
+          const href = buildBoxWodProgrammingUrl({
+            appUrl: boxWodAppUrl,
+            centerId: block.center_id,
+            classTypeId: block.class_type_id,
+            date: block.service_date,
+            organizationId: resolution.organization.id,
+          });
+
+          return href
+            ? ([[block.id, href]] satisfies Array<[string, string]>)
+            : [];
+        })
+      : [];
   const coverageBlocks = dedupeBlocks([...blocks, ...monthBlocks]);
   const assignments = await getScheduleBlockAssignments({
     blockIds: coverageBlocks.map((block) => block.id),
@@ -4660,6 +4691,8 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
             assignments={assignments}
             basePath={scheduleBasePath}
             blocks={blocks}
+            boxWodActionMode={boxWodActionMode}
+            boxWodProgrammingHrefs={boxWodProgrammingHrefs}
             canManageSchedule={canManageSchedule}
             centers={centers}
             classTypes={classTypes}

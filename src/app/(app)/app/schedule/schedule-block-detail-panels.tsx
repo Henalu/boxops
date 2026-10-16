@@ -10,6 +10,7 @@ import {
   CircleOff,
   Download,
   Eye,
+  ExternalLink,
   FileText,
   History,
   Plus,
@@ -48,6 +49,7 @@ import {
   type ScheduleCoverageState,
 } from "@/lib/schedule-blocks";
 import { getRequestsPath } from "@/lib/navigation/app-paths";
+import type { BoxWodActionMode } from "@/lib/boxwod-navigation";
 import { cn } from "@/lib/utils";
 import type { StaffWorkWindowOccurrence } from "@/lib/staff-work-windows";
 import type { CoverageTraceItem } from "@/lib/coverage-traceability";
@@ -120,6 +122,8 @@ type ScheduleBlockDetailPanelsProps = {
   assignments: ScheduleBlockAssignmentRow[];
   basePath: string;
   blocks: ScheduleBlockRow[];
+  boxWodActionMode: BoxWodActionMode;
+  boxWodProgrammingHrefs: Array<[string, string]>;
   canManageSchedule: boolean;
   centers: CenterRow[];
   classTypes: ClassTypeRow[];
@@ -442,6 +446,53 @@ function ScheduleBlockStatusBadge({ status }: { status: string }) {
     >
       {getScheduleBlockStatusLabel(status)}
     </Badge>
+  );
+}
+
+function BoxWodProgrammingAction({
+  href,
+  mode,
+}: {
+  href: string | null;
+  mode: BoxWodActionMode;
+}) {
+  if (mode === "hidden") {
+    return null;
+  }
+
+  const actionClassName = "h-11 min-h-11 px-3 md:h-11 md:min-h-11";
+
+  if (mode === "enabled" && href) {
+    return (
+      <Button
+        asChild
+        className={actionClassName}
+        data-boxwod-programming-action="enabled"
+        size="sm"
+        variant="outline"
+      >
+        <a href={href} rel="noopener noreferrer" target="_blank">
+          Gestionar WOD
+          <ExternalLink aria-hidden="true" />
+          <span className="sr-only">Se abre en BoxWod</span>
+        </a>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      aria-label="Gestionar WOD. BoxWod no está configurado en este entorno."
+      className={actionClassName}
+      data-boxwod-programming-action="disabled"
+      disabled
+      size="sm"
+      title="Configura BOXWOD_APP_URL para activar este acceso."
+      variant="outline"
+    >
+      Gestionar WOD
+      <ExternalLink aria-hidden="true" />
+    </Button>
   );
 }
 
@@ -1685,6 +1736,8 @@ export function ScheduleBlockDetailPanels({
   assignments,
   basePath,
   blocks,
+  boxWodActionMode,
+  boxWodProgrammingHrefs,
   canManageSchedule,
   centers,
   classTypes,
@@ -1736,6 +1789,10 @@ export function ScheduleBlockDetailPanels({
     () => new Map(documentProgrammingByBlock),
     [documentProgrammingByBlock],
   );
+  const boxWodProgrammingHrefByBlockId = React.useMemo(
+    () => new Map(boxWodProgrammingHrefs),
+    [boxWodProgrammingHrefs],
+  );
   const coachDisplaysById = React.useMemo(
     () => new Map(coachDisplays.map((coach) => [coach.id, coach])),
     [coachDisplays],
@@ -1786,11 +1843,17 @@ export function ScheduleBlockDetailPanels({
               {formatTime(selectedBlock.end_time)}
             </p>
           </div>
-          <Button asChild size="icon" variant="ghost">
-            <RouteStateButton aria-label="Cerrar detalle" href={closeHref}>
-              <X aria-hidden="true" />
-            </RouteStateButton>
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <BoxWodProgrammingAction
+              href={boxWodProgrammingHrefByBlockId.get(selectedBlock.id) ?? null}
+              mode={boxWodActionMode}
+            />
+            <Button asChild size="icon" variant="ghost">
+              <RouteStateButton aria-label="Cerrar detalle" href={closeHref}>
+                <X aria-hidden="true" />
+              </RouteStateButton>
+            </Button>
+          </div>
         </div>
 
         <div className="p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">

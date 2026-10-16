@@ -117,9 +117,18 @@ test.describe("staff work windows source guardrails", () => {
     expect(detailPanel).toContain("Nadie previsto en esta franja");
     expect(detailPanel).toContain("Asignado fuera de jornada prevista");
 
-    expect(source).not.toMatch(
-      /\.from\(["']staff_work_windows["']\)[\s\S]{0,160}\.delete\(/,
+    const deletionPattern = /\.from\(["']staff_work_windows["']\)[\s\S]{0,160}\.delete\(/g;
+    expect([...source.matchAll(deletionPattern)]).toHaveLength(1);
+    const deleteAction = actions.slice(actions.indexOf("export async function deleteStaffWorkWindowsBulk"));
+    expect(deleteAction).toMatch(/getOperationalActionContext\(\s*formData,\s*"staff-work-windows"/);
+    expect(deleteAction).toContain("hasStaffWorkWindowDeleteConfirmation(formData)");
+    expect(deleteAction).toContain("staffWorkWindowIds.length > STAFF_WORK_WINDOW_DELETE_LIMIT");
+    expect(deleteAction).toMatch(
+      /\.from\("staff_work_windows"\)\s*\.delete\(\)\s*\.eq\("organization_id", context\.organization\.id\)\s*\.in\("id", staffWorkWindowIds\)/,
     );
+    const deletionMigration = readProjectFile("supabase/migrations/20260608190904_staff_work_window_delete_management.sql");
+    expect(deletionMigration).toContain("FOR DELETE TO authenticated");
+    expect(deletionMigration).toContain("USING (public.has_org_role(organization_id, ARRAY['owner', 'admin', 'manager']))");
     expect(source).not.toMatch(/\bservice_role\b/);
     expect(source).not.toMatch(/\bSTL\b/);
     expect(source).not.toMatch(/\bnavigator\.geolocation\b/);

@@ -248,7 +248,7 @@ test.describe("overtime candidates I.21-I.24 source guardrails", () => {
     expect(timePage).toContain("Posibles excesos de horas");
     expect(timePage).toContain("posible exceso");
     expect(timePage).toContain("por revisar");
-    expect(timePage).toContain("necesite revision");
+    expect(timePage).toContain("necesite revisión");
     expect(timePage).toContain("Listas para aplicar");
     expect(timePage).toContain("Solicitudes pendientes");
     expect(timePage).toContain("overtimeCandidateTerminalStatuses");
