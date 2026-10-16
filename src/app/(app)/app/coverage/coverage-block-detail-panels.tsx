@@ -42,7 +42,7 @@ type ScheduleBlockRow = Pick<
   | "status"
 >;
 
-type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
+type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status" | "timezone">;
 type ClassTypeRow = Pick<Tables<"class_types">, "id" | "name" | "status">;
 
 type AssignmentRow = Pick<
@@ -120,7 +120,7 @@ function formatTime(value: string) {
   return value.slice(0, 5);
 }
 
-function formatTraceDate(value: string | null) {
+function formatTraceDate(value: string | null, timeZone: string) {
   if (!value) {
     return "Impacto actual";
   }
@@ -131,14 +131,15 @@ function formatTraceDate(value: string | null) {
       hour: "2-digit",
       minute: "2-digit",
       month: "short",
+      timeZone,
     }).format(new Date(value));
   } catch {
     return value;
   }
 }
 
-function formatTraceMeta(item: CoverageTraceItem) {
-  const dateLabel = formatTraceDate(item.occurredAt);
+function formatTraceMeta(item: CoverageTraceItem, timeZone: string) {
+  const dateLabel = formatTraceDate(item.occurredAt, timeZone);
 
   if (item.source === "operational_audit_events") {
     return dateLabel === "Impacto actual"
@@ -368,9 +369,11 @@ function AssignmentStatusBadge({ status }: { status: string }) {
 
 function CoverageTraceList({
   loadError,
+  timeZone,
   traceItems,
 }: {
   loadError?: boolean;
+  timeZone: string;
   traceItems: CoverageTraceItem[];
 }) {
   if (!loadError && traceItems.length === 0) {
@@ -408,7 +411,7 @@ function CoverageTraceList({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{item.title}</span>
                 <span className="text-xs opacity-80">
-                  {formatTraceMeta(item)}
+                  {formatTraceMeta(item, timeZone)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-5 opacity-90">{item.detail}</p>
@@ -432,6 +435,7 @@ function CoverageAssignmentPanel({
   coverageTraceLoadError,
   organizationId,
   returnPath,
+  timeZone,
   traceItems,
   weekStart,
 }: {
@@ -446,6 +450,7 @@ function CoverageAssignmentPanel({
   coverageTraceLoadError?: boolean;
   organizationId: string;
   returnPath: string;
+  timeZone: string;
   traceItems: CoverageTraceItem[];
   weekStart: string;
 }) {
@@ -518,6 +523,7 @@ function CoverageAssignmentPanel({
       {canManageSchedule ? (
         <CoverageTraceList
           loadError={coverageTraceLoadError}
+          timeZone={timeZone}
           traceItems={traceItems}
         />
       ) : null}
@@ -836,6 +842,7 @@ export function CoverageBlockDetailPanels({
             coverageTraceLoadError={coverageTraceLoadError}
             organizationId={organizationId}
             returnPath={returnPath}
+            timeZone={center?.timezone ?? "UTC"}
             traceItems={coverageTraceByBlockId.get(selectedBlock.id) ?? []}
             weekStart={weekStart}
           />

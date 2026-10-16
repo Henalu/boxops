@@ -95,7 +95,7 @@ type ScheduleBlockRow = Pick<
   | "status"
 >;
 
-type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
+type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status" | "timezone">;
 type ClassTypeRow = Pick<Tables<"class_types">, "id" | "name" | "status">;
 type AssignmentRow = Pick<
   Tables<"schedule_block_assignments">,
@@ -381,7 +381,7 @@ async function getCoverageData({
         .order("start_time", { ascending: true }),
       supabase
         .from("centers")
-        .select("id, name, status")
+        .select("id, name, status, timezone")
         .eq("organization_id", organizationId)
         .order("status", { ascending: true })
         .order("name", { ascending: true }),
