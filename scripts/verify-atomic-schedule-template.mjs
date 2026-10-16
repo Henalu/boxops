@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const migration = readFileSync(new URL(
-  "../supabase/migrations/20260907081226_atomic_schedule_template_week.sql", import.meta.url,
-), "utf8");
+const migration = [
+  "20260907081226_atomic_schedule_template_week.sql",
+  "20261016065729_avoid_template_connector_deadlock.sql",
+].map((file) => readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8"))
+  .join("\n");
 const verification = readFileSync(new URL(
   "../supabase/snippets/atomic-schedule-template-week-verification.sql", import.meta.url,
 ), "utf8");

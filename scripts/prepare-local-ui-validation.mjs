@@ -32,6 +32,7 @@ for (const role of ["owner", "admin", "manager", "coach", "athlete", "foreign", 
 const q = (value) => `'${String(value).replaceAll("'", "''")}'`;
 const sql = ["BEGIN; SET LOCAL statement_timeout = '30s';"];
 sql.push(readFileSync("supabase/migrations/20260907081226_atomic_schedule_template_week.sql", "utf8"));
+sql.push(readFileSync("supabase/migrations/20261016065729_avoid_template_connector_deadlock.sql", "utf8"));
 for (const actor of Object.values(fixture.roles)) {
   sql.push(`INSERT INTO auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,confirmation_token,recovery_token,email_change_token_new,email_change,email_change_token_current,reauthentication_token,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
     VALUES ('00000000-0000-0000-0000-000000000000',${q(actor.id)},'authenticated','authenticated',${q(actor.email)},extensions.crypt(${q(actor.password)},extensions.gen_salt('bf')),now(),'','','','','','','{"provider":"email","providers":["email"]}','{"boxopsLocalUI":true}',now(),now());

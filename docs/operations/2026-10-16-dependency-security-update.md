@@ -67,3 +67,13 @@ Auditorias e informes de pruebas se guardan en `.local-evidence/dependency-secur
 ## Limites
 
 La validacion corresponde al entorno local y al build actualizado. No acredita una nueva version en Vercel, envio real de correo, sesion HTTPS compartida con BoxWod ni la totalidad de las suites runtime historicas. Los pendientes operativos de produccion siguen separados de esta actualizacion.
+
+## Revision posterior para integrar la PR #2
+
+El usuario autoriza integrar y comprobar produccion. Los cambios anteriores se incorporan a la [PR #2](https://github.com/Henalu/boxops/pull/2), donde se registra el commit publicado, el deployment y la evidencia final de produccion.
+
+La revision independiente reproduce un deadlock entre el bloqueo `FOR UPDATE` de la plantilla en la nueva RPC y el bloqueo de tabla seguido de la comprobacion de clave foranea en el conector. PostgreSQL cancela una operacion sin dejar datos parciales. La migracion aditiva `20261016065729_avoid_template_connector_deadlock.sql` utiliza `FOR NO KEY UPDATE`: conserva la exclusion de ediciones de plantilla y permite la comprobacion de clave foranea del conector. No cambia roles, RLS, validaciones ni el bloqueo por organizacion/semana. La migracion original ya instalada permanece intacta.
+
+La reproduccion local compara ambas variantes en conexiones concurrentes y termina con rollback. El runner SQL y el preparador de fixtures locales cargan tambien la correccion, para que las futuras verificaciones no reinstalen accidentalmente el bloqueo anterior. Referencia: [bloqueos de filas en PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS).
+
+La correccion se aplica al hub con `supabase db push --linked --skip-vault`, despues de comprobar que el dry-run contiene exclusivamente esa migracion. El historial queda en 74/74; se confirma el bloqueo nuevo, SECURITY INVOKER y ejecucion anonima denegada. Las 35 aserciones SQL pasan tanto localmente como contra la funcion remota instalada, con rollback completo y cero organizaciones de prueba residuales.
