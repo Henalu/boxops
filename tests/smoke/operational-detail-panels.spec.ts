@@ -129,4 +129,63 @@ test.describe("operational detail panels route-state smoke", () => {
       triggerSelector: '[data-template-block-edit-trigger="true"]',
     });
   });
+
+  test.describe("direct entry hydration across timezones", () => {
+    test.use({ timezoneId: "America/Los_Angeles" });
+
+    for (const surface of ["schedule", "coverage"] as const) {
+      test(`${surface} trace dates match server HTML after direct entry and reload`, async ({
+        page,
+      }) => {
+        const errors: string[] = [];
+        page.on("pageerror", (error) => errors.push(error.message));
+        page.on("console", (message) => {
+          if (message.type() === "error") errors.push(message.text());
+        });
+
+        await loginAs(page, adminCredentials!);
+        await page.goto(buildProtectedPath(`/app/${surface}`, { view: "week" }));
+        await page.waitForLoadState("networkidle");
+        const triggers = page
+          .locator(`[data-operational-detail-trigger="${surface}-block"]`)
+          .filter({ visible: true });
+        await expect(triggers.first()).toBeVisible();
+        const panelSelector = `[data-operational-detail-panel="${surface}-block"]`;
+        const traceSelector = `${panelSelector} [data-coverage-traceability] li > div > span:last-child`;
+        const traceLabels = page.locator(traceSelector);
+        for (let index = 0; index < await triggers.count(); index += 1) {
+          await triggers.nth(index).click();
+          await expect(page.locator(panelSelector)).toBeVisible();
+          if ((await traceLabels.allTextContents()).some((label) => /\d{2}:\d{2}/.test(label))) {
+            break;
+          }
+          await page.getByLabel("Cerrar detalle").last().click();
+          await expect(page.locator(panelSelector)).toHaveCount(0);
+        }
+        await expect(traceLabels.first()).toBeVisible();
+        const detailUrl = page.url();
+        expect(new URL(detailUrl).searchParams.has("block_id")).toBe(true);
+
+        const serverResponse = await page.request.get(detailUrl);
+        expect(serverResponse.ok()).toBe(true);
+        const serverLabels = await page.evaluate(
+          ({ html, selector }) =>
+            Array.from(
+              new DOMParser().parseFromString(html, "text/html").querySelectorAll(selector),
+              (element) => element.textContent?.trim() ?? "",
+            ),
+          { html: await serverResponse.text(), selector: traceSelector },
+        );
+        expect(serverLabels.some((label) => /\d{2}:\d{2}/.test(label))).toBe(true);
+
+        await page.goto(detailUrl, { waitUntil: "networkidle" });
+        await expect(traceLabels).toHaveText(serverLabels);
+        await page.reload({ waitUntil: "networkidle" });
+        await expect(traceLabels).toHaveText(serverLabels);
+        await page.getByLabel("Cerrar detalle").last().click();
+        await expect(page.locator(panelSelector)).toHaveCount(0);
+        expect(errors).toEqual([]);
+      });
+    }
+  });
 });

@@ -73,7 +73,7 @@ type ScheduleBlockRow = Pick<
   | "updated_at"
 >;
 
-type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status">;
+type CenterRow = Pick<Tables<"centers">, "id" | "name" | "status" | "timezone">;
 
 type ClassTypeRow = Pick<
   Tables<"class_types">,
@@ -183,7 +183,7 @@ function formatTime(value: string) {
   return formatTimeForInput(value) || value;
 }
 
-function formatTraceDate(value: string | null) {
+function formatTraceDate(value: string | null, timeZone: string) {
   if (!value) {
     return "Impacto actual";
   }
@@ -194,14 +194,15 @@ function formatTraceDate(value: string | null) {
       hour: "2-digit",
       minute: "2-digit",
       month: "short",
+      timeZone,
     }).format(new Date(value));
   } catch {
     return value;
   }
 }
 
-function formatTraceMeta(item: CoverageTraceItem) {
-  const dateLabel = formatTraceDate(item.occurredAt);
+function formatTraceMeta(item: CoverageTraceItem, timeZone: string) {
+  const dateLabel = formatTraceDate(item.occurredAt, timeZone);
 
   if (item.source === "operational_audit_events") {
     return dateLabel === "Impacto actual"
@@ -1117,9 +1118,11 @@ function DocumentProgrammingPanel({
 
 function CoverageTraceList({
   loadError,
+  timeZone,
   traceItems,
 }: {
   loadError?: boolean;
+  timeZone: string;
   traceItems: CoverageTraceItem[];
 }) {
   if (!loadError && traceItems.length === 0) {
@@ -1157,7 +1160,7 @@ function CoverageTraceList({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{item.title}</span>
                 <span className="text-xs opacity-80">
-                  {formatTraceMeta(item)}
+                  {formatTraceMeta(item, timeZone)}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-5 opacity-90">{item.detail}</p>
@@ -1282,6 +1285,7 @@ function ScheduleAssignmentPanel({
   organizationId,
   returnPath,
   showActiveAssignments = true,
+  timeZone,
   traceItems,
   view,
   weekStart,
@@ -1299,6 +1303,7 @@ function ScheduleAssignmentPanel({
   organizationId?: string;
   returnPath?: string;
   showActiveAssignments?: boolean;
+  timeZone: string;
   traceItems?: CoverageTraceItem[];
   view?: ScheduleView;
   weekStart?: string;
@@ -1362,6 +1367,7 @@ function ScheduleAssignmentPanel({
       {canManageSchedule ? (
         <CoverageTraceList
           loadError={coverageTraceLoadError}
+          timeZone={timeZone}
           traceItems={traceItems ?? []}
         />
       ) : null}
@@ -1582,6 +1588,7 @@ function ScheduleBlockReadOnlyCard({
           coachDisplaysById={coachDisplaysById}
           coverage={coverage}
           organizationId={organizationId}
+          timeZone={center?.timezone ?? "UTC"}
         />
       </CardContent>
     </Card>
@@ -1722,6 +1729,9 @@ function ScheduleBlockAdminCard({
           organizationId={organizationId}
           returnPath={returnPath}
           showActiveAssignments={false}
+          timeZone={
+            centers.find((center) => center.id === block.center_id)?.timezone ?? "UTC"
+          }
           traceItems={traceItems}
           view={view}
           weekStart={weekStart}
